@@ -41,9 +41,9 @@ const (
 var (
 	kubeReleaseBucketURL  = "https://dl.k8s.io"
 	kubeCIBucketURL       = "https://storage.googleapis.com/k8s-release-dev"
-	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
-	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?)\z`)
-	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci)/)?([-\w_\.+]+)$`)
+	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)([-\w.+]*)?$`)
+	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9](\d)?)?)?)\z`)
+	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci)/)?([-\w.+]+)$`)
 )
 
 // KubernetesReleaseVersion is helper function that can fetch
@@ -135,7 +135,7 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 // Current usage is for CI images where all of symbols except '+' are valid,
 // but function is for generic usage where input can't be always pre-validated.
 func KubernetesVersionToImageTag(version string) string {
-	allowed := regexp.MustCompile(`[^-a-zA-Z0-9_\.]`)
+	allowed := regexp.MustCompile(`[^-\w.]`)
 	return allowed.ReplaceAllString(version, "_")
 }
 

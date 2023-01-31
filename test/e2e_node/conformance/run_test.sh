@@ -201,7 +201,6 @@ start_kubelet --kubeconfig "${KUBELET_KUBECONFIG}" \
   --system-cgroups=/system \
   --cgroup-root=/ \
   --v=$log_level \
-  --logtostderr
 
 wait_kubelet
 

@@ -11,7 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build linux,appengine !linux
+//go:build (linux && appengine) || (!linux && !darwin)
+// +build linux,appengine !linux,!darwin
 
 package util
 

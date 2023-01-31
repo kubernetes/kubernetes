@@ -30,9 +30,10 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics"
-	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/metrics"
 )
 
 // Validator parallels the structure of schema.Structural and includes the compiled CEL programs
@@ -74,7 +75,7 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
 // returns the Validator if any x-kubernetes-validations exist in the schema, or nil if no x-kubernetes-validations
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
-func validator(s *schema.Structural, isResourceRoot bool, declType *model.DeclType, perCallLimit uint64) *Validator {
+func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
 	compiledRules, err := Compile(s, declType, perCallLimit)
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
@@ -85,8 +86,8 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *model.DeclTy
 		propertiesValidators = make(map[string]Validator, len(s.Properties))
 		for k, p := range s.Properties {
 			prop := p
-			var fieldType *model.DeclType
-			if escapedPropName, ok := model.Escape(k); ok {
+			var fieldType *cel.DeclType
+			if escapedPropName, ok := cel.Escape(k); ok {
 				if f, ok := declType.Fields[escapedPropName]; ok {
 					fieldType = f.Type
 				} else {
@@ -138,7 +139,9 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *model.DeclTy
 // context is passed for supporting context cancellation during cel validation
 func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	t := time.Now()
-	defer metrics.Metrics.ObserveEvaluation(time.Since(t))
+	defer func() {
+		metrics.Metrics.ObserveEvaluation(time.Since(t))
+	}()
 	remainingBudget = costBudget
 	if s == nil || obj == nil {
 		return nil, remainingBudget

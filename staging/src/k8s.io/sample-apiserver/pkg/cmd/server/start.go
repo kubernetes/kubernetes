@@ -51,6 +51,8 @@ type WardleServerOptions struct {
 	SharedInformerFactory informers.SharedInformerFactory
 	StdOut                io.Writer
 	StdErr                io.Writer
+
+	AlternateDNS []string
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions
@@ -117,7 +119,7 @@ func (o *WardleServerOptions) Complete() error {
 // Config returns config for the api server given WardleServerOptions
 func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", o.AlternateDNS, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 

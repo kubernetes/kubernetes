@@ -39,9 +39,9 @@ import (
 	"k8s.io/mount-utils"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -99,6 +99,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -144,7 +145,7 @@ various mechanisms (primarily through the apiserver) and ensures that the contai
 described in those PodSpecs are running and healthy. The kubelet doesn't manage
 containers which were not created by Kubernetes.
 
-Other than from an PodSpec from the apiserver, there are three ways that a container
+Other than from an PodSpec from the apiserver, there are two ways that a container
 manifest can be provided to the Kubelet.
 
 File: Path passed as a flag on the command line. Files under this path will be monitored
@@ -152,10 +153,7 @@ periodically for updates. The monitoring period is 20s by default and is configu
 via a flag.
 
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
-is checked every 20 seconds (also configurable with a flag).
-
-HTTP server: The kubelet can also listen for HTTP and respond to a simple API
-(underspec'd currently) to submit a new manifest.`,
+is checked every 20 seconds (also configurable with a flag).`,
 		// The Kubelet has special flag parsing requirements to enforce flag precedence rules,
 		// so we do all our parsing manually in Run, below.
 		// DisableFlagParsing=true provides the full set of flags passed to the kubelet in the
@@ -235,13 +233,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.InfoS("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
-			// The features.DynamicKubeletConfig is locked to false,
-			// feature gate is not locked using the LockedToDefault flag
-			// to make sure node authorizer can keep working with the older nodes
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-				return fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", features.DynamicKubeletConfig, true, false)
-			}
-
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
 				KubeletFlags:         *kubeletFlags,
@@ -269,6 +260,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// set up signal context for kubelet shutdown
 			ctx := genericapiserver.SetupSignalContext()
 
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			// run the kubelet
 			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
 		},
@@ -356,6 +348,13 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 	kc, err := loader.Load()
 	if err != nil {
 		return nil, fmt.Errorf(errFmt, name, err)
+	}
+
+	// EvictionHard may be nil if it was not set in kubelet's config file.
+	// EvictionHard can have OS-specific fields, which is why there's no default value for it.
+	// See: https://github.com/kubernetes/kubernetes/pull/110263
+	if kc.EvictionHard == nil {
+		kc.EvictionHard = eviction.DefaultEvictionHard
 	}
 	return kc, err
 }
@@ -703,15 +702,21 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return err
 		}
 
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
 		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
-				cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
-			} else if s.CPUManagerPolicyOptions != nil {
-				return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
-					s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
+		} else if s.CPUManagerPolicyOptions != nil {
+			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
+				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
+		}
+
+		var topologyManagerPolicyOptions map[string]string
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+			} else if s.TopologyManagerPolicyOptions != nil {
+				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
+					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
 			}
 		}
 
@@ -737,25 +742,31 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
-				QOSReserved:                             *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
-				ExperimentalCPUManagerPolicyOptions:     cpuManagerPolicyOptions,
-				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
-				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
-				ExperimentalPodPidsLimit:                s.PodPidsLimit,
-				EnforceCPULimits:                        s.CPUCFSQuota,
-				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:       s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
+				QOSReserved:                              *experimentalQOSReserved,
+				CPUManagerPolicy:                         s.CPUManagerPolicy,
+				CPUManagerPolicyOptions:                  cpuManagerPolicyOptions,
+				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
+				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
+				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
+				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				EnforceCPULimits:                         s.CPUCFSQuota,
+				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
+				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
+				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
-			devicePluginEnabled,
-			kubeDeps.Recorder)
+			kubeDeps.Recorder,
+			kubeDeps.KubeClient,
+		)
 
 		if err != nil {
 			return err
 		}
+	}
+
+	if kubeDeps.PodStartupLatencyTracker == nil {
+		kubeDeps.PodStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
 	}
 
 	// TODO(vmarmol): Do this through container config.
@@ -1281,7 +1292,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 			semconv.HostNameKey.String(hostname),
 		),
 	}
-	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlpgrpc.Option{}, resourceOpts)
+	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlptracegrpc.Option{}, resourceOpts)
 	if err != nil {
 		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
 	}

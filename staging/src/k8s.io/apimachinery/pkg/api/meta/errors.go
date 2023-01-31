@@ -17,6 +17,7 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,11 @@ func (e *AmbiguousResourceError) Error() string {
 	return fmt.Sprintf("%v matches multiple resources or kinds", e.PartialResource)
 }
 
+func (*AmbiguousResourceError) Is(target error) bool {
+	_, ok := target.(*AmbiguousResourceError)
+	return ok
+}
+
 // AmbiguousKindError is returned if the RESTMapper finds multiple matches for a kind
 type AmbiguousKindError struct {
 	PartialKind schema.GroupVersionKind
@@ -63,16 +69,16 @@ func (e *AmbiguousKindError) Error() string {
 	return fmt.Sprintf("%v matches multiple resources or kinds", e.PartialKind)
 }
 
+func (*AmbiguousKindError) Is(target error) bool {
+	_, ok := target.(*AmbiguousKindError)
+	return ok
+}
+
 func IsAmbiguousError(err error) bool {
 	if err == nil {
 		return false
 	}
-	switch err.(type) {
-	case *AmbiguousResourceError, *AmbiguousKindError:
-		return true
-	default:
-		return false
-	}
+	return errors.Is(err, &AmbiguousResourceError{}) || errors.Is(err, &AmbiguousKindError{})
 }
 
 // NoResourceMatchError is returned if the RESTMapper can't find any match for a resource
@@ -82,6 +88,11 @@ type NoResourceMatchError struct {
 
 func (e *NoResourceMatchError) Error() string {
 	return fmt.Sprintf("no matches for %v", e.PartialResource)
+}
+
+func (*NoResourceMatchError) Is(target error) bool {
+	_, ok := target.(*NoResourceMatchError)
+	return ok
 }
 
 // NoKindMatchError is returned if the RESTMapper can't find any match for a kind
@@ -108,14 +119,14 @@ func (e *NoKindMatchError) Error() string {
 	}
 }
 
+func (*NoKindMatchError) Is(target error) bool {
+	_, ok := target.(*NoKindMatchError)
+	return ok
+}
+
 func IsNoMatchError(err error) bool {
 	if err == nil {
 		return false
 	}
-	switch err.(type) {
-	case *NoResourceMatchError, *NoKindMatchError:
-		return true
-	default:
-		return false
-	}
+	return errors.Is(err, &NoResourceMatchError{}) || errors.Is(err, &NoKindMatchError{})
 }

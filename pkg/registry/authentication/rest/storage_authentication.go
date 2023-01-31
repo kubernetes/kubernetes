@@ -18,13 +18,18 @@ package rest
 
 import (
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/registry/authentication/selfsubjectreview"
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 
@@ -43,6 +48,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
+	if storageMap := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1alpha1.SchemeGroupVersion.Version] = storageMap
+	}
+
 	if storageMap := p.v1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = storageMap
 	}
@@ -59,6 +68,21 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = tokenReviewStorage
 	}
 
+	return storage
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+
+	// selfsubjectreviews
+	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
+			selfSRStorage := selfsubjectreview.NewREST()
+			storage[resource] = selfSRStorage
+		} else {
+			klog.Warningln("SelfSubjectReview API is disabled because corresponding feature gate APISelfSubjectReview is not enabled.")
+		}
+	}
 	return storage
 }
 

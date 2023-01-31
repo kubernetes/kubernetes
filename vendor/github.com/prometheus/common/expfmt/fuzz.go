@@ -12,6 +12,7 @@
 // limitations under the License.
 
 // Build only when actually fuzzing
+//go:build gofuzz
 // +build gofuzz
 
 package expfmt

@@ -442,14 +442,14 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		incomingPod                *v1.Pod
-		existingPods               []*v1.Pod
-		fits                       bool
-		nodes                      []*v1.Node
-		want                       []string // nodes expected to schedule onto
-		enableNodeInclustionPolicy bool
-		enableMatchLabelKeys       bool
+		name                      string
+		incomingPod               *v1.Pod
+		existingPods              []*v1.Pod
+		fits                      bool
+		nodes                     []*v1.Node
+		want                      []string // nodes expected to schedule onto
+		enableNodeInclusionPolicy bool
+		enableMatchLabelKeys      bool
 	}{
 		// note: naming starts at index 0
 		// the symbol ~X~ means that node is infeasible
@@ -512,8 +512,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                       []string{"node-3"},
-			enableNodeInclustionPolicy: true,
+			want:                      []string{"node-3"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as ~3~/~1~
@@ -538,8 +538,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                       []string{"node-3"},
-			enableNodeInclustionPolicy: true,
+			want:                      []string{"node-3"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, node-1 is the preferred fit",
@@ -598,7 +598,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclustionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)

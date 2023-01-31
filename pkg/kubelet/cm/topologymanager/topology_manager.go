@@ -130,15 +130,20 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string) (Manager, error) {
+func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName)
 
-	var numaNodes []int
-	for _, node := range topology {
-		numaNodes = append(numaNodes, node.Id)
+	opts, err := NewPolicyOptions(topologyPolicyOptions)
+	if err != nil {
+		return nil, err
 	}
 
-	if topologyPolicyName != PolicyNone && len(numaNodes) > maxAllowableNUMANodes {
+	numaInfo, err := NewNUMAInfo(topology, opts)
+	if err != nil {
+		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
+	}
+
+	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > maxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
@@ -149,13 +154,13 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		policy = NewNonePolicy()
 
 	case PolicyBestEffort:
-		policy = NewBestEffortPolicy(numaNodes)
+		policy = NewBestEffortPolicy(numaInfo, opts)
 
 	case PolicyRestricted:
-		policy = NewRestrictedPolicy(numaNodes)
+		policy = NewRestrictedPolicy(numaInfo, opts)
 
 	case PolicySingleNumaNode:
-		policy = NewSingleNumaNodePolicy(numaNodes)
+		policy = NewSingleNumaNodePolicy(numaInfo, opts)
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)

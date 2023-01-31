@@ -342,7 +342,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
-		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter, nil))
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)

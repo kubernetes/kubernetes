@@ -35,6 +35,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,11 +55,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	unionauthz "k8s.io/apiserver/pkg/authorization/union"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -69,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
@@ -81,13 +79,6 @@ const (
 	BobToken     string = "xyz987" // username: bob.  Present in token file.
 	UnknownToken string = "qwerty" // Not present in token file.
 )
-
-func getTestTokenAuth() authenticator.Request {
-	tokenAuthenticator := tokentest.New()
-	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
-	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	return group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
-}
 
 func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (authenticator.Request, error) {
 	kubecfgFile, err := os.CreateTemp("", "webhook-kubecfg")
@@ -464,9 +455,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 	})
 	defer tearDownFn()
@@ -570,10 +559,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+			opts.Authorization.Modes = []string{"AlwaysDeny"}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 	})
 	defer tearDownFn()
@@ -609,17 +596,6 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	}
 }
 
-// Inject into control plane an authorizer that uses user info.
-// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
-type allowAliceAuthorizer struct{}
-
-func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
-		return authorizer.DecisionAllow, "", nil
-	}
-	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
-}
-
 // TestAliceNotForbiddenOrUnauthorized tests a user who is known to
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
@@ -627,10 +603,9 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.Modes = []string{"ABAC"}
+			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -704,10 +679,9 @@ func TestBobIsForbidden(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.Modes = []string{"ABAC"}
+			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -754,10 +728,9 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.Modes = []string{"ABAC"}
+			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -807,9 +780,12 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() != "impersonate" {
 		return authorizer.DecisionAllow, "", nil
 	}
-	// bob can impersonate anyone, but that it
+	// bob can impersonate anyone, but that's it
 	if a.GetUser() != nil && a.GetUser().GetName() == "bob" && a.GetVerb() == "impersonate" {
 		return authorizer.DecisionAllow, "", nil
+	}
+	if a.GetUser() != nil && a.GetUser().GetName() == "bob" && a.GetVerb() != "impersonate" {
+		return authorizer.DecisionDeny, "", nil
 	}
 	// service accounts can do everything
 	if a.GetUser() != nil && strings.HasPrefix(a.GetUser().GetName(), serviceaccount.ServiceAccountUsernamePrefix) {
@@ -824,10 +800,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = impersonateAuthorizer{}
+			// Prepend an impersonation authorizer with specific opinions about alice and bob
+			config.GenericConfig.Authorization.Authorizer = unionauthz.New(impersonateAuthorizer{}, config.GenericConfig.Authorization.Authorizer)
 		},
 	})
 	defer tearDownFn()
@@ -860,7 +837,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
-				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
+				t.Errorf("Expected status Forbidden, but got %s", resp.Status)
 			}
 		}()
 	}
@@ -1101,23 +1078,13 @@ func csrPEM(t *testing.T) []byte {
 	return req
 }
 
-func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {
-	f, err := os.CreateTemp("", "auth_test")
-	if err != nil {
-		t.Fatalf("unexpected error creating policyfile: %v", err)
-	}
-	f.Close()
-	defer os.Remove(f.Name())
-
-	if err := os.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+func newABACFileWithContents(t *testing.T, contents string) string {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "auth_test")
+	if err := os.WriteFile(file, []byte(contents), 0700); err != nil {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
-
-	pl, err := abac.NewFromFile(f.Name())
-	if err != nil {
-		t.Fatalf("unexpected error creating authorizer from policyfile: %v", err)
-	}
-	return pl
+	return file
 }
 
 type trackingAuthorizer struct {
@@ -1137,10 +1104,10 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = trackingAuthorizer
+			config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, trackingAuthorizer)
 		},
 	})
 	defer tearDownFn()
@@ -1203,18 +1170,13 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
-	// This file has alice and bob in it.
-	a := newAuthorizerWithContents(t, `{"namespace": "auth-namespace"}
-`)
-
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = a
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"namespace": "auth-namespace"}`)
+			opts.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1309,18 +1271,13 @@ func TestNamespaceAuthorization(t *testing.T) {
 // TestKindAuthorization tests that authorization can be controlled
 // by namespace.
 func TestKindAuthorization(t *testing.T) {
-	// This file has alice and bob in it.
-	a := newAuthorizerWithContents(t, `{"resource": "services"}
-`)
-
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = a
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"resource": "services"}`)
+			opts.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1397,17 +1354,13 @@ func TestKindAuthorization(t *testing.T) {
 // TestReadOnlyAuthorization tests that authorization can be controlled
 // by namespace.
 func TestReadOnlyAuthorization(t *testing.T) {
-	// This file has alice and bob in it.
-	a := newAuthorizerWithContents(t, `{"readonly": true}`)
-
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-			config.GenericConfig.Authorization.Authorizer = a
+			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"readonly": true}`)
+			opts.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1484,12 +1437,13 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.Authorization.Modes = []string{"ABAC"}
+			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 			// Disable checking API audiences that is set by testserver by default.
 			config.GenericConfig.Authentication.APIAudiences = nil
-			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
 		},
 	})
 	defer tearDownFn()

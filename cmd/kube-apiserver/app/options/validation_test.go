@@ -18,9 +18,11 @@ package options
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	netutils "k8s.io/utils/net"
 )
 
@@ -246,6 +248,55 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 
 			if err != nil && tc.expectErrors && err.Error() != tc.expectedErrorMessage {
 				t.Errorf("Expected error message: \"%s\"\nGot: \"%s\"", tc.expectedErrorMessage, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidateAPIPriorityAndFairness(t *testing.T) {
+	const conflict = "conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true"
+	tests := []struct {
+		runtimeConfig    string
+		errShouldContain string
+	}{
+		{
+			runtimeConfig:    "api/all=false",
+			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "api/beta=false",
+			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta1=false",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta2=false",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=false",
+			errShouldContain: conflict,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.runtimeConfig, func(t *testing.T) {
+			options := &ServerRunOptions{
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{
+					EnablePriorityAndFairness: true,
+				},
+				APIEnablement: genericoptions.NewAPIEnablementOptions(),
+			}
+			options.APIEnablement.RuntimeConfig.Set(test.runtimeConfig)
+
+			var errMessageGot string
+			if errs := validateAPIPriorityAndFairness(options); len(errs) > 0 {
+				errMessageGot = errs[0].Error()
+			}
+			if !strings.Contains(errMessageGot, test.errShouldContain) {
+				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
 			}
 		})
 	}

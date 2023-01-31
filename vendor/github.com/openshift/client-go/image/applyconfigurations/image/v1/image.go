@@ -26,6 +26,7 @@ type ImageApplyConfiguration struct {
 	DockerImageSignatures            [][]byte                           `json:"dockerImageSignatures,omitempty"`
 	DockerImageManifestMediaType     *string                            `json:"dockerImageManifestMediaType,omitempty"`
 	DockerImageConfig                *string                            `json:"dockerImageConfig,omitempty"`
+	DockerImageManifests             []ImageManifestApplyConfiguration  `json:"dockerImageManifests,omitempty"`
 }
 
 // Image constructs an declarative configuration of the Image type for use with
@@ -312,5 +313,18 @@ func (b *ImageApplyConfiguration) WithDockerImageManifestMediaType(value string)
 // If called multiple times, the DockerImageConfig field is set to the value of the last call.
 func (b *ImageApplyConfiguration) WithDockerImageConfig(value string) *ImageApplyConfiguration {
 	b.DockerImageConfig = &value
+	return b
+}
+
+// WithDockerImageManifests adds the given value to the DockerImageManifests field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the DockerImageManifests field.
+func (b *ImageApplyConfiguration) WithDockerImageManifests(values ...*ImageManifestApplyConfiguration) *ImageApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithDockerImageManifests")
+		}
+		b.DockerImageManifests = append(b.DockerImageManifests, *values[i])
+	}
 	return b
 }

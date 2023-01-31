@@ -3,30 +3,31 @@
 // Package sso provides the client and types for making API
 // requests to AWS Single Sign-On.
 //
-// AWS Single Sign-On Portal is a web service that makes it easy for you to
-// assign user access to AWS SSO resources such as the user portal. Users can
-// get AWS account applications and roles assigned to them and get federated
-// into the application.
+// AWS IAM Identity Center (successor to AWS Single Sign-On) Portal is a web
+// service that makes it easy for you to assign user access to IAM Identity
+// Center resources such as the AWS access portal. Users can get AWS account
+// applications and roles assigned to them and get federated into the application.
 //
-// For general information about AWS SSO, see What is AWS Single Sign-On? (https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html)
-// in the AWS SSO User Guide.
+// Although AWS Single Sign-On was renamed, the sso and identitystore API namespaces
+// will continue to retain their original name for backward compatibility purposes.
+// For more information, see IAM Identity Center rename (https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html#renamed).
 //
-// This API reference guide describes the AWS SSO Portal operations that you
-// can call programatically and includes detailed information on data types
-// and errors.
+// This reference guide describes the IAM Identity Center Portal operations
+// that you can call programatically and includes detailed information on data
+// types and errors.
 //
 // AWS provides SDKs that consist of libraries and sample code for various programming
 // languages and platforms, such as Java, Ruby, .Net, iOS, or Android. The SDKs
-// provide a convenient way to create programmatic access to AWS SSO and other
-// AWS services. For more information about the AWS SDKs, including how to download
-// and install them, see Tools for Amazon Web Services (http://aws.amazon.com/tools/).
+// provide a convenient way to create programmatic access to IAM Identity Center
+// and other AWS services. For more information about the AWS SDKs, including
+// how to download and install them, see Tools for Amazon Web Services (http://aws.amazon.com/tools/).
 //
 // See https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10 for more information on this service.
 //
 // See sso package documentation for more information.
 // https://docs.aws.amazon.com/sdk-for-go/api/service/sso/
 //
-// Using the Client
+// # Using the Client
 //
 // To contact AWS Single Sign-On with the SDK use the New function to create
 // a new service client. With that client you can make API requests to the service.

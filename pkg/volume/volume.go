@@ -189,7 +189,7 @@ type CustomBlockVolumeMapper interface {
 	// MapPodDevice maps the block device to a path and return the path.
 	// Unique device path across kubelet node reboot is required to avoid
 	// unexpected block volume destruction.
-	// If empty string is returned, the path retuned by attacher.Attach() and
+	// If empty string is returned, the path returned by attacher.Attach() and
 	// attacher.WaitForAttach() will be used.
 	MapPodDevice() (publishPath string, err error)
 
@@ -286,7 +286,7 @@ type DeviceMounter interface {
 
 type BulkVolumeVerifier interface {
 	// BulkVerifyVolumes checks whether the list of volumes still attached to the
-	// the clusters in the node. It returns a map which maps from the volume spec to the checking result.
+	// clusters in the node. It returns a map which maps from the volume spec to the checking result.
 	// If an error occurs during check - error should be returned and volume on nodes
 	// should be assumed as still attached.
 	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)

@@ -16,12 +16,10 @@ import (
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps"
 	batchapi "k8s.io/kubernetes/pkg/apis/batch"
 	coreapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	podsecapi "k8s.io/pod-security-admission/api"
 )
 
@@ -52,7 +50,6 @@ var (
 )
 
 var _ = initializer.WantsExternalKubeInformerFactory(&csiInlineVolSec{})
-var _ = initializer.WantsFeatures(&csiInlineVolSec{})
 var _ = admission.ValidationInterface(&csiInlineVolSec{})
 
 func Register(plugins *admission.Plugins) {
@@ -68,14 +65,14 @@ func Register(plugins *admission.Plugins) {
 // CSI driver as an inline volume.
 type csiInlineVolSec struct {
 	*admission.Handler
-	enabled               bool
-	inspectedFeatureGates bool
-	defaultPolicy         podsecapi.Policy
-	nsLister              corev1listers.NamespaceLister
-	nsListerSynced        func() bool
-	csiDriverLister       storagev1listers.CSIDriverLister
-	csiDriverListSynced   func() bool
-	podSpecExtractor      PodSpecExtractor
+	//enabled               bool
+	//inspectedFeatureGates bool
+	defaultPolicy       podsecapi.Policy
+	nsLister            corev1listers.NamespaceLister
+	nsListerSynced      func() bool
+	csiDriverLister     storagev1listers.CSIDriverLister
+	csiDriverListSynced func() bool
+	podSpecExtractor    PodSpecExtractor
 }
 
 // SetExternalKubeInformerFactory registers an informer
@@ -106,15 +103,7 @@ func (c *csiInlineVolSec) SetExternalKubeInformerFactory(kubeInformers informers
 	}
 }
 
-func (c *csiInlineVolSec) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	c.enabled = featureGates.Enabled(features.CSIInlineVolumeAdmission)
-	c.inspectedFeatureGates = true
-}
-
 func (c *csiInlineVolSec) ValidateInitialization() error {
-	if !c.inspectedFeatureGates {
-		return fmt.Errorf("%s did not see feature gates", PluginName)
-	}
 	if c.nsLister == nil {
 		return fmt.Errorf("%s plugin needs a namespace lister", PluginName)
 	}
@@ -138,10 +127,6 @@ func (c *csiInlineVolSec) PolicyToEvaluate(labels map[string]string) (podsecapi.
 }
 
 func (c *csiInlineVolSec) Validate(ctx context.Context, attrs admission.Attributes, o admission.ObjectInterfaces) error {
-	// Only validate if feature gate is enabled
-	if !c.enabled {
-		return nil
-	}
 	// Only validate applicable resources
 	gr := attrs.GetResource().GroupResource()
 	if !podSpecResources[gr] {

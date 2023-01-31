@@ -124,7 +124,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return printTemplate(&rsForRevision.Spec.Template)
 	}
 	if deployment.Spec.Paused {
-		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", name)
+		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume' and try again")
 	}
 
 	// Skip if the revision already matches current Deployment

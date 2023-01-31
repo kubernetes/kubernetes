@@ -51,7 +51,7 @@ const (
 // always get scheduled.  If we run other tests in parallel, this may not
 // happen.  In the future, running in parallel may work if we have an eviction
 // model which lets the DS controller kick out other pods to make room.
-// See http://issues.k8s.io/21767 for more details
+// See https://issues.k8s.io/21767 for more details
 var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 	var f *framework.Framework
 

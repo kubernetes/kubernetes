@@ -118,6 +118,53 @@ func (mr *MockPodDeletionSafetyProviderMockRecorder) PodResourcesAreReclaimed(po
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodResourcesAreReclaimed", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodResourcesAreReclaimed), pod, status)
 }
 
+// MockPodStartupLatencyStateHelper is a mock of PodStartupLatencyStateHelper interface.
+type MockPodStartupLatencyStateHelper struct {
+	ctrl     *gomock.Controller
+	recorder *MockPodStartupLatencyStateHelperMockRecorder
+}
+
+// MockPodStartupLatencyStateHelperMockRecorder is the mock recorder for MockPodStartupLatencyStateHelper.
+type MockPodStartupLatencyStateHelperMockRecorder struct {
+	mock *MockPodStartupLatencyStateHelper
+}
+
+// NewMockPodStartupLatencyStateHelper creates a new mock instance.
+func NewMockPodStartupLatencyStateHelper(ctrl *gomock.Controller) *MockPodStartupLatencyStateHelper {
+	mock := &MockPodStartupLatencyStateHelper{ctrl: ctrl}
+	mock.recorder = &MockPodStartupLatencyStateHelperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPodStartupLatencyStateHelper) EXPECT() *MockPodStartupLatencyStateHelperMockRecorder {
+	return m.recorder
+}
+
+// DeletePodStartupState mocks base method.
+func (m *MockPodStartupLatencyStateHelper) DeletePodStartupState(podUID types.UID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeletePodStartupState", podUID)
+}
+
+// DeletePodStartupState indicates an expected call of DeletePodStartupState.
+func (mr *MockPodStartupLatencyStateHelperMockRecorder) DeletePodStartupState(podUID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePodStartupState", reflect.TypeOf((*MockPodStartupLatencyStateHelper)(nil).DeletePodStartupState), podUID)
+}
+
+// RecordStatusUpdated mocks base method.
+func (m *MockPodStartupLatencyStateHelper) RecordStatusUpdated(pod *v1.Pod) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RecordStatusUpdated", pod)
+}
+
+// RecordStatusUpdated indicates an expected call of RecordStatusUpdated.
+func (mr *MockPodStartupLatencyStateHelperMockRecorder) RecordStatusUpdated(pod interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordStatusUpdated", reflect.TypeOf((*MockPodStartupLatencyStateHelper)(nil).RecordStatusUpdated), pod)
+}
+
 // MockManager is a mock of Manager interface.
 type MockManager struct {
 	ctrl     *gomock.Controller

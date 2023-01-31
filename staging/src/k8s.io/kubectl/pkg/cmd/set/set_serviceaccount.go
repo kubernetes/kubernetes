@@ -174,10 +174,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 			Latest()
 	}
 	o.infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Run creates and applies the patch either locally or calling apiserver.

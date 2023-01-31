@@ -47,7 +47,7 @@ func packageNameForImport(f *ast.File, path string) *string {
 // or nil otherwise.
 func importSpec(f *ast.File, path string) *ast.ImportSpec {
 	for _, s := range f.Imports {
-		if importPath(s) == path {
+		if strings.HasPrefix(importPath(s), path) {
 			return s
 		}
 	}

@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 const (
@@ -62,6 +64,10 @@ func (h Header) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals this header from JSON
 func (h *Header) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, h)
+	}
+
 	if err := json.Unmarshal(data, &h.CommonValidations); err != nil {
 		return err
 	}
@@ -72,4 +78,28 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	return json.Unmarshal(data, &h.HeaderProps)
+}
+
+func (h *Header) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		CommonValidations
+		SimpleSchema
+		Extensions
+		HeaderProps
+	}
+
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+
+	h.CommonValidations = x.CommonValidations
+	h.SimpleSchema = x.SimpleSchema
+	h.Extensions = x.Extensions
+	h.HeaderProps = x.HeaderProps
+
+	h.Extensions.sanitize()
+	if len(h.Extensions) == 0 {
+		h.Extensions = nil
+	}
+	return nil
 }

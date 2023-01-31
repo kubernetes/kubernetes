@@ -404,16 +404,16 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 // validateNoAnnotationOverwrites validates that when overwrite is false, to-be-updated annotations don't exist in the object annotation map (yet)
 func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[string]string) error {
 	var buf bytes.Buffer
-	for key := range annotations {
+	for key, value := range annotations {
 		// change-cause annotation can always be overwritten
 		if key == polymorphichelpers.ChangeCauseAnnotation {
 			continue
 		}
-		if value, found := accessor.GetAnnotations()[key]; found {
+		if currValue, found := accessor.GetAnnotations()[key]; found && currValue != value {
 			if buf.Len() > 0 {
 				buf.WriteString("; ")
 			}
-			buf.WriteString(fmt.Sprintf("'%s' already has a value (%s)", key, value))
+			buf.WriteString(fmt.Sprintf("'%s' already has a value (%s)", key, currValue))
 		}
 	}
 	if buf.Len() > 0 {

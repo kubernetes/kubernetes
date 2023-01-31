@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"testing"
@@ -39,10 +40,11 @@ import (
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
+	ctx := context.Background()
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
-	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP, []string{podIP})
+	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, []string{podIP})
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
@@ -73,6 +75,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 }
 
 func TestGenerateContainerConfig(t *testing.T) {
+	ctx := context.Background()
 	_, imageService, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
@@ -102,7 +105,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	}
 
 	expectedConfig := makeExpectedConfig(m, pod, 0, false)
-	containerConfig, _, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
+	containerConfig, _, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -133,11 +136,11 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err)
 
-	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	resp, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID}, false)
+	imageID, _ := imageService.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
+	resp, _ := imageService.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: imageID}, false)
 
 	resp.Image.Uid = nil
 	resp.Image.Username = "test"
@@ -145,7 +148,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
@@ -232,18 +235,23 @@ func TestCalculateLinuxResources(t *testing.T) {
 
 	assert.NoError(t, err)
 
+	generateResourceQuantity := func(str string) *resource.Quantity {
+		quantity := resource.MustParse(str)
+		return &quantity
+	}
+
 	tests := []struct {
 		name     string
-		cpuReq   resource.Quantity
-		cpuLim   resource.Quantity
-		memLim   resource.Quantity
+		cpuReq   *resource.Quantity
+		cpuLim   *resource.Quantity
+		memLim   *resource.Quantity
 		expected *runtimeapi.LinuxContainerResources
 	}{
 		{
 			name:   "Request128MBLimit256MB",
-			cpuReq: resource.MustParse("1"),
-			cpuLim: resource.MustParse("2"),
-			memLim: resource.MustParse("128Mi"),
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -253,9 +261,9 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 		{
 			name:   "RequestNoMemory",
-			cpuReq: resource.MustParse("2"),
-			cpuLim: resource.MustParse("8"),
-			memLim: resource.MustParse("0"),
+			cpuReq: generateResourceQuantity("2"),
+			cpuLim: generateResourceQuantity("8"),
+			memLim: generateResourceQuantity("0"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           800000,
@@ -263,9 +271,32 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 		},
+		{
+			name:   "RequestNilCPU",
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2048,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name:   "RequestZeroCPU",
+			cpuReq: generateResourceQuantity("0"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 0,
+			},
+		},
 	}
 	for _, test := range tests {
-		linuxContainerResources := m.calculateLinuxResources(&test.cpuReq, &test.cpuLim, &test.memLim)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }

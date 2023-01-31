@@ -2,7 +2,6 @@ package prober
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -12,15 +11,15 @@ import (
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
-func (pb *prober) maybeProbeForBody(prober httpprobe.Prober, url *url.URL, headers http.Header, timeout time.Duration, pod *v1.Pod, container v1.Container, probeType probeType) (probe.Result, string, error) {
+func (pb *prober) maybeProbeForBody(prober httpprobe.Prober, req *http.Request, timeout time.Duration, pod *v1.Pod, container v1.Container, probeType probeType) (probe.Result, string, error) {
 	if !isInterestingPod(pod) {
-		return prober.Probe(url, headers, timeout)
+		return prober.Probe(req, timeout)
 	}
 	bodyProber, ok := prober.(httpprobe.DetailedProber)
 	if !ok {
-		return prober.Probe(url, headers, timeout)
+		return prober.Probe(req, timeout)
 	}
-	result, output, body, probeError := bodyProber.ProbeForBody(url, headers, timeout)
+	result, output, body, probeError := bodyProber.ProbeForBody(req, timeout)
 	switch result {
 	case probe.Success:
 		return result, output, probeError

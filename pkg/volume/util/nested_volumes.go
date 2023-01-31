@@ -51,8 +51,14 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 				return fmt.Errorf("invalid container mount point %v", myMountPoint)
 			}
 			myMPSlash := myMountPoint + string(os.PathSeparator)
-			// The previously found nested mountpoint (or "" if none found yet)
-			prevNestedMP := ""
+			// The previously found nested mountpoints.
+			// NOTE: We can't simply rely on sort.Strings to have all the mountpoints sorted and
+			// grouped. For example, the following strings are sorted in this exact order:
+			// /dir/nested, /dir/nested-vol, /dir/nested.vol, /dir/nested/double, /dir/nested2
+			// The issue is a bit worse for Windows paths, since the \'s value is higher than /'s:
+			// \dir\nested, \dir\nested-vol, \dir\nested.vol, \dir\nested2, \dir\nested\double
+			// Because of this, we should use a list of previously mounted mountpoints, rather than only one.
+			prevNestedMPs := []string{}
 			// examine each mount point to see if it's nested beneath this volume
 			// (but skip any that are double-nested beneath this volume)
 			// For example, if this volume is mounted as /dir and other volumes are mounted
@@ -61,11 +67,19 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 				if !strings.HasPrefix(mp, myMPSlash) {
 					continue // skip -- not nested beneath myMountPoint
 				}
-				if prevNestedMP != "" && strings.HasPrefix(mp, prevNestedMP) {
+
+				isNested := false
+				for _, prevNestedMP := range prevNestedMPs {
+					if strings.HasPrefix(mp, prevNestedMP) {
+						isNested = true
+						break
+					}
+				}
+				if isNested {
 					continue // skip -- double nested beneath myMountPoint
 				}
 				// since this mount point is nested, remember it so that we can check that following ones aren't nested beneath this one
-				prevNestedMP = mp + string(os.PathSeparator)
+				prevNestedMPs = append(prevNestedMPs, mp+string(os.PathSeparator))
 				retval = append(retval, mp[len(myMPSlash):])
 			}
 		}

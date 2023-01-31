@@ -11,12 +11,16 @@
 // using IAM so that specific users or Amazon EC2 instances can access repositories
 // and images.
 //
+// Amazon ECR has service endpoints in each supported Region. For more information,
+// see Amazon ECR endpoints (https://docs.aws.amazon.com/general/latest/gr/ecr.html)
+// in the Amazon Web Services General Reference.
+//
 // See https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21 for more information on this service.
 //
 // See ecr package documentation for more information.
 // https://docs.aws.amazon.com/sdk-for-go/api/service/ecr/
 //
-// Using the Client
+// # Using the Client
 //
 // To contact Amazon EC2 Container Registry with the SDK use the New function to create
 // a new service client. With that client you can make API requests to the service.

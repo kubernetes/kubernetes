@@ -391,17 +391,6 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 
-	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
-	// supports the current volumeLifecycleMode.
-	if err := p.supportsVolumeLifecycleMode(driverName, volumeLifecycleMode); err != nil {
-		return nil, err
-	}
-
-	fsGroupPolicy, err := p.getFSGroupPolicy(driverName)
-	if err != nil {
-		return nil, err
-	}
-
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		return nil, errors.New(log("failed to get a kubernetes client"))
@@ -420,7 +409,6 @@ func (p *csiPlugin) NewMounter(
 		podUID:              pod.UID,
 		driverName:          csiDriverName(driverName),
 		volumeLifecycleMode: volumeLifecycleMode,
-		fsGroupPolicy:       fsGroupPolicy,
 		volumeID:            volumeHandle,
 		specVolumeID:        spec.Name(),
 		readOnly:            readOnly,
@@ -428,51 +416,9 @@ func (p *csiPlugin) NewMounter(
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
 
-	// Save volume info in pod dir
 	dir := mounter.GetPath()
-	dataDir := filepath.Dir(dir) // dropoff /mount at end
-
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
-		return nil, errors.New(log("failed to create dir %#v:  %v", dataDir, err))
-	}
-	klog.V(4).Info(log("created path successfully [%s]", dataDir))
-
 	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
-
-	// persist volume info data for teardown
-	node := string(p.host.GetNodeName())
-	volData := map[string]string{
-		volDataKey.specVolID:           spec.Name(),
-		volDataKey.volHandle:           volumeHandle,
-		volDataKey.driverName:          driverName,
-		volDataKey.nodeName:            node,
-		volDataKey.volumeLifecycleMode: string(volumeLifecycleMode),
-	}
-
-	attachID := getAttachmentName(volumeHandle, driverName, node)
-	volData[volDataKey.attachmentID] = attachID
-
-	err = saveVolumeData(dataDir, volDataFileName, volData)
-	defer func() {
-		// Only if there was an error and volume operation was considered
-		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
-			// attempt to cleanup volume mount dir.
-			if err = removeMountDir(p, dir); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", dir, err))
-			}
-		}
-	}()
-
-	if err != nil {
-		errorMsg := log("csi.NewMounter failed to save volume info data: %v", err)
-		klog.Error(errorMsg)
-
-		return nil, errors.New(errorMsg)
-	}
-
 	klog.V(4).Info(log("mounter created successfully"))
-
 	return mounter, nil
 }
 
@@ -505,27 +451,30 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	return unmounter, nil
 }
 
-func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
 	if err != nil {
-		return nil, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
+		return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
 	}
-
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
-	var spec *volume.Spec
+	var ret volume.ReconstructedVolume
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		ret.SELinuxMountContext = volData[volDataKey.seLinuxMountContext]
+	}
+
 	// If mode is VolumeLifecycleEphemeral, use constructVolSourceSpec
 	// to construct volume source spec. If mode is VolumeLifecyclePersistent,
 	// use constructPVSourceSpec to construct volume construct pv source spec.
 	if storage.VolumeLifecycleMode(volData[volDataKey.volumeLifecycleMode]) == storage.VolumeLifecycleEphemeral {
-		spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
-		return spec, nil
+		ret.Spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
+		return ret, nil
 	}
-	spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 
-	return spec, nil
+	ret.Spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
+	return ret, nil
 }
 
 // constructVolSourceSpec constructs volume.Spec with CSIVolumeSource
@@ -582,6 +531,9 @@ func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error)
 		}
 		csiDriver, err := p.getCSIDriver(driver)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		if csiDriver.Spec.SELinuxMount != nil {
@@ -822,49 +774,6 @@ func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
 	return csiDriver, err
 }
 
-// supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
-// An error indicates that it isn't supported and explains why.
-func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storage.VolumeLifecycleMode) error {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional), but then only persistent volumes are supported.
-	var csiDriver *storage.CSIDriver
-	if p.csiDriverLister != nil {
-		c, err := p.getCSIDriver(driver)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// Some internal error.
-			return err
-		}
-		csiDriver = c
-	}
-
-	// The right response depends on whether we have information
-	// about the driver and the volume mode.
-	switch {
-	case csiDriver == nil && volumeMode == storage.VolumeLifecyclePersistent:
-		// No information, but that's okay for persistent volumes (and only those).
-		return nil
-	case csiDriver == nil:
-		return fmt.Errorf("volume mode %q not supported by driver %s (no CSIDriver object)", volumeMode, driver)
-	case containsVolumeMode(csiDriver.Spec.VolumeLifecycleModes, volumeMode):
-		// Explicitly listed.
-		return nil
-	default:
-		return fmt.Errorf("volume mode %q not supported by driver %s (only supports %q)", volumeMode, driver, csiDriver.Spec.VolumeLifecycleModes)
-	}
-}
-
-// containsVolumeMode checks whether the given volume mode is listed.
-func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
 // getVolumeLifecycleMode returns the mode for the specified spec: {persistent|ephemeral}.
 // 1) If mode cannot be determined, it will default to "persistent".
 // 2) If Mode cannot be resolved to either {persistent | ephemeral}, an error is returned
@@ -881,34 +790,6 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil
-}
-
-// getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
-// An error indicates that it isn't supported and explains why.
-func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, error) {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional)
-	var csiDriver *storage.CSIDriver
-	if p.csiDriverLister != nil {
-		c, err := p.getCSIDriver(driver)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// Some internal error.
-			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
-		}
-		csiDriver = c
-	}
-
-	// If the csiDriver isn't defined, return the default behavior
-	if csiDriver == nil {
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
-	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
-	}
-	return *csiDriver.Spec.FSGroupPolicy, nil
 }
 
 func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {

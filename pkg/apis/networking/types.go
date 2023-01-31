@@ -158,15 +158,15 @@ type NetworkPolicyPort struct {
 	EndPort *int32
 }
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string
@@ -423,7 +423,45 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer api.LoadBalancerStatus
+	LoadBalancer IngressLoadBalancerStatus
+}
+
+// IngressLoadBalancerStatus represents the status of a load-balancer
+type IngressLoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer.
+	// +optional
+	Ingress []IngressLoadBalancerIngress
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+type IngressLoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based.
+	// +optional
+	IP string
+
+	// Hostname is set for load-balancer ingress points that are DNS based.
+	// +optional
+	Hostname string
+
+	// Ports provides information about the ports exposed by this LoadBalancer.
+	// +optional
+	Ports []IngressPortStatus
+}
+
+// IngressPortStatus represents the error condition of an ingress port
+type IngressPortStatus struct {
+	// Port is the port number of the ingress port.
+	Port int32
+
+	// Protocol is the protocol of the ingress port.
+	Protocol api.Protocol
+
+	// Error indicates a problem on this port.
+	// The format of the error must comply with the following rules:
+	// - Kubernetes-defined error values use CamelCase names
+	// - Provider-specific error values must follow label-name style (e.g.
+	//   example.com/name).
+	Error *string
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -628,7 +666,7 @@ type ClusterCIDRSpec struct {
 	// +optional
 	IPv4 string
 
-	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "2001:db8::/64").
 	// At least one of IPv4 and IPv6 must be specified.
 	// This field is immutable.
 	// +optional

@@ -255,15 +255,14 @@ if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_G
   RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
 fi
 
+# List of the set of feature gates recognized by the GCP CCM
+export CCM_FEATURE_GATES="APIListChunking,APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,RemainingItemCount,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
+
 # Optional: set feature gates
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
 FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
 if [[ -n "${NODE_ACCELERATORS}" ]]; then
-    if [[ -z "${FEATURE_GATES:-}" ]]; then
-        FEATURE_GATES="DevicePlugins=true"
-    else
-        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
-    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -549,3 +548,11 @@ export TLS_CIPHER_SUITES=""
 # CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
 # and kubelet
 export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
+
+# When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
+# are presented to kubelet:
+# --image-credential-provider-config=${path-to-config}
+# --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
+# Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
+# feature gates are set to true for kubelet to use external credential provider.
+ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-false}"

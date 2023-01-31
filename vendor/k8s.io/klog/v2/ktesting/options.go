@@ -29,7 +29,7 @@ import (
 //
 // Must be constructed with NewConfig.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -40,7 +40,7 @@ type Config struct {
 
 // ConfigOption implements functional parameters for NewConfig.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -54,7 +54,7 @@ type configOptions struct {
 
 // VerbosityFlagName overrides the default -testing.v for the verbosity level.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -67,7 +67,7 @@ func VerbosityFlagName(name string) ConfigOption {
 // VModulFlagName overrides the default -testing.vmodule for the per-module
 // verbosity levels.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -84,7 +84,7 @@ func VModuleFlagName(name string) ConfigOption {
 // which is useful when debugging a failed test. `go test` only shows the log
 // output for failed tests. To see all output, use `go test -v`.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -97,7 +97,7 @@ func Verbosity(level int) ConfigOption {
 // NewConfig returns a configuration with recommended defaults and optional
 // modifications. Command line flags are not bound to any FlagSet yet.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -120,7 +120,7 @@ func NewConfig(opts ...ConfigOption) *Config {
 
 // AddFlags registers the command line flags that control the configuration.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.

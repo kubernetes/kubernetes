@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -68,11 +67,6 @@ func TestAuthorizer(t *testing.T) {
 		expect   authorizer.Decision
 		features featuregate.FeatureGate
 	}{
-		{
-			name:   "allowed node configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node0-configmap", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
-		},
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
@@ -127,12 +121,6 @@ func TestAuthorizer(t *testing.T) {
 			name:   "allowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
 			expect: authorizer.DecisionAllow,
-		},
-
-		{
-			name:   "disallowed node configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node1-configmap", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed configmap",
@@ -385,36 +373,23 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	}
 	g.AddPod(pod3)
 
-	g.SetNodeConfigMap("node1", "shared-configmap", "ns1")
-	g.SetNodeConfigMap("node2", "shared-configmap", "ns1")
-	g.SetNodeConfigMap("node3", "configmap", "ns1")
-
 	testcases := []struct {
-		User          user.Info
-		Secret        string
-		ConfigMap     string
-		ExpectAllowed bool
+		User      user.Info
+		Secret    string
+		ConfigMap string
+		Decision  authorizer.Decision
 	}{
-		{User: node1, ExpectAllowed: true, Secret: "node1-only"},
-		{User: node1, ExpectAllowed: true, Secret: "node1-node2-only"},
-		{User: node1, ExpectAllowed: true, Secret: "shared-all"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-only"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-node2-only"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
 
-		{User: node2, ExpectAllowed: false, Secret: "node1-only"},
-		{User: node2, ExpectAllowed: true, Secret: "node1-node2-only"},
-		{User: node2, ExpectAllowed: true, Secret: "shared-all"},
+		{User: node2, Decision: authorizer.DecisionNoOpinion, Secret: "node1-only"},
+		{User: node2, Decision: authorizer.DecisionAllow, Secret: "node1-node2-only"},
+		{User: node2, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
 
-		{User: node3, ExpectAllowed: false, Secret: "node1-only"},
-		{User: node3, ExpectAllowed: false, Secret: "node1-node2-only"},
-		{User: node3, ExpectAllowed: true, Secret: "shared-all"},
-
-		{User: node1, ExpectAllowed: true, ConfigMap: "shared-configmap"},
-		{User: node1, ExpectAllowed: false, ConfigMap: "configmap"},
-
-		{User: node2, ExpectAllowed: true, ConfigMap: "shared-configmap"},
-		{User: node2, ExpectAllowed: false, ConfigMap: "configmap"},
-
-		{User: node3, ExpectAllowed: false, ConfigMap: "shared-configmap"},
-		{User: node3, ExpectAllowed: true, ConfigMap: "configmap"},
+		{User: node3, Decision: authorizer.DecisionNoOpinion, Secret: "node1-only"},
+		{User: node3, Decision: authorizer.DecisionNoOpinion, Secret: "node1-node2-only"},
+		{User: node3, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
 	}
 
 	for i, tc := range testcases {
@@ -439,8 +414,8 @@ func TestAuthorizerSharedResources(t *testing.T) {
 			t.Fatalf("test case must include a request for a Secret or ConfigMap")
 		}
 
-		if (decision == authorizer.DecisionAllow) != tc.ExpectAllowed {
-			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, decision)
+		if decision != tc.Decision {
+			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
 		}
 	}
 
@@ -630,11 +605,6 @@ func BenchmarkAuthorization(b *testing.B) {
 		features featuregate.FeatureGate
 	}{
 		{
-			name:   "allowed node configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node0-configmap", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
-		},
-		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
@@ -648,12 +618,6 @@ func BenchmarkAuthorization(b *testing.B) {
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
-		},
-
-		{
-			name:   "disallowed node configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node1-configmap", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed configmap",
@@ -779,9 +743,6 @@ func BenchmarkAuthorization(b *testing.B) {
 func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
-	for _, node := range nodes {
-		p.addNode(node)
-	}
 	for _, pod := range pods {
 		p.addPod(pod)
 	}
@@ -830,19 +791,9 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			attachments = append(attachments, attachment)
 		}
 
-		name := fmt.Sprintf("%s-configmap", nodeName)
 		nodes = append(nodes, &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
-			Spec: corev1.NodeSpec{
-				ConfigSource: &corev1.NodeConfigSource{
-					ConfigMap: &corev1.ConfigMapNodeConfigSource{
-						Name:             name,
-						Namespace:        "ns0",
-						UID:              types.UID(fmt.Sprintf("ns0-%s", name)),
-						KubeletConfigKey: "kubelet",
-					},
-				},
-			},
+			Spec:       corev1.NodeSpec{},
 		})
 	}
 	return nodes, pods, pvs, attachments

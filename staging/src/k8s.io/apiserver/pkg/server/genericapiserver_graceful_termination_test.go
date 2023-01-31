@@ -79,7 +79,7 @@ func (w *wrappedLifecycleSignal) Signal() {
 	}
 }
 
-func wrapLifecycleSignalsWithRecorer(t *testing.T, signals *lifecycleSignals, before func(lifecycleSignal)) {
+func wrapLifecycleSignalsWithRecorder(t *testing.T, signals *lifecycleSignals, before func(lifecycleSignal)) {
 	// it's important to record the signal being fired on a 'before' callback
 	// to avoid flakes, since on the server the signaling of events are
 	// an asynchronous process.
@@ -124,7 +124,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	 described in the following diagram
 //	   - every vertical line is an independent timeline
 //	   - the leftmost vertical line represents the go routine that
-//	     is executing GenericAPIServer.Run methos
+//	     is executing GenericAPIServer.Run method
 //	   - (signal name) indicates that the given lifecycle signal has been fired
 //
 //	                                 stopCh
@@ -185,7 +185,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 
 	signals := &s.lifecycleSignals
 	recorder := &signalRecorder{}
-	wrapLifecycleSignalsWithRecorer(t, signals, recorder.before)
+	wrapLifecycleSignalsWithRecorder(t, signals, recorder.before)
 
 	// before the AfterShutdownDelayDuration signal is fired, we want
 	// the test to execute a verification step.
@@ -393,7 +393,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 	signals := &s.lifecycleSignals
 	recorder := &signalRecorder{}
-	wrapLifecycleSignalsWithRecorer(t, signals, recorder.before)
+	wrapLifecycleSignalsWithRecorder(t, signals, recorder.before)
 
 	// before the AfterShutdownDelayDuration signal is fired, we want
 	// the test to execute a verification step.

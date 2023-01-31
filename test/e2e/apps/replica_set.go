@@ -185,7 +185,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	replicas := int32(1)
 
 	// Create a ReplicaSet for a service that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
@@ -323,7 +323,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	name := "pod-adoption-release"
 	ginkgo.By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
-	p := f.PodClient().CreateSync(&v1.Pod{
+	p := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{

@@ -659,7 +659,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	// Mock NodeStatusUpdate fail
 	rc.(*reconciler).nodeStatusUpdater = statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciliationLoopFunc()
-	// The first detach will be triggered after at leaset 50ms (maxWaitForUnmountDuration in test).
+	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
 	time.Sleep(100 * time.Millisecond)
 	reconciliationLoopFunc()
 	// Right before detach operation is performed, the volume will be first removed from being reported
@@ -722,7 +722,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	// Delete the pod, but detach will fail
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
-	// The first detach will be triggered after at leaset 50ms (maxWaitForUnmountDuration in test).
+	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
 	// Right before detach operation is performed, the volume will be first removed from being reported
 	// as attached on node status (RemoveVolumeFromReportAsAttached). After detach operation which is expected to fail,
 	// controller then added the volume back as attached.
@@ -1582,6 +1582,7 @@ func verifyVolumeAttachedToNode(
 			attachState,
 			expectedAttachState)
 	}
+	t.Logf("Volume <%v> is attached to node <%v>: %v", volumeName, nodeName, attachState)
 }
 
 func verifyVolumeReportedAsAttachedToNode(
@@ -1600,6 +1601,7 @@ func verifyVolumeReportedAsAttachedToNode(
 	}
 
 	if result == isAttached {
+		t.Logf("Volume <%v> is reported as attached to node <%v>: %v", volumeName, nodeName, result)
 		return
 	}
 	t.Fatalf("Check volume <%v> is reported as attached to node <%v>, got %v, expected %v",
@@ -1624,6 +1626,7 @@ func verifyVolumeNoStatusUpdateNeeded(
 				nodeName)
 		}
 	}
+	t.Logf("Volume <%v> is not reported as need to update status on node <%v>", volumeName, nodeName)
 }
 
 func verifyNewDetacherCallCount(

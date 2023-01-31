@@ -35,8 +35,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v2alpha1"
 	"k8s.io/klog/v2"
+	kmsapi "k8s.io/kms/apis/v2alpha1"
 )
 
 const (
@@ -187,5 +187,5 @@ func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptReque
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plaintext)))
 	base64.StdEncoding.Encode(buf, request.Plaintext)
 
-	return &kmsapi.EncryptResponse{Ciphertext: buf, KeyId: "1", Annotations: map[string][]byte{"kms.kubernetes.io/local-kek": []byte("encrypted-local-kek")}}, nil
+	return &kmsapi.EncryptResponse{Ciphertext: buf, KeyId: "1", Annotations: map[string][]byte{"local-kek.kms.kubernetes.io": []byte("encrypted-local-kek")}}, nil
 }

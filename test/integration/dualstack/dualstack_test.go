@@ -82,6 +82,14 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 			expectError:        false,
 		},
 		{
+			name:               "Type ClusterIP - Client Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
 			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
 			serviceType:        v1.ServiceTypeClusterIP,
 			clusterIPs:         []string{},
@@ -218,10 +226,9 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
 				},
 				Spec: v1.ServiceSpec{
-					Type:           tc.serviceType,
-					ClusterIPs:     tc.clusterIPs,
-					IPFamilies:     tc.ipFamilies,
-					IPFamilyPolicy: &tc.ipFamilyPolicy,
+					Type:       tc.serviceType,
+					ClusterIPs: tc.clusterIPs,
+					IPFamilies: tc.ipFamilies,
 					Ports: []v1.ServicePort{
 						{
 							Port:       443,
@@ -229,6 +236,14 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 						},
 					},
 				},
+			}
+
+			if len(tc.ipFamilyPolicy) > 0 {
+				svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
+			}
+
+			if len(tc.clusterIPs) > 0 {
+				svc.Spec.ClusterIP = tc.clusterIPs[0]
 			}
 
 			// create the service
@@ -510,6 +525,47 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 			expectError:        false,
 		},
 		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 Family",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv6 Family",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"2001:db8:1::16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
+			ipFamilies:         nil,
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.18", "2001:db8:1::18"},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        true,
+		},
+		{
 			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
 			serviceType:        v1.ServiceTypeClusterIP,
 			clusterIPs:         []string{},
@@ -647,10 +703,9 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
 				},
 				Spec: v1.ServiceSpec{
-					Type:           tc.serviceType,
-					ClusterIPs:     tc.clusterIPs,
-					IPFamilies:     tc.ipFamilies,
-					IPFamilyPolicy: &tc.ipFamilyPolicy,
+					Type:       tc.serviceType,
+					ClusterIPs: tc.clusterIPs,
+					IPFamilies: tc.ipFamilies,
 					Ports: []v1.ServicePort{
 						{
 							Port:       443,
@@ -658,6 +713,14 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 						},
 					},
 				},
+			}
+
+			if len(tc.ipFamilyPolicy) > 0 {
+				svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
+			}
+
+			if len(tc.clusterIPs) > 0 {
+				svc.Spec.ClusterIP = tc.clusterIPs[0]
 			}
 
 			// create a service

@@ -306,6 +306,79 @@ func TestTranslateRBDInTreePVToCSI(t *testing.T) {
 			errExpected: false,
 		},
 		{
+			name: "normal-pvc-without-dynamic-provisioner-pfx-set",
+			inTree: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: RBDDriverName,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					ClaimRef: &v1.ObjectReference{
+						Name:      "test-pvc",
+						Namespace: "default",
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						RBD: &v1.RBDPersistentVolumeSource{
+							CephMonitors: []string{"10.70.53.126:6789"},
+							RBDPool:      "replicapool",
+							RBDImage:     "e4111eb6-4088-11ec-b823-0242ac110003",
+							RadosUser:    "admin",
+							FSType:       "ext4",
+							ReadOnly:     false,
+							SecretRef: &v1.SecretReference{
+								Name:      "ceph-secret",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+			},
+			csi: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: RBDDriverName,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					ClaimRef: &v1.ObjectReference{
+						Name:      "test-pvc",
+						Namespace: "default",
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:       RBDDriverName,
+							VolumeHandle: "mig_mons-b7f67366bb43f32e07d8a261a7840da9_image-e4111eb6-4088-11ec-b823-0242ac110003_7265706c696361706f6f6c",
+							ReadOnly:     false,
+							FSType:       "ext4",
+							VolumeAttributes: map[string]string{
+								"clusterID":        "b7f67366bb43f32e07d8a261a7840da9",
+								"imageFeatures":    "layering",
+								"imageFormat":      "",
+								"imageName":        "e4111eb6-4088-11ec-b823-0242ac110003",
+								"journalPool":      "",
+								"migration":        "true",
+								"pool":             "replicapool",
+								"staticVolume":     "true",
+								"tryOtherMounters": "true",
+							},
+							NodeStageSecretRef: &v1.SecretReference{
+								Name:      "ceph-secret",
+								Namespace: "default",
+							},
+							ControllerExpandSecretRef: &v1.SecretReference{
+								Name:      "ceph-secret",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+			},
+			errExpected: false,
+		},
+		{
 			name:        "nil PV",
 			inTree:      nil,
 			csi:         nil,

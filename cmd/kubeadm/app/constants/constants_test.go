@@ -25,7 +25,7 @@ import (
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
-	expected := "/etc/kubernetes/manifests"
+	expected := filepath.FromSlash("/etc/kubernetes/manifests")
 	actual := GetStaticPodDirectory()
 
 	if actual != expected {
@@ -51,7 +51,7 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 }
 
 func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/bootstrap-kubelet.conf"
+	expected := filepath.FromSlash("/etc/kubernetes/bootstrap-kubelet.conf")
 	actual := GetBootstrapKubeletKubeConfigPath()
 
 	if actual != expected {
@@ -64,7 +64,7 @@ func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
 }
 
 func TestGetKubeletKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/kubelet.conf"
+	expected := filepath.FromSlash("/etc/kubernetes/kubelet.conf")
 	actual := GetKubeletKubeConfigPath()
 
 	if actual != expected {
@@ -99,7 +99,8 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.componentName, func(t *testing.T) {
 			actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
-			if actual != rt.expected {
+			expected := filepath.FromSlash(rt.expected)
+			if actual != expected {
 				t.Errorf(
 					"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
 					rt.expected,

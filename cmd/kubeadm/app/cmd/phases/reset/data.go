@@ -34,7 +34,7 @@ type resetData interface {
 	Cfg() *kubeadmapi.InitConfiguration
 	DryRun() bool
 	Client() clientset.Interface
-	AddDirsToClean(dirs ...string)
 	CertificatesDir() string
 	CRISocketPath() string
+	CleanupTmpDir() bool
 }

@@ -737,7 +737,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
 			// so that reconciler can clean up volume when needed. However, volume resize failed,
 			// we should not mark the volume as mounted to avoid pod starts using it.
-			// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
+			// Considering the above situations, we mark volume as uncertain here so that reconciler will trigger
 			// volume tear down when pod is deleted, and also makes sure pod will not start using it.
 			if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts); err != nil {
 				klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
@@ -1114,7 +1114,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 		}
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
-		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
+		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
 			var mapErr error
 			stagingPath, mapErr = customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {
@@ -1237,7 +1237,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
 			// so that reconciler can clean up volume when needed. However, if nodeExpandVolume failed,
 			// we should not mark the volume as mounted to avoid pod starts using it.
-			// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
+			// Considering the above situations, we mark volume as uncertain here so that reconciler will trigger
 			// volume tear down when pod is deleted, and also makes sure pod will not start using it.
 			if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts); err != nil {
 				klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())

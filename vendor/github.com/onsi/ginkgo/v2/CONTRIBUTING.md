@@ -8,6 +8,6 @@ Your contributions to Ginkgo are essential for its long-term maintenance and imp
     - When adding to the Ginkgo CLI, note that there are very few unit tests.  Please add an integration test.
 - Make sure all the tests succeed via `ginkgo -r -p`
 - Vet your changes via `go vet ./...`
-- Update the documentation. Ginko uses `godoc` comments and documentation in `docs/index.md`.  You can run `bundle exec jekyll serve` in the `docs` directory to preview your changes.
+- Update the documentation. Ginkgo uses `godoc` comments and documentation in `docs/index.md`.  You can run `bundle exec jekyll serve` in the `docs` directory to preview your changes.
 
 Thanks for supporting Ginkgo!

@@ -350,7 +350,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -361,7 +361,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// For all methods other than HEAD the response body returns 'foo' with the received http method
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -444,7 +444,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			httpVerbs := []string{"DELETE", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -455,7 +455,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// The response body returns 'foo' with the received http method
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -465,10 +465,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// Test that each method returns 301 for both pod and service endpoints
 			redirectVerbs := []string{"GET", "HEAD"}
 			for _, redirectVerb := range redirectVerbs {
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + redirectVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + redirectVerb
 				validateRedirectRequest(client, redirectVerb, urlString)
 
-				urlString = f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + redirectVerb
+				urlString = strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + redirectVerb
 				validateRedirectRequest(client, redirectVerb, urlString)
 			}
 		})

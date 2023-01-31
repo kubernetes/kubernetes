@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1090,7 +1090,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta2(), serverConcurrency, requestWaitLimit)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency, requestWaitLimit)
 
 	factory.Start(stopCh)
 
@@ -1112,7 +1112,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	// make sure that apf controller syncs the priority level configuration object we are using in this test.
 	// read the metrics and ensure the concurrency limit for our priority level is set to the expected value.
 	pollErr := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		if err := gaugeValueMatch("apiserver_flowcontrol_request_concurrency_limit", map[string]string{"priority_level": plName}, plConcurrency); err != nil {
+		if err := gaugeValueMatch("apiserver_flowcontrol_nominal_limit_seats", map[string]string{"priority_level": plName}, plConcurrency); err != nil {
 			t.Logf("polling retry - error: %s", err)
 			return false, nil
 		}
@@ -1197,7 +1197,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	handler = apifilters.WithRequestDeadline(handler, nil, nil, longRunningRequestCheck, nil, requestTimeout)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
 	handler = WithPanicRecovery(handler, requestInfoFactory)
-	handler = apifilters.WithAuditID(handler)
+	handler = apifilters.WithAuditInit(handler)
 	return handler
 }
 
@@ -1268,7 +1268,7 @@ func newConfiguration(fsName, plName, user string, concurrency int32, queueLengt
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: concurrency,
+				NominalConcurrencyShares: concurrency,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type:    responseType,
 					Queuing: qcfg,

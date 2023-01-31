@@ -107,11 +107,11 @@
             "type": "boolean"
           },
           "serving": {
-            "description": "serving is identical to ready except that it is set regardless of the terminating state of endpoints. This condition should be set to true for a ready endpoint that is terminating. If nil, consumers should defer to the ready condition. This field can be enabled with the EndpointSliceTerminatingCondition feature gate.",
+            "description": "serving is identical to ready except that it is set regardless of the terminating state of endpoints. This condition should be set to true for a ready endpoint that is terminating. If nil, consumers should defer to the ready condition.",
             "type": "boolean"
           },
           "terminating": {
-            "description": "terminating indicates that this endpoint is terminating. A nil value indicates an unknown state. Consumers should interpret this unknown state to mean that the endpoint is not terminating. This field can be enabled with the EndpointSliceTerminatingCondition feature gate.",
+            "description": "terminating indicates that this endpoint is terminating. A nil value indicates an unknown state. Consumers should interpret this unknown state to mean that the endpoint is not terminating.",
             "type": "boolean"
           }
         },
@@ -461,6 +461,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -502,6 +507,11 @@
             "group": "authentication.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -609,6 +619,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1alpha1"
@@ -672,6 +687,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -993,6 +1013,11 @@
             "group": "",
             "kind": "Status",
             "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "Status",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -1104,6 +1129,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1beta1"
           },
           {
@@ -1145,6 +1175,11 @@
             "group": "authentication.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -1252,6 +1287,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "WatchEvent",
             "version": "v1alpha1"
@@ -1315,6 +1355,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",

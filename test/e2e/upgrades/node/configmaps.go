@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -147,8 +148,8 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 		"content of file \"/etc/configmap-volume/data\": some configmap data",
 		"mode of file \"/etc/configmap-volume/data\": -rw-r--r--",
 	}
-	f.TestContainerOutput("volume consume configmap", pod, 0, expectedOutput)
+	e2eoutput.TestContainerOutput(f, "volume consume configmap", pod, 0, expectedOutput)
 
 	expectedOutput = []string{"CONFIGMAP_DATA=some configmap data"}
-	f.TestContainerOutput("env consume configmap", pod, 1, expectedOutput)
+	e2eoutput.TestContainerOutput(f, "env consume configmap", pod, 1, expectedOutput)
 }

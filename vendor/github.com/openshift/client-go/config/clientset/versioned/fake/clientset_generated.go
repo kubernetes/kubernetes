@@ -6,6 +6,8 @@ import (
 	clientset "github.com/openshift/client-go/config/clientset/versioned"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	fakeconfigv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1/fake"
+	configv1alpha1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1"
+	fakeconfigv1alpha1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -66,4 +68,9 @@ var (
 // ConfigV1 retrieves the ConfigV1Client
 func (c *Clientset) ConfigV1() configv1.ConfigV1Interface {
 	return &fakeconfigv1.FakeConfigV1{Fake: &c.Fake}
+}
+
+// ConfigV1alpha1 retrieves the ConfigV1alpha1Client
+func (c *Clientset) ConfigV1alpha1() configv1alpha1.ConfigV1alpha1Interface {
+	return &fakeconfigv1alpha1.FakeConfigV1alpha1{Fake: &c.Fake}
 }

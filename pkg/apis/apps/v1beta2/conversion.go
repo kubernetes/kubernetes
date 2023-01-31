@@ -189,7 +189,7 @@ func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2.Sta
 		return err
 	}
 	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
-	// see http://issue.k8s.io/87583
+	// see https://issue.k8s.io/87583
 	if out.VolumeClaimTemplates != nil {
 		// copy so we don't modify the input
 		templatesCopy := make([]core.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
@@ -210,7 +210,7 @@ func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSe
 		return err
 	}
 	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
-	// see http://issue.k8s.io/87583
+	// see https://issue.k8s.io/87583
 	if out.VolumeClaimTemplates != nil {
 		// copy so we don't modify the input
 		templatesCopy := make([]corev1.PersistentVolumeClaim, len(out.VolumeClaimTemplates))

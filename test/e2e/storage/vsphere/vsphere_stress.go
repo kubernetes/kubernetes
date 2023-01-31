@@ -72,11 +72,17 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
 		// Each iteration creates PVC, verify PV is provisioned, then creates a pod, verify volume is attached to the node, and then delete the pod and delete pvc.
 		instances = GetAndExpectIntEnvVar(VCPStressInstances)
-		framework.ExpectEqual(instances <= volumesPerNode*len(nodeList.Items), true, fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
-		framework.ExpectEqual(instances > len(scNames), true, "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
+		if instances > volumesPerNode*len(nodeList.Items) {
+			framework.Failf("Number of Instances should be less or equal: %v, got instead %v", volumesPerNode*len(nodeList.Items), instances)
+		}
+		if instances <= len(scNames) {
+			framework.Failf("VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes, got instead %v", instances)
+		}
 
 		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
-		framework.ExpectEqual(iterations > 0, true, "VCP_STRESS_ITERATIONS should be greater than 0")
+		if iterations <= 0 {
+			framework.Failf("VCP_STRESS_ITERATIONS should be greater than 0, got instead %v", iterations)
+		}
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -160,7 +166,9 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 
 		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
-		framework.ExpectEqual(isVolumeAttached, true)
+		if !isVolumeAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+		}
 		framework.ExpectNoError(verifyDiskAttachedError)
 
 		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))

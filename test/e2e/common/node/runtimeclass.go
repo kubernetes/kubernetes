@@ -62,7 +62,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler, nil)
 		defer deleteRuntimeClass(f, rcName)
-		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		eventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
 			"involvedObject.name":      pod.Name,
@@ -89,7 +89,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		defer deleteRuntimeClass(f, rcName)
-		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
 
@@ -104,7 +104,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func() {
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		defer deleteRuntimeClass(f, rcName)
-		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
@@ -134,7 +134,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			},
 		})
 		defer deleteRuntimeClass(f, rcName)
-		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)

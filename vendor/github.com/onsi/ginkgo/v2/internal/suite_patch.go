@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/onsi/ginkgo/v2/internal/interrupt_handler"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
@@ -27,8 +29,15 @@ func (suite *Suite) WalkTests(fn AnnotateFunc) {
 	}
 }
 
+func (suite *Suite) InPhaseBuildTree() bool {
+	return suite.phase == PhaseBuildTree
+}
+
 func (suite *Suite) ClearBeforeAndAfterSuiteNodes() {
-	suite.BuildTree()
+	// Don't build the tree multiple times, it results in multiple initing of tests
+	if !suite.InPhaseBuildTree() {
+		suite.BuildTree()
+	}
 	newNodes := Nodes{}
 	for _, node := range suite.suiteNodes {
 		if node.NodeType == types.NodeTypeBeforeSuite || node.NodeType == types.NodeTypeAfterSuite || node.NodeType == types.NodeTypeSynchronizedBeforeSuite || node.NodeType == types.NodeTypeSynchronizedAfterSuite {
@@ -50,7 +59,10 @@ func (suite *Suite) RunSpec(spec types.TestSpec, suiteLabels Labels, suitePath s
 	suite.reporter = reporters.NoopReporter{}
 	suite.writer = writer
 	suite.outputInterceptor = NoopOutputInterceptor{}
-	suite.interruptHandler = interrupt_handler.NewInterruptHandler(suiteConfig.Timeout, nil)
+	if suite.config.Timeout > 0 {
+		suite.deadline = time.Now().Add(suiteConfig.Timeout)
+	}
+	suite.interruptHandler = interrupt_handler.NewInterruptHandler(nil)
 	suite.config = suiteConfig
 
 	success := suite.runSpecs("", suiteLabels, suitePath, false, []Spec{spec.(Spec)})

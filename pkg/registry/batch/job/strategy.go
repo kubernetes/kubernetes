@@ -24,6 +24,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -93,13 +94,10 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) {
-		// Until this feature graduates to GA and soaks in clusters, we use an
-		// annotation to mark whether jobs are tracked with it.
-		addJobTrackingAnnotation(job)
-	} else {
-		dropJobTrackingAnnotation(job)
-	}
+	// While legacy tracking is supported, we use an annotation to mark whether
+	// jobs are tracked with finalizers.
+	addJobTrackingAnnotation(job)
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		job.Spec.PodFailurePolicy = nil
 	}
@@ -122,19 +120,11 @@ func hasJobTrackingAnnotation(job *batch.Job) bool {
 	return ok
 }
 
-func dropJobTrackingAnnotation(job *batch.Job) {
-	delete(job.Annotations, batchv1.JobTrackingFinalizer)
-}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && !hasJobTrackingAnnotation(oldJob) {
-		dropJobTrackingAnnotation(newJob)
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
 		newJob.Spec.PodFailurePolicy = nil
@@ -146,6 +136,13 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	// See metav1.ObjectMeta description for more information on Generation.
 	if !apiequality.Semantic.DeepEqual(newJob.Spec, oldJob.Spec) {
 		newJob.Generation = oldJob.Generation + 1
+	}
+
+	// While legacy tracking is supported, we use an annotation to mark whether
+	// jobs are tracked with finalizers. This annotation cannot be removed by
+	// users.
+	if hasJobTrackingAnnotation(oldJob) {
+		addJobTrackingAnnotation(newJob)
 	}
 }
 
@@ -170,9 +167,11 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidation
 	}
 	opts := validation.JobValidationOptions{
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
-		AllowTrackingAnnotation: utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers),
+		AllowTrackingAnnotation: true,
 	}
 	if oldJob != nil {
+		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
+
 		// Because we don't support the tracking with finalizers for already
 		// existing jobs, we allow the annotation only if the Job already had it,
 		// regardless of the feature gate.

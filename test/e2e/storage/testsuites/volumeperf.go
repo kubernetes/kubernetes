@@ -19,13 +19,13 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -93,14 +93,13 @@ func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframewor
 
 func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config      *storageframework.PerTestConfig
-		testCleanup func()
-		cs          clientset.Interface
-		ns          *v1.Namespace
-		scName      string
-		pvcs        []*v1.PersistentVolumeClaim
-		options     *storageframework.PerformanceTestOptions
-		stopCh      chan struct{}
+		config  *storageframework.PerTestConfig
+		cs      clientset.Interface
+		ns      *v1.Namespace
+		scName  string
+		pvcs    []*v1.PersistentVolumeClaim
+		options *storageframework.PerformanceTestOptions
+		stopCh  chan struct{}
 	}
 	var (
 		dInfo *storageframework.DriverInfo
@@ -128,7 +127,8 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
+
+	ginkgo.AfterEach(func() {
 		ginkgo.By("Closing informer channel")
 		close(l.stopCh)
 		ginkgo.By("Deleting all PVCs")
@@ -141,7 +141,6 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 		err := l.cs.StorageV1().StorageClasses().Delete(context.TODO(), l.scName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		l.testCleanup()
 	})
 
 	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func() {
@@ -150,7 +149,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 			ns:      f.Namespace,
 			options: dInfo.PerformanceTestOptions,
 		}
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 
 		// Stats for volume provisioning operation
 		// TODO: Add stats for attach, resize and snapshot
@@ -219,7 +218,9 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 	var min, max, sum time.Duration
 	for _, pvc := range pvcs {
 		pvcMetric, ok := stats.perObjectInterval[pvc.Name]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("PVC %s not found in perObjectInterval", pvc.Name)
+		}
 
 		elapsedTime := pvcMetric.elapsed
 		sum += elapsedTime
@@ -271,7 +272,9 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		// Check if PVC entered the bound state
 		if oldPVC.Status.Phase != v1.ClaimBound && newPVC.Status.Phase == v1.ClaimBound {
 			newPVCInterval, ok := pvcMetrics.perObjectInterval[newPVC.Name]
-			framework.ExpectEqual(ok, true, "PVC %s should exist in interval map already", newPVC.Name)
+			if !ok {
+				framework.Failf("PVC %s should exist in interval map already", newPVC.Name)
+			}
 			count++
 			newPVCInterval.enterDesiredState = now
 			newPVCInterval.elapsed = now.Sub(newPVCInterval.create)
@@ -299,9 +302,13 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldPVC, ok := oldObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead an old object of type %T", oldObj)
+				}
 				newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead a new object of type %T", newObj)
+				}
 
 				checkPVCBound(oldPVC, newPVC)
 			},

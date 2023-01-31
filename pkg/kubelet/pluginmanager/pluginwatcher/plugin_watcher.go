@@ -73,12 +73,12 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 			select {
 			case event := <-fsWatcher.Events:
 				//TODO: Handle errors by taking corrective measures
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Has(fsnotify.Create) {
 					err := w.handleCreateEvent(event)
 					if err != nil {
 						klog.ErrorS(err, "Error when handling create event", "event", event)
 					}
-				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				} else if event.Has(fsnotify.Remove) {
 					w.handleDeleteEvent(event)
 				}
 				continue

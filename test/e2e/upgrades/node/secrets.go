@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -144,8 +145,8 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 		"mode of file \"/etc/secret-volume/data\": -rw-r--r--",
 	}
 
-	f.TestContainerOutput("volume consume secrets", pod, 0, expectedOutput)
+	e2eoutput.TestContainerOutput(f, "volume consume secrets", pod, 0, expectedOutput)
 
 	expectedOutput = []string{"SECRET_DATA=keep it secret"}
-	f.TestContainerOutput("env consume secrets", pod, 1, expectedOutput)
+	e2eoutput.TestContainerOutput(f, "env consume secrets", pod, 1, expectedOutput)
 }

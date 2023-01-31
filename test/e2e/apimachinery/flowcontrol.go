@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	requestConcurrencyLimitMetricName = "apiserver_flowcontrol_request_concurrency_limit"
+	nominalConcurrencyLimitMetricName = "apiserver_flowcontrol_nominal_limit_seats"
 	priorityLevelLabelName            = "priority_level"
 )
 
@@ -146,7 +146,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 
 		ginkgo.By("getting request concurrency from metrics")
 		for i := range clients {
-			realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, clients[i].priorityLevelName)
+			realConcurrency, err := getPriorityLevelNominalConcurrency(f.ClientSet, clients[i].priorityLevelName)
 			framework.ExpectNoError(err)
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
 			if clients[i].concurrency < 1 {
@@ -219,7 +219,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		}
 
 		framework.Logf("getting real concurrency")
-		realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, priorityLevelName)
+		realConcurrency, err := getPriorityLevelNominalConcurrency(f.ClientSet, priorityLevelName)
 		framework.ExpectNoError(err)
 		for i := range clients {
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
@@ -256,8 +256,8 @@ var _ = SIGDescribe("API priority and fairness", func() {
 
 // createPriorityLevel creates a priority level with the provided assured
 // concurrency share.
-func createPriorityLevel(f *framework.Framework, priorityLevelName string, assuredConcurrencyShares int32) (*flowcontrol.PriorityLevelConfiguration, func()) {
-	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Create(
+func createPriorityLevel(f *framework.Framework, priorityLevelName string, nominalConcurrencyShares int32) (*flowcontrol.PriorityLevelConfiguration, func()) {
+	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(
 		context.TODO(),
 		&flowcontrol.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -266,7 +266,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					AssuredConcurrencyShares: assuredConcurrencyShares,
+					NominalConcurrencyShares: nominalConcurrencyShares,
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					},
@@ -276,11 +276,11 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return createdPriorityLevel, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta3().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
 	}
 }
 
-func getPriorityLevelConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
+func getPriorityLevelNominalConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
 	resp, err := c.CoreV1().RESTClient().Get().RequestURI("/metrics").DoRaw(context.TODO())
 	if err != nil {
 		return 0, err
@@ -299,7 +299,7 @@ func getPriorityLevelConcurrency(c clientset.Interface, priorityLevelName string
 			return 0, err
 		}
 		for _, metric := range v {
-			if string(metric.Metric[model.MetricNameLabel]) != requestConcurrencyLimitMetricName {
+			if string(metric.Metric[model.MetricNameLabel]) != nominalConcurrencyLimitMetricName {
 				continue
 			}
 			if string(metric.Metric[priorityLevelLabelName]) != priorityLevelName {
@@ -324,7 +324,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 		})
 	}
 
-	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Create(
+	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Create(
 		context.TODO(),
 		&flowcontrol.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{
@@ -354,7 +354,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return createdFlowSchema, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
 	}
 }
 
@@ -364,7 +364,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 // schema status, and (2) metrics. The function times out after 30 seconds.
 func waitForSteadyState(f *framework.Framework, flowSchemaName string, priorityLevelName string) {
 	framework.ExpectNoError(wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		fs, err := f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Get(context.TODO(), flowSchemaName, metav1.GetOptions{})
+		fs, err := f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Get(context.TODO(), flowSchemaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -376,7 +376,7 @@ func waitForSteadyState(f *framework.Framework, flowSchemaName string, priorityL
 			// hasn't been achieved.
 			return false, nil
 		}
-		_, err = getPriorityLevelConcurrency(f.ClientSet, priorityLevelName)
+		_, err = getPriorityLevelNominalConcurrency(f.ClientSet, priorityLevelName)
 		if err != nil {
 			if err == errPriorityLevelNotFound {
 				return false, nil

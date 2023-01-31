@@ -41,7 +41,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 )
 
@@ -74,12 +73,10 @@ type serviceCache struct {
 // Controller keeps cloud provider service resources
 // (like load balancers) in sync with the registry.
 type Controller struct {
-	cloud            cloudprovider.Interface
-	knownHosts       []*v1.Node
-	servicesToUpdate sets.String
-	kubeClient       clientset.Interface
-	clusterName      string
-	balancer         cloudprovider.LoadBalancer
+	cloud       cloudprovider.Interface
+	kubeClient  clientset.Interface
+	clusterName string
+	balancer    cloudprovider.LoadBalancer
 	// TODO(#85155): Stop relying on this and remove the cache completely.
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
@@ -88,16 +85,14 @@ type Controller struct {
 	eventRecorder       record.EventRecorder
 	nodeLister          corelisters.NodeLister
 	nodeListerSynced    cache.InformerSynced
-	// services that need to be synced
-	queue workqueue.RateLimitingInterface
-
-	// nodeSyncLock ensures there is only one instance of triggerNodeSync getting executed at one time
-	// and protects internal states (needFullSync) of nodeSync
-	nodeSyncLock sync.Mutex
-	// nodeSyncCh triggers nodeSyncLoop to run
-	nodeSyncCh chan interface{}
-	// needFullSync indicates if the nodeSyncInternal will do a full node sync on all LB services.
-	needFullSync bool
+	// services and nodes that need to be synced
+	serviceQueue workqueue.RateLimitingInterface
+	nodeQueue    workqueue.RateLimitingInterface
+	// lastSyncedNodes is used when reconciling node state and keeps track of
+	// the last synced set of nodes. This field is concurrently safe because the
+	// nodeQueue is serviced by only one go-routine, so node events are not
+	// processed concurrently.
+	lastSyncedNodes []*v1.Node
 }
 
 // New returns a new service controller to keep cloud provider service resources
@@ -113,16 +108,9 @@ func New(
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage(subSystemName, kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
-
 	registerMetrics()
 	s := &Controller{
 		cloud:            cloud,
-		knownHosts:       []*v1.Node{},
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
@@ -130,9 +118,9 @@ func New(
 		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		// nodeSyncCh has a size 1 buffer. Only one pending sync signal would be cached.
-		nodeSyncCh: make(chan interface{}, 1),
+		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
+		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
+		lastSyncedNodes:  []*v1.Node{},
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -163,7 +151,7 @@ func New(
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
-				s.triggerNodeSync()
+				s.enqueueNode(cur)
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldNode, ok := old.(*v1.Node)
@@ -176,17 +164,17 @@ func New(
 					return
 				}
 
-				if !shouldSyncNode(oldNode, curNode) {
+				if !shouldSyncUpdatedNode(oldNode, curNode) {
 					return
 				}
 
-				s.triggerNodeSync()
+				s.enqueueNode(curNode)
 			},
 			DeleteFunc: func(old interface{}) {
-				s.triggerNodeSync()
+				s.enqueueNode(old)
 			},
 		},
-		time.Duration(0),
+		nodeSyncPeriod,
 	)
 
 	if err := s.init(); err != nil {
@@ -196,15 +184,6 @@ func New(
 	return s, nil
 }
 
-// needFullSyncAndUnmark returns the value and needFullSync and marks the field to false.
-func (c *Controller) needFullSyncAndUnmark() bool {
-	c.nodeSyncLock.Lock()
-	defer c.nodeSyncLock.Unlock()
-	ret := c.needFullSync
-	c.needFullSync = false
-	return ret
-}
-
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (c *Controller) enqueueService(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -212,7 +191,17 @@ func (c *Controller) enqueueService(obj interface{}) {
 		runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
-	c.queue.Add(key)
+	c.serviceQueue.Add(key)
+}
+
+// obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
+func (c *Controller) enqueueNode(obj interface{}) {
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
+		return
+	}
+	c.nodeQueue.Add(key)
 }
 
 // Run starts a background goroutine that watches for changes to services that
@@ -227,7 +216,8 @@ func (c *Controller) enqueueService(obj interface{}) {
 // object.
 func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer runtime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer c.serviceQueue.ShutDown()
+	defer c.nodeQueue.ShutDown()
 
 	// Start event processing pipeline.
 	c.eventBroadcaster.StartStructuredLogging(0)
@@ -244,81 +234,60 @@ func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetr
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.worker, time.Second)
+		go wait.UntilWithContext(ctx, c.serviceWorker, time.Second)
 	}
 
-	go c.nodeSyncLoop(ctx, workers)
-	go wait.Until(c.triggerNodeSync, nodeSyncPeriod, ctx.Done())
+	// Initialize one go-routine servicing node events. This ensure we only
+	// process one node at any given moment in time
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { c.nodeWorker(ctx, workers) }, time.Second)
 
 	<-ctx.Done()
 }
 
-// triggerNodeSync triggers a nodeSync asynchronously
-func (c *Controller) triggerNodeSync() {
-	c.nodeSyncLock.Lock()
-	defer c.nodeSyncLock.Unlock()
-	newHosts, err := listWithPredicate(c.nodeLister, c.getNodeConditionPredicate())
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to retrieve current set of nodes from node lister: %v", err))
-		// if node list cannot be retrieve, trigger full node sync to be safe.
-		c.needFullSync = true
-	} else if !nodeSlicesEqualForLB(newHosts, c.knownHosts) {
-		// Here the last known state is recorded as knownHosts. For each
-		// LB update, the latest node list is retrieved. This is to prevent
-		// a stale set of nodes were used to be update loadbalancers when
-		// there are many loadbalancers in the clusters. nodeSyncInternal
-		// would be triggered until all loadbalancers are updated to the new state.
-		klog.V(2).Infof("Node changes detected, triggering a full node sync on all loadbalancer services")
-		c.needFullSync = true
-		c.knownHosts = newHosts
-	}
-
-	select {
-	case c.nodeSyncCh <- struct{}{}:
-		klog.V(4).Info("Triggering nodeSync")
-		return
-	default:
-		klog.V(4).Info("A pending nodeSync is already in queue")
-		return
+// worker runs a worker thread that just dequeues items, processes them, and marks them done.
+// It enforces that the syncHandler is never invoked concurrently with the same key.
+func (c *Controller) serviceWorker(ctx context.Context) {
+	for c.processNextServiceItem(ctx) {
 	}
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (c *Controller) worker(ctx context.Context) {
-	for c.processNextWorkItem(ctx) {
+func (c *Controller) nodeWorker(ctx context.Context, workers int) {
+	for c.processNextNodeItem(ctx, workers) {
 	}
 }
 
-// nodeSyncLoop takes nodeSync signal and triggers nodeSync
-func (c *Controller) nodeSyncLoop(ctx context.Context, workers int) {
-	klog.V(4).Info("nodeSyncLoop Started")
-	for {
-		select {
-		case <-c.nodeSyncCh:
-			klog.V(4).Info("nodeSync has been triggered")
-			c.nodeSyncInternal(ctx, workers)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *Controller) processNextWorkItem(ctx context.Context) bool {
-	key, quit := c.queue.Get()
+func (c *Controller) processNextNodeItem(ctx context.Context, workers int) bool {
+	key, quit := c.nodeQueue.Get()
 	if quit {
 		return false
 	}
-	defer c.queue.Done(key)
+	defer c.nodeQueue.Done(key)
+
+	for serviceToRetry := range c.syncNodes(ctx, workers) {
+		c.serviceQueue.Add(serviceToRetry)
+	}
+
+	c.nodeQueue.Forget(key)
+	return true
+}
+
+func (c *Controller) processNextServiceItem(ctx context.Context) bool {
+	key, quit := c.serviceQueue.Get()
+	if quit {
+		return false
+	}
+	defer c.serviceQueue.Done(key)
 
 	err := c.syncService(ctx, key.(string))
 	if err == nil {
-		c.queue.Forget(key)
+		c.serviceQueue.Forget(key)
 		return true
 	}
 
 	runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
-	c.queue.AddRateLimited(key)
+	c.serviceQueue.AddRateLimited(key)
 	return true
 }
 
@@ -453,7 +422,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 }
 
 func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := listWithPredicate(c.nodeLister, c.getNodeConditionPredicate())
+	nodes, err := listWithPredicates(c.nodeLister, getNodePredicatesForService(service)...)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +633,20 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 		return false
 	}
 
+	if !reflect.DeepEqual(x.AppProtocol, y.AppProtocol) {
+		return false
+	}
+
 	return true
+}
+
+func serviceKeys(services []*v1.Service) sets.String {
+	ret := sets.NewString()
+	for _, service := range services {
+		key, _ := cache.MetaNamespaceKeyFunc(service)
+		ret.Insert(key)
+	}
+	return ret
 }
 
 func nodeNames(nodes []*v1.Node) sets.String {
@@ -675,124 +657,65 @@ func nodeNames(nodes []*v1.Node) sets.String {
 	return ret
 }
 
-func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	return nodeNames(x).Equal(nodeNames(y))
-}
-
-func (c *Controller) getNodeConditionPredicate() NodeConditionPredicate {
-	return func(node *v1.Node) bool {
-		if _, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]; hasExcludeBalancerLabel {
-			return false
-		}
-
-		// Remove nodes that are about to be deleted by the cluster autoscaler.
-		for _, taint := range node.Spec.Taints {
-			if taint.Key == ToBeDeletedTaint {
-				klog.V(4).Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
-				return false
-			}
-		}
-
-		// If we have no info, don't accept
-		if len(node.Status.Conditions) == 0 {
-			return false
-		}
-		for _, cond := range node.Status.Conditions {
-			// We consider the node for load balancing only when its NodeReady condition status
-			// is ConditionTrue
-			if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
-				klog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			}
-		}
+func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
+	// Evaluate the individual node exclusion predicate before evaluating the
+	// compounded result of all predicates. We don't sync ETP=local services
+	// for changes on the readiness condition, hence if a node remains NotReady
+	// and a user adds the exclusion label we will need to sync as to make sure
+	// this change is reflected correctly on ETP=local services. The sync
+	// function compares lastSyncedNodes with the new (existing) set of nodes
+	// for each service, so services which are synced with the same set of nodes
+	// should be skipped internally in the sync function. This is needed as to
+	// trigger a global sync for all services and make sure no service gets
+	// skipped due to a changing node predicate.
+	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
+	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 }
 
-func shouldSyncNode(oldNode, newNode *v1.Node) bool {
-	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
-		return true
-	}
-
-	if !reflect.DeepEqual(oldNode.Labels, newNode.Labels) {
-		return true
-	}
-
-	return nodeReadyConditionStatus(oldNode) != nodeReadyConditionStatus(newNode)
-}
-
-func nodeReadyConditionStatus(node *v1.Node) v1.ConditionStatus {
-	for _, condition := range node.Status.Conditions {
-		if condition.Type != v1.NodeReady {
-			continue
-		}
-
-		return condition.Status
-	}
-
-	return ""
-}
-
-// nodeSyncInternal handles updating the hosts pointed to by all load
+// syncNodes handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
-func (c *Controller) nodeSyncInternal(ctx context.Context, workers int) {
+func (c *Controller) syncNodes(ctx context.Context, workers int) sets.String {
 	startTime := time.Now()
 	defer func() {
 		latency := time.Since(startTime).Seconds()
-		klog.V(4).Infof("It took %v seconds to finish nodeSyncInternal", latency)
+		klog.V(4).Infof("It took %v seconds to finish syncNodes", latency)
 		nodeSyncLatency.Observe(latency)
 	}()
 
-	if !c.needFullSyncAndUnmark() {
-		// The set of nodes in the cluster hasn't changed, but we can retry
-		// updating any services that we failed to update last time around.
-		// It is required to call `c.cache.get()` on each Service in case there was
-		// an update event that occurred between retries.
-		var servicesToUpdate []*v1.Service
-		for key := range c.servicesToUpdate {
-			cachedService, exist := c.cache.get(key)
-			if !exist {
-				klog.Errorf("Service %q should be in the cache but not", key)
-				continue
-			}
-			servicesToUpdate = append(servicesToUpdate, cachedService.state)
-		}
-
-		c.servicesToUpdate = c.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
-		return
-	}
 	klog.V(2).Infof("Syncing backends for all LB services.")
-
-	// Try updating all services, and save the failed ones to try again next
-	// round.
 	servicesToUpdate := c.cache.allServices()
 	numServices := len(servicesToUpdate)
-	c.servicesToUpdate = c.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
+	servicesToRetry := c.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
 	klog.V(2).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
-		numServices-len(c.servicesToUpdate), numServices)
+		numServices-len(servicesToRetry), numServices)
+	return servicesToRetry
 }
 
-// nodeSyncService syncs the nodes for one load balancer type service
-func (c *Controller) nodeSyncService(svc *v1.Service) bool {
+// nodeSyncService syncs the nodes for one load balancer type service. The return value
+// indicates if we should retry. Hence, this functions returns false if we've updated
+// load balancers and finished doing it successfully, or didn't try to at all because
+// there's no need. This function returns true if we tried to update load balancers and
+// failed, indicating to the caller that we should try again.
+func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.Node) bool {
+	retSuccess := false
+	retNeedRetry := true
 	if svc == nil || !wantsLoadBalancer(svc) {
-		return false
+		return retSuccess
+	}
+	newNodes = filterWithPredicates(newNodes, getNodePredicatesForService(svc)...)
+	oldNodes = filterWithPredicates(oldNodes, getNodePredicatesForService(svc)...)
+	if nodeNames(newNodes).Equal(nodeNames(oldNodes)) {
+		return retSuccess
 	}
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
-	hosts, err := listWithPredicate(c.nodeLister, c.getNodeConditionPredicate())
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("failed to retrieve node list: %v", err))
-		return true
-	}
-
-	if err := c.lockedUpdateLoadBalancerHosts(svc, hosts); err != nil {
+	if err := c.lockedUpdateLoadBalancerHosts(svc, newNodes); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", svc.Namespace, svc.Name, err))
-		return true
+		return retNeedRetry
 	}
 	klog.V(4).Infof("nodeSyncService finished successfully for service %s/%s", svc.Namespace, svc.Name)
-	return false
+	return retSuccess
 }
 
 // updateLoadBalancerHosts updates all existing load balancers so that
@@ -801,11 +724,20 @@ func (c *Controller) nodeSyncService(svc *v1.Service) bool {
 func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry sets.String) {
 	klog.V(4).Infof("Running updateLoadBalancerHosts(len(services)==%d, workers==%d)", len(services), workers)
 
+	// Include all nodes and let nodeSyncService filter and figure out if
+	// the update is relevant for the service in question.
+	nodes, err := listWithPredicates(c.nodeLister)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to retrieve node list: %v", err))
+		return serviceKeys(services)
+	}
+
 	// lock for servicesToRetry
 	servicesToRetry = sets.NewString()
 	lock := sync.Mutex{}
+
 	doWork := func(piece int) {
-		if shouldRetry := c.nodeSyncService(services[piece]); !shouldRetry {
+		if shouldRetry := c.nodeSyncService(services[piece], c.lastSyncedNodes, nodes); !shouldRetry {
 			return
 		}
 		lock.Lock()
@@ -813,8 +745,8 @@ func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1
 		key := fmt.Sprintf("%s/%s", services[piece].Namespace, services[piece].Name)
 		servicesToRetry.Insert(key)
 	}
-
 	workqueue.ParallelizeUntil(ctx, workers, len(services), doWork)
+	c.lastSyncedNodes = nodes
 	klog.V(4).Infof("Finished updateLoadBalancerHosts")
 	return servicesToRetry
 }
@@ -990,19 +922,75 @@ func (c *Controller) patchStatus(service *v1.Service, previousStatus, newStatus 
 // some set of criteria defined by the function.
 type NodeConditionPredicate func(node *v1.Node) bool
 
-// listWithPredicate gets nodes that matches predicate function.
-func listWithPredicate(nodeLister corelisters.NodeLister, predicate NodeConditionPredicate) ([]*v1.Node, error) {
+var (
+	allNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
+		nodeIncludedPredicate,
+		nodeUnTaintedPredicate,
+		nodeReadyPredicate,
+	}
+	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
+		nodeIncludedPredicate,
+		nodeUnTaintedPredicate,
+	}
+)
+
+func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
+	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		return etpLocalNodePredicates
+	}
+	return allNodePredicates
+}
+
+// We consider the node for load balancing only when the node is not labelled for exclusion.
+func nodeIncludedPredicate(node *v1.Node) bool {
+	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
+	return !hasExcludeBalancerLabel
+}
+
+// We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.
+func nodeUnTaintedPredicate(node *v1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == ToBeDeletedTaint {
+			return false
+		}
+	}
+	return true
+}
+
+// We consider the node for load balancing only when its NodeReady condition status is ConditionTrue
+func nodeReadyPredicate(node *v1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady {
+			return cond.Status == v1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// listWithPredicate gets nodes that matches all predicate functions.
+func listWithPredicates(nodeLister corelisters.NodeLister, predicates ...NodeConditionPredicate) ([]*v1.Node, error) {
 	nodes, err := nodeLister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
+	return filterWithPredicates(nodes, predicates...), nil
+}
 
+func filterWithPredicates(nodes []*v1.Node, predicates ...NodeConditionPredicate) []*v1.Node {
 	var filtered []*v1.Node
 	for i := range nodes {
-		if predicate(nodes[i]) {
+		if respectsPredicates(nodes[i], predicates...) {
 			filtered = append(filtered, nodes[i])
 		}
 	}
+	return filtered
+}
 
-	return filtered, nil
+func respectsPredicates(node *v1.Node, predicates ...NodeConditionPredicate) bool {
+	for _, p := range predicates {
+		if !p(node) {
+			return false
+		}
+	}
+	return true
 }

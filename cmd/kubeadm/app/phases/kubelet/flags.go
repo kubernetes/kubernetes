@@ -76,8 +76,6 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 	kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
-	// container runtime is by default docker in kubelet v1.23, so it can be removed in v1.26
-	kubeletFlags["container-runtime"] = "remote"
 
 	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
 	// and prevents its garbage collection

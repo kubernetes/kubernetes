@@ -50,6 +50,15 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	}
 
+	if requestInfo.Name != "" {
+		// Requests with metadata.name specified are usually executed as get
+		// requests in storage layer so their width should be 1.
+		// Example of such list requests:
+		// /apis/certificates.k8s.io/v1/certificatesigningrequests?fieldSelector=metadata.name%3Dcsr-xxs4m
+		// /api/v1/namespaces/test/configmaps?fieldSelector=metadata.name%3Dbig-deployment-1&limit=500&resourceVersion=0
+		return WorkEstimate{InitialSeats: e.config.MinimumSeats}
+	}
+
 	query := r.URL.Query()
 	listOptions := metav1.ListOptions{}
 	if err := metav1.Convert_url_Values_To_v1_ListOptions(&query, &listOptions, nil); err != nil {

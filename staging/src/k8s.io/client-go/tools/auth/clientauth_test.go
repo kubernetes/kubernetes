@@ -17,7 +17,6 @@ limitations under the License.
 package auth_test
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -42,7 +41,7 @@ func TestLoadFromFile(t *testing.T) {
 	}
 	for _, loadAuthInfoTest := range loadAuthInfoTests {
 		tt := loadAuthInfoTest
-		aifile, err := ioutil.TempFile("", "testAuthInfo")
+		aifile, err := os.CreateTemp("", "testAuthInfo")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

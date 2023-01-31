@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
@@ -69,7 +68,7 @@ const (
 	// defaultSyncBackOff is the default backoff period for syncService calls.
 	defaultSyncBackOff = 1 * time.Second
 	// maxSyncBackOff is the max backoff period for syncService calls.
-	maxSyncBackOff = 100 * time.Second
+	maxSyncBackOff = 1000 * time.Second
 
 	// controllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
@@ -87,10 +86,6 @@ func NewController(podInformer coreinformers.PodInformer,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
-
-	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1().RESTClient().GetRateLimiter())
-	}
 
 	endpointslicemetrics.RegisterMetrics()
 
@@ -169,6 +164,7 @@ func NewController(podInformer coreinformers.PodInformer,
 		endpointSliceTracker: c.endpointSliceTracker,
 		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
 		topologyCache:        c.topologyCache,
+		eventRecorder:        c.eventRecorder,
 	}
 
 	return c

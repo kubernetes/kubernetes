@@ -21,6 +21,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -83,5 +84,5 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 func (t *PersistentVolumeUpgradeTest) testPod(f *framework.Framework, cmd string) {
 	pod := e2epod.MakePod(f.Namespace.Name, nil, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
 	expectedOutput := []string{pvTestData}
-	f.TestContainerOutput("pod consumes pv", pod, 0, expectedOutput)
+	e2eoutput.TestContainerOutput(f, "pod consumes pv", pod, 0, expectedOutput)
 }

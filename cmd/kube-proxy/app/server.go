@@ -19,7 +19,6 @@ limitations under the License.
 package app
 
 import (
-	"errors"
 	goflag "flag"
 	"fmt"
 	"net"
@@ -58,14 +57,15 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
@@ -75,9 +75,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	"k8s.io/kubernetes/pkg/proxy/iptables"
-	"k8s.io/kubernetes/pkg/proxy/ipvs"
-	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -87,20 +84,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
-const (
-	proxyModeUserspace   = "userspace"
-	proxyModeIPTables    = "iptables"
-	proxyModeIPVS        = "ipvs"
-	proxyModeKernelspace = "kernelspace" //nolint:deadcode,varcheck
-)
+func init() {
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
-	CleanupAndExit() error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -158,7 +151,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"Only the previous minor version is meaningful, other values will not be allowed. "+
 			"The format is <major>.<minor>, e.g.: '1.16'. "+
 			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
-			"rather than being surprised when they are permanently removed in the release after that."+
+			"rather than being surprised when they are permanently removed in the release after that. "+
 			"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
@@ -172,18 +165,18 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable. This parameter is ignored if a config file is specified by --config.")
 	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'iptables' (Linux-only), 'ipvs' (Linux-only), 'kernelspace' (Windows-only), or 'userspace' (Linux/Windows, deprecated). The default value is 'iptables' on Linux and 'userspace' on Windows(will be 'kernelspace' in a future release)."+
+	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default) or 'ipvs'. On Windows the only supported value is 'kernelspace'."+
 		"This parameter is ignored if a config file is specified by --config.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n")+
+		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n")+"\n"+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
 	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
 	fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
-	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
+	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", pointer.Int32Deref(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
+	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", pointer.Int32Deref(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
 	fs.Int32Var(o.config.Conntrack.Min, "conntrack-min", *o.config.Conntrack.Min,
@@ -203,10 +196,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.DurationVar(&o.config.UDPIdleTimeout.Duration, "udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 
 	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
 	fs.BoolVar(&o.config.IPTables.MasqueradeAll, "masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
+	fs.BoolVar(o.config.IPTables.LocalhostNodePorts, "iptables-localhost-nodeports", pointer.BoolDeref(o.config.IPTables.LocalhostNodePorts, true), "If false Kube-proxy will disable the legacy behavior of allowing NodePort services to be accessed via localhost, This only applies to iptables mode and ipv4.")
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler. This parameter is ignored if a config file is specified by --config.")
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
@@ -269,10 +262,7 @@ func (o *Options) initWatcher() error {
 }
 
 func (o *Options) eventHandler(ent fsnotify.Event) {
-	eventOpIs := func(Op fsnotify.Op) bool {
-		return ent.Op&Op == Op
-	}
-	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
+	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
 		return
@@ -314,13 +304,13 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
+	if o.CleanupAndExit {
+		return cleanupAndExit()
+	}
+
 	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
-	}
-
-	if o.CleanupAndExit {
-		return proxyServer.CleanupAndExit()
 	}
 
 	o.proxyServer = proxyServer
@@ -496,7 +486,8 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Validate(); err != nil {
 				return fmt.Errorf("failed validate: %w", err)
 			}
-
+			// add feature enablement metrics
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			if err := opts.Run(); err != nil {
 				klog.ErrorS(err, "Error running ProxyServer")
 				return err
@@ -545,15 +536,15 @@ type ProxyServer struct {
 	Recorder               events.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
-	ProxyMode              string
+	ProxyMode              kubeproxyconfig.ProxyMode
 	NodeRef                *v1.ObjectReference
 	MetricsBindAddress     string
 	BindAddressHardFail    bool
 	EnableProfiling        bool
-	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
 	ConfigSyncPeriod       time.Duration
 	HealthzServer          healthcheck.ProxierHealthUpdater
+	localDetectorMode      kubeproxyconfig.LocalMode
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -616,13 +607,16 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
-func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
+func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
 
 	proxyMux := mux.NewPathRecorderMux("kube-proxy")
 	healthz.InstallHandler(proxyMux)
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
+		slis.SLIMetricsWithReset{}.Install(proxyMux)
+	}
 	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -749,7 +743,7 @@ func (s *ProxyServer) Run() error {
 			options.LabelSelector = labelSelector.String()
 		}))
 
-	// Create configs (i.e. Watches for Services and Endpoints or EndpointSlices)
+	// Create configs (i.e. Watches for Services and EndpointSlices)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
@@ -757,34 +751,31 @@ func (s *ProxyServer) Run() error {
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
-	if endpointsHandler, ok := s.Proxier.(config.EndpointsHandler); ok && !s.UseEndpointSlices {
-		endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
-		endpointsConfig.RegisterEventHandler(endpointsHandler)
-		go endpointsConfig.Run(wait.NeverStop)
-	} else {
-		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.ConfigSyncPeriod)
-		endpointSliceConfig.RegisterEventHandler(s.Proxier)
-		go endpointSliceConfig.Run(wait.NeverStop)
-	}
+	endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.ConfigSyncPeriod)
+	endpointSliceConfig.RegisterEventHandler(s.Proxier)
+	go endpointSliceConfig.Run(wait.NeverStop)
 
-	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
-	// functions must configure their shared informer event handlers first.
+	// This has to start after the calls to NewServiceConfig because that
+	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-		// Make an informer that selects for our nodename.
-		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
-			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
-			}))
-		nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
-		nodeConfig.RegisterEventHandler(s.Proxier)
-		go nodeConfig.Run(wait.NeverStop)
-
-		// This has to start after the calls to NewNodeConfig because that must
-		// configure the shared informer event handler first.
-		currentNodeInformerFactory.Start(wait.NeverStop)
+	// Make an informer that selects for our nodename.
+	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
+		}))
+	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
+	// https://issues.k8s.io/111321
+	if s.localDetectorMode == kubeproxyconfig.LocalModeNodeCIDR {
+		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
 	}
+	nodeConfig.RegisterEventHandler(s.Proxier)
+
+	go nodeConfig.Run(wait.NeverStop)
+
+	// This has to start after the calls to NewNodeConfig because that must
+	// configure the shared informer event handler first.
+	currentNodeInformerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
@@ -815,27 +806,6 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 	return 0, nil
 }
 
-// CleanupAndExit remove iptables rules and ipset/ipvs rules in ipvs proxy mode
-// and exit if success return nil
-func (s *ProxyServer) CleanupAndExit() error {
-	// cleanup IPv6 and IPv4 iptables rules
-	ipts := []utiliptables.Interface{
-		utiliptables.New(s.execer, utiliptables.ProtocolIPv4),
-		utiliptables.New(s.execer, utiliptables.ProtocolIPv6),
-	}
-	var encounteredError bool
-	for _, ipt := range ipts {
-		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface) || encounteredError
-	}
-	if encounteredError {
-		return errors.New("encountered an error while tearing down rules")
-	}
-
-	return nil
-}
-
 // detectNodeIP returns the nodeIP used by the proxier
 // The order of precedence is:
 // 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
@@ -847,7 +817,7 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if nodeIP == nil {
-		klog.V(0).InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+		klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 	return nodeIP

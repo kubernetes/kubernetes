@@ -21,7 +21,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,9 +29,19 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// WaitForAllJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
+// WaitForJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
 // when pods will run for a long time, or it will be racy.
-func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
+func WaitForJobPodsRunning(c clientset.Interface, ns, jobName string, expectedCount int32) error {
+	return waitForJobPodsInPhase(c, ns, jobName, expectedCount, v1.PodRunning)
+}
+
+// WaitForJobPodsSucceeded wait for all pods for the Job named JobName in namespace ns to become Succeeded.
+func WaitForJobPodsSucceeded(c clientset.Interface, ns, jobName string, expectedCount int32) error {
+	return waitForJobPodsInPhase(c, ns, jobName, expectedCount, v1.PodSucceeded)
+}
+
+// waitForJobPodsInPhase wait for all pods for the Job named JobName in namespace ns to be in a given phase.
+func waitForJobPodsInPhase(c clientset.Interface, ns, jobName string, expectedCount int32, phase v1.PodPhase) error {
 	return wait.Poll(framework.Poll, JobTimeout, func() (bool, error) {
 		pods, err := GetJobPods(c, ns, jobName)
 		if err != nil {
@@ -39,11 +49,11 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 		}
 		count := int32(0)
 		for _, p := range pods.Items {
-			if p.Status.Phase == v1.PodRunning {
+			if p.Status.Phase == phase {
 				count++
 			}
 		}
-		return count == parallelism, nil
+		return count == expectedCount, nil
 	})
 }
 
@@ -56,6 +66,27 @@ func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions i
 		}
 		return curr.Status.Succeeded == completions, nil
 	})
+}
+
+// WaitForJobFailed uses c to wait for the Job jobName in namespace ns to fail
+func WaitForJobFailed(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return isJobFailed(curr), nil
+	})
+}
+
+func isJobFailed(j *batchv1.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).

@@ -35,8 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -97,8 +99,7 @@ func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriv
 
 func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		hostExec          storageutils.HostExec
 		resource          *storageframework.VolumeResource
@@ -122,7 +123,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
@@ -179,8 +180,6 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 			l.resource = nil
 		}
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 
 		if l.hostExec != nil {
@@ -487,7 +486,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
+	e2eoutput.TestContainerOutput(f, "atomic-volume-subpath", pod, 0, []string{contents})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -670,7 +669,7 @@ func addMultipleWrites(container *v1.Container, file1 string, file2 string) {
 func testMultipleReads(f *framework.Framework, pod *v1.Pod, containerIndex int, file1 string, file2 string) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("multi_subpath", pod, containerIndex, []string{
+	e2eoutput.TestContainerOutput(f, "multi_subpath", pod, containerIndex, []string{
 		"content of file \"" + file1 + "\": mount-tester new file",
 		"content of file \"" + file2 + "\": mount-tester new file",
 	})
@@ -689,7 +688,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("subpath", pod, containerIndex, []string{
+	e2eoutput.TestContainerOutput(f, "subpath", pod, containerIndex, []string{
 		"content of file \"" + file + "\": mount-tester new file",
 	})
 
@@ -1003,7 +1002,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec storageutils.Hos
 	}
 	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
 
-	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true, nil, volumePath)
 
 	if podNode != nil {
 		mountPoints := globalMountPointsByNode[podNode.Name]
@@ -1040,5 +1039,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

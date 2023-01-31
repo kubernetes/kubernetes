@@ -36,7 +36,7 @@ func ValidateWebhookURL(fldPath *field.Path, URL string, forceHttps bool) field.
 			allErrors = append(allErrors, field.Invalid(fldPath, u.Scheme, "'https' is the only allowed URL scheme"+form))
 		}
 		if len(u.Host) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, u.Host, "host must be provided"+form))
+			allErrors = append(allErrors, field.Invalid(fldPath, u.Host, "host must be specified"+form))
 		}
 		if u.User != nil {
 			allErrors = append(allErrors, field.Invalid(fldPath, u.User.String(), "user information is not permitted in the URL"))

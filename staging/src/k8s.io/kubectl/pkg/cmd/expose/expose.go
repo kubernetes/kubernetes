@@ -381,10 +381,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		return o.PrintObj(actualObject, o.Out)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {

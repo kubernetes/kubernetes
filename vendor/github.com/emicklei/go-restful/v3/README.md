@@ -84,6 +84,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Route errors produce HTTP 404/405/406/415 errors, customizable using ServiceErrorHandler(...)
 - Configurable (trace) logging
 - Customizable gzip/deflate readers and writers using CompressorProvider registration
+- Inject your own http.Handler using the `HttpMiddlewareHandlerToFilter` function
 
 ## How to customize
 There are several hooks to customize the behavior of the go-restful package.
@@ -94,7 +95,7 @@ There are several hooks to customize the behavior of the go-restful package.
 - Trace logging
 - Compression
 - Encoders for other serializers
-- Use [jsoniter](https://github.com/json-iterator/go) by build this package using a tag, e.g. `go build -tags=jsoniter .` 
+- Use [jsoniter](https://github.com/json-iterator/go) by building this package using a build tag, e.g. `go build -tags=jsoniter .` 
 
 ## Resources
 

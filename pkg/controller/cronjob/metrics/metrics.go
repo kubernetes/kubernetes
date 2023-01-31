@@ -29,9 +29,9 @@ var (
 	CronJobCreationSkew = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      CronJobControllerSubsystem,
-			Name:           "cronjob_job_creation_skew_duration_seconds",
+			Name:           "job_creation_skew_duration_seconds",
 			Help:           "Time between when a cronjob is scheduled to be run, and when the corresponding job is created",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 			Buckets:        metrics.ExponentialBuckets(1, 2, 10),
 		},
 	)

@@ -32,9 +32,7 @@ const (
 
 func getMockCSIInlineVolSec(namespace *corev1.Namespace, driver *storagev1.CSIDriver) (*csiInlineVolSec, error) {
 	c := &csiInlineVolSec{
-		Handler:               admission.NewHandler(admission.Create),
-		enabled:               true,
-		inspectedFeatureGates: true,
+		Handler: admission.NewHandler(admission.Create),
 		defaultPolicy: podsecapi.Policy{
 			Enforce: podsecapi.LevelVersion{
 				Level:   defaultPodSecEnforceProfile,

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -355,6 +356,103 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.ExpectEqual(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Message, "Updated by an e2e test", "The Message returned was %v", statusUpdated.Status.Conditions[0].Message)
 		framework.Logf("Status.Condition: %#v", statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1])
 	})
+
+	/*
+		Release: v1.26
+		Testname: Namespace, apply update to a namespace
+		Description: When updating the namespace it MUST
+		succeed and the field MUST equal the new value.
+	*/
+	framework.ConformanceIt("should apply an update to a Namespace", func() {
+		var err error
+		var updatedNamespace *v1.Namespace
+		ns := f.Namespace.Name
+		cs := f.ClientSet
+
+		ginkgo.By(fmt.Sprintf("Updating Namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updatedNamespace, err = cs.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get Namespace %q", ns)
+
+			updatedNamespace.Labels[ns] = "updated"
+			updatedNamespace, err = cs.CoreV1().Namespaces().Update(context.TODO(), updatedNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update Namespace: %q", ns)
+		framework.ExpectEqual(updatedNamespace.ObjectMeta.Labels[ns], "updated", "Failed to update namespace %q. Current Labels: %#v", ns, updatedNamespace.Labels)
+		framework.Logf("Namespace %q now has labels, %#v", ns, updatedNamespace.Labels)
+	})
+
+	/*
+		Release: v1.26
+		Testname: Namespace, apply finalizer to a namespace
+		Description: Attempt to create a Namespace which MUST be succeed.
+		Updating the namespace with a fake finalizer MUST succeed. The
+		fake finalizer MUST be found. Removing the fake finalizer from
+		the namespace MUST succeed and MUST NOT be found.
+	*/
+	framework.ConformanceIt("should apply a finalizer to a Namespace", func() {
+
+		fakeFinalizer := v1.FinalizerName("e2e.example.com/fakeFinalizer")
+		var updatedNamespace *v1.Namespace
+		nsName := "e2e-ns-" + utilrand.String(5)
+
+		ginkgo.By(fmt.Sprintf("Creating namespace %q", nsName))
+		testNamespace, err := f.CreateNamespace(nsName, nil)
+		framework.ExpectNoError(err, "failed creating Namespace")
+		ns := testNamespace.ObjectMeta.Name
+		nsClient := f.ClientSet.CoreV1().Namespaces()
+		framework.Logf("Namespace %q has %#v", testNamespace.Name, testNamespace.Spec.Finalizers)
+
+		ginkgo.By(fmt.Sprintf("Adding e2e finalizer to namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updateNamespace, err := nsClient.Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get Namespace %q", ns)
+
+			updateNamespace.Spec.Finalizers = append(updateNamespace.Spec.Finalizers, fakeFinalizer)
+			updatedNamespace, err = nsClient.Finalize(context.TODO(), updateNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to add finalizer to the namespace: %q", ns)
+
+		var foundFinalizer bool
+		for _, item := range updatedNamespace.Spec.Finalizers {
+			if item == fakeFinalizer {
+				foundFinalizer = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundFinalizer, true, "Finalizer %q was not found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+
+		ginkgo.By(fmt.Sprintf("Removing e2e finalizer from namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updatedNamespace, err = nsClient.Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get namespace %q", ns)
+
+			var finalizerList []v1.FinalizerName
+			for _, item := range updatedNamespace.Spec.Finalizers {
+				if item != fakeFinalizer {
+					finalizerList = append(finalizerList, item)
+				}
+			}
+			updatedNamespace.Spec.Finalizers = finalizerList
+			updatedNamespace, err = nsClient.Finalize(context.TODO(), updatedNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to remove finalizer from namespace: %q", ns)
+
+		foundFinalizer = false
+		for _, item := range updatedNamespace.Spec.Finalizers {
+			if item == fakeFinalizer {
+				foundFinalizer = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundFinalizer, false, "Finalizer %q was found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+	})
+
 })
 
 func unstructuredToNamespace(obj *unstructured.Unstructured) (*v1.Namespace, error) {

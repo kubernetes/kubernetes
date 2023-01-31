@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // transformObject takes the object as returned by storage and ensures it is in
@@ -129,7 +128,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx context.Context, scope *RequestScope, trace *utiltrace.Trace, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+func transformResponseObject(ctx context.Context, scope *RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
 		scope.err(err, w, req)
@@ -147,7 +146,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, trace *ut
 		return
 	}
 	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj, false)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed

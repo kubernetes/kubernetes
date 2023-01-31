@@ -27,11 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -88,11 +85,10 @@ func makeNode(podCIDRs []string, addSpecDynamicConfig bool, addStatusDynamicConf
 
 func TestDropFields(t *testing.T) {
 	testCases := []struct {
-		name                    string
-		node                    *api.Node
-		oldNode                 *api.Node
-		compareNode             *api.Node
-		enableNodeDynamicConfig bool
+		name        string
+		node        *api.Node
+		oldNode     *api.Node
+		compareNode *api.Node
 	}{
 		{
 			name:        "nil pod cidrs",
@@ -127,60 +123,45 @@ func TestDropFields(t *testing.T) {
 			compareNode: makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 		},
 		{
-			name:                    "new with no Spec.ConfigSource and no Status.Config , enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, false, false),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
+			name:        "new with no Spec.ConfigSource and no Status.Config",
+			node:        makeNode(nil, false, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:                    "new with Spec.ConfigSource and no Status.Config, enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, false),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
+			name:        "new with Spec.ConfigSource and no Status.Config",
+			node:        makeNode(nil, true, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
+			name:        "new with Spec.ConfigSource and Status.Config",
+			node:        makeNode(nil, true, true),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has none), enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, false, false),
-			compareNode:             makeNode(nil, false, true),
+			name:        "update with Spec.ConfigSource and Status.Config (old has none)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, false, false),
+			compareNode: makeNode(nil, false, true),
 		},
 		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has them), enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, true, true),
-			compareNode:             makeNode(nil, true, true),
+			name:        "update with Spec.ConfigSource and Status.Config (old has them)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, true, true),
+			compareNode: makeNode(nil, true, true),
 		},
 		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has Status.Config), enableNodeDynamicConfig disabled",
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, false, true),
-			compareNode:             makeNode(nil, false, true),
-		},
-		{
-			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig enabled",
-			enableNodeDynamicConfig: true,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, true, true),
+			name:        "update with Spec.ConfigSource and Status.Config (old has Status.Config)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, false, true),
+			compareNode: makeNode(nil, false, true),
 		},
 	}
 
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
-
 			dropDisabledFields(tc.node, tc.oldNode)
 
 			old := tc.oldNode.DeepCopy()

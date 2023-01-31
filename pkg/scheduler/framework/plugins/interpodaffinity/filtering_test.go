@@ -1262,7 +1262,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 
 			// Add test.addedPod to state1 and verify it is equal to allPodsState.
 			nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
-			if err := ipa.AddPod(ctx, cycleState, test.pendingPod, framework.NewPodInfo(test.addedPod), nodeInfo); err != nil {
+			if err := ipa.AddPod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error adding pod to meta: %v", err)
 			}
 
@@ -1284,7 +1284,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			}
 
 			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, framework.NewPodInfo(test.addedPod), nodeInfo); err != nil {
+			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}
 			if !reflect.DeepEqual(originalState, state) {
@@ -1439,7 +1439,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, nil)
-			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, framework.NewPodInfo(tt.pod), l)
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, mustNewPodInfo(t, tt.pod), l)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)
 			}
@@ -1457,4 +1457,12 @@ func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *frame
 		t.Fatal(err)
 	}
 	return nodeInfo
+}
+
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
 }

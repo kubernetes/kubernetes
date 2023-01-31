@@ -23,27 +23,22 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/url"
 	"os"
 	"os/exec"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	gomegatypes "github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -57,28 +52,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	uexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
-	// Minimal number of nodes for the cluster to be considered large.
-	largeClusterThreshold = 100
-
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
-
-	// AllContainers specifies that all containers be visited
-	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-	AllContainers = InitContainers | Containers | EphemeralContainers
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -328,7 +308,10 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 		}
 		return false, nil
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("wait for service account %q in namespace %q: %w", serviceAccountName, ns, err)
+	}
+	return nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -540,199 +523,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// LookForStringInPodExec looks for the given string in the output of a command
-// executed in the first container of specified pod.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForStringInPodExecToContainer(ns, podName, "", command, expectedString, timeout)
-}
-
-// LookForStringInPodExecToContainer looks for the given string in the output of a
-// command executed in specified pod container, or first container if not specified.
-func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns)}
-		if len(containerName) > 0 {
-			args = append(args, fmt.Sprintf("--container=%s", containerName))
-		}
-		args = append(args, "--")
-		args = append(args, command...)
-		return RunKubectlOrDie(ns, args...)
-	})
-}
-
-// lookForString looks for the given string in the output of fn, repeatedly calling fn until
-// the timeout is reached or the string is found. Returns last log and possibly
-// error if the string was not found.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
-	for t := time.Now(); time.Since(t) < timeout; time.Sleep(Poll) {
-		result = fn()
-		if strings.Contains(result, expectedString) {
-			return
-		}
-	}
-	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
-	return
-}
-
-// KubectlBuilder is used to build, customize and execute a kubectl Command.
-// Add more functions to customize the builder as needed.
-type KubectlBuilder struct {
-	cmd     *exec.Cmd
-	timeout <-chan time.Time
-}
-
-// NewKubectlCommand returns a KubectlBuilder for running kubectl.
-func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
-	b := new(KubectlBuilder)
-	tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, namespace)
-	b.cmd = tk.KubectlCmd(args...)
-	return b
-}
-
-// WithEnv sets the given environment and returns itself.
-func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
-	b.cmd.Env = env
-	return b
-}
-
-// WithTimeout sets the given timeout and returns itself.
-func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
-	b.timeout = t
-	return b
-}
-
-// WithStdinData sets the given data to stdin and returns itself.
-func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
-	b.cmd.Stdin = strings.NewReader(data)
-	return &b
-}
-
-// WithStdinReader sets the given reader and returns itself.
-func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
-	b.cmd.Stdin = reader
-	return &b
-}
-
-// ExecOrDie runs the kubectl executable or dies if error occurs.
-func (b KubectlBuilder) ExecOrDie(namespace string) string {
-	str, err := b.Exec()
-	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
-	// Note that we're still dying after retrying so that we can get visibility to triage it further.
-	if isTimeout(err) {
-		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
-		time.Sleep(2 * time.Second)
-		retryStr, retryErr := RunKubectl(namespace, "version")
-		Logf("stdout: %q", retryStr)
-		Logf("err: %v", retryErr)
-	}
-	ExpectNoError(err)
-	return str
-}
-
-func isTimeout(err error) bool {
-	switch err := err.(type) {
-	case *url.Error:
-		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
-			return true
-		}
-	case net.Error:
-		if err.Timeout() {
-			return true
-		}
-	}
-	return false
-}
-
-// Exec runs the kubectl executable.
-func (b KubectlBuilder) Exec() (string, error) {
-	stdout, _, err := b.ExecWithFullOutput()
-	return stdout, err
-}
-
-// ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
-func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := b.cmd
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
-	if err := cmd.Start(); err != nil {
-		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
-	}
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- cmd.Wait()
-	}()
-	select {
-	case err := <-errCh:
-		if err != nil {
-			var rc = 127
-			if ee, ok := err.(*exec.ExitError); ok {
-				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
-				Logf("rc: %d", rc)
-			}
-			return stdout.String(), stderr.String(), uexec.CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
-				Code: rc,
-			}
-		}
-	case <-b.timeout:
-		b.cmd.Process.Kill()
-		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
-	}
-	Logf("stderr: %q", stderr.String())
-	Logf("stdout: %q", stdout.String())
-	return stdout.String(), stderr.String(), nil
-}
-
-// RunKubectlOrDie is a convenience wrapper over kubectlBuilder
-func RunKubectlOrDie(namespace string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).ExecOrDie(namespace)
-}
-
-// RunKubectl is a convenience wrapper over kubectlBuilder
-func RunKubectl(namespace string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).Exec()
-}
-
-// RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
-// It will also return the command's stderr.
-func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
-	return NewKubectlCommand(namespace, args...).ExecWithFullOutput()
-}
-
-// RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlOrDieInput(namespace string, data string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).ExecOrDie(namespace)
-}
-
-// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlInput(namespace string, data string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).Exec()
-}
-
-// RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
-func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
-	}
-	return RunKubemciCmd(args...)
-}
-
-// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
-// It assumes that kubemci exists in PATH.
-func RunKubemciCmd(args ...string) (string, error) {
-	// kubemci is assumed to be in PATH.
-	kubemci := "kubemci"
-	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
-
-	b.cmd = exec.Command(kubemci, args...)
-	return b.Exec()
-}
-
 // StartCmdAndStreamOutput returns stdout and stderr after starting the given cmd.
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
@@ -753,449 +543,6 @@ func TryKill(cmd *exec.Cmd) {
 	if err := cmd.Process.Kill(); err != nil {
 		Logf("ERROR failed to kill command %v! The process may leak", cmd)
 	}
-}
-
-// testContainerOutputMatcher runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using the given matcher.
-func (f *Framework) testContainerOutputMatcher(scenarioName string,
-	pod *v1.Pod,
-	containerIndex int,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
-	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
-	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
-		Failf("Invalid container index: %d", containerIndex)
-	}
-	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
-}
-
-// ContainerType signifies container type
-type ContainerType int
-
-const (
-	// Containers is for normal containers
-	Containers ContainerType = 1 << iota
-	// InitContainers is for init containers
-	InitContainers
-	// EphemeralContainers is for ephemeral containers
-	EphemeralContainers
-)
-
-// allFeatureEnabledContainers returns a ContainerType mask which includes all container
-// types except for the ones guarded by feature gate.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func allFeatureEnabledContainers() ContainerType {
-	return AllContainers
-}
-
-// ContainerVisitor is called with each container spec, and returns true
-// if visiting should continue.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
-
-// visitContainers invokes the visitor function with a pointer to every container
-// spec in the given pod spec with type set in mask. If visitor returns false,
-// visiting is short-circuited. visitContainers returns true if visiting completes,
-// false if visiting was short-circuited.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
-	if mask&InitContainers != 0 {
-		for i := range podSpec.InitContainers {
-			if !visitor(&podSpec.InitContainers[i], InitContainers) {
-				return false
-			}
-		}
-	}
-	if mask&Containers != 0 {
-		for i := range podSpec.Containers {
-			if !visitor(&podSpec.Containers[i], Containers) {
-				return false
-			}
-		}
-	}
-	if mask&EphemeralContainers != 0 {
-		for i := range podSpec.EphemeralContainers {
-			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
-// It then tests that the matcher with each expectedOutput matches the output of the specified container.
-func (f *Framework) MatchContainerOutput(
-	pod *v1.Pod,
-	containerName string,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
-	ns := pod.ObjectMeta.Namespace
-	if ns == "" {
-		ns = f.Namespace.Name
-	}
-	podClient := f.PodClientNS(ns)
-
-	createdPod := podClient.Create(pod)
-	defer func() {
-		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-	}()
-
-	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
-
-	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get pod status: %v", err)
-	}
-
-	if podErr != nil {
-		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = visitContainers(&podStatus.Spec, allFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
-			if err != nil {
-				Logf("Failed to get logs from node %q pod %q container %q: %v",
-					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
-			} else {
-				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
-			}
-			return true
-		})
-		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
-	}
-
-	Logf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
-	if err != nil {
-		Logf("Failed to get logs from node %q pod %q container %q. %v",
-			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
-	}
-
-	for _, expected := range expectedOutput {
-		m := matcher(expected)
-		matches, err := m.Match(logs)
-		if err != nil {
-			return fmt.Errorf("expected %q in container output: %v", expected, err)
-		} else if !matches {
-			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
-		}
-	}
-
-	return nil
-}
-
-// EventsLister is a func that lists events.
-type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
-
-// dumpEventsInNamespace dumps events in the given namespace.
-func dumpEventsInNamespace(eventsLister EventsLister, namespace string) {
-	ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
-	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	ExpectNoError(err, "failed to list events in namespace %q", namespace)
-
-	ginkgo.By(fmt.Sprintf("Found %d events.", len(events.Items)))
-	// Sort events by their first timestamp
-	sortedEvents := events.Items
-	if len(sortedEvents) > 1 {
-		sort.Sort(byFirstTimestamp(sortedEvents))
-	}
-	for _, e := range sortedEvents {
-		Logf("At %v - event for %v: %v %v: %v", e.FirstTimestamp, e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
-	}
-	// Note that we don't wait for any Cleanup to propagate, which means
-	// that if you delete a bunch of pods right before ending your test,
-	// you may or may not see the killing/deletion/Cleanup events.
-}
-
-// DumpAllNamespaceInfo dumps events, pods and nodes information in the given namespace.
-func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
-	dumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
-		return c.CoreV1().Events(ns).List(context.TODO(), opts)
-	}, namespace)
-
-	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
-
-	// If cluster is large, then the following logs are basically useless, because:
-	// 1. it takes tens of minutes or hours to grab all of them
-	// 2. there are so many of them that working with them are mostly impossible
-	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := TestContext.MaxNodesToGather
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		Logf("unable to fetch node list: %v", err)
-		return
-	}
-	if len(nodes.Items) <= maxNodesForDump {
-		dumpAllNodeInfo(c, nodes)
-	} else {
-		Logf("skipping dumping cluster info - cluster too large")
-	}
-}
-
-// byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
-type byFirstTimestamp []v1.Event
-
-func (o byFirstTimestamp) Len() int      { return len(o) }
-func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byFirstTimestamp) Less(i, j int) bool {
-	if o[i].FirstTimestamp.Equal(&o[j].FirstTimestamp) {
-		return o[i].InvolvedObject.Name < o[j].InvolvedObject.Name
-	}
-	return o[i].FirstTimestamp.Before(&o[j].FirstTimestamp)
-}
-
-func dumpAllNodeInfo(c clientset.Interface, nodes *v1.NodeList) {
-	names := make([]string, len(nodes.Items))
-	for ix := range nodes.Items {
-		names[ix] = nodes.Items[ix].Name
-	}
-	DumpNodeDebugInfo(c, names, Logf)
-}
-
-// DumpNodeDebugInfo dumps debug information of the given nodes.
-func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{})) {
-	for _, n := range nodeNames {
-		logFunc("\nLogging node info for node %v", n)
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), n, metav1.GetOptions{})
-		if err != nil {
-			logFunc("Error getting node info %v", err)
-		}
-		logFunc("Node Info: %v", node)
-
-		logFunc("\nLogging kubelet events for node %v", n)
-		for _, e := range getNodeEvents(c, n) {
-			logFunc("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
-				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
-		}
-		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
-		podList, err := getKubeletPods(c, n)
-		if err != nil {
-			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
-			continue
-		}
-		for _, p := range podList.Items {
-			logFunc("%v started at %v (%d+%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
-			for _, c := range p.Status.InitContainerStatuses {
-				logFunc("\tInit container %v ready: %v, restart count %v",
-					c.Name, c.Ready, c.RestartCount)
-			}
-			for _, c := range p.Status.ContainerStatuses {
-				logFunc("\tContainer %v ready: %v, restart count %v",
-					c.Name, c.Ready, c.RestartCount)
-			}
-		}
-		e2emetrics.HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
-		// TODO: Log node resource info
-	}
-}
-
-// getKubeletPods retrieves the list of pods on the kubelet.
-func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	var client restclient.Result
-	finished := make(chan struct{}, 1)
-	go func() {
-		// call chain tends to hang in some cases when Node is not ready. Add an artificial timeout for this call. #22165
-		client = c.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, KubeletPort)).
-			Suffix("pods").
-			Do(context.TODO())
-
-		finished <- struct{}{}
-	}()
-	select {
-	case <-finished:
-		result := &v1.PodList{}
-		if err := client.Into(result); err != nil {
-			return &v1.PodList{}, err
-		}
-		return result, nil
-	case <-time.After(PodGetTimeout):
-		return &v1.PodList{}, fmt.Errorf("Waiting up to %v for getting the list of pods", PodGetTimeout)
-	}
-}
-
-// logNodeEvents logs kubelet events from the given node. This includes kubelet
-// restart and node unhealthy events. Note that listing events like this will mess
-// with latency metrics, beware of calling it during a test.
-func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
-	selector := fields.Set{
-		"involvedObject.kind":      "Node",
-		"involvedObject.name":      nodeName,
-		"involvedObject.namespace": metav1.NamespaceAll,
-		"source":                   "kubelet",
-	}.AsSelector().String()
-	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := c.CoreV1().Events(metav1.NamespaceSystem).List(context.TODO(), options)
-	if err != nil {
-		Logf("Unexpected error retrieving node events %v", err)
-		return []v1.Event{}
-	}
-	return events.Items
-}
-
-// WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become schedulable.
-func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
-		return nil
-	}
-
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
-	return wait.PollImmediate(
-		30*time.Second,
-		timeout,
-		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
-	)
-}
-
-// AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
-func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
-	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
-}
-
-// ExpectNodeHasLabel expects that the given node has the given label pair.
-func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
-	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
-	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	ExpectEqual(node.Labels[labelKey], labelValue)
-}
-
-// RemoveLabelOffNode is for cleaning up labels temporarily added to node,
-// won't fail if target label doesn't exist or has been removed.
-func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
-	ginkgo.By("removing the label " + labelKey + " off the node " + nodeName)
-	ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
-
-	ginkgo.By("verifying the node doesn't have the label " + labelKey)
-	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
-}
-
-// ExpectNodeHasTaint expects that the node has the given taint.
-func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	ginkgo.By("verifying the node has the taint " + taint.ToString())
-	if has, err := NodeHasTaint(c, nodeName, taint); !has {
-		ExpectNoError(err)
-		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
-	}
-}
-
-// NodeHasTaint returns true if the node has the given taint, else returns false.
-func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool, error) {
-	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	nodeTaints := node.Spec.Taints
-
-	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
-		return false, nil
-	}
-	return true, nil
-}
-
-// RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
-// inside of a shell.
-func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
-}
-
-// RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
-// inside of a shell. It will also return the command's stderr.
-func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
-	return RunKubectlWithFullOutput(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
-}
-
-// RunHostCmdOrDie calls RunHostCmd and dies on error.
-func RunHostCmdOrDie(ns, name, cmd string) string {
-	stdout, err := RunHostCmd(ns, name, cmd)
-	Logf("stdout: %v", stdout)
-	ExpectNoError(err)
-	return stdout
-}
-
-// RunHostCmdWithRetries calls RunHostCmd and retries all errors
-// until it succeeds or the specified timeout expires.
-// This can be used with idempotent commands to deflake transient Node issues.
-func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration) (string, error) {
-	start := time.Now()
-	for {
-		out, err := RunHostCmd(ns, name, cmd)
-		if err == nil {
-			return out, nil
-		}
-		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
-		}
-		Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
-		time.Sleep(interval)
-	}
-}
-
-// AllNodesReady checks whether all registered nodes are ready. Setting -1 on
-// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
-// TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
-// and figure out how to do it in a configurable way, as we can't expect all setups to run
-// default test add-ons.
-func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
-		return nil
-	}
-
-	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
-
-	var notReady []*v1.Node
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		notReady = nil
-		// It should be OK to list unschedulable Nodes here.
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if !e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true) {
-				notReady = append(notReady, node)
-			}
-		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
-		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
-	})
-
-	if err != nil && err != wait.ErrWaitTimeout {
-		return err
-	}
-
-	if len(notReady) > TestContext.AllowedNotReadyNodes {
-		msg := ""
-		for _, node := range notReady {
-			msg = fmt.Sprintf("%s, %s", msg, node.Name)
-		}
-		return fmt.Errorf("Not ready nodes: %#v", msg)
-	}
-	return nil
-}
-
-// LookForStringInLog looks for the given string in the log of a specific pod container
-func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie(ns, "logs", podName, container)
-	})
 }
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
@@ -1320,25 +667,6 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 	return ips.List()
 }
 
-// CreateEmptyFileOnPod creates empty file at given path on the pod.
-// TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
-func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
-	return err
-}
-
-// DumpDebugInfo dumps debug info of tests.
-func DumpDebugInfo(c clientset.Interface, ns string) {
-	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	for _, s := range sl.Items {
-		desc, _ := RunKubectl(ns, "describe", "po", s.Name)
-		Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
-
-		l, _ := RunKubectl(ns, "logs", s.Name, "--tail=100")
-		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
-	}
-}
-
 // PrettyPrintJSON converts metrics to JSON format.
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
@@ -1354,20 +682,10 @@ func PrettyPrintJSON(metrics interface{}) string {
 	return formatted.String()
 }
 
-// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
-func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
-}
-
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
 //
-//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	testContext         cancellation signal across API boundaries, e.g: context.TODO()
 //	dc                  sets up a client to the API
 //	resourceType        specify the type of resource
 //	namespace           select a namespace

@@ -1,3 +1,0 @@
-# Ensure that openapi definitions are not ignored to ensure that
-# openshift/origin can vendor them.
-!zz_generated.openapi.go

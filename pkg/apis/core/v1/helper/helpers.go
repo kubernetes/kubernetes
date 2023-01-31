@@ -39,7 +39,7 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
 	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+	if errs := validation.IsQualifiedName(nameForQuota); len(errs) != 0 {
 		return false
 	}
 	return true

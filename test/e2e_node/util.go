@@ -310,7 +310,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
 	if err != nil {
 		return nil, nil, err
 	}

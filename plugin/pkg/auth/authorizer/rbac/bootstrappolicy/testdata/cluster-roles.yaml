@@ -935,6 +935,7 @@ items:
     - /livez
     - /livez/*
     - /metrics
+    - /metrics/slis
     - /readyz
     - /readyz/*
     verbs:

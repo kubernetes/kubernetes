@@ -165,6 +165,18 @@ func FormParameter(name, description string) *Parameter {
 	return p
 }
 
+// MultiPartFormParameter creates a new Parameter of kind Form (using multipart/form-data) for documentation purposes.
+// It is initialized as required with string as its DataType.
+func (w *WebService) MultiPartFormParameter(name, description string) *Parameter {
+	return MultiPartFormParameter(name, description)
+}
+
+func MultiPartFormParameter(name, description string) *Parameter {
+	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
+	p.beMultiPartForm()
+	return p
+}
+
 // Route creates a new Route using the RouteBuilder and add to the ordered list of Routes.
 func (w *WebService) Route(builder *RouteBuilder) *WebService {
 	w.routesLock.Lock()

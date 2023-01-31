@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 )
 
 type pidProvider func() int
@@ -39,7 +39,12 @@ var (
 	defaultExecutablePathProvider executablePathProvider = os.Executable
 	defaultCommandArgsProvider    commandArgsProvider    = func() []string { return os.Args }
 	defaultOwnerProvider          ownerProvider          = user.Current
-	defaultRuntimeNameProvider    runtimeNameProvider    = func() string { return runtime.Compiler }
+	defaultRuntimeNameProvider    runtimeNameProvider    = func() string {
+		if runtime.Compiler == "gc" {
+			return "go"
+		}
+		return runtime.Compiler
+	}
 	defaultRuntimeVersionProvider runtimeVersionProvider = runtime.Version
 	defaultRuntimeOSProvider      runtimeOSProvider      = func() string { return runtime.GOOS }
 	defaultRuntimeArchProvider    runtimeArchProvider    = func() string { return runtime.GOARCH }
@@ -115,14 +120,14 @@ type processRuntimeDescriptionDetector struct{}
 // Detect returns a *Resource that describes the process identifier (PID) of the
 // executing process.
 func (processPIDDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.ProcessPIDKey.Int(pid())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessPIDKey.Int(pid())), nil
 }
 
 // Detect returns a *Resource that describes the name of the process executable.
 func (processExecutableNameDetector) Detect(ctx context.Context) (*Resource, error) {
 	executableName := filepath.Base(commandArgs()[0])
 
-	return NewWithAttributes(semconv.ProcessExecutableNameKey.String(executableName)), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessExecutableNameKey.String(executableName)), nil
 }
 
 // Detect returns a *Resource that describes the full path of the process executable.
@@ -132,13 +137,13 @@ func (processExecutablePathDetector) Detect(ctx context.Context) (*Resource, err
 		return nil, err
 	}
 
-	return NewWithAttributes(semconv.ProcessExecutablePathKey.String(executablePath)), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessExecutablePathKey.String(executablePath)), nil
 }
 
 // Detect returns a *Resource that describes all the command arguments as received
 // by the process.
 func (processCommandArgsDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.ProcessCommandArgsKey.Array(commandArgs())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgsKey.StringSlice(commandArgs())), nil
 }
 
 // Detect returns a *Resource that describes the username of the user that owns the
@@ -149,18 +154,18 @@ func (processOwnerDetector) Detect(ctx context.Context) (*Resource, error) {
 		return nil, err
 	}
 
-	return NewWithAttributes(semconv.ProcessOwnerKey.String(owner.Username)), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessOwnerKey.String(owner.Username)), nil
 }
 
 // Detect returns a *Resource that describes the name of the compiler used to compile
 // this process image.
 func (processRuntimeNameDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.ProcessRuntimeNameKey.String(runtimeName())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessRuntimeNameKey.String(runtimeName())), nil
 }
 
 // Detect returns a *Resource that describes the version of the runtime of this process.
 func (processRuntimeVersionDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.ProcessRuntimeVersionKey.String(runtimeVersion())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessRuntimeVersionKey.String(runtimeVersion())), nil
 }
 
 // Detect returns a *Resource that describes the runtime of this process.
@@ -169,69 +174,7 @@ func (processRuntimeDescriptionDetector) Detect(ctx context.Context) (*Resource,
 		"go version %s %s/%s", runtimeVersion(), runtimeOS(), runtimeArch())
 
 	return NewWithAttributes(
+		semconv.SchemaURL,
 		semconv.ProcessRuntimeDescriptionKey.String(runtimeDescription),
 	), nil
-}
-
-// WithProcessPID adds an attribute with the process identifier (PID) to the
-// configured Resource.
-func WithProcessPID() Option {
-	return WithDetectors(processPIDDetector{})
-}
-
-// WithProcessExecutableName adds an attribute with the name of the process
-// executable to the configured Resource.
-func WithProcessExecutableName() Option {
-	return WithDetectors(processExecutableNameDetector{})
-}
-
-// WithProcessExecutablePath adds an attribute with the full path to the process
-// executable to the configured Resource.
-func WithProcessExecutablePath() Option {
-	return WithDetectors(processExecutablePathDetector{})
-}
-
-// WithProcessCommandArgs adds an attribute with all the command arguments (including
-// the command/executable itself) as received by the process the configured Resource.
-func WithProcessCommandArgs() Option {
-	return WithDetectors(processCommandArgsDetector{})
-}
-
-// WithProcessOwner adds an attribute with the username of the user that owns the process
-// to the configured Resource.
-func WithProcessOwner() Option {
-	return WithDetectors(processOwnerDetector{})
-}
-
-// WithProcessRuntimeName adds an attribute with the name of the runtime of this
-// process to the configured Resource.
-func WithProcessRuntimeName() Option {
-	return WithDetectors(processRuntimeNameDetector{})
-}
-
-// WithProcessRuntimeVersion adds an attribute with the version of the runtime of
-// this process to the configured Resource.
-func WithProcessRuntimeVersion() Option {
-	return WithDetectors(processRuntimeVersionDetector{})
-}
-
-// WithProcessRuntimeDescription adds an attribute with an additional description
-// about the runtime of the process to the configured Resource.
-func WithProcessRuntimeDescription() Option {
-	return WithDetectors(processRuntimeDescriptionDetector{})
-}
-
-// WithProcess adds all the Process attributes to the configured Resource.
-// See individual WithProcess* functions to configure specific attributes.
-func WithProcess() Option {
-	return WithDetectors(
-		processPIDDetector{},
-		processExecutableNameDetector{},
-		processExecutablePathDetector{},
-		processCommandArgsDetector{},
-		processOwnerDetector{},
-		processRuntimeNameDetector{},
-		processRuntimeVersionDetector{},
-		processRuntimeDescriptionDetector{},
-	)
 }

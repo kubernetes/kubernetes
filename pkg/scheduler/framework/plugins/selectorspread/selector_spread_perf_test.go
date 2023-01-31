@@ -90,7 +90,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
 				}
 				parallelizer := parallelize.NewParallelizer(parallelize.DefaultParallelism)
-				parallelizer.Until(ctx, len(filteredNodes), scoreNode)
+				parallelizer.Until(ctx, len(filteredNodes), scoreNode, "")
 				status = plugin.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)

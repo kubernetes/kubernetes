@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -65,7 +66,6 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		client            clientset.Interface
 		namespace         string
 		nodeName          string
-		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 	)
@@ -74,20 +74,11 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		if !isNodeLabeled {
-			nodeName = GetReadySchedulableRandomNodeInfo().Name
-			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
-			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel[NodeLabelKey] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
-			isNodeLabeled = true
-		}
-	})
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(client, nodeName, NodeLabelKey)
-		}
+		nodeName = GetReadySchedulableRandomNodeInfo().Name
+		nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
+		nodeKeyValueLabel = map[string]string{NodeLabelKey: nodeLabelValue}
+		e2enode.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
+		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
 	})
 
 	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {
@@ -152,7 +143,9 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-	framework.ExpectEqual(isAttached, true)
+	if !isAttached {
+		framework.Failf("Volume: %s is not attached to the node: %v", pv.Spec.VsphereVolume.VolumePath, nodeName)
+	}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")
@@ -167,7 +160,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 }
 
 func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath string, diskFormat string) bool {
-	ginkgo.By("Verifing disk format")
+	ginkgo.By("Verifying disk format")
 	eagerlyScrub := false
 	thinProvisioned := false
 	diskFound := false
@@ -198,7 +191,9 @@ func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath 
 		}
 	}
 
-	framework.ExpectEqual(diskFound, true, "Failed to find disk")
+	if !diskFound {
+		framework.Failf("Failed to find disk: %s", pvVolumePath)
+	}
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
 		if eagerlyScrub == true && thinProvisioned == false {

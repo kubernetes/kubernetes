@@ -2,11 +2,16 @@
 
 package v1
 
+import (
+	v1 "github.com/openshift/api/image/v1"
+)
+
 // TagImportPolicyApplyConfiguration represents an declarative configuration of the TagImportPolicy type for use
 // with apply.
 type TagImportPolicyApplyConfiguration struct {
-	Insecure  *bool `json:"insecure,omitempty"`
-	Scheduled *bool `json:"scheduled,omitempty"`
+	Insecure   *bool              `json:"insecure,omitempty"`
+	Scheduled  *bool              `json:"scheduled,omitempty"`
+	ImportMode *v1.ImportModeType `json:"importMode,omitempty"`
 }
 
 // TagImportPolicyApplyConfiguration constructs an declarative configuration of the TagImportPolicy type for use with
@@ -28,5 +33,13 @@ func (b *TagImportPolicyApplyConfiguration) WithInsecure(value bool) *TagImportP
 // If called multiple times, the Scheduled field is set to the value of the last call.
 func (b *TagImportPolicyApplyConfiguration) WithScheduled(value bool) *TagImportPolicyApplyConfiguration {
 	b.Scheduled = &value
+	return b
+}
+
+// WithImportMode sets the ImportMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ImportMode field is set to the value of the last call.
+func (b *TagImportPolicyApplyConfiguration) WithImportMode(value v1.ImportModeType) *TagImportPolicyApplyConfiguration {
+	b.ImportMode = &value
 	return b
 }

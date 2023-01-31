@@ -86,7 +86,7 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 	return metrics, nil
 }
 
-// MetricsManager defines the metrics mananger for CSI operation
+// MetricsManager defines the metrics manager for CSI operation
 type MetricsManager struct {
 	driverName string
 }

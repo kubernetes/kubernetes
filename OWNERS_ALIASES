@@ -1,4 +1,6 @@
 aliases:
+  # Note: sig-architecture-approvers has approval on root files (including go.mod/go.sum) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
+  # People with approve rights via this alias should defer dependency update PRs to dep-approvers.
   sig-architecture-approvers:
     - dims
     - derekwaynecarr
@@ -97,12 +99,14 @@ aliases:
   # SIG Release
   release-engineering-approvers:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
   release-managers:
     - cpanato
+    - jeremyrickard
     - justaugustus
     - palnabarun
     - puerco
@@ -114,23 +118,24 @@ aliases:
     - cblecker
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
     - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-    - Verolop # Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
-    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
     - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-    - Verolop # Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   sig-storage-approvers:
     - saad-ali
@@ -181,6 +186,7 @@ aliases:
   # - wgliang
 
   sig-cli-maintainers:
+    - ardaguclu
     - apelisse
     - brianpursley
     - deads2k
@@ -198,8 +204,8 @@ aliases:
   # - monopole
   # - smarterclayton
   sig-cli-reviewers:
+    - ardaguclu
     - brianpursley
-    - dougsland
     - eddiezane
     - KnVerey
     - seans3
@@ -207,13 +213,11 @@ aliases:
   sig-testing-reviewers:
     - bentheelder
     - cblecker
-    - fejta
     - spiffxp
     - dims
   sig-testing-approvers:
     - bentheelder
     - cblecker
-    - fejta
     - spiffxp
     # emeritus
     # - ixdy
@@ -234,7 +238,6 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
-    - ehashman
     - feiskyer
     - mtaufen
     - sjenning
@@ -439,15 +442,18 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
-    - ehashman
   sig-scalability-approvers:
-    - mm4tt
+    - marseel
+    - mborsz
     - wojtek-t
+  # emeritus:
+  # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
-    - mm4tt
     - wojtek-t
+  # emeritus:
+  # - mm4tt
   sig-scheduling-api-reviewers:
     - alculquicondor
   sig-storage-api-reviewers:
@@ -460,6 +466,8 @@ aliases:
     - jayunit100
     - jsturtevant
     - marosset
+  # Note: dep-approvers has approval on root files (including OWNERS_ALIASES) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
+  # People with approve rights via this alias should defer updates of root files other than go.mod/go.sum to dep-approvers.
   dep-approvers:
     - BenTheElder
     - cblecker
@@ -467,11 +475,12 @@ aliases:
     - thockin
     - sttts
     - soltysh
+    - liggitt
   dep-reviewers:
     - logicalhan
   feature-approvers:
     - andrewsykim # Cloud Provider
-    - brancz # Instrumentation
+    - logicalhan # Instrumentation
     - ahg-g # Scheduling
     - caseydavenport # Network
     - dcbw # Network

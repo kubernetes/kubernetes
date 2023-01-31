@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -83,7 +84,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, pod.ObjectMeta.Name)}
 		// Create Pod
-		f.TestContainerOutput("shortname only", pod, 0, output)
+		e2eoutput.TestContainerOutput(f, "shortname only", pod, 0, output)
 	})
 
 	/*
@@ -100,7 +101,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, pod.ObjectMeta.Name)}
 		// Create Pod
-		f.TestContainerOutput("shortname only", pod, 0, output)
+		e2eoutput.TestContainerOutput(f, "shortname only", pod, 0, output)
 	})
 
 	/*
@@ -119,7 +120,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, hostFQDN)}
 		// Create Pod
-		f.TestContainerOutput("shortname and fqdn", pod, 0, output)
+		e2eoutput.TestContainerOutput(f, "shortname and fqdn", pod, 0, output)
 	})
 
 	/*
@@ -144,7 +145,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		framework.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
 		output := []string{fmt.Sprintf("%s;%s;", hostFQDN, hostFQDN)}
 		// Create Pod
-		f.TestContainerOutput("fqdn and fqdn", pod, 0, output)
+		e2eoutput.TestContainerOutput(f, "fqdn and fqdn", pod, 0, output)
 	})
 
 	/*
@@ -170,9 +171,9 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		setHostnameAsFQDN := true
 		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
 		// Create Pod
-		launchedPod := f.PodClient().Create(pod)
+		launchedPod := e2epod.NewPodClient(f).Create(pod)
 		// Ensure we delete pod
-		defer f.PodClient().DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		defer e2epod.NewPodClient(f).DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 		// Pod should remain in the pending state generating events with reason FailedCreatePodSandBox
 		// Expected Message Error Event

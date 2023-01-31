@@ -218,7 +218,7 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 // This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
 // Here it is mostly about applying the partition path
 func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, devicePath string) []string {
-	devicePaths := []string{}
+	var devicePaths []string
 	if devicePath != "" {
 		devicePaths = append(devicePaths, devicePath)
 	}

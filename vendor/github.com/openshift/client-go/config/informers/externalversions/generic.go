@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/openshift/api/config/v1"
+	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -79,6 +80,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().Proxies().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("schedulers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().Schedulers().Informer()}, nil
+
+		// Group=config.openshift.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("insightsdatagathers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1alpha1().InsightsDataGathers().Informer()}, nil
 
 	}
 

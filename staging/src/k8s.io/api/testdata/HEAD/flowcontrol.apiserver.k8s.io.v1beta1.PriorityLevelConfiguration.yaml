@@ -35,6 +35,8 @@ metadata:
 spec:
   limited:
     assuredConcurrencyShares: 1
+    borrowingLimitPercent: 4
+    lendablePercent: 3
     limitResponse:
       queuing:
         handSize: 2

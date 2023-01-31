@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1934,7 +1935,7 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eoutput.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
@@ -1950,7 +1951,7 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 	// Dump debug information if the error was nil.
 	if err == nil {
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eoutput.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
@@ -1976,7 +1977,7 @@ func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, pod
 		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eoutput.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 	}
 }
 

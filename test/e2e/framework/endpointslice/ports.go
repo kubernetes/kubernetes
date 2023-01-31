@@ -17,12 +17,16 @@ limitations under the License.
 package endpointslice
 
 import (
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 // PortsByPodUID is a map that maps pod UID to container ports.
 type PortsByPodUID map[types.UID][]int
+
+// FullPortsByPodUID is a map that maps pod UID to container ports.
+type FullPortsByPodUID map[types.UID][]v1.ContainerPort
 
 // GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
 func GetContainerPortsByPodUID(eps []discoveryv1.EndpointSlice) PortsByPodUID {
@@ -39,6 +43,31 @@ func GetContainerPortsByPodUID(eps []discoveryv1.EndpointSlice) PortsByPodUID {
 					m[ep.TargetRef.UID] = make([]int, 0)
 				}
 				m[ep.TargetRef.UID] = append(m[ep.TargetRef.UID], int(containerPort))
+			}
+		}
+	}
+	return m
+}
+
+// GetFullContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
+func GetFullContainerPortsByPodUID(eps []discoveryv1.EndpointSlice) FullPortsByPodUID {
+	m := FullPortsByPodUID{}
+
+	for _, es := range eps {
+		for _, port := range es.Ports {
+			if port.Port == nil {
+				continue
+			}
+			containerPort := v1.ContainerPort{
+				Name:          *port.Name,
+				ContainerPort: *port.Port,
+				Protocol:      *port.Protocol,
+			}
+			for _, ep := range es.Endpoints {
+				if _, ok := m[ep.TargetRef.UID]; !ok {
+					m[ep.TargetRef.UID] = make([]v1.ContainerPort, 0)
+				}
+				m[ep.TargetRef.UID] = append(m[ep.TargetRef.UID], containerPort)
 			}
 		}
 	}

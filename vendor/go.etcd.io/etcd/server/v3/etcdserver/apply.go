@@ -428,6 +428,7 @@ func (a *applierV3backend) Range(ctx context.Context, txn mvcc.TxnRead, r *pb.Ra
 }
 
 func (a *applierV3backend) Txn(ctx context.Context, rt *pb.TxnRequest) (*pb.TxnResponse, *traceutil.Trace, error) {
+	lg := a.s.Logger()
 	trace := traceutil.Get(ctx)
 	if trace.IsEmpty() {
 		trace = traceutil.New("transaction", a.s.Logger())
@@ -474,7 +475,18 @@ func (a *applierV3backend) Txn(ctx context.Context, rt *pb.TxnRequest) (*pb.TxnR
 		txn.End()
 		txn = a.s.KV().Write(trace)
 	}
-	a.applyTxn(ctx, txn, rt, txnPath, txnResp)
+	_, err := a.applyTxn(ctx, txn, rt, txnPath, txnResp)
+	if err != nil {
+		if isWrite {
+			// end txn to release locks before panic
+			txn.End()
+			// When txn with write operations starts it has to be successful
+			// We don't have a way to recover state in case of write failure
+			lg.Panic("unexpected error during txn with writes", zap.Error(err))
+		} else {
+			lg.Error("unexpected error during readonly txn", zap.Error(err))
+		}
+	}
 	rev := txn.Rev()
 	if len(txn.Changes()) != 0 {
 		rev++
@@ -486,7 +498,7 @@ func (a *applierV3backend) Txn(ctx context.Context, rt *pb.TxnRequest) (*pb.TxnR
 		traceutil.Field{Key: "number_of_response", Value: len(txnResp.Responses)},
 		traceutil.Field{Key: "response_revision", Value: txnResp.Header.Revision},
 	)
-	return txnResp, trace, nil
+	return txnResp, trace, err
 }
 
 // newTxnResp allocates a txn response for a txn request given a path.
@@ -617,14 +629,13 @@ func compareKV(c *pb.Compare, ckv mvccpb.KeyValue) bool {
 	return true
 }
 
-func (a *applierV3backend) applyTxn(ctx context.Context, txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPath []bool, tresp *pb.TxnResponse) (txns int) {
+func (a *applierV3backend) applyTxn(ctx context.Context, txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPath []bool, tresp *pb.TxnResponse) (txns int, err error) {
 	trace := traceutil.Get(ctx)
 	reqs := rt.Success
 	if !txnPath[0] {
 		reqs = rt.Failure
 	}
 
-	lg := a.s.Logger()
 	for i, req := range reqs {
 		respi := tresp.Responses[i].Response
 		switch tv := req.Request.(type) {
@@ -635,7 +646,7 @@ func (a *applierV3backend) applyTxn(ctx context.Context, txn mvcc.TxnWrite, rt *
 				traceutil.Field{Key: "range_end", Value: string(tv.RequestRange.RangeEnd)})
 			resp, err := a.Range(ctx, txn, tv.RequestRange)
 			if err != nil {
-				lg.Panic("unexpected error during txn", zap.Error(err))
+				return 0, fmt.Errorf("applyTxn: failed Range: %w", err)
 			}
 			respi.(*pb.ResponseOp_ResponseRange).ResponseRange = resp
 			trace.StopSubTrace()
@@ -646,26 +657,30 @@ func (a *applierV3backend) applyTxn(ctx context.Context, txn mvcc.TxnWrite, rt *
 				traceutil.Field{Key: "req_size", Value: tv.RequestPut.Size()})
 			resp, _, err := a.Put(ctx, txn, tv.RequestPut)
 			if err != nil {
-				lg.Panic("unexpected error during txn", zap.Error(err))
+				return 0, fmt.Errorf("applyTxn: failed Put: %w", err)
 			}
 			respi.(*pb.ResponseOp_ResponsePut).ResponsePut = resp
 			trace.StopSubTrace()
 		case *pb.RequestOp_RequestDeleteRange:
 			resp, err := a.DeleteRange(txn, tv.RequestDeleteRange)
 			if err != nil {
-				lg.Panic("unexpected error during txn", zap.Error(err))
+				return 0, fmt.Errorf("applyTxn: failed DeleteRange: %w", err)
 			}
 			respi.(*pb.ResponseOp_ResponseDeleteRange).ResponseDeleteRange = resp
 		case *pb.RequestOp_RequestTxn:
 			resp := respi.(*pb.ResponseOp_ResponseTxn).ResponseTxn
-			applyTxns := a.applyTxn(ctx, txn, tv.RequestTxn, txnPath[1:], resp)
+			applyTxns, err := a.applyTxn(ctx, txn, tv.RequestTxn, txnPath[1:], resp)
+			if err != nil {
+				// don't wrap the error. It's a recursive call and err should be already wrapped
+				return 0, err
+			}
 			txns += applyTxns + 1
 			txnPath = txnPath[applyTxns+1:]
 		default:
 			// empty union
 		}
 	}
-	return txns
+	return txns, nil
 }
 
 func (a *applierV3backend) Compaction(compaction *pb.CompactionRequest) (*pb.CompactionResponse, <-chan struct{}, *traceutil.Trace, error) {

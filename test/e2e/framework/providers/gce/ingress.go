@@ -788,7 +788,7 @@ func (cont *IngressController) CreateStaticIP(name string) string {
 	return ip.Address
 }
 
-// deleteStaticIPs delets all static-ips allocated through calls to
+// deleteStaticIPs deletes all static-ips allocated through calls to
 // CreateStaticIP.
 func (cont *IngressController) deleteStaticIPs() error {
 	if cont.staticIPName != "" {

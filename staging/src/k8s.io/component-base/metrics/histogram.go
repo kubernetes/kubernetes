@@ -23,19 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// DefBuckets is a wrapper for prometheus.DefBuckets
-var DefBuckets = prometheus.DefBuckets
-
-// LinearBuckets is a wrapper for prometheus.LinearBuckets.
-func LinearBuckets(start, width float64, count int) []float64 {
-	return prometheus.LinearBuckets(start, width, count)
-}
-
-// ExponentialBuckets is a wrapper for prometheus.ExponentialBuckets.
-func ExponentialBuckets(start, factor float64, count int) []float64 {
-	return prometheus.ExponentialBuckets(start, factor, count)
-}
-
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
@@ -52,7 +39,7 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 
 	h := &Histogram{
 		HistogramOpts: opts,
-		lazyMetric:    lazyMetric{},
+		lazyMetric:    lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	h.setPrometheusHistogram(noopMetric{})
 	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -119,7 +106,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	v.lazyInit(v, fqName)
 	return v

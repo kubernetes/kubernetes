@@ -64,7 +64,7 @@ type KubeSchedulerConfiguration struct {
 	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
-	// nodes will be scored.
+	// nodes will be scored. It is overridden by profile level PercentageofNodesToScore.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
@@ -135,6 +135,17 @@ type KubeSchedulerProfile struct {
 	// is scheduled with this profile.
 	SchedulerName *string `json:"schedulerName,omitempty"`
 
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty,
+	// global PercentageOfNodesToScore will be used.
+	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
+
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the
 	// default plugins. Disabled plugins are any of the default plugins that
@@ -159,6 +170,9 @@ type KubeSchedulerProfile struct {
 // Enabled plugins are called in the order specified here, after default plugins. If they need to
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
+	// PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.
+	PreEnqueue PluginSet `json:"preEnqueue,omitempty"`
+
 	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
 	QueueSort PluginSet `json:"queueSort,omitempty"`
 

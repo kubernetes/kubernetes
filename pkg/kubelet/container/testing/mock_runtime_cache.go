@@ -21,6 +21,7 @@ limitations under the License.
 package testing
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -52,32 +53,32 @@ func (m *MockRuntimeCache) EXPECT() *MockRuntimeCacheMockRecorder {
 }
 
 // ForceUpdateIfOlder mocks base method.
-func (m *MockRuntimeCache) ForceUpdateIfOlder(arg0 time.Time) error {
+func (m *MockRuntimeCache) ForceUpdateIfOlder(arg0 context.Context, arg1 time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ForceUpdateIfOlder", arg0)
+	ret := m.ctrl.Call(m, "ForceUpdateIfOlder", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ForceUpdateIfOlder indicates an expected call of ForceUpdateIfOlder.
-func (mr *MockRuntimeCacheMockRecorder) ForceUpdateIfOlder(arg0 interface{}) *gomock.Call {
+func (mr *MockRuntimeCacheMockRecorder) ForceUpdateIfOlder(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceUpdateIfOlder", reflect.TypeOf((*MockRuntimeCache)(nil).ForceUpdateIfOlder), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceUpdateIfOlder", reflect.TypeOf((*MockRuntimeCache)(nil).ForceUpdateIfOlder), arg0, arg1)
 }
 
 // GetPods mocks base method.
-func (m *MockRuntimeCache) GetPods() ([]*container.Pod, error) {
+func (m *MockRuntimeCache) GetPods(arg0 context.Context) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods")
+	ret := m.ctrl.Call(m, "GetPods", arg0)
 	ret0, _ := ret[0].([]*container.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPods indicates an expected call of GetPods.
-func (mr *MockRuntimeCacheMockRecorder) GetPods() *gomock.Call {
+func (mr *MockRuntimeCacheMockRecorder) GetPods(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockRuntimeCache)(nil).GetPods))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockRuntimeCache)(nil).GetPods), arg0)
 }
 
 // MockpodsGetter is a mock of podsGetter interface.
@@ -104,16 +105,16 @@ func (m *MockpodsGetter) EXPECT() *MockpodsGetterMockRecorder {
 }
 
 // GetPods mocks base method.
-func (m *MockpodsGetter) GetPods(arg0 bool) ([]*container.Pod, error) {
+func (m *MockpodsGetter) GetPods(arg0 context.Context, arg1 bool) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods", arg0)
+	ret := m.ctrl.Call(m, "GetPods", arg0, arg1)
 	ret0, _ := ret[0].([]*container.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPods indicates an expected call of GetPods.
-func (mr *MockpodsGetterMockRecorder) GetPods(arg0 interface{}) *gomock.Call {
+func (mr *MockpodsGetterMockRecorder) GetPods(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockpodsGetter)(nil).GetPods), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockpodsGetter)(nil).GetPods), arg0, arg1)
 }

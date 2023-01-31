@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
 // +build linux
 
 package procfs
@@ -27,7 +28,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// CPUInfo contains general information about a system CPU found in /proc/cpuinfo
+// CPUInfo contains general information about a system CPU found in /proc/cpuinfo.
 type CPUInfo struct {
 	Processor       uint
 	VendorID        string
@@ -469,7 +470,7 @@ func parseCPUInfoDummy(_ []byte) ([]CPUInfo, error) { // nolint:unused,deadcode
 }
 
 // firstNonEmptyLine advances the scanner to the first non-empty line
-// and returns the contents of that line
+// and returns the contents of that line.
 func firstNonEmptyLine(scanner *bufio.Scanner) string {
 	for scanner.Scan() {
 		line := scanner.Text()

@@ -24,10 +24,13 @@ import (
 
 // JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 // being deleted before being accounted in the Job status.
-// The apiserver and job controller use this string as a Job annotation, to
-// mark Jobs that are being tracked using pod finalizers. Two releases after
-// the JobTrackingWithFinalizers graduates to GA, JobTrackingFinalizer will
-// no longer be used as a Job annotation.
+//
+// Additionally, the apiserver and job controller use this string as a Job
+// annotation, to mark Jobs that are being tracked using pod finalizers.
+// However, this behavior is deprecated in kubernetes 1.26. This means that, in
+// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
+// apiserver and job controller will ignore this annotation and they will
+// always track jobs using finalizers.
 const JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -405,9 +408,6 @@ type JobStatus struct {
 	// (3) Remove the pod UID from the array while increasing the corresponding
 	//     counter.
 	//
-	// This field is beta-level. The job controller only makes use of this field
-	// when the feature gate JobTrackingWithFinalizers is enabled (enabled
-	// by default).
 	// Old jobs might not be tracked using this field, in which case the field
 	// remains null.
 	// +optional
@@ -440,8 +440,7 @@ const (
 	// JobFailed means the job has failed its execution.
 	JobFailed JobConditionType = "Failed"
 	// FailureTarget means the job is about to fail its execution.
-	// The constant is to be renamed once the name is accepted within the KEP-3329.
-	AlphaNoCompatGuaranteeJobFailureTarget JobConditionType = "FailureTarget"
+	JobFailureTarget JobConditionType = "FailureTarget"
 )
 
 // JobCondition describes current state of a job.

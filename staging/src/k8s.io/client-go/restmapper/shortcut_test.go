@@ -362,6 +362,10 @@ func (c *fakeDiscoveryClient) OpenAPIV3() openapi.Client {
 	panic("implement me")
 }
 
+func (c *fakeDiscoveryClient) WithLegacy() discovery.DiscoveryInterface {
+	panic("implement me")
+}
+
 type fakeCachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
 	freshHandler      func() bool

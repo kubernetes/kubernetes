@@ -42,7 +42,7 @@ import (
 // and the group will be set to allow containers to use emptyDir volumes
 // from the group attribute.
 //
-// http://issue.k8s.io/2630
+// https://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -188,14 +188,16 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 	return ed, nil
 }
 
-func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (volume.ReconstructedVolume, error) {
 	emptyDirVolume := &v1.Volume{
 		Name: volName,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(emptyDirVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(emptyDirVolume),
+	}, nil
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
@@ -524,11 +526,7 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err = os.RemoveAll(dir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {

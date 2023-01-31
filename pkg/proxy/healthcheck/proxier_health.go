@@ -79,13 +79,16 @@ func newProxierHealthServer(listener listener, httpServerFactory httpServerFacto
 	}
 }
 
-// Updated updates the lastUpdated timestamp.
+// Updated indicates that kube-proxy has successfully updated its backend, so it should
+// be considered healthy now.
 func (hs *proxierHealthServer) Updated() {
 	hs.oldestPendingQueued.Store(zeroTime)
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
-// QueuedUpdate updates the lastQueued timestamp.
+// QueuedUpdate indicates that the proxy has received changes from the apiserver but
+// has not yet pushed them to its backend. If the proxy does not call Updated within the
+// healthTimeout time then it will be considered unhealthy.
 func (hs *proxierHealthServer) QueuedUpdate() {
 	// Set oldestPendingQueued only if it's currently zero
 	hs.oldestPendingQueued.CompareAndSwap(zeroTime, hs.clock.Now())

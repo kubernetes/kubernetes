@@ -17,7 +17,6 @@ limitations under the License.
 package conversion
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -40,7 +39,7 @@ type converterMetricFactory struct {
 	factoryLock sync.Mutex
 }
 
-func newConverterMertricFactory() *converterMetricFactory {
+func newConverterMetricFactory() *converterMetricFactory {
 	return &converterMetricFactory{durations: map[string]*metrics.HistogramVec{}, factoryLock: sync.Mutex{}}
 }
 
@@ -52,15 +51,15 @@ type converterMetric struct {
 	crdName   string
 }
 
-func (c *converterMetricFactory) addMetrics(converterName string, crdName string, converter crConverterInterface) (crConverterInterface, error) {
+func (c *converterMetricFactory) addMetrics(crdName string, converter crConverterInterface) (crConverterInterface, error) {
 	c.factoryLock.Lock()
 	defer c.factoryLock.Unlock()
-	metric, exists := c.durations[converterName]
+	metric, exists := c.durations["webhook"]
 	if !exists {
 		metric = metrics.NewHistogramVec(
 			&metrics.HistogramOpts{
-				Name:           fmt.Sprintf("apiserver_crd_%s_conversion_duration_seconds", converterName),
-				Help:           fmt.Sprintf("CRD %s conversion duration in seconds", converterName),
+				Name:           "apiserver_crd_webhook_conversion_duration_seconds",
+				Help:           "CRD webhook conversion duration in seconds",
 				Buckets:        latencyBuckets,
 				StabilityLevel: metrics.ALPHA,
 			},
@@ -69,7 +68,7 @@ func (c *converterMetricFactory) addMetrics(converterName string, crdName string
 		if err != nil {
 			return nil, err
 		}
-		c.durations[converterName] = metric
+		c.durations["webhook"] = metric
 	}
 	return &converterMetric{latencies: metric, delegate: converter, crdName: crdName}, nil
 }

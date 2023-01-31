@@ -47,7 +47,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(f.ClientSet, f.Namespace.Name)

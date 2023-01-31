@@ -34,11 +34,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -94,13 +92,13 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	// Nodes allow *all* fields, including status, to be set on create.
 	// for create
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && oldNode == nil {
+	if oldNode == nil {
 		node.Spec.ConfigSource = nil
 		node.Status.Config = nil
 	}
 
 	// for update
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
+	if !nodeConfigSourceInUse(oldNode) && oldNode != nil {
 		node.Spec.ConfigSource = nil
 	}
 
@@ -170,7 +168,7 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeStatusConfigInUse(oldNode) {
+	if !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
 	}
 }
@@ -249,6 +247,10 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, err
 	}
 
+	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
+	}
+
 	// We check if we want to get a default Kubelet's transport. It happens if either:
 	// - no port is specified in request (Kubelet's port is default)
 	// - the requested port matches the kubelet port for this node
@@ -261,10 +263,6 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 			nil
 	}
 
-	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
-	}
-
 	// Otherwise, return the requested scheme and port, and the proxy transport
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
 }
@@ -274,7 +272,7 @@ func dynamicKubeletConfigIsDeprecatedWarning(obj runtime.Object) []string {
 	if newNode.Spec.ConfigSource != nil {
 		var warnings []string
 		// KEP https://github.com/kubernetes/enhancements/issues/281
-		warnings = append(warnings, "spec.configSource: deprecated in v1.22, support removal is planned in v1.23")
+		warnings = append(warnings, "spec.configSource: the feature is removed")
 		return warnings
 	}
 	return nil

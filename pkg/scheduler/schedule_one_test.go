@@ -411,7 +411,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		return true, binding, nil
 	})
 	controllers := make(map[string]string)
-	stopFn := broadcaster.StartEventWatcher(func(obj runtime.Object) {
+	stopFn, err := broadcaster.StartEventWatcher(func(obj runtime.Object) {
 		e, ok := obj.(*eventsv1.Event)
 		if !ok || e.Reason != "Scheduled" {
 			return
@@ -419,6 +419,9 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		controllers[e.Regarding.Name] = e.ReportingController
 		wg.Done()
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer stopFn()
 
 	// Run scheduler.
@@ -527,7 +530,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      fmt.Errorf(`binding rejected: %w`, fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder"))),
+			expectError:      fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder")),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
@@ -584,24 +587,20 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			s := newScheduler(
-				cache,
-				nil,
-				func() *framework.QueuedPodInfo {
-					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
+			sched := &Scheduler{
+				Cache:  cache,
+				client: client,
+				NextPod: func() *framework.QueuedPodInfo {
+					return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, item.sendPod)}
 				},
-				nil,
-				internalqueue.NewTestQueue(ctx, nil),
-				profile.Map{
-					testSchedulerName: fwk,
-				},
-				client,
-				nil,
-				0)
-			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				Profiles:        profile.Map{testSchedulerName: fwk},
+			}
+
+			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
 			}
-			s.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
 				gotPod = p.Pod
 				gotError = err
 
@@ -609,14 +608,17 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
+			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*eventsv1.Event)
 				if e.Reason != item.eventReason {
 					t.Errorf("got event %v, want %v", e.Reason, item.eventReason)
 				}
 				close(called)
 			})
-			s.scheduleOne(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sched.scheduleOne(ctx)
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("assumed pod: wanted %v, got %v", e, a)
@@ -829,7 +831,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objects...), 0)
-	scheduler, _, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, nil, fns...)
+	scheduler, _, errChan := setupTestScheduler(ctx, t, queuedPodStore, scache, informerFactory, nil, fns...)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
 	scheduler.scheduleOne(ctx)
@@ -950,15 +952,18 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
-			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, fakeVolumeBinder, eventBroadcaster)
+			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, t, fakeVolumeBinder, eventBroadcaster)
 			eventChan := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
+			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*eventsv1.Event)
 				if e, a := item.eventReason, e.Reason; e != a {
 					t.Errorf("expected %v, got %v", e, a)
 				}
 				close(eventChan)
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 			s.scheduleOne(ctx)
 			// Wait for pod to succeed or fail scheduling
 			select {
@@ -1061,9 +1066,9 @@ func TestSchedulerBinding(t *testing.T) {
 				nodeInfoSnapshot:         nil,
 				percentageOfNodesToScore: 0,
 			}
-			err = sched.bind(ctx, fwk, pod, "node", nil)
-			if err != nil {
-				t.Error(err)
+			status := sched.bind(ctx, fwk, pod, "node", nil)
+			if !status.IsSuccess() {
+				t.Error(status.AsError())
 			}
 
 			// Checking default binding.
@@ -1694,10 +1699,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
+					PreFilterMsg:         `persistentvolumeclaim "unknownPVC" not found`,
 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
 				},
 			},
@@ -1718,10 +1721,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
+					PreFilterMsg:         `persistentvolumeclaim "existingPVC" is being deleted`,
 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
 				},
 			},
@@ -1878,10 +1879,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
-						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
+					PreFilterMsg:         "injected unschedulable status",
 					UnschedulablePlugins: sets.NewString("FakePreFilter"),
 				},
 			},
@@ -1922,7 +1921,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.NewString("node2"),
-			wantEvaluatedNodes: pointer.Int32Ptr(1),
+			wantEvaluatedNodes: pointer.Int32(1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -1948,12 +1947,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-						"node2": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-						"node3": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					UnschedulablePlugins: sets.String{},
+					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
 				},
 			},
 		},
@@ -1977,10 +1973,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter2"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					UnschedulablePlugins: sets.String{},
+					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
 				},
 			},
 		},
@@ -2021,20 +2016,17 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := newScheduler(
-				cache,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
+
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -2199,7 +2191,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk.AddNominatedPod(framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj()),
+			fwk.AddNominatedPod(mustNewPodInfo(t, st.MakePod().UID("nominated").Priority(midPriority).Obj()),
 				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
 			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
@@ -2334,19 +2326,14 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error creating framework: %+v", err)
 			}
 
-			scheduler := newScheduler(
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -2368,10 +2355,11 @@ var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 
 func TestNumFeasibleNodesToFind(t *testing.T) {
 	tests := []struct {
-		name                     string
-		percentageOfNodesToScore int32
-		numAllNodes              int32
-		wantNumNodes             int32
+		name              string
+		globalPercentage  int32
+		profilePercentage *int32
+		numAllNodes       int32
+		wantNumNodes      int32
 	}{
 		{
 			name:         "not set percentageOfNodesToScore and nodes number not more than 50",
@@ -2379,10 +2367,10 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 10,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
-			percentageOfNodesToScore: 40,
-			numAllNodes:              10,
-			wantNumNodes:             10,
+			name:              "set profile percentageOfNodesToScore and nodes number not more than 50",
+			profilePercentage: pointer.Int32(40),
+			numAllNodes:       10,
+			wantNumNodes:      10,
 		},
 		{
 			name:         "not set percentageOfNodesToScore and nodes number more than 50",
@@ -2390,29 +2378,43 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 420,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50",
-			percentageOfNodesToScore: 40,
-			numAllNodes:              1000,
-			wantNumNodes:             400,
+			name:              "set profile percentageOfNodesToScore and nodes number more than 50",
+			profilePercentage: pointer.Int32(40),
+			numAllNodes:       1000,
+			wantNumNodes:      400,
 		},
 		{
-			name:         "not set percentageOfNodesToScore and nodes number more than 50*125",
+			name:              "set global and profile percentageOfNodesToScore and nodes number more than 50",
+			globalPercentage:  100,
+			profilePercentage: pointer.Int32(40),
+			numAllNodes:       1000,
+			wantNumNodes:      400,
+		},
+		{
+			name:             "set global percentageOfNodesToScore and nodes number more than 50",
+			globalPercentage: 40,
+			numAllNodes:      1000,
+			wantNumNodes:     400,
+		},
+		{
+			name:         "not set profile percentageOfNodesToScore and nodes number more than 50*125",
 			numAllNodes:  6000,
 			wantNumNodes: 300,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
-			percentageOfNodesToScore: 40,
-			numAllNodes:              6000,
-			wantNumNodes:             2400,
+			name:              "set profile percentageOfNodesToScore and nodes number more than 50*125",
+			profilePercentage: pointer.Int32(40),
+			numAllNodes:       6000,
+			wantNumNodes:      2400,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sched := &Scheduler{
-				percentageOfNodesToScore: tt.percentageOfNodesToScore,
+				percentageOfNodesToScore: tt.globalPercentage,
 			}
-			if gotNumNodes := sched.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+			if gotNumNodes := sched.numFeasibleNodesToFind(tt.profilePercentage, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
 				t.Errorf("Scheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
@@ -2445,7 +2447,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// To make numAllNodes % nodesToFind != 0
 	sched.percentageOfNodesToScore = 30
-	nodesToFind := int(sched.numFeasibleNodesToFind(int32(numAllNodes)))
+	nodesToFind := int(sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
@@ -2521,18 +2523,15 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 			snapshot := internalcache.NewSnapshot(nil, nodes)
-			scheduler := newScheduler(
-				cache,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
 
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
+
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2582,18 +2581,14 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 		cache.AddNode(n)
 	}
 
-	s := newScheduler(
-		cache,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		emptySnapshot,
-		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateSnapshot(s.nodeInfoSnapshot)
-	return s
+	sched := &Scheduler{
+		Cache:                    cache,
+		nodeInfoSnapshot:         emptySnapshot,
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+	}
+	sched.applyDefaultHandlers()
+	cache.UpdateSnapshot(sched.nodeInfoSnapshot)
+	return sched
 }
 
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
@@ -2619,7 +2614,7 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
 	pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
-	scheduler, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, nil, nil, fns...)
+	scheduler, bindingChan, errChan := setupTestScheduler(ctx, t, queuedPodStore, scache, nil, nil, fns...)
 
 	queuedPodStore.Add(pod)
 	// queuedPodStore: [foo:8080]
@@ -2646,7 +2641,7 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 	bindingChan := make(chan *v1.Binding, 1)
 	client := clientsetfake.NewSimpleClientset()
 	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -2681,21 +2676,20 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 	)
 
 	errChan := make(chan error, 1)
-	sched := newScheduler(
-		cache,
-		nil,
-		func() *framework.QueuedPodInfo {
-			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
+	sched := &Scheduler{
+		Cache:                    cache,
+		client:                   client,
+		nodeInfoSnapshot:         internalcache.NewEmptySnapshot(),
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		NextPod: func() *framework.QueuedPodInfo {
+			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		nil,
-		schedulingQueue,
-		profile.Map{
-			testSchedulerName: fwk,
-		},
-		client,
-		internalcache.NewEmptySnapshot(),
-		schedulerapi.DefaultPercentageOfNodesToScore)
-	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+		SchedulingQueue: schedulingQueue,
+		Profiles:        profile.Map{testSchedulerName: fwk},
+	}
+
+	sched.SchedulePod = sched.schedulePod
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
 		errChan <- err
 
 		msg := truncateMessage(err.Error())
@@ -2704,7 +2698,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
@@ -2727,7 +2721,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volum
 			return &volumebinding.VolumeBinding{Binder: volumeBinder, PVCLister: pvcInformer.Lister()}, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
-	s, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, broadcaster, fns...)
+	s, bindingChan, errChan := setupTestScheduler(ctx, t, queuedPodStore, scache, informerFactory, broadcaster, fns...)
 	return s, bindingChan, errChan
 }
 
@@ -2737,4 +2731,12 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volum
 func makePredicateError(failReason string) error {
 	s := fmt.Sprintf("0/1 nodes are available: %v.", failReason)
 	return fmt.Errorf(s)
+}
+
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
 }

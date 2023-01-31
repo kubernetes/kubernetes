@@ -112,7 +112,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 				},
 			},
 		}
-		f.PodClient().CreateSync(hostExecPod)
+		e2epod.NewPodClient(f).CreateSync(hostExecPod)
 
 		// use a 5 seconds timeout per connection
 		timeout := 5
@@ -124,14 +124,14 @@ var _ = common.SIGDescribe("HostPort", func() {
 		for i := 0; i < 5; i++ {
 			// check pod1
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
-			hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
+			hostname1, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod1...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
 				continue
 			}
 			// check pod2
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port))
-			hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod2...)
+			hostname2, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod2...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue
@@ -143,7 +143,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 			}
 			// check pod3
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, hostIP, port))
-			hostname3, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
+			hostname3, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod3...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue

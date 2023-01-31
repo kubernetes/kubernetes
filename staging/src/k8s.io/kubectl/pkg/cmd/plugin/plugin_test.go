@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -175,6 +177,34 @@ func TestPluginPathsAreValid(t *testing.T) {
 				t.Fatalf("unexpected output: expected to contain %v, but got %v", test.expectOut, out.String())
 			}
 		})
+	}
+}
+
+func TestListPlugins(t *testing.T) {
+	pluginPath, _ := filepath.Abs("./testdata")
+	expectPlugins := []string{
+		filepath.Join(pluginPath, "kubectl-foo"),
+		filepath.Join(pluginPath, "kubectl-version"),
+	}
+
+	verifier := newFakePluginPathVerifier()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	pluginPaths := []string{pluginPath}
+
+	o := &PluginListOptions{
+		Verifier:  verifier,
+		IOStreams: ioStreams,
+
+		PluginPaths: pluginPaths,
+	}
+
+	plugins, errs := o.ListPlugins()
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	if !reflect.DeepEqual(expectPlugins, plugins) {
+		t.Fatalf("saw unexpected plugins. Expecting %v, got %v", expectPlugins, plugins)
 	}
 }
 

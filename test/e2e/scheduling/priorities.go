@@ -142,17 +142,17 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			ginkgo.By("Trying to apply a label on the found node.")
 			k = "kubernetes.io/e2e-node-topologyKey"
 			v := "topologyvalue1"
-			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-			defer framework.RemoveLabelOffNode(cs, nodeName, k)
+			e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 			ginkgo.By("Trying to apply a label on other nodes.")
 			v = "topologyvalue2"
 			for _, node := range nodeList.Items {
 				if node.Name != nodeName {
-					framework.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
-					framework.ExpectNodeHasLabel(cs, node.Name, k, v)
-					defer framework.RemoveLabelOffNode(cs, node.Name, k)
+					e2enode.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
+					e2enode.ExpectNodeHasLabel(cs, node.Name, k, v)
+					defer e2enode.RemoveLabelOffNode(cs, node.Name, k)
 				}
 			}
 		}
@@ -276,12 +276,12 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2enode.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 			}
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2enode.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 		})
 
@@ -561,5 +561,5 @@ func getRandomTaint() v1.Taint {
 
 func addTaintToNode(cs clientset.Interface, nodeName string, testTaint v1.Taint) {
 	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+	e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 }

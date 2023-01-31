@@ -4,6 +4,7 @@ package config
 
 import (
 	v1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
+	v1alpha1 "github.com/openshift/client-go/config/informers/externalversions/config/v1alpha1"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
 )
 
@@ -11,6 +12,8 @@ import (
 type Interface interface {
 	// V1 provides access to shared informers for resources in V1.
 	V1() v1.Interface
+	// V1alpha1 provides access to shared informers for resources in V1alpha1.
+	V1alpha1() v1alpha1.Interface
 }
 
 type group struct {
@@ -27,4 +30,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // V1 returns a new v1.Interface.
 func (g *group) V1() v1.Interface {
 	return v1.New(g.factory, g.namespace, g.tweakListOptions)
+}
+
+// V1alpha1 returns a new v1alpha1.Interface.
+func (g *group) V1alpha1() v1alpha1.Interface {
+	return v1alpha1.New(g.factory, g.namespace, g.tweakListOptions)
 }

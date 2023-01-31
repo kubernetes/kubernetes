@@ -28,20 +28,20 @@ import (
 	"os"
 	"testing"
 
-	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -91,30 +91,15 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			t.Fatalf("Error occurred while generating unmapVolumeFunc: %v", e)
 		}
 
-		metricFamilyName := "storage_operation_duration_seconds"
-		labelFilter := map[string]string{
-			"migrated":       "false",
-			"status":         "success",
-			"operation_name": "unmap_volume",
-			"volume_plugin":  expectedPluginName,
-		}
-		// compare the relative change of the metric because of the global state of the prometheus.DefaultGatherer.Gather()
-		storageOperationDurationSecondsMetricBefore := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
+		m := util.StorageOperationMetric.WithLabelValues(expectedPluginName, "unmap_volume", "success", "false")
+		storageOperationDurationSecondsMetricBefore, _ := testutil.GetHistogramMetricCount(m)
 
 		var ee error
 		unmapVolumeFunc.CompleteFunc(volumetypes.CompleteFuncParam{Err: &ee})
 
-		storageOperationDurationSecondsMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
-		if storageOperationDurationSecondsMetricAfter == nil {
-			t.Fatalf("Couldn't find the metric with name(%s) and labels(%v)", metricFamilyName, labelFilter)
-		}
-
-		if storageOperationDurationSecondsMetricBefore == nil {
-			assert.Equal(t, uint64(1), *storageOperationDurationSecondsMetricAfter.Histogram.SampleCount, tc.name)
-		} else {
-			metricValueDiff := *storageOperationDurationSecondsMetricAfter.Histogram.SampleCount - *storageOperationDurationSecondsMetricBefore.Histogram.SampleCount
-			assert.Equal(t, uint64(1), metricValueDiff, tc.name)
-		}
+		storageOperationDurationSecondsMetricAfter, _ := testutil.GetHistogramMetricCount(m)
+		metricValueDiff := storageOperationDurationSecondsMetricAfter - storageOperationDurationSecondsMetricBefore
+		assert.Equal(t, uint64(1), metricValueDiff, tc.name)
 	}
 }
 
@@ -406,40 +391,6 @@ func getTestPV(volumeName string, specSize string) *v1.PersistentVolume {
 	}
 }
 
-func findMetricWithNameAndLabels(metricFamilyName string, labelFilter map[string]string) *io_prometheus_client.Metric {
-	metricFamily := getMetricFamily(metricFamilyName)
-	if metricFamily == nil {
-		return nil
-	}
-
-	for _, metric := range metricFamily.GetMetric() {
-		if isLabelsMatchWithMetric(labelFilter, metric) {
-			return metric
-		}
-	}
-
-	return nil
-}
-
-func isLabelsMatchWithMetric(labelFilter map[string]string, metric *io_prometheus_client.Metric) bool {
-	if len(labelFilter) != len(metric.Label) {
-		return false
-	}
-	for labelName, labelValue := range labelFilter {
-		labelFound := false
-		for _, labelPair := range metric.Label {
-			if labelName == *labelPair.Name && labelValue == *labelPair.Value {
-				labelFound = true
-				break
-			}
-		}
-		if !labelFound {
-			return false
-		}
-	}
-	return true
-}
-
 func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr, objects ...runtime.Object) OperationGenerator {
 	fakeKubeClient := fakeclient.NewSimpleClientset(objects...)
 	fakeRecorder := &record.FakeRecorder{}
@@ -490,16 +441,6 @@ func getTestVolumeToUnmount(pod *v1.Pod, pvSpec v1.PersistentVolumeSpec, pluginN
 		VolumeSpec: volumeSpec,
 	}
 	return volumeToUnmount
-}
-
-func getMetricFamily(metricFamilyName string) *io_prometheus_client.MetricFamily {
-	metricFamilies, _ := legacyregistry.DefaultGatherer.Gather()
-	for _, mf := range metricFamilies {
-		if *mf.Name == metricFamilyName {
-			return mf
-		}
-	}
-	return nil
 }
 
 func initTestPlugins(t *testing.T, plugs []volume.VolumePlugin, pluginName string) (*volume.VolumePluginMgr, string) {

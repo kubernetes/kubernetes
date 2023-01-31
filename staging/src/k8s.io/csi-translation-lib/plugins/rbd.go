@@ -294,7 +294,7 @@ func composeMigVolID(mons string, pool string, image string) string {
 	clusterIDInHandle := md5.Sum([]byte(mons))
 	clusterField := monsPfx + fmt.Sprintf("%x", clusterIDInHandle)
 	poolHashInHandle := hex.EncodeToString([]byte(pool))
-	imageHashInHandle := strings.Split(image, defaultIntreeImagePfx)[1]
+	imageHashInHandle := strings.TrimPrefix(image, defaultIntreeImagePfx)
 	imageField := imgPfx + imageHashInHandle
 	volHash := strings.Join([]string{migVolPfx, clusterField, imageField, poolHashInHandle}, "_")
 	return volHash

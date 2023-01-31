@@ -341,7 +341,9 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, control
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(controlPlaneNode)
 	isVMPresentFlag, err := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(isVMPresentFlag, false, errorMsg)
+	if isVMPresentFlag {
+		framework.Failf("VM with name %s is present, %s", dummyVMFullName, errorMsg)
+	}
 }
 
 func getControlPlaneNode(client clientset.Interface) (string, error) {

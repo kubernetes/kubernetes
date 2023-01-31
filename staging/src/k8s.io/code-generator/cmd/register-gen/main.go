@@ -24,13 +24,11 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/code-generator/cmd/register-gen/generators"
-	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs := generatorargs.NewDefaults()
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)

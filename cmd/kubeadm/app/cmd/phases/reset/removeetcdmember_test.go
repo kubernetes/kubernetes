@@ -63,10 +63,11 @@ func TestGetEtcdDataDir(t *testing.T) {
 		writeManifest bool
 		validConfig   bool
 	}{
-		"non-existent file returns error": {
-			expectErr:     true,
+		"non-existent file returns default data dir": {
+			expectErr:     false,
 			writeManifest: false,
 			validConfig:   true,
+			dataDir:       "/var/lib/etcd",
 		},
 		"return etcd data dir": {
 			dataDir:       "/path/to/etcd",

@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -80,12 +79,6 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		secretSynced:         secrets.Informer().HasSynced,
 		tokenSecretNamespace: options.TokenSecretNamespace,
 		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "token_cleaner"),
-	}
-
-	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
 	}
 
 	secrets.Informer().AddEventHandlerWithResyncPeriod(

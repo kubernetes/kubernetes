@@ -550,7 +550,7 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 			exists: true,
 		},
 		{
-			name: "key existence in terms with one of the keys specfied",
+			name: "key existence in terms with one of the keys specified",
 			reqs: []v1.NodeSelectorRequirement{
 				{
 					Key:      "key1",

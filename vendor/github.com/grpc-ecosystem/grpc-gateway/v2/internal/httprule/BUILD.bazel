@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//visibility:public"])
+
+go_library(
+    name = "httprule",
+    srcs = [
+        "compile.go",
+        "parse.go",
+        "types.go",
+    ],
+    importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule",
+    deps = ["//utilities"],
+)
+
+go_test(
+    name = "httprule_test",
+    size = "small",
+    srcs = [
+        "compile_test.go",
+        "parse_test.go",
+        "types_test.go",
+    ],
+    embed = [":httprule"],
+    deps = [
+        "//utilities",
+        "@com_github_golang_glog//:glog",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":httprule",
+    visibility = ["//:__subpackages__"],
+)

@@ -141,7 +141,7 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 
 		// Use http/1.1 instead of http/2.
 		// This is a workaround for http/2-enabled clients not load-balancing concurrent requests to multiple backends.
-		// See http://issue.k8s.io/75791 for details.
+		// See https://issue.k8s.io/75791 for details.
 		cfg.NextProtos = []string{"http/1.1"}
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer

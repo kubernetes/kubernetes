@@ -387,6 +387,9 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	} else {
 		rest.FillObjectMetaSystemFields(objectMeta)
+		if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
+			objectMeta.SetName(e.CreateStrategy.GenerateName(objectMeta.GetGenerateName()))
+		}
 	}
 
 	if e.BeginCreate != nil {

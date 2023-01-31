@@ -38,9 +38,6 @@ import (
 )
 
 const (
-	// DefaultBindTimeoutSeconds defines the default bind timeout in seconds
-	DefaultBindTimeoutSeconds = 600
-
 	stateKey framework.StateKey = Name
 
 	maxUtilization = 100

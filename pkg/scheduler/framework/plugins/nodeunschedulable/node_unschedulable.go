@@ -68,7 +68,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
-	// TODO (k82cn): deprecates `node.Spec.Unschedulable` in 1.13.
 	if node.Spec.Unschedulable && !podToleratesUnschedulable {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}

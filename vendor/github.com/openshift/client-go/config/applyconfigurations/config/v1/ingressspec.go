@@ -9,7 +9,7 @@ type IngressSpecApplyConfiguration struct {
 	AppsDomain           *string                                `json:"appsDomain,omitempty"`
 	ComponentRoutes      []ComponentRouteSpecApplyConfiguration `json:"componentRoutes,omitempty"`
 	RequiredHSTSPolicies []RequiredHSTSPolicyApplyConfiguration `json:"requiredHSTSPolicies,omitempty"`
-	LoadBalancer         *LoadBalancerApplyConfiguration        `json:"loadbalancer,omitempty"`
+	LoadBalancer         *LoadBalancerApplyConfiguration        `json:"loadBalancer,omitempty"`
 }
 
 // IngressSpecApplyConfiguration constructs an declarative configuration of the IngressSpec type for use with

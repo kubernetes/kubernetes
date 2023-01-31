@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -230,7 +231,7 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	}
 	return p
@@ -246,6 +247,12 @@ func (p *PodWrapper) Container(s string) *PodWrapper {
 // Containers sets `containers` to the PodSpec of the inner pod.
 func (p *PodWrapper) Containers(containers []v1.Container) *PodWrapper {
 	p.Spec.Containers = containers
+	return p
+}
+
+// PodResourceClaims appends PodResourceClaims into PodSpec of the inner pod.
+func (p *PodWrapper) PodResourceClaims(podResourceClaims ...v1.PodResourceClaim) *PodWrapper {
+	p.Spec.ResourceClaims = append(p.Spec.ResourceClaims, podResourceClaims...)
 	return p
 }
 
@@ -382,6 +389,14 @@ func (p *PodWrapper) PVC(name string) *PodWrapper {
 // Volume creates volume and injects into the inner pod.
 func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
 	p.Spec.Volumes = append(p.Spec.Volumes, volume)
+	return p
+}
+
+// SchedulingGates sets `gates` as additional SchedulerGates of the inner pod.
+func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
+	for _, gate := range gates {
+		p.Spec.SchedulingGates = append(p.Spec.SchedulingGates, v1.PodSchedulingGate{Name: gate})
+	}
 	return p
 }
 
@@ -581,10 +596,7 @@ func (p *PodWrapper) Labels(labels map[string]string) *PodWrapper {
 
 // Annotation sets a {k,v} pair to the inner pod annotation.
 func (p *PodWrapper) Annotation(key, value string) *PodWrapper {
-	if p.ObjectMeta.Annotations == nil {
-		p.ObjectMeta.Annotations = make(map[string]string)
-	}
-	p.ObjectMeta.Annotations[key] = value
+	metav1.SetMetaDataAnnotation(&p.ObjectMeta, key, value)
 	return p
 }
 
@@ -694,4 +706,252 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 	n.Spec.Taints = taints
 	return n
+}
+
+// PersistentVolumeClaimWrapper wraps a PersistentVolumeClaim inside.
+type PersistentVolumeClaimWrapper struct{ v1.PersistentVolumeClaim }
+
+// MakePersistentVolumeClaim creates a PersistentVolumeClaim wrapper.
+func MakePersistentVolumeClaim() *PersistentVolumeClaimWrapper {
+	return &PersistentVolumeClaimWrapper{}
+}
+
+// Obj returns the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Obj() *v1.PersistentVolumeClaim {
+	return &p.PersistentVolumeClaim
+}
+
+// Name sets `s` as the name of the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Name(s string) *PersistentVolumeClaimWrapper {
+	p.SetName(s)
+	return p
+}
+
+// Namespace sets `s` as the namespace of the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Namespace(s string) *PersistentVolumeClaimWrapper {
+	p.SetNamespace(s)
+	return p
+}
+
+// Annotation sets a {k,v} pair to the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Annotation(key, value string) *PersistentVolumeClaimWrapper {
+	metav1.SetMetaDataAnnotation(&p.ObjectMeta, key, value)
+	return p
+}
+
+// VolumeName sets `name` as the volume name of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) VolumeName(name string) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.VolumeName = name
+	return p
+}
+
+// AccessModes sets `accessModes` as the access modes of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVolumeAccessMode) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.AccessModes = accessModes
+	return p
+}
+
+// Resources sets `resources` as the resource requirements of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Resources(resources v1.ResourceRequirements) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.Resources = resources
+	return p
+}
+
+// PersistentVolumeWrapper wraps a PersistentVolume inside.
+type PersistentVolumeWrapper struct{ v1.PersistentVolume }
+
+// MakePersistentVolume creates a PersistentVolume wrapper.
+func MakePersistentVolume() *PersistentVolumeWrapper {
+	return &PersistentVolumeWrapper{}
+}
+
+// Obj returns the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Obj() *v1.PersistentVolume {
+	return &p.PersistentVolume
+}
+
+// Name sets `s` as the name of the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Name(s string) *PersistentVolumeWrapper {
+	p.SetName(s)
+	return p
+}
+
+// AccessModes sets `accessModes` as the access modes of the inner
+// PersistentVolume.
+func (p *PersistentVolumeWrapper) AccessModes(accessModes []v1.PersistentVolumeAccessMode) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.AccessModes = accessModes
+	return p
+}
+
+// Capacity sets `capacity` as the resource list of the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Capacity(capacity v1.ResourceList) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.Capacity = capacity
+	return p
+}
+
+// HostPathVolumeSource sets `src` as the host path volume source of the inner
+// PersistentVolume.
+func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSource) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.HostPath = src
+	return p
+}
+
+// ResourceClaimWrapper wraps a ResourceClaim inside.
+type ResourceClaimWrapper struct{ resourcev1alpha1.ResourceClaim }
+
+// MakeResourceClaim creates a ResourceClaim wrapper.
+func MakeResourceClaim() *ResourceClaimWrapper {
+	return &ResourceClaimWrapper{resourcev1alpha1.ResourceClaim{}}
+}
+
+// FromResourceClaim creates a ResourceClaim wrapper from some existing object.
+func FromResourceClaim(other *resourcev1alpha1.ResourceClaim) *ResourceClaimWrapper {
+	return &ResourceClaimWrapper{*other.DeepCopy()}
+}
+
+// Obj returns the inner ResourceClaim.
+func (wrapper *ResourceClaimWrapper) Obj() *resourcev1alpha1.ResourceClaim {
+	return &wrapper.ResourceClaim
+}
+
+// Name sets `s` as the name of the inner object.
+func (wrapper *ResourceClaimWrapper) Name(s string) *ResourceClaimWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+// UID sets `s` as the UID of the inner object.
+func (wrapper *ResourceClaimWrapper) UID(s string) *ResourceClaimWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+// Namespace sets `s` as the namespace of the inner object.
+func (wrapper *ResourceClaimWrapper) Namespace(s string) *ResourceClaimWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+// OwnerReference updates the owning controller of the object.
+func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema.GroupVersionKind) *ResourceClaimWrapper {
+	wrapper.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: gvk.GroupVersion().String(),
+			Kind:       gvk.Kind,
+			Name:       name,
+			UID:        types.UID(uid),
+			Controller: pointer.Bool(true),
+		},
+	}
+	return wrapper
+}
+
+// AllocationMode sets the allocation mode of the inner object.
+func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha1.AllocationMode) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Spec.AllocationMode = a
+	return wrapper
+}
+
+// ResourceClassName sets the resource class name of the inner object.
+func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Spec.ResourceClassName = name
+	return wrapper
+}
+
+// Allocation sets the allocation of the inner object.
+func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourcev1alpha1.AllocationResult) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Status.Allocation = allocation
+	return wrapper
+}
+
+// DeallocationRequested sets that field of the inner object.
+func (wrapper *ResourceClaimWrapper) DeallocationRequested(deallocationRequested bool) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Status.DeallocationRequested = deallocationRequested
+	return wrapper
+}
+
+// ReservedFor sets that field of the inner object.
+func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha1.ResourceClaimConsumerReference) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Status.ReservedFor = consumers
+	return wrapper
+}
+
+// PodSchedulingWrapper wraps a PodScheduling inside.
+type PodSchedulingWrapper struct{ resourcev1alpha1.PodScheduling }
+
+// MakePodScheduling creates a PodScheduling wrapper.
+func MakePodScheduling() *PodSchedulingWrapper {
+	return &PodSchedulingWrapper{resourcev1alpha1.PodScheduling{}}
+}
+
+// FromPodScheduling creates a PodScheduling wrapper from some existing object.
+func FromPodScheduling(other *resourcev1alpha1.PodScheduling) *PodSchedulingWrapper {
+	return &PodSchedulingWrapper{*other.DeepCopy()}
+}
+
+// Obj returns the inner object.
+func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha1.PodScheduling {
+	return &wrapper.PodScheduling
+}
+
+// Name sets `s` as the name of the inner object.
+func (wrapper *PodSchedulingWrapper) Name(s string) *PodSchedulingWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+// UID sets `s` as the UID of the inner object.
+func (wrapper *PodSchedulingWrapper) UID(s string) *PodSchedulingWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+// Namespace sets `s` as the namespace of the inner object.
+func (wrapper *PodSchedulingWrapper) Namespace(s string) *PodSchedulingWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+// OwnerReference updates the owning controller of the inner object.
+func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema.GroupVersionKind) *PodSchedulingWrapper {
+	wrapper.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: gvk.GroupVersion().String(),
+			Kind:       gvk.Kind,
+			Name:       name,
+			UID:        types.UID(uid),
+			Controller: pointer.Bool(true),
+		},
+	}
+	return wrapper
+}
+
+// Label applies a {k,v} label pair to the inner object
+func (wrapper *PodSchedulingWrapper) Label(k, v string) *PodSchedulingWrapper {
+	if wrapper.Labels == nil {
+		wrapper.Labels = make(map[string]string)
+	}
+	wrapper.Labels[k] = v
+	return wrapper
+}
+
+// SelectedNode sets that field of the inner object.
+func (wrapper *PodSchedulingWrapper) SelectedNode(s string) *PodSchedulingWrapper {
+	wrapper.Spec.SelectedNode = s
+	return wrapper
+}
+
+// PotentialNodes sets that field of the inner object.
+func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedulingWrapper {
+	wrapper.Spec.PotentialNodes = nodes
+	return wrapper
+}
+
+// ResourceClaims sets that field of the inner object.
+func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcev1alpha1.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
+	wrapper.Status.ResourceClaims = statuses
+	return wrapper
 }

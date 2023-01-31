@@ -46,7 +46,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
-# priviledged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
+# privileged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

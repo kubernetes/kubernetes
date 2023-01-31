@@ -26,12 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
@@ -60,7 +61,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
+			result := e2eoutput.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
 		}
 	})
@@ -82,7 +83,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 		for _, nodeIP := range nodeIPs {
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-			result := framework.RunHostCmdOrDie(ns,
+			result := e2eoutput.RunHostCmdOrDie(ns,
 				pod.Name,
 				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s/metrics",
 					"%{http_code}",
@@ -96,5 +97,5 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "agnhost-pod", nil, nil, nil)
 	pod.ObjectMeta.GenerateName = "test-node-authn-"
-	return f.PodClient().CreateSync(pod)
+	return e2epod.NewPodClient(f).CreateSync(pod)
 }

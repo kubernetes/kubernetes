@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -81,7 +82,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 
 	scheduling.SetupNVIDIAGPUNode(f, false)
 
-	f.PodClient().Create(&v1.Pod{
+	e2epod.NewPodClient(f).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
 		},

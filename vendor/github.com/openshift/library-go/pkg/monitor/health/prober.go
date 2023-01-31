@@ -75,21 +75,20 @@ var _ Notifier = &Prober{}
 //
 // The following methods allows you to configure behaviour of the monitor after creation.
 //
-//   WithUnHealthyProbesThreshold - that specifies consecutive failed health checks after which a target is considered unhealthy
-//                                  the default value is: 3
+//	WithUnHealthyProbesThreshold - that specifies consecutive failed health checks after which a target is considered unhealthy
+//	                               the default value is: 3
 //
-//   WithHealthyProbesThreshold   - that specifies consecutive successful health checks after which a target is considered healthy
-//                                  the default value is: 5
+//	WithHealthyProbesThreshold   - that specifies consecutive successful health checks after which a target is considered healthy
+//	                               the default value is: 5
 //
-//   WithProbeResponseTimeout     - that specifies a time limit for requests made by the HTTP client for the health check
-//                                  the default value is: 1 second
+//	WithProbeResponseTimeout     - that specifies a time limit for requests made by the HTTP client for the health check
+//	                               the default value is: 1 second
 //
-//   WithProbeInterval            - that specifies a time interval at which health checks are send
-//                                  the default value is: 2 seconds
+//	WithProbeInterval            - that specifies a time interval at which health checks are send
+//	                               the default value is: 2 seconds
 //
-//   WithMetrics                  - that specifies a set of methods that are used to register various metrics
-//                                  the default value is: no metrics
-//
+//	WithMetrics                  - that specifies a set of methods that are used to register various metrics
+//	                               the default value is: no metrics
 //
 // Additionally the monitor implements Listener and Notifier interfaces.
 //
@@ -98,7 +97,8 @@ var _ Notifier = &Prober{}
 //
 // Interested parties can register a listener for notifications about healthy/unhealthy targets changes via AddListener.
 // TODO: instead of restConfig we could accept transport so that it is reused instead of creating a new connection to targets
-//       reusing the transport has the advantage of using the same connection as other clients
+//
+//	reusing the transport has the advantage of using the same connection as other clients
 func New(targetProvider TargetProvider, restConfig *rest.Config) (*Prober, error) {
 	client, err := createHealthCheckHTTPClient(defaultProbeResponseTimeout, restConfig)
 	if err != nil {

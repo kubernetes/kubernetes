@@ -37,15 +37,15 @@ import (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	ginkgo.Context("[NodeConformance][LinuxOnly] Container PID namespace sharing", func() {
 		ginkgo.It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
 			ginkgo.By("Create a pod with isolated PID namespaces.")
-			f.PodClient().CreateSync(&v1.Pod{
+			e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "isolated-pid-ns-test-pod"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -65,8 +65,8 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 
 			ginkgo.By("Check if both containers receive PID 1.")
-			pid1 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
-			pid2 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
+			pid1 := e2epod.ExecCommandInContainer(f, "isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := e2epod.ExecCommandInContainer(f, "isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
 			if pid1 != "1" || pid2 != "1" {
 				framework.Failf("PIDs of different containers are not all 1: test-container-1=%v, test-container-2=%v", pid1, pid2)
 			}
@@ -74,7 +74,7 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("processes in containers sharing a pod namespace should be able to see each other", func() {
 			ginkgo.By("Create a pod with shared PID namespace.")
-			f.PodClient().CreateSync(&v1.Pod{
+			e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},
 				Spec: v1.PodSpec{
 					ShareProcessNamespace: &[]bool{true}[0],
@@ -95,8 +95,8 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 
 			ginkgo.By("Check if the process in one container is visible to the process in the other.")
-			pid1 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
-			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
+			pid1 := e2epod.ExecCommandInContainer(f, "shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := e2epod.ExecCommandInContainer(f, "shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
 			if pid1 != pid2 {
 				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
 			}
@@ -141,7 +141,7 @@ var _ = SIGDescribe("Security Context", func() {
 				true,
 			))
 
-			output := f.ExecShellInContainer(nginxPodName, nginxPodName,
+			output := e2epod.ExecShellInContainer(f, nginxPodName, nginxPodName,
 				"cat /var/run/nginx.pid")
 			nginxPid = strings.TrimSpace(output)
 		})

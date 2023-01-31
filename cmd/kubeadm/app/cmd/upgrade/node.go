@@ -33,7 +33,6 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -146,12 +145,6 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
-	// In case we fetch a configuration from the cluster, mutate the ImageRepository field
-	// to be 'registry.k8s.io', if it was 'k8s.gcr.io'. Don't mutate the in-cluster value by passing
-	// nil as the client field; this is done only on "apply".
-	// TODO: Remove this in 1.26
-	// https://github.com/kubernetes/kubeadm/issues/2671
-	_ = uploadconfig.MutateImageRepository(cfg, nil)
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {

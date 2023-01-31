@@ -40,7 +40,7 @@ Bash:
   # Linux:
   $ %[1]s completion bash > /etc/bash_completion.d/%[1]s
   # macOS:
-  $ %[1]s completion bash > /usr/local/etc/bash_completion.d/%[1]s
+  $ %[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
 
 Zsh:
 
@@ -99,6 +99,11 @@ To tell Cobra *not* to provide the default `completion` command:
 rootCmd.CompletionOptions.DisableDefaultCmd = true
 ```
 
+To tell Cobra to mark the default `completion` command as *hidden*:
+```
+rootCmd.CompletionOptions.HiddenDefaultCmd = true
+```
+
 To tell Cobra *not* to provide the user with the `--no-descriptions` flag to the completion sub-commands:
 ```
 rootCmd.CompletionOptions.DisableNoDescFlag = true
@@ -122,7 +127,7 @@ For example, if you want `kubectl get [tab][tab]` to show a list of valid "nouns
 Some simplified code from `kubectl get` looks like:
 
 ```go
-validArgs []string = { "pod", "node", "service", "replicationcontroller" }
+validArgs = []string{ "pod", "node", "service", "replicationcontroller" }
 
 cmd := &cobra.Command{
 	Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
@@ -148,7 +153,7 @@ node   pod   replicationcontroller   service
 If your nouns have aliases, you can define them alongside `ValidArgs` using `ArgAliases`:
 
 ```go
-argAliases []string = { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
+argAliases = []string { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
 
 cmd := &cobra.Command{
     ...
@@ -530,6 +535,21 @@ search for a keyword in charts
 $ helm s[tab]
 search  show  status
 ```
+### Aliases
+
+You can also configure `powershell` aliases for your program and they will also support completions.
+
+```
+$ sal aliasname origcommand
+$ Register-ArgumentCompleter -CommandName 'aliasname' -ScriptBlock $__origcommandCompleterBlock
+
+# and now when you run `aliasname` completion will make
+# suggestions as it did for `origcommand`.
+
+$ aliasname <tab>
+completion     firstcommand   secondcommand
+```
+The name of the completer block variable is of the form `$__<programName>CompleterBlock` where every `-` and `:` in the program name have been replaced with `_`, to respect powershell naming syntax.
 
 ### Limitations
 

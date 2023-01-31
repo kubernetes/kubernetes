@@ -27,7 +27,7 @@ import (
 func TestIntegrator(t *testing.T) {
 	now := time.Now()
 	clk := testclock.NewFakeClock(now)
-	igr := NewIntegrator(clk)
+	igr := NewNamedIntegrator(clk, "testee")
 	igr.Add(3)
 	clk.Step(time.Second)
 	results := igr.GetResults()

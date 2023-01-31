@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 // DefaultParallelism is the default parallelism used in scheduler.
@@ -51,6 +52,13 @@ func chunkSizeFor(n, parallelism int) int {
 }
 
 // Until is a wrapper around workqueue.ParallelizeUntil to use in scheduling algorithms.
-func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc) {
-	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, doWorkPiece, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)))
+// A given operation will be a label that is recorded in the goroutine metric.
+func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string) {
+	withMetrics := func(piece int) {
+		metrics.Goroutines.WithLabelValues(operation).Inc()
+		defer metrics.Goroutines.WithLabelValues(operation).Dec()
+		doWorkPiece(piece)
+	}
+
+	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, withMetrics, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)))
 }

@@ -148,6 +148,8 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
+		storageframework.CapReadWriteOncePod:    true,
+		storageframework.CapMultiplePVsSameID:   true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -205,7 +207,7 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *storageframework.PerTestCon
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	driverns := driverNamespace.Name
@@ -284,8 +286,9 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		driverns,
 		cleanup,
 		cancelLogging)
+	ginkgo.DeferCleanup(cleanupFunc)
 
-	return config, cleanupFunc
+	return config
 }
 
 // mockCSI
@@ -306,6 +309,7 @@ type mockCSIDriver struct {
 	embedded               bool
 	calls                  MockCSICalls
 	embeddedCSIDriver      *mockdriver.CSIDriver
+	enableSELinuxMount     *bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -352,6 +356,7 @@ type CSIMockDriverOpts struct {
 	TokenRequests          []storagev1.TokenRequest
 	RequiresRepublish      *bool
 	FSGroupPolicy          *storagev1.FSGroupPolicy
+	EnableSELinuxMount     *bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -394,7 +399,7 @@ func (c *MockCSICalls) Get() []MockCSICall {
 	return c.calls[:]
 }
 
-// Add appens one new call at the end.
+// Add appends one new call at the end.
 func (c *MockCSICalls) Add(call MockCSICall) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -486,10 +491,11 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:  false,
-				storageframework.CapFsGroup:      false,
-				storageframework.CapExec:         false,
-				storageframework.CapVolumeLimits: true,
+				storageframework.CapPersistence:       false,
+				storageframework.CapFsGroup:           false,
+				storageframework.CapExec:              false,
+				storageframework.CapVolumeLimits:      true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 		manifests:              driverManifests,
@@ -503,6 +509,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		requiresRepublish:      driverOpts.RequiresRepublish,
 		fsGroupPolicy:          driverOpts.FSGroupPolicy,
 		enableVolumeMountGroup: driverOpts.EnableVolumeMountGroup,
+		enableSELinuxMount:     driverOpts.EnableSELinuxMount,
 		embedded:               driverOpts.Embedded,
 		hooks:                  driverOpts.Hooks,
 	}
@@ -530,7 +537,7 @@ func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig,
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	m.clientSet = f.ClientSet
 
 	// Create secondary namespace which will be used for creating driver
@@ -653,6 +660,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		TokenRequests:     m.tokenRequests,
 		RequiresRepublish: m.requiresRepublish,
 		FSGroupPolicy:     m.fsGroupPolicy,
+		SELinuxMount:      m.enableSELinuxMount,
 	}
 	cleanup, err := utils.CreateFromManifests(f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
@@ -688,12 +696,12 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		cleanup,
 		cancelLogging)
 
-	cleanupFunc := func() {
+	ginkgo.DeferCleanup(func() {
 		embeddedCleanup()
 		driverCleanupFunc()
-	}
+	})
 
-	return config, cleanupFunc
+	return config
 }
 
 func (m *mockCSIDriver) interceptGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -805,6 +813,8 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
+				storageframework.CapReadWriteOncePod:    true,
+				storageframework.CapMultiplePVsSameID:   true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
@@ -858,7 +868,7 @@ func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	testns := f.Namespace.Name
 	cfg := &storageframework.PerTestConfig{
 		Driver:    g,
@@ -868,7 +878,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 
 	if framework.ProviderIs("gke") {
 		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
-		return cfg, func() {}
+		return cfg
 	}
 
 	ginkgo.By("deploying csi gce-pd driver")
@@ -915,13 +925,14 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 		driverns,
 		cleanup,
 		cancelLogging)
+	ginkgo.DeferCleanup(cleanupFunc)
 
 	return &storageframework.PerTestConfig{
 		Driver:          g,
 		Prefix:          "gcepd",
 		Framework:       f,
 		DriverNamespace: driverNamespace,
-	}, cleanupFunc
+	}
 }
 
 // WaitForCSIDriverRegistrationOnAllNodes waits for the CSINode object to be updated
@@ -987,8 +998,6 @@ func generateDriverCleanupFunc(
 	driverName, testns, driverns string,
 	driverCleanup, cancelLogging func()) func() {
 
-	cleanupHandle := new(framework.CleanupActionHandle)
-
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
@@ -1003,13 +1012,7 @@ func generateDriverCleanupFunc(
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", driverns))
 		tryFunc(func() { f.DeleteNamespace(driverns) })
-		// cleanup function has already ran and hence we don't need to run it again.
-		// We do this as very last action because in-case defer(or AfterEach) races
-		// with AfterSuite and test routine gets killed then this block still
-		// runs in AfterSuite
-		framework.RemoveCleanupAction(*cleanupHandle)
 	}
 
-	*cleanupHandle = framework.AddCleanupAction(cleanupFunc)
 	return cleanupFunc
 }

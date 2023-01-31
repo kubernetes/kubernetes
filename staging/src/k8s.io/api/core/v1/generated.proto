@@ -400,6 +400,36 @@ message CinderVolumeSource {
   optional LocalObjectReference secretRef = 4;
 }
 
+// ClaimSource describes a reference to a ResourceClaim.
+//
+// Exactly one of these fields should be set.  Consumers of this type must
+// treat an empty object as if it has an unknown value.
+message ClaimSource {
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace as this pod.
+  optional string resourceClaimName = 1;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace as this pod.
+  //
+  // The template will be used to create a new ResourceClaim, which will
+  // be bound to this pod. When this pod is deleted, the ResourceClaim
+  // will also be deleted. The name of the ResourceClaim will be <pod
+  // name>-<resource name>, where <resource name> is the
+  // PodResourceClaim.Name. Pod validation will reject the pod if the
+  // concatenated name is not valid for a ResourceClaim (e.g. too long).
+  //
+  // An existing ResourceClaim with that name that is not owned by the
+  // pod will not be used for the pod to avoid using an unrelated
+  // resource by mistake. Scheduling and pod startup are then blocked
+  // until the unrelated ResourceClaim is removed.
+  //
+  // This field is immutable and no changes will be made to the
+  // corresponding ResourceClaim by the control plane after creating the
+  // ResourceClaim.
+  optional string resourceClaimTemplateName = 2;
+}
+
 // ClientIPConfig represents the configurations of Client IP based session affinity.
 message ClientIPConfig {
   // timeoutSeconds specifies the seconds of ClientIP type session sticky time.
@@ -2413,7 +2443,7 @@ message NodeSpec {
   // +optional
   repeated Taint taints = 5;
 
-  // Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.
+  // Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
   // +optional
   optional NodeConfigSource configSource = 6;
 
@@ -2453,7 +2483,7 @@ message NodeStatus {
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
   // Note: This field is declared as mergeable, but the merge key is not sufficiently
   // unique, which can cause data corruption when it is merged. Callers should instead
-  // use a full-replacement patch. See http://pr.k8s.io/79391 for an example.
+  // use a full-replacement patch. See https://pr.k8s.io/79391 for an example.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -2711,30 +2741,37 @@ message PersistentVolumeClaimSpec {
   // * An existing PVC (PersistentVolumeClaim)
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
-  // If the AnyVolumeDataSource feature gate is enabled, this field will always have
-  // the same contents as the DataSourceRef field.
+  // When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
+  // and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+  // If the namespace is specified, then dataSourceRef will not be copied to dataSource.
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
 
   // dataSourceRef specifies the object from which to populate the volume with data, if a non-empty
-  // volume is desired. This may be any local object from a non-empty API group (non
+  // volume is desired. This may be any object from a non-empty API group (non
   // core object) or a PersistentVolumeClaim object.
   // When this field is specified, volume binding will only succeed if the type of
   // the specified object matches some installed volume populator or dynamic
   // provisioner.
-  // This field will replace the functionality of the DataSource field and as such
+  // This field will replace the functionality of the dataSource field and as such
   // if both fields are non-empty, they must have the same value. For backwards
-  // compatibility, both fields (DataSource and DataSourceRef) will be set to the same
+  // compatibility, when namespace isn't specified in dataSourceRef,
+  // both fields (dataSource and dataSourceRef) will be set to the same
   // value automatically if one of them is empty and the other is non-empty.
-  // There are two important differences between DataSource and DataSourceRef:
-  // * While DataSource only allows two specific types of objects, DataSourceRef
+  // When namespace is specified in dataSourceRef,
+  // dataSource isn't set to the same value and must be empty.
+  // There are three important differences between dataSource and dataSourceRef:
+  // * While dataSource only allows two specific types of objects, dataSourceRef
   //   allows any non-core object, as well as PersistentVolumeClaim objects.
-  // * While DataSource ignores disallowed values (dropping them), DataSourceRef
+  // * While dataSource ignores disallowed values (dropping them), dataSourceRef
   //   preserves all values, and generates an error if a disallowed value is
   //   specified.
+  // * While dataSource only allows local objects, dataSourceRef allows objects
+  //   in any namespaces.
   // (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+  // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
-  optional TypedLocalObjectReference dataSourceRef = 8;
+  optional TypedObjectReference dataSourceRef = 8;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -3353,6 +3390,25 @@ message PodReadinessGate {
   optional string conditionType = 1;
 }
 
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
+// Containers that need access to the ResourceClaim reference it with this name.
+message PodResourceClaim {
+  // Name uniquely identifies this resource claim inside the pod.
+  // This must be a DNS_LABEL.
+  optional string name = 1;
+
+  // Source describes where to find the ResourceClaim.
+  optional ClaimSource source = 2;
+}
+
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
+message PodSchedulingGate {
+  // Name of the scheduling gate.
+  // Each scheduling gate must have a unique name field.
+  optional string name = 1;
+}
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -3401,8 +3457,11 @@ message PodSecurityContext {
   optional bool runAsNonRoot = 3;
 
   // A list of groups applied to the first process run in each container, in addition
-  // to the container's primary GID.  If unspecified, no groups will be added to
-  // any container.
+  // to the container's primary GID, the fsGroup (if specified), and group memberships
+  // defined in the container image for the uid of the container process. If unspecified,
+  // no additional groups are added to any container. Note that group memberships
+  // defined in the container image for the uid of the container process are still effective,
+  // even if they are not included in this list.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   repeated int64 supplementalGroups = 4;
@@ -3747,6 +3806,35 @@ message PodSpec {
   // +k8s:conversion-gen=false
   // +optional
   optional bool hostUsers = 37;
+
+  // SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
+  // More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+  //
+  // This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  repeated PodSchedulingGate schedulingGates = 38;
+
+  // ResourceClaims defines which ResourceClaims must be allocated
+  // and reserved before the Pod is allowed to start. The resources
+  // will be made available to those containers which consume them
+  // by name.
+  //
+  // This is an alpha field and requires enabling the
+  // DynamicResourceAllocation feature gate.
+  //
+  // This field is immutable.
+  //
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DynamicResourceAllocation
+  // +optional
+  repeated PodResourceClaim resourceClaims = 39;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -4293,7 +4381,7 @@ message ReplicationControllerSpec {
 // ReplicationControllerStatus represents the current status of a replication
 // controller.
 message ReplicationControllerStatus {
-  // Replicas is the most recently oberved number of replicas.
+  // Replicas is the most recently observed number of replicas.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   optional int32 replicas = 1;
 
@@ -4318,6 +4406,14 @@ message ReplicationControllerStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated ReplicationControllerCondition conditions = 6;
+}
+
+// ResourceClaim references one entry in PodSpec.ResourceClaims.
+message ResourceClaim {
+  // Name must match the name of one entry in pod.spec.resourceClaims of
+  // the Pod where this field is used. It makes that resource available
+  // inside a container.
+  optional string name = 1;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
@@ -4409,6 +4505,19 @@ message ResourceRequirements {
   // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
+
+  // Claims lists the names of resources, defined in spec.resourceClaims,
+  // that are used by this container.
+  //
+  // This is an alpha field and requires enabling the
+  // DynamicResourceAllocation feature gate.
+  //
+  // This field is immutable.
+  //
+  // +listType=set
+  // +featureGate=DynamicResourceAllocation
+  // +optional
+  repeated ResourceClaim claims = 3;
 }
 
 // SELinuxOptions are the labels to be applied to the container
@@ -5203,7 +5312,6 @@ message ServiceSpec {
   // implementation (e.g. cloud providers) should ignore Services that set this field.
   // This field can only be set when creating or updating a Service to type 'LoadBalancer'.
   // Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-  // +featureGate=LoadBalancerClass
   // +optional
   optional string loadBalancerClass = 21;
 
@@ -5213,7 +5321,6 @@ message ServiceSpec {
   // dropping the traffic if there are no local endpoints. The default value,
   // "Cluster", uses the standard behavior of routing to all endpoints evenly
   // (possibly modified by topology and other features).
-  // +featureGate=ServiceInternalTrafficPolicy
   // +optional
   optional string internalTrafficPolicy = 22;
 }
@@ -5501,7 +5608,7 @@ message TopologySpreadConstraint {
   // - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
   //
   // If this value is nil, the behavior is equivalent to the Honor policy.
-  // This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeAffinityPolicy = 6;
 
@@ -5512,7 +5619,7 @@ message TopologySpreadConstraint {
   // - Ignore: node taints are ignored. All nodes are included.
   //
   // If this value is nil, the behavior is equivalent to the Ignore policy.
-  // This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeTaintsPolicy = 7;
 
@@ -5542,6 +5649,27 @@ message TypedLocalObjectReference {
 
   // Name is the name of resource being referenced
   optional string name = 3;
+}
+
+message TypedObjectReference {
+  // APIGroup is the group for the resource being referenced.
+  // If APIGroup is not specified, the specified Kind must be in the core API group.
+  // For any other third-party types, APIGroup is required.
+  // +optional
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced
+  optional string name = 3;
+
+  // Namespace is the namespace of resource being referenced
+  // Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
+  // (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+  // +featureGate=CrossNamespaceVolumeDataSource
+  // +optional
+  optional string namespace = 4;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

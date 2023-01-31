@@ -6,7 +6,6 @@ approvers:
   - klueska
   - sjenning
   - mrunalp
-  - ehashman
   - SergeyKanzhelev
   - endocrimes
 emeritus_approvers:
@@ -16,6 +15,7 @@ emeritus_approvers:
   - yujuhong
   - dashpole
   - ConnorDoyle
+  - ehashman
 reviewers:
   - bart0sh
   - endocrimes

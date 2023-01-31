@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -75,11 +74,11 @@ const (
 
 type fakeKubelet struct {
 	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	containerInfoFunc   func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	containerInfoFunc   func(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	rawInfoFunc         func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
 	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
 	podsFunc            func() []*v1.Pod
-	runningPodsFunc     func() ([]*v1.Pod, error)
+	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
 	logFunc             func(w http.ResponseWriter, req *http.Request)
 	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
@@ -110,8 +109,8 @@ func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options 
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
-func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return fk.containerInfoFunc(podFullName, uid, containerName, req)
+func (fk *fakeKubelet) GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
+	return fk.containerInfoFunc(ctx, podFullName, uid, containerName, req)
 }
 
 func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
@@ -130,8 +129,8 @@ func (fk *fakeKubelet) GetPods() []*v1.Pod {
 	return fk.podsFunc()
 }
 
-func (fk *fakeKubelet) GetRunningPods() ([]*v1.Pod, error) {
-	return fk.runningPodsFunc()
+func (fk *fakeKubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
+	return fk.runningPodsFunc(ctx)
 }
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
@@ -146,15 +145,23 @@ func (fk *fakeKubelet) GetHostname() string {
 	return fk.hostnameFunc()
 }
 
-func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
+func (fk *fakeKubelet) RunInContainer(_ context.Context, podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
 }
 
-func (fk *fakeKubelet) CheckpointContainer(podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
+func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
 	if containerName == "checkpointingFailure" {
 		return fmt.Errorf("Returning error for test")
 	}
 	return nil
+}
+
+func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
+	return nil, nil
+}
+
+func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	return nil, nil
 }
 
 type fakeRuntime struct {
@@ -163,15 +170,15 @@ type fakeRuntime struct {
 	portForwardFunc func(string, int32, io.ReadWriteCloser) error
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return f.execFunc(containerID, cmd, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return f.attachFunc(containerID, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(_ context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	return f.portForwardFunc(podSandboxID, port, stream)
 }
 
@@ -210,7 +217,7 @@ func newTestStreamingServer(streamIdleTimeout time.Duration) (s *testStreamingSe
 	return s, nil
 }
 
-func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getExecCheck != nil {
 		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
 	}
@@ -229,7 +236,7 @@ func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerNa
 	return url.Parse(resp.GetUrl())
 }
 
-func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetAttach(_ context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getAttachCheck != nil {
 		fk.getAttachCheck(podFullName, podUID, containerName, streamOpts)
 	}
@@ -247,7 +254,7 @@ func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, container
 	return url.Parse(resp.GetUrl())
 }
 
-func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
 	if fk.getPortForwardCheck != nil {
 		fk.getPortForwardCheck(podName, podNamespace, podUID, portForwardOpts)
 	}
@@ -273,14 +280,16 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 func (*fakeKubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
 	return map[string]volume.BlockVolume{}, true
 }
-func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
-func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                     { return nil, nil }
+func (*fakeKubelet) ListPodStats(_ context.Context) ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(_ context.Context) ([]statsapi.PodStats, error) {
 	return nil, nil
 }
-func (*fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (*fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
-func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
+func (*fakeKubelet) ListPodCPUAndMemoryStats(_ context.Context) ([]statsapi.PodStats, error) {
+	return nil, nil
+}
+func (*fakeKubelet) ImageFsStats(_ context.Context) (*statsapi.FsStats, error) { return nil, nil }
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)               { return nil, nil }
 func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
@@ -434,7 +443,7 @@ func TestServeRunInContainer(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// copying the response body did not work
 		t.Errorf("Cannot copy resp: %#v", err)
@@ -477,7 +486,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// copying the response body did not work
 		t.Errorf("Cannot copy resp: %#v", err)
@@ -747,7 +756,7 @@ func assertHealthIsOk(t *testing.T, httpURL string) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
 	}
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		// copying the response body did not work
 		t.Fatalf("Cannot copy resp: %#v", readErr)
@@ -823,7 +832,7 @@ func TestContainerLogs(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("Error reading container logs: %v", err)
 			}
@@ -913,7 +922,7 @@ func TestCheckpointContainer(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		assert.Equal(t, resp.StatusCode, 500)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
 	})
 	// Now test a successful checkpoint succeeds
@@ -1113,7 +1122,7 @@ func testExecAttach(t *testing.T, verb string) {
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			assert.NoError(t, err, "reading response body")
 
 			require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
@@ -1455,7 +1464,7 @@ func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
-	v, err := ioutil.ReadAll(resp.Body)
+	v, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	assert.Contains(t, string(v), "parse form failed")
@@ -1465,14 +1474,14 @@ func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, 
 	resp, err := http.Get(fw.testHTTPServer.URL + path)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, expectedResponse, string(body))
 
 	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, expectedResponse, string(body))
 }

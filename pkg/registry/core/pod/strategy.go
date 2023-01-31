@@ -38,12 +38,14 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -87,6 +89,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	podutil.DropDisabledPodFields(pod, nil)
 
 	applySeccompVersionSkew(pod)
+	applyWaitingForSchedulingGatesCondition(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -640,6 +643,29 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 	}
 
 	return container, nil
+}
+
+// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// to a new-created Pod if necessary.
+func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
+		len(pod.Spec.SchedulingGates) == 0 {
+		return
+	}
+
+	// If found a condition with type PodScheduled, return.
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == api.PodScheduled {
+			return
+		}
+	}
+
+	pod.Status.Conditions = append(pod.Status.Conditions, api.PodCondition{
+		Type:    api.PodScheduled,
+		Status:  api.ConditionFalse,
+		Reason:  api.PodReasonSchedulingGated,
+		Message: "Scheduling is blocked due to non-empty scheduling gates",
+	})
 }
 
 // applySeccompVersionSkew implements the version skew behavior described in:

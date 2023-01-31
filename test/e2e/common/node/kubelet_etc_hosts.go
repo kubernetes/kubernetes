@@ -92,12 +92,12 @@ func (config *KubeletManagedHostConfig) setup() {
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
 	podSpec := config.createPodSpec(etcHostsPodName)
-	config.pod = config.f.PodClient().CreateSync(podSpec)
+	config.pod = e2epod.NewPodClient(config.f).CreateSync(podSpec)
 }
 
 func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
 	podSpec := config.createPodSpecWithHostNetwork(etcHostsHostNetworkPodName)
-	config.hostNetworkPod = config.f.PodClient().CreateSync(podSpec)
+	config.hostNetworkPod = e2epod.NewPodClient(config.f).CreateSync(podSpec)
 }
 
 func assertManagedStatus(
@@ -148,7 +148,7 @@ func assertManagedStatus(
 }
 
 func (config *KubeletManagedHostConfig) getFileContents(podName, containerName, path string) string {
-	return config.f.ExecCommandInContainer(podName, containerName, "cat", path)
+	return e2epod.ExecCommandInContainer(config.f, podName, containerName, "cat", path)
 }
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {

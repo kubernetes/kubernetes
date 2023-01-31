@@ -126,7 +126,7 @@ func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *rbdPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -386,17 +386,17 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}, nil
 }
 
-func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 	if !ok {
-		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	hu := kvh.GetHostUtil()
 	pluginMntDir := volutil.GetPluginMountDir(plugin.host, plugin.GetPluginName())
 	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	s := dstrings.Split(sourceName, "-image-")
 	if len(s) != 2 {
@@ -414,11 +414,11 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 		klog.V(3).Infof("SourceName %s wrong, fallback to old format", sourceName)
 		sourceName, err = plugin.getDeviceNameFromOldMountPath(mounter, mountPath)
 		if err != nil {
-			return nil, err
+			return volume.ReconstructedVolume{}, err
 		}
 		s = dstrings.Split(sourceName, "-image-")
 		if len(s) != 2 {
-			return nil, fmt.Errorf("sourceName %s wrong, should be pool+\"-image-\"+imageName", sourceName)
+			return volume.ReconstructedVolume{}, fmt.Errorf("sourceName %s wrong, should be pool+\"-image-\"+imageName", sourceName)
 		}
 	}
 	rbdVolume := &v1.Volume{
@@ -430,7 +430,19 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(rbdVolume), nil
+
+	var mountContext string
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		mountContext, err = hu.GetSELinuxMountContext(mountPath)
+		if err != nil {
+			return volume.ReconstructedVolume{}, err
+		}
+	}
+
+	return volume.ReconstructedVolume{
+		Spec:                volume.NewSpecFromVolume(rbdVolume),
+		SELinuxMountContext: mountContext,
+	}, nil
 }
 
 func (plugin *rbdPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
@@ -770,7 +782,7 @@ func (r *rbdVolumeDeleter) Delete() error {
 	return r.manager.DeleteImage(r)
 }
 
-// rbd implmenets volume.Volume interface.
+// rbd implements volume.Volume interface.
 // It's embedded in Mounter/Unmounter/Deleter.
 type rbd struct {
 	volName  string
@@ -782,8 +794,9 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	exec     utilexec.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager                diskManager
-	volume.MetricsProvider `json:"-"`
+	manager                   diskManager
+	volume.MetricsProvider    `json:"-"`
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Volume = &rbd{}
@@ -837,7 +850,7 @@ func (rbd *rbd) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       rbd.ReadOnly,
 		Managed:        !rbd.ReadOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !rbd.mountedWithSELinuxContext,
 	}
 }
 
@@ -853,6 +866,11 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 		return err
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
+	}
+
 	klog.V(3).Infof("rbd: successfully setup at %s", dir)
 	return err
 }

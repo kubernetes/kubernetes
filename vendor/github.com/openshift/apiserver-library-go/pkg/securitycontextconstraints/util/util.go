@@ -184,28 +184,28 @@ func EqualStringSlices(a, b []string) bool {
 // addition of OpenShift-specific "openshift-service-ca.crt" ConfigMap source.
 //
 // This is what a sample injected volume looks like:
-// - projected:
-//   defaultMode: 420
-//   sources:
+//   - projected:
+//     defaultMode: 420
+//     sources:
 //   - serviceAccountToken:
-//       expirationSeconds: 3607
-//       path: token
+//     expirationSeconds: 3607
+//     path: token
 //   - configMap:
-//       name: kube-root-ca.crt
-//       items:
-//       - key: ca.crt
-//         path: ca.crt
+//     name: kube-root-ca.crt
+//     items:
+//   - key: ca.crt
+//     path: ca.crt
 //   - downwardAPI:
-//       items:
-//       - path: namespace
-//         fieldRef:
-//           apiVersion: v1
-//           fieldPath: metadata.namespace
+//     items:
+//   - path: namespace
+//     fieldRef:
+//     apiVersion: v1
+//     fieldPath: metadata.namespace
 //   - configMap:
-//       name: openshift-service-ca.crt
-//       items:
-//       - key: service-ca.crt
-//         path: service-ca.crt
+//     name: openshift-service-ca.crt
+//     items:
+//   - key: service-ca.crt
+//     path: service-ca.crt
 func IsOnlyServiceAccountTokenSources(v *api.ProjectedVolumeSource) bool {
 	for _, s := range v.Sources {
 		// reject any projected source that does not match any of our expected source types

@@ -109,7 +109,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
 				targetCPUUtilizationPercent := int32(50)
-				hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
+				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
 				defer e2eautoscaling.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
 				cpuLoad := 8 * cpuRequestMillis * int64(targetCPUUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))

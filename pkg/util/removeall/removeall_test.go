@@ -20,6 +20,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ type fakeMounter struct {
 
 // IsLikelyNotMountPoint overrides mount.FakeMounter.IsLikelyNotMountPoint for our use.
 func (f *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	name := path.Base(file)
+	name := filepath.Base(file)
 	if strings.HasPrefix(name, "mount") {
 		return false, nil
 	}

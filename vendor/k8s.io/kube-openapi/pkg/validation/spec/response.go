@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // ResponseProps properties specific to a response
@@ -39,13 +41,46 @@ type Response struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (r *Response) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, r)
+	}
+
 	if err := json.Unmarshal(data, &r.ResponseProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &r.Refable); err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &r.VendorExtensible)
+	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Response) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		ResponseProps
+		Extensions
+	}
+
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+
+	r.Extensions = x.Extensions
+	r.ResponseProps = x.ResponseProps
+
+	if err := r.Refable.Ref.fromMap(r.Extensions); err != nil {
+		return err
+	}
+
+	r.Extensions.sanitize()
+	if len(r.Extensions) == 0 {
+		r.Extensions = nil
+	}
+
+	return nil
 }
 
 // MarshalJSON converts this items object to JSON

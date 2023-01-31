@@ -24,8 +24,8 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 ERROR="KMS gRPC is out of date. Please run hack/update-generated-kms.sh"
-KUBE_KMS_V1BETA1="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
-KUBE_KMS_V2ALPHA1="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v2alpha1/"
+KUBE_KMS_V1BETA1="${KUBE_ROOT}/staging/src/k8s.io/kms/apis/v1beta1/"
+KUBE_KMS_V2ALPHA1="${KUBE_ROOT}/staging/src/k8s.io/kms/apis/v2alpha1/"
 KUBE_KMS_V2="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"

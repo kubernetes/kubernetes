@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
@@ -100,7 +102,7 @@ func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *fcPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -238,7 +240,7 @@ func (plugin *fcPlugin) newUnmapperInternal(volName string, podUID types.UID, ma
 	}, nil
 }
 
-func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	// Find globalPDPath from pod volume directory(mountPath)
 	// examples:
 	//   mountPath:     pods/{podUid}/volumes/kubernetes.io~fc/{volumeName}
@@ -254,10 +256,10 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	if io.IsInconsistentReadError(err) {
 		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
 		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it manually", mountPath)
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	for _, path := range paths {
 		if strings.Contains(path, plugin.host.GetPluginDir(fcPluginName)) {
@@ -267,12 +269,12 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	}
 	// Couldn't fetch globalPDPath
 	if len(globalPDPath) == 0 {
-		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
+		return volume.ReconstructedVolume{}, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
 	}
 
 	wwns, lun, wwids, err := parsePDName(globalPDPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
+		return volume.ReconstructedVolume{}, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
 	}
 	// Create volume from wwn+lun or wwid
 	fcVolume := &v1.Volume{
@@ -281,14 +283,31 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 			FC: &v1.FCVolumeSource{WWIDs: wwids, Lun: &lun, TargetWWNs: wwns},
 		},
 	}
+
+	var mountContext string
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+		if !ok {
+			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		}
+		hu := kvh.GetHostUtil()
+		mountContext, err = hu.GetSELinuxMountContext(mountPath)
+		if err != nil {
+			return volume.ReconstructedVolume{}, err
+		}
+	}
+
 	klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
 		fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun, fcVolume.VolumeSource.FC.WWIDs)
-	return volume.NewSpecFromVolume(fcVolume), nil
+	return volume.ReconstructedVolume{
+		Spec:                volume.NewSpecFromVolume(fcVolume),
+		SELinuxMountContext: mountContext,
+	}, nil
 }
 
 // ConstructBlockVolumeSpec creates a new volume.Spec with following steps.
 //   - Searches a file whose name is {pod uuid} under volume plugin directory.
-//   - If a file is found, then retreives volumePluginDependentPath from globalMapPathUUID.
+//   - If a file is found, then retrieves volumePluginDependentPath from globalMapPathUUID.
 //   - Once volumePluginDependentPath is obtained, store volume information to VolumeSource
 //
 // examples:
@@ -358,12 +377,13 @@ func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
 
 type fcDiskMounter struct {
 	*fcDisk
-	readOnly     bool
-	fsType       string
-	volumeMode   v1.PersistentVolumeMode
-	mounter      *mount.SafeFormatAndMount
-	deviceUtil   util.DeviceUtil
-	mountOptions []string
+	readOnly                  bool
+	fsType                    string
+	volumeMode                v1.PersistentVolumeMode
+	mounter                   *mount.SafeFormatAndMount
+	deviceUtil                util.DeviceUtil
+	mountOptions              []string
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Mounter = &fcDiskMounter{}
@@ -372,7 +392,7 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       b.readOnly,
 		Managed:        !b.readOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !b.mountedWithSELinuxContext,
 	}
 }
 
@@ -385,6 +405,11 @@ func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) erro
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("fc: failed to setup")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}
 	return err
 }

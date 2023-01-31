@@ -77,7 +77,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
 
 	// Collect the upgrades kubeadm can do in this list
-	upgrades := []Upgrade{}
+	var upgrades []Upgrade
 
 	// Get the cluster version
 	clusterVersionStr, clusterVersion, err := versionGetterImpl.ClusterVersion()

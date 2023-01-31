@@ -252,7 +252,7 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 		}
 		for arrIx := range values {
 			for valIx := range values[arrIx] {
-				valueStrings = append(valueStrings, fmt.Sprintf("%v", values[arrIx][valIx].Interface()))
+				valueStrings = append(valueStrings, printers.EscapeTerminal(fmt.Sprint(values[arrIx][valIx].Interface())))
 			}
 		}
 		columns[ix] = strings.Join(valueStrings, ",")

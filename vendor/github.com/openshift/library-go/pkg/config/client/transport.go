@@ -79,9 +79,10 @@ func (rt *preferredHostRT) RoundTrip(r *http.Request) (*http.Response, error) {
 // Because this wrapper might be the first or might be actually wrapped with already existing wrappers that already implement CancelRequest we need to simply conform.
 //
 // See for more details:
-//   https://github.com/kubernetes/kubernetes/blob/442a69c3bdf6fe8e525b05887e57d89db1e2f3a5/staging/src/k8s.io/client-go/transport/transport.go#L257
-//   https://github.com/kubernetes/kubernetes/blob/e29c568c4a9cd45d15665345aa015e21bcff52dd/staging/src/k8s.io/client-go/rest/config.go#L328
-//   https://github.com/kubernetes/kubernetes/blob/3b2746c9ea9e0fa247b01dca27634e509b385eda/staging/src/k8s.io/client-go/transport/round_trippers.go#L302
+//
+//	https://github.com/kubernetes/kubernetes/blob/442a69c3bdf6fe8e525b05887e57d89db1e2f3a5/staging/src/k8s.io/client-go/transport/transport.go#L257
+//	https://github.com/kubernetes/kubernetes/blob/e29c568c4a9cd45d15665345aa015e21bcff52dd/staging/src/k8s.io/client-go/rest/config.go#L328
+//	https://github.com/kubernetes/kubernetes/blob/3b2746c9ea9e0fa247b01dca27634e509b385eda/staging/src/k8s.io/client-go/transport/round_trippers.go#L302
 func (rt *preferredHostRT) CancelRequest(req *http.Request) {
 	type canceler interface{ CancelRequest(*http.Request) }
 

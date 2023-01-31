@@ -312,8 +312,10 @@ func (DeveloperConsoleCatalogTypes) SwaggerDoc() map[string]string {
 }
 
 var map_Perspective = map[string]string{
-	"id":         "id defines the id of the perspective. Example: \"dev\", \"admin\". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.",
-	"visibility": "visibility defines the state of perspective along with access review checks if needed for that perspective.",
+	"":                "Perspective defines a perspective that cluster admins want to show/hide in the perspective switcher dropdown",
+	"id":              "id defines the id of the perspective. Example: \"dev\", \"admin\". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.",
+	"visibility":      "visibility defines the state of perspective along with access review checks if needed for that perspective.",
+	"pinnedResources": "pinnedResources defines the list of default pinned resources that users will see on the perspective navigation if they have not customized these pinned resources themselves. The list of available Kubernetes resources could be read via `kubectl api-resources`. The console will also provide a configuration UI and a YAML snippet that will list the available resources that can be pinned to the navigation. Incorrect or unknown resources will be ignored.",
 }
 
 func (Perspective) SwaggerDoc() map[string]string {
@@ -328,6 +330,17 @@ var map_PerspectiveVisibility = map[string]string{
 
 func (PerspectiveVisibility) SwaggerDoc() map[string]string {
 	return map_PerspectiveVisibility
+}
+
+var map_PinnedResourceReference = map[string]string{
+	"":         "PinnedResourceReference includes the group, version and type of resource",
+	"group":    "group is the API Group of the Resource. Enter empty string for the core group. This value should consist of only lowercase alphanumeric characters, hyphens and periods. Example: \"\", \"apps\", \"build.openshift.io\", etc.",
+	"version":  "version is the API Version of the Resource. This value should consist of only lowercase alphanumeric characters. Example: \"v1\", \"v1beta1\", etc.",
+	"resource": "resource is the type that is being referenced. It is normally the plural form of the resource kind in lowercase. This value should consist of only lowercase alphanumeric characters and hyphens. Example: \"deployments\", \"deploymentconfigs\", \"pods\", etc.",
+}
+
+func (PinnedResourceReference) SwaggerDoc() map[string]string {
+	return map_PinnedResourceReference
 }
 
 var map_ProjectAccess = map[string]string{
@@ -1001,6 +1014,7 @@ func (InsightsOperatorStatus) SwaggerDoc() map[string]string {
 
 var map_InsightsReport = map[string]string{
 	"":             "insightsReport provides Insights health check report based on the most recently sent Insights data.",
+	"downloadedAt": "downloadedAt is the time when the last Insights report was downloaded. An empty value means that there has not been any Insights report downloaded yet and it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).",
 	"healthChecks": "healthChecks provides basic information about active Insights health checks in a cluster.",
 }
 

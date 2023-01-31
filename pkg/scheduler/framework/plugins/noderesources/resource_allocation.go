@@ -107,8 +107,8 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 	return 0, 0
 }
 
-// calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod and the
-// PodOverhead feature is enabled, the Overhead is added to the result.
+// calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
+// the Overhead is added to the result.
 // podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	var podRequest int64

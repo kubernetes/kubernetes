@@ -417,5 +417,5 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 	}
 
 	// Log all pods for system admin
-	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjs(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
+	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjSlice(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
 }

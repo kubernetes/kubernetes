@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -59,7 +59,7 @@ func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string) error {
-	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	framework.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
 	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -67,7 +67,7 @@ func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-	e2elog.Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
+	framework.Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
 	err = WaitForPodNotFoundInNamespace(c, podName, podNamespace, PodDeleteTimeout)
 	if err != nil {
 		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
@@ -92,7 +92,7 @@ func DeletePodsWithGracePeriod(c clientset.Interface, pods []v1.Pod, grace int64
 
 // DeletePodWithGracePeriodByName deletes a pod by name and namespace. Resilient to the pod not existing.
 func DeletePodWithGracePeriodByName(c clientset.Interface, podName, podNamespace string, grace int64) error {
-	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	framework.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
 	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(grace))
 	if err != nil {
 		if apierrors.IsNotFound(err) {

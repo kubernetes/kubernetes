@@ -1,0 +1,86 @@
+strict digraph full {
+  // Node definitions.
+  "alpha" [
+    label="uid=alpha\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="alpha"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "bravo" [
+    label="uid=bravo\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="bravo"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "charlie" [
+    label="uid=charlie\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="charlie"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "delta" [
+    label="uid=delta\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="delta"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "foxtrot" [
+    label="uid=foxtrot\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="foxtrot"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "golf" [
+    label="uid=golf\nnamespace=\n./\n"
+    group=""
+    version=""
+    kind=""
+    namespace=""
+    name=""
+    uid="golf"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  // Edge definitions.
+  "alpha" -> "bravo";
+  "alpha" -> "charlie";
+  "delta" -> "foxtrot";
+  "foxtrot" -> "golf";
+}

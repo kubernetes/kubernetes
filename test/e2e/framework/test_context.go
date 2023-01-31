@@ -32,14 +32,15 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
+	gomegaformat "github.com/onsi/gomega/format"
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
 const (
@@ -197,6 +198,9 @@ type TestContextType struct {
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
 // simulate node failures.
+//
+// TODO: move this and the corresponding command line flags into
+// test/e2e/framework/node.
 type NodeKillerConfig struct {
 	// Enabled determines whether NodeKill should do anything at all.
 	// All other options below are ignored if Enabled = false.
@@ -256,7 +260,7 @@ type CloudConfig struct {
 	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
-	ConfigFile        string // for azure and openstack
+	ConfigFile        string // for azure
 	NodeTag           string
 	MasterTag         string
 
@@ -304,6 +308,9 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
+	// The default is too low for objects like pods, even when using YAML. We double the default.
+	flags.IntVar(&gomegaformat.MaxLength, "gomega-max-length", 8000, "Sets the maximum size for the gomega formatter (= gomega.MaxLength). Use 0 to disable truncation.")
+
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
@@ -424,44 +431,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
-	clusterNick := "cluster"
-	userNick := "user"
-	contextNick := "context"
-
-	configCmd := clientcmdapi.NewConfig()
-
-	credentials := clientcmdapi.NewAuthInfo()
-	credentials.Token = clientCfg.BearerToken
-	credentials.TokenFile = clientCfg.BearerTokenFile
-	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
-	if len(credentials.ClientCertificate) == 0 {
-		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
-	}
-	credentials.ClientKey = clientCfg.TLSClientConfig.KeyFile
-	if len(credentials.ClientKey) == 0 {
-		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
-	}
-	configCmd.AuthInfos[userNick] = credentials
-
-	cluster := clientcmdapi.NewCluster()
-	cluster.Server = clientCfg.Host
-	cluster.CertificateAuthority = clientCfg.CAFile
-	if len(cluster.CertificateAuthority) == 0 {
-		cluster.CertificateAuthorityData = clientCfg.CAData
-	}
-	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	configCmd.Clusters[clusterNick] = cluster
-
-	context := clientcmdapi.NewContext()
-	context.Cluster = clusterNick
-	context.AuthInfo = userNick
-	configCmd.Contexts[contextNick] = context
-	configCmd.CurrentContext = contextNick
-
-	return configCmd
-}
-
 // GenerateSecureToken returns a string of length tokenLen, consisting
 // of random bytes encoded as base64 for use as a Bearer Token during
 // communication with an APIServer
@@ -491,6 +460,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	fs.Set("logtostderr", "false")
 	fs.Set("alsologtostderr", "false")
 	fs.Set("one_output", "true")
+	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
 	klog.SetOutput(ginkgo.GinkgoWriter)
 
 	// Only set a default host if one won't be supplied via kubeconfig
@@ -498,7 +468,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// Check if we can use the in-cluster config
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
 			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
-				kubeConfig := createKubeConfig(clusterConfig)
+				kubeConfig := kubeconfig.CreateKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
 				klog.V(4).Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
@@ -560,6 +530,14 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 }
 
+const (
+	// This is the traditional gomega.Format default of 4000 for an object
+	// dump plus some extra room for the message.
+	maxFailureMessageSize = 5000
+
+	truncatedMsg = "\n[... see output for full dump ...]\n"
+)
+
 // writeJUnitReport generates a JUnit file in the e2e report directory that is
 // shorter than the one normally written by `ginkgo --junit-report`. This is
 // needed because the full report can become too large for tools like Spyglass
@@ -576,6 +554,18 @@ func writeJUnitReport(report ginkgo.Report) {
 		if specReport.State != types.SpecStateFailed {
 			specReport.CapturedGinkgoWriterOutput = ""
 			specReport.CapturedStdOutErr = ""
+		} else {
+			// Truncate the failure message if it is too large.
+			msgLen := len(specReport.Failure.Message)
+			if msgLen > maxFailureMessageSize {
+				// Insert full message at the beginning where it is easy to find.
+				specReport.CapturedGinkgoWriterOutput =
+					"Full failure message:\n" +
+						specReport.Failure.Message + "\n\n" +
+						strings.Repeat("=", 70) + "\n\n" +
+						specReport.CapturedGinkgoWriterOutput
+				specReport.Failure.Message = specReport.Failure.Message[0:maxFailureMessageSize/2] + truncatedMsg + specReport.Failure.Message[msgLen-maxFailureMessageSize/2:msgLen]
+			}
 		}
 
 		// Remove report entries generated by ginkgo.By("doing

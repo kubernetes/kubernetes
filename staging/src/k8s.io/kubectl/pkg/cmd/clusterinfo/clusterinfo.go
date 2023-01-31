@@ -55,7 +55,7 @@ type ClusterInfoOptions struct {
 	Client  *restclient.Config
 }
 
-func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdClusterInfo(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoOptions{
 		IOStreams: ioStreams,
 	}
@@ -66,17 +66,17 @@ func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Long:    longDescr,
 		Example: clusterinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.AddCommand(NewCmdClusterInfoDump(f, ioStreams))
+	cmd.AddCommand(NewCmdClusterInfoDump(restClientGetter, ioStreams))
 	return cmd
 }
 
-func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ClusterInfoOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command) error {
 	var err error
-	o.Client, err = f.ToRESTConfig()
+	o.Client, err = restClientGetter.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) err
 	}
 	o.Namespace = cmdNamespace
 
-	o.Builder = f.NewBuilder()
+	o.Builder = resource.NewBuilder(restClientGetter)
 	return nil
 }
 

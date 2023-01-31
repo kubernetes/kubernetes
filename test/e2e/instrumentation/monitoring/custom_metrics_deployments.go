@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -234,7 +235,7 @@ func CreateAdapter(adapterDeploymentFile string) error {
 	if err != nil {
 		return err
 	}
-	stat, err := framework.RunKubectl("", "apply", "-f", adapterURL)
+	stat, err := e2ekubectl.RunKubectl("", "apply", "-f", adapterURL)
 	framework.Logf(stat)
 	return err
 }
@@ -247,7 +248,7 @@ func createClusterAdminBinding() error {
 	}
 	serviceAccount := strings.TrimSpace(stdout)
 	framework.Logf("current service account: %q", serviceAccount)
-	stat, err := framework.RunKubectl("", "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
+	stat, err := e2ekubectl.RunKubectl("", "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }
@@ -287,7 +288,7 @@ func CleanupDescriptors(service *gcm.Service, projectID string) {
 
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
 func CleanupAdapter(adapterDeploymentFile string) {
-	stat, err := framework.RunKubectl("", "delete", "-f", adapterDeploymentFile)
+	stat, err := e2ekubectl.RunKubectl("", "delete", "-f", adapterDeploymentFile)
 	framework.Logf(stat)
 	if err != nil {
 		framework.Logf("Failed to delete adapter deployments: %s", err)
@@ -300,7 +301,7 @@ func CleanupAdapter(adapterDeploymentFile string) {
 }
 
 func cleanupClusterAdminBinding() {
-	stat, err := framework.RunKubectl("", "delete", "clusterrolebinding", ClusterAdminBinding)
+	stat, err := e2ekubectl.RunKubectl("", "delete", "clusterrolebinding", ClusterAdminBinding)
 	framework.Logf(stat)
 	if err != nil {
 		framework.Logf("Failed to delete cluster admin binding: %s", err)

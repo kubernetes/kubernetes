@@ -28,7 +28,7 @@ func (impl *dupSyscallOutputInterceptorImpl) CreateStdoutStderrClones() (*os.Fil
 
 	// And then wrap the clone file descriptors in files.
 	// One benefit of this (that we don't use yet) is that we can actually write
-	// to these files to emit output to the console evne though we're intercepting output
+	// to these files to emit output to the console even though we're intercepting output
 	stdoutClone := os.NewFile(uintptr(stdoutCloneFD), "stdout-clone")
 	stderrClone := os.NewFile(uintptr(stderrCloneFD), "stderr-clone")
 

@@ -18,11 +18,11 @@ package volumebinding
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -655,9 +655,7 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: call PreFilter and check status")
 			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
-			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
-				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
-			}
+			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
@@ -679,9 +677,7 @@ func TestVolumeBinding(t *testing.T) {
 			t.Logf("Verify: call Filter and check status")
 			for i, nodeInfo := range nodeInfos {
 				gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
-				if !reflect.DeepEqual(gotStatus, item.wantFilterStatus[i]) {
-					t.Errorf("filter status does not match for node %q, got: %v, want: %v", nodeInfo.Node().Name, gotStatus, item.wantFilterStatus)
-				}
+				assert.Equal(t, item.wantFilterStatus[i], gotStatus)
 			}
 
 			t.Logf("Verify: Score")

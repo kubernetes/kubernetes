@@ -22,6 +22,9 @@ const (
 	// FormParameterKind = indicator of Request parameter type "form"
 	FormParameterKind
 
+	// MultiPartFormParameterKind = indicator of Request parameter type "multipart/form-data"
+	MultiPartFormParameterKind
+
 	// CollectionFormatCSV comma separated values `foo,bar`
 	CollectionFormatCSV = CollectionFormat("csv")
 
@@ -105,6 +108,11 @@ func (p *Parameter) beHeader() *Parameter {
 
 func (p *Parameter) beForm() *Parameter {
 	p.data.Kind = FormParameterKind
+	return p
+}
+
+func (p *Parameter) beMultiPartForm() *Parameter {
+	p.data.Kind = MultiPartFormParameterKind
 	return p
 }
 

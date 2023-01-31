@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // The generated scripts require PowerShell v5.0+ (which comes Windows 10, but
 // can be downloaded separately for windows 7 or 8.1).
 
@@ -8,9 +22,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func genPowerShellComp(buf io.StringWriter, name string, includeDesc bool) {
+	// Variables should not contain a '-' or ':' character
+	nameForVar := name
+	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
+	nameForVar = strings.Replace(nameForVar, ":", "_", -1)
+
 	compCmd := ShellCompRequestCmd
 	if !includeDesc {
 		compCmd = ShellCompNoDescRequestCmd
@@ -27,7 +47,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
 `+"    $_ -replace '\\s|#|@|\\$|;|,|''|\\{|\\}|\\(|\\)|\"|`|\\||<|>|&','`$&'"+`
 }
 
-Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
+[scriptblock]$__%[2]sCompleterBlock = {
     param(
             $WordToComplete,
             $CommandAst,
@@ -52,16 +72,17 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
     }
     __%[1]s_debug "Truncated command: $Command"
 
-    $ShellCompDirectiveError=%[3]d
-    $ShellCompDirectiveNoSpace=%[4]d
-    $ShellCompDirectiveNoFileComp=%[5]d
-    $ShellCompDirectiveFilterFileExt=%[6]d
-    $ShellCompDirectiveFilterDirs=%[7]d
+    $ShellCompDirectiveError=%[4]d
+    $ShellCompDirectiveNoSpace=%[5]d
+    $ShellCompDirectiveNoFileComp=%[6]d
+    $ShellCompDirectiveFilterFileExt=%[7]d
+    $ShellCompDirectiveFilterDirs=%[8]d
 
     # Prepare the command to request completions for the program.
     # Split the command at the first space to separate the program and arguments.
     $Program,$Arguments = $Command.Split(" ",2)
-    $RequestComp="$Program %[2]s $Arguments"
+
+    $RequestComp="$Program %[3]s $Arguments"
     __%[1]s_debug "RequestComp: $RequestComp"
 
     # we cannot use $WordToComplete because it
@@ -90,10 +111,12 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
     }
 
     __%[1]s_debug "Calling $RequestComp"
+    # First disable ActiveHelp which is not supported for Powershell
+    $env:%[9]s=0
+
     #call the command store the output in $out and redirect stderr and stdout to null
     # $Out is an array contains each line per element
     Invoke-Expression -OutVariable out "$RequestComp" 2>&1 | Out-Null
-
 
     # get directive from last line
     [int]$Directive = $Out[-1].TrimStart(':')
@@ -240,9 +263,11 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
 
     }
 }
-`, name, compCmd,
+
+Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock $__%[2]sCompleterBlock
+`, name, nameForVar, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
 }
 
 func (c *Command) genPowerShellCompletion(w io.Writer, includeDesc bool) error {

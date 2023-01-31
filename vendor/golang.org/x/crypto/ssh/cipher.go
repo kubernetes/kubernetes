@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 
 	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/internal/poly1305"
@@ -97,13 +96,13 @@ func streamCipherMode(skip int, createFunc func(key, iv []byte) (cipher.Stream, 
 // are not supported and will not be negotiated, even if explicitly requested in
 // ClientConfig.Crypto.Ciphers.
 var cipherModes = map[string]*cipherMode{
-	// Ciphers from RFC4344, which introduced many CTR-based ciphers. Algorithms
+	// Ciphers from RFC 4344, which introduced many CTR-based ciphers. Algorithms
 	// are defined in the order specified in the RFC.
 	"aes128-ctr": {16, aes.BlockSize, streamCipherMode(0, newAESCTR)},
 	"aes192-ctr": {24, aes.BlockSize, streamCipherMode(0, newAESCTR)},
 	"aes256-ctr": {32, aes.BlockSize, streamCipherMode(0, newAESCTR)},
 
-	// Ciphers from RFC4345, which introduces security-improved arcfour ciphers.
+	// Ciphers from RFC 4345, which introduces security-improved arcfour ciphers.
 	// They are defined in the order specified in the RFC.
 	"arcfour128": {16, 0, streamCipherMode(1536, newRC4)},
 	"arcfour256": {32, 0, streamCipherMode(1536, newRC4)},
@@ -111,7 +110,7 @@ var cipherModes = map[string]*cipherMode{
 	// Cipher defined in RFC 4253, which describes SSH Transport Layer Protocol.
 	// Note that this cipher is not safe, as stated in RFC 4253: "Arcfour (and
 	// RC4) has problems with weak keys, and should be used with caution."
-	// RFC4345 introduces improved versions of Arcfour.
+	// RFC 4345 introduces improved versions of Arcfour.
 	"arcfour": {16, 0, streamCipherMode(0, newRC4)},
 
 	// AEAD ciphers
@@ -497,7 +496,7 @@ func (c *cbcCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error)
 			// data, to make distinguishing between
 			// failing MAC and failing length check more
 			// difficult.
-			io.CopyN(ioutil.Discard, r, int64(c.oracleCamouflage))
+			io.CopyN(io.Discard, r, int64(c.oracleCamouflage))
 		}
 	}
 	return p, err
@@ -640,9 +639,9 @@ const chacha20Poly1305ID = "chacha20-poly1305@openssh.com"
 // chacha20Poly1305Cipher implements the chacha20-poly1305@openssh.com
 // AEAD, which is described here:
 //
-//   https://tools.ietf.org/html/draft-josefsson-ssh-chacha20-poly1305-openssh-00
+//	https://tools.ietf.org/html/draft-josefsson-ssh-chacha20-poly1305-openssh-00
 //
-// the methods here also implement padding, which RFC4253 Section 6
+// the methods here also implement padding, which RFC 4253 Section 6
 // also requires of stream ciphers.
 type chacha20Poly1305Cipher struct {
 	lengthKey  [32]byte

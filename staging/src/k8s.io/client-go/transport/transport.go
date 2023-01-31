@@ -22,9 +22,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"reflect"
+	"os"
 	"sync"
 	"time"
 
@@ -62,20 +61,12 @@ func New(config *Config) (http.RoundTripper, error) {
 }
 
 func isValidHolders(config *Config) bool {
-	if config.TLS.GetCertHolder != nil {
-		if config.TLS.GetCertHolder.GetCert == nil ||
-			config.TLS.GetCert == nil ||
-			reflect.ValueOf(config.TLS.GetCertHolder.GetCert).Pointer() != reflect.ValueOf(config.TLS.GetCert).Pointer() {
-			return false
-		}
+	if config.TLS.GetCertHolder != nil && config.TLS.GetCertHolder.GetCert == nil {
+		return false
 	}
 
-	if config.DialHolder != nil {
-		if config.DialHolder.Dial == nil ||
-			config.Dial == nil ||
-			reflect.ValueOf(config.DialHolder.Dial).Pointer() != reflect.ValueOf(config.Dial).Pointer() {
-			return false
-		}
+	if config.DialHolder != nil && config.DialHolder.Dial == nil {
+		return false
 	}
 
 	return true
@@ -141,7 +132,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 				return dynamicCertLoader()
 			}
 			if c.HasCertCallback() {
-				cert, err := c.TLS.GetCert()
+				cert, err := c.TLS.GetCertHolder.GetCert()
 				if err != nil {
 					return nil, err
 				}
@@ -182,10 +173,7 @@ func loadTLSFiles(c *Config) error {
 	}
 
 	c.TLS.KeyData, err = dataFromSliceOrFile(c.TLS.KeyData, c.TLS.KeyFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
@@ -195,7 +183,7 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 		return data, nil
 	}
 	if len(file) > 0 {
-		fileData, err := ioutil.ReadFile(file)
+		fileData, err := os.ReadFile(file)
 		if err != nil {
 			return []byte{}, err
 		}

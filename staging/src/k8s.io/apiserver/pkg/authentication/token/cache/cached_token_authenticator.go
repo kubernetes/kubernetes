@@ -36,6 +36,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -59,6 +60,12 @@ type cacheRecord struct {
 	// based on the current time, but that may be okay since cache TTLs are generally
 	// small (seconds).
 	annotations map[string]string
+	warnings    []*cacheWarning
+}
+
+type cacheWarning struct {
+	agent string
+	text  string
 }
 
 type cachedTokenAuthenticator struct {
@@ -128,6 +135,9 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	for key, value := range record.annotations {
 		audit.AddAuditAnnotation(ctx, key, value)
 	}
+	for _, w := range record.warnings {
+		warning.AddWarning(ctx, w.agent, w.text)
+	}
 	return record.resp, true, nil
 }
 
@@ -184,14 +194,19 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		if audsOk {
 			ctx = authenticator.WithAudiences(ctx, auds)
 		}
+		recorder := &recorder{}
+		ctx = warning.WithWarningRecorder(ctx, recorder)
 
 		// since this is shared work between multiple requests, we have no way of knowing if any
 		// particular request supports audit annotations.  thus we always attempt to record them.
 		ev := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{Event: ev})
+		ctx = audit.WithAuditContext(ctx)
+		ac := audit.AuditContextFrom(ctx)
+		ac.Event = ev
 
 		record.resp, record.ok, record.err = a.authenticator.AuthenticateToken(ctx, token)
 		record.annotations = ev.Annotations
+		record.warnings = recorder.extractWarnings()
 
 		if !a.cacheErrs && record.err != nil {
 			return record, nil
@@ -268,4 +283,25 @@ func toBytes(s string) []byte {
 // toString performs unholy acts to avoid allocations
 func toString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
+}
+
+// simple recorder that only appends warning
+type recorder struct {
+	mu       sync.Mutex
+	warnings []*cacheWarning
+}
+
+// AddWarning adds a warning to recorder.
+func (r *recorder) AddWarning(agent, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.warnings = append(r.warnings, &cacheWarning{agent: agent, text: text})
+}
+
+func (r *recorder) extractWarnings() []*cacheWarning {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	warnings := r.warnings
+	r.warnings = nil
+	return warnings
 }

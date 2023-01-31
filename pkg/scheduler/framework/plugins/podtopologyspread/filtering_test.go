@@ -56,7 +56,7 @@ var (
 	fooSelector        = st.MakeLabelSelector().Exists("foo").Obj()
 	barSelector        = st.MakeLabelSelector().Exists("bar").Obj()
 
-	taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectPreferNoSchedule}}
+	taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectNoSchedule}}
 )
 
 func (p *criticalPaths) sort() {
@@ -69,16 +69,16 @@ func (p *criticalPaths) sort() {
 func TestPreFilterState(t *testing.T) {
 
 	tests := []struct {
-		name                       string
-		pod                        *v1.Pod
-		nodes                      []*v1.Node
-		existingPods               []*v1.Pod
-		objs                       []runtime.Object
-		defaultConstraints         []v1.TopologySpreadConstraint
-		want                       *preFilterState
-		enableMinDomains           bool
-		enableNodeInclustionPolicy bool
-		enableMatchLabelKeys       bool
+		name                      string
+		pod                       *v1.Pod
+		nodes                     []*v1.Node
+		existingPods              []*v1.Pod
+		objs                      []runtime.Object
+		defaultConstraints        []v1.TopologySpreadConstraint
+		want                      *preFilterState
+		enableMinDomains          bool
+		enableNodeInclusionPolicy bool
+		enableMatchLabelKeys      bool
 	}{
 		{
 			name: "clean cluster with one spreadConstraint",
@@ -645,7 +645,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),
@@ -672,7 +672,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "NodeAffinityPolicy honored with labelSelectors",
@@ -683,7 +683,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),
@@ -710,7 +710,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with labelSelectors",
@@ -749,7 +749,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-c"}: 0,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy honored with nodeAffinity",
@@ -760,7 +760,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),
@@ -787,7 +787,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
@@ -826,7 +826,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-c"}: 0,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "feature gate disabled with NodeTaintsPolicy",
@@ -864,7 +864,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-c"}: 0,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "NodeTaintsPolicy ignored",
@@ -902,7 +902,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-c"}: 0,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy honored",
@@ -939,7 +939,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy honored with tolerated taints",
@@ -978,7 +978,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-c"}: 0,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "two node inclusion Constraints, zone: honor/ignore, node: ignore/ignore",
@@ -1028,7 +1028,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-x"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "two node inclusion Constraints, zone: honor/honor, node: honor/ignore",
@@ -1077,7 +1077,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-x"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "two node inclusion Constraints, zone: honor/ignore, node: honor/ignore",
@@ -1128,7 +1128,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-x"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "two node inclusion Constraints, zone: ignore/ignore, node: honor/honor",
@@ -1180,7 +1180,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-y"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled",
@@ -1350,7 +1350,7 @@ func TestPreFilterState(t *testing.T) {
 
 			p := plugintesting.SetupPluginWithInformers(ctx, t, topologySpreadFunc, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
 			p.(*PodTopologySpread).enableMinDomainsInPodTopologySpread = tt.enableMinDomains
-			p.(*PodTopologySpread).enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.(*PodTopologySpread).enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.(*PodTopologySpread).enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
 			cs := framework.NewCycleState()
@@ -1380,14 +1380,14 @@ func TestPreFilterStateAddPod(t *testing.T) {
 	zoneConstraint := nodeConstraint
 	zoneConstraint.TopologyKey = "zone"
 	tests := []struct {
-		name                       string
-		preemptor                  *v1.Pod
-		addedPod                   *v1.Pod
-		existingPods               []*v1.Pod
-		nodeIdx                    int // denotes which node 'addedPod' belongs to
-		nodes                      []*v1.Node
-		want                       *preFilterState
-		enableNodeInclustionPolicy bool
+		name                      string
+		preemptor                 *v1.Pod
+		addedPod                  *v1.Pod
+		existingPods              []*v1.Pod
+		nodeIdx                   int // denotes which node 'addedPod' belongs to
+		nodes                     []*v1.Node
+		want                      *preFilterState
+		enableNodeInclusionPolicy bool
 	}{
 		{
 			name: "node a and b both impact current min match",
@@ -1686,7 +1686,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "add a pod when scheduling node affinity unmatched pod with NodeInclusionPolicy enabled",
@@ -1712,7 +1712,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "add a pod when scheduling node affinity matched pod with NodeInclusionPolicy disabled",
@@ -1739,7 +1739,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "add a pod when scheduling node affinity matched pod with NodeInclusionPolicy enabled",
@@ -1766,7 +1766,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 2,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "add a label selector not matched pod when with NodeInclusionPolicy enabled",
@@ -1793,7 +1793,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "add a pod when scheduling taint untolerated pod with NodeInclusionPolicy disabled",
@@ -1820,7 +1820,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "add a pod when scheduling taint tolerated pod with NodeInclusionPolicy enabled",
@@ -1847,7 +1847,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 	}
 	for _, tt := range tests {
@@ -1856,7 +1856,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
-			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 
 			cs := framework.NewCycleState()
 			if _, s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
@@ -1866,7 +1866,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := p.AddPod(ctx, cs, tt.preemptor, framework.NewPodInfo(tt.addedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.AddPod(ctx, cs, tt.preemptor, mustNewPodInfo(t, tt.addedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			state, err := getPreFilterState(cs)
@@ -1892,15 +1892,15 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	zoneConstraint := nodeConstraint
 	zoneConstraint.TopologyKey = "zone"
 	tests := []struct {
-		name                       string
-		preemptor                  *v1.Pod // preemptor pod
-		nodes                      []*v1.Node
-		existingPods               []*v1.Pod
-		deletedPodIdx              int     // need to reuse *Pod of existingPods[i]
-		deletedPod                 *v1.Pod // this field is used only when deletedPodIdx is -1
-		nodeIdx                    int     // denotes which node "deletedPod" belongs to
-		want                       *preFilterState
-		enableNodeInclustionPolicy bool
+		name                      string
+		preemptor                 *v1.Pod // preemptor pod
+		nodes                     []*v1.Node
+		existingPods              []*v1.Pod
+		deletedPodIdx             int     // need to reuse *Pod of existingPods[i]
+		deletedPod                *v1.Pod // this field is used only when deletedPodIdx is -1
+		nodeIdx                   int     // denotes which node "deletedPod" belongs to
+		want                      *preFilterState
+		enableNodeInclusionPolicy bool
 	}{
 		{
 			// A high priority pod may not be scheduled due to node taints or resource shortage.
@@ -2083,7 +2083,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "remove a pod when scheduling node affinity unmatched pod with NodeInclusionPolicy enabled",
@@ -2109,7 +2109,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "remove a pod when scheduling node affinity matched pod with NodeInclusionPolicy disabled",
@@ -2136,7 +2136,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: false,
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			name: "remove a pod when scheduling node affinity matched pod with NodeInclusionPolicy enabled",
@@ -2163,7 +2163,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 				},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 	}
 	for _, tt := range tests {
@@ -2172,7 +2172,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
-			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 
 			cs := framework.NewCycleState()
 			if _, s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
@@ -2188,7 +2188,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := p.RemovePod(ctx, cs, tt.preemptor, framework.NewPodInfo(deletedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.RemovePod(ctx, cs, tt.preemptor, mustNewPodInfo(t, deletedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -2257,7 +2257,7 @@ func BenchmarkFilter(b *testing.B) {
 					n, _ := p.sharedLister.NodeInfos().Get(allNodes[i].Name)
 					p.Filter(ctx, state, tt.pod, n)
 				}
-				p.parallelizer.Until(ctx, len(allNodes), filterNode)
+				p.parallelizer.Until(ctx, len(allNodes), filterNode, "")
 			}
 		})
 		b.Run(tt.name+"/Clone", func(b *testing.B) {
@@ -2279,13 +2279,13 @@ func mustConvertLabelSelectorAsSelector(t *testing.T, ls *metav1.LabelSelector) 
 
 func TestSingleConstraint(t *testing.T) {
 	tests := []struct {
-		name                       string
-		pod                        *v1.Pod
-		nodes                      []*v1.Node
-		existingPods               []*v1.Pod
-		wantStatusCode             map[string]framework.Code
-		enableMinDomains           bool
-		enableNodeInclustionPolicy bool
+		name                      string
+		pod                       *v1.Pod
+		nodes                     []*v1.Node
+		existingPods              []*v1.Pod
+		wantStatusCode            map[string]framework.Code
+		enableMinDomains          bool
+		enableNodeInclusionPolicy bool
 	}{
 		{
 			name: "no existing pods",
@@ -2718,7 +2718,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// pods spread across node as 1/1/0/~1~
@@ -2744,7 +2744,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// pods spread across node as 1/1/0/~0~
@@ -2770,7 +2770,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// pods spread across node as 1/1/0/~1~
@@ -2796,7 +2796,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// pods spread across node as 1/1/0/~0~
@@ -2821,7 +2821,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Success, // in real case, when we disable TaintToleration Plugin, node-y will be success.
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// pods spread across node as 1/1/0/~1~
@@ -2846,7 +2846,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 	}
 	for _, tt := range tests {
@@ -2855,7 +2855,7 @@ func TestSingleConstraint(t *testing.T) {
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			p.enableMinDomainsInPodTopologySpread = tt.enableMinDomains
-			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			state := framework.NewCycleState()
 			if _, s := p.PreFilter(context.Background(), state, tt.pod); !s.IsSuccess() {
 				t.Errorf("preFilter failed with status: %v", s)
@@ -2874,12 +2874,12 @@ func TestSingleConstraint(t *testing.T) {
 
 func TestMultipleConstraints(t *testing.T) {
 	tests := []struct {
-		name                       string
-		pod                        *v1.Pod
-		nodes                      []*v1.Node
-		existingPods               []*v1.Pod
-		wantStatusCode             map[string]framework.Code
-		enableNodeInclustionPolicy bool
+		name                      string
+		pod                       *v1.Pod
+		nodes                     []*v1.Node
+		existingPods              []*v1.Pod
+		wantStatusCode            map[string]framework.Code
+		enableNodeInclusionPolicy bool
 	}{
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on any zone (hence any node)
@@ -3104,7 +3104,7 @@ func TestMultipleConstraints(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/0
@@ -3132,7 +3132,7 @@ func TestMultipleConstraints(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 1/~1~
@@ -3161,7 +3161,7 @@ func TestMultipleConstraints(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 1/0
@@ -3190,7 +3190,7 @@ func TestMultipleConstraints(t *testing.T) {
 				"node-x": framework.Success,
 				"node-y": framework.Unschedulable,
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 	}
 	for _, tt := range tests {
@@ -3198,7 +3198,7 @@ func TestMultipleConstraints(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
-			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			state := framework.NewCycleState()
 			if _, s := p.PreFilter(context.Background(), state, tt.pod); !s.IsSuccess() {
 				t.Errorf("preFilter failed with status: %v", s)
@@ -3227,4 +3227,12 @@ func TestPreFilterDisabled(t *testing.T) {
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
+}
+
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
 }

@@ -3,6 +3,7 @@ package ginkgo
 import (
 	"github.com/onsi/ginkgo/v2/internal"
 	"github.com/onsi/ginkgo/v2/internal/global"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 func AppendSpecText(test *internal.Spec, text string) {
@@ -19,4 +20,8 @@ func GetFailer() *internal.Failer {
 
 func GetWriter() *internal.Writer {
 	return GinkgoWriter.(*internal.Writer)
+}
+
+func SetReporterConfig(r types.ReporterConfig) {
+	reporterConfig = r
 }

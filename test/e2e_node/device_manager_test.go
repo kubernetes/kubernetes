@@ -85,7 +85,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
@@ -131,7 +131,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod = makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-			pod = f.PodClient().Create(pod)
+			pod = e2epod.NewPodClient(f).Create(pod)
 			err = e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 				if pod.Status.Phase != v1.PodPending {
 					return true, nil
@@ -139,7 +139,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				return false, nil
 			})
 			framework.ExpectNoError(err)
-			pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			if pod.Status.Phase != v1.PodFailed {
@@ -205,7 +205,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 

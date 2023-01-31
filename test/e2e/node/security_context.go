@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -73,7 +74,38 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
 		groups := []string{"1234", "5678"}
-		f.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
+		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
+	})
+
+	ginkgo.When("if the container's primary UID belongs to some groups in the image [LinuxOnly]", func() {
+		ginkgo.It("should add pod.Spec.SecurityContext.SupplementalGroups to them [LinuxOnly] in resultant supplementary groups for the container processes", func() {
+			uidInImage := int64(1000)
+			gidDefinedInImage := int64(50000)
+			supplementalGroup := int64(60000)
+			agnhost := imageutils.GetConfig(imageutils.Agnhost)
+			(&agnhost).SetVersion("2.43")
+			pod := scTestPod(false, false)
+			pod.Spec.Containers[0].Image = agnhost.GetE2EImage()
+			pod.Spec.Containers[0].Command = []string{"id", "-G"}
+			pod.Spec.SecurityContext.SupplementalGroups = []int64{int64(supplementalGroup)}
+			pod.Spec.SecurityContext.RunAsUser = &uidInImage
+
+			// In specified image(agnhost E2E image),
+			// - user-defined-in-image(uid=1000) is defined
+			// - user-defined-in-image belongs to group-defined-in-image(gid=50000)
+			// thus, resultant supplementary group of the container processes should be
+			// - 1000: self
+			// - 50000: pre-defined groups define in the container image of self(uid=1000)
+			// - 60000: SupplementalGroups
+			// $ id -G
+			// 1000 50000 60000
+			e2eoutput.TestContainerOutput(
+				f,
+				"pod.Spec.SecurityContext.SupplementalGroups with pre-defined-group in the image",
+				pod, 0,
+				[]string{fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)},
+			)
+		})
 	})
 
 	ginkgo.It("should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]", func() {
@@ -82,7 +114,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", userID),
 			fmt.Sprintf("gid=%v", 0),
 		})
@@ -102,7 +134,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.SecurityContext.RunAsGroup = &groupID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", userID),
 			fmt.Sprintf("gid=%v", groupID),
 		})
@@ -117,7 +149,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", overrideUserID),
 			fmt.Sprintf("gid=%v", 0),
 		})
@@ -142,7 +174,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", overrideUserID),
 			fmt.Sprintf("gid=%v", overrideGroupID),
 		})
@@ -165,27 +197,27 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput("seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(f, "seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp unconfined on the pod [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput("seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(f, "seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp runtime/default [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput("seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
+		e2eoutput.TestContainerOutput(f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
 
 	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput("seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
 	})
 })
 
@@ -262,7 +294,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
-	f.TestContainerOutput("Pod with same MCS label reading test file", pod, 0, []string{testContent})
+	e2eoutput.TestContainerOutput(f, "Pod with same MCS label reading test file", pod, 0, []string{testContent})
 
 	// Confirm that the same pod with a different MCS
 	// label cannot access the volume

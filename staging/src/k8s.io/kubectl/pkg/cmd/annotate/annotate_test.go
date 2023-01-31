@@ -227,7 +227,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		annotations map[string]string
 		remove      []string
 		expected    runtime.Object
-		expectErr   bool
+		expectedErr string
 	}{
 		{
 			obj: &v1.Pod{
@@ -236,7 +236,20 @@ func TestUpdateAnnotations(t *testing.T) {
 				},
 			},
 			annotations: map[string]string{"a": "b"},
-			expectErr:   true,
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"a": "c"},
+			expectedErr: "--overwrite is false but found the following declared annotation(s): 'a' already has a value (b)",
 		},
 		{
 			obj: &v1.Pod{
@@ -365,13 +378,16 @@ func TestUpdateAnnotations(t *testing.T) {
 			resourceVersion:   test.version,
 		}
 		err := options.updateAnnotations(test.obj)
-		if test.expectErr {
+		if test.expectedErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
 			}
+			if err.Error() != test.expectedErr {
+				t.Errorf("error expected: %v, got: %v", test.expectedErr, err.Error())
+			}
 			continue
 		}
-		if !test.expectErr && err != nil {
+		if test.expectedErr == "" && err != nil {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
@@ -383,7 +399,6 @@ func TestUpdateAnnotations(t *testing.T) {
 func TestAnnotateErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
-		flags map[string]string
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -430,9 +445,6 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 
-			for k, v := range testCase.flags {
-				cmd.Flags().Set(k, v)
-			}
 			options := NewAnnotateOptions(iostreams)
 			err := options.Complete(tf, cmd, testCase.args)
 			if err == nil {
@@ -443,10 +455,10 @@ func TestAnnotateErrors(t *testing.T) {
 				return
 			}
 			if bufOut.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufOut.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufOut.String())
 			}
 			if bufErr.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufErr.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufErr.String())
 			}
 		})
 	}

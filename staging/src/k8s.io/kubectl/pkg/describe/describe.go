@@ -65,6 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -148,11 +149,13 @@ func (pw *prefixWriter) Write(level int, format string, a ...interface{}) {
 	for i := 0; i < level; i++ {
 		prefix += levelSpace
 	}
-	fmt.Fprintf(pw.out, prefix+format, a...)
+	output := fmt.Sprintf(prefix+format, a...)
+	printers.WriteEscaped(pw.out, output)
 }
 
 func (pw *prefixWriter) WriteLine(a ...interface{}) {
-	fmt.Fprintln(pw.out, a...)
+	output := fmt.Sprintln(a...)
+	printers.WriteEscaped(pw.out, output)
 }
 
 func (pw *prefixWriter) Flush() {
@@ -2664,7 +2667,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w.Write(LEVEL_0, "Address:\t%v\n", ingressLoadBalancerStatusStringerV1(ing.Status.LoadBalancer, true))
 		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
@@ -2672,11 +2675,11 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		w.Write(LEVEL_0, "Ingress Class:\t%v\n", ingressClassName)
 		def := ing.Spec.DefaultBackend
 		ns := ing.Namespace
-		if def == nil {
-			w.Write(LEVEL_0, "Default backend:\t<default>\n")
-		} else {
-			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
+		defaultBackendDescribe := "<default>"
+		if def != nil {
+			defaultBackendDescribe = i.describeBackendV1(ns, def)
 		}
+		w.Write(LEVEL_0, "Default backend:\t%s\n", defaultBackendDescribe)
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1(w, ing.Spec.TLS)
 		}
@@ -2699,7 +2702,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", i.describeBackendV1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", defaultBackendDescribe)
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
@@ -2716,7 +2719,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w.Write(LEVEL_0, "Address:\t%v\n", ingressLoadBalancerStatusStringerV1beta1(ing.Status.LoadBalancer, true))
 		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
@@ -5599,9 +5602,29 @@ func findNodeRoles(node *corev1.Node) []string {
 	return roles.List()
 }
 
-// loadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// ingressLoadBalancerStatusStringerV1 behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
-func loadBalancerStatusStringer(s corev1.LoadBalancerStatus, wide bool) string {
+func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatus, wide bool) string {
+	ingress := s.Ingress
+	result := sets.NewString()
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result.Insert(ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result.Insert(ingress[i].Hostname)
+		}
+	}
+
+	r := strings.Join(result.List(), ",")
+	if !wide && len(r) > LoadBalancerWidth {
+		r = r[0:(LoadBalancerWidth-3)] + "..."
+	}
+	return r
+}
+
+// ingressLoadBalancerStatusStringerV1beta1 behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
 	result := sets.NewString()
 	for i := range ingress {

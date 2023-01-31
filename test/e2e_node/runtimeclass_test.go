@@ -118,7 +118,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 					framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 				})
 				ginkgo.By("Creating a Guaranteed pod with which has Overhead defined", func() {
-					guaranteedPod = f.PodClient().CreateSync(&v1.Pod{
+					guaranteedPod = e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							GenerateName: "pod-with-overhead-",
 							Namespace:    f.Namespace.Name,
@@ -140,7 +140,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 				ginkgo.By("Checking if the pod cgroup was created appropriately", func() {
 					cgroupsToVerify := []string{"pod" + podUID}
 					pod := makePodToVerifyCgroupSize(cgroupsToVerify, "30000", "251658240")
-					pod = f.PodClient().Create(pod)
+					pod = e2epod.NewPodClient(f).Create(pod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})

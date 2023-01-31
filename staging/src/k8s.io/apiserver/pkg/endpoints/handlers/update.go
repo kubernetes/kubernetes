@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -35,27 +37,22 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Update", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
-
-		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
-			return
-		}
+		ctx, span := tracing.Start(ctx, "Update", traceFields(req)...)
+		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -65,7 +62,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
@@ -76,12 +73,13 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 
-		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
-		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
+		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Update)
 		if err != nil {
+			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(body)))
 
 		options := &metav1.UpdateOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
@@ -111,7 +109,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
-		trace.Step("About to convert to expected version")
+		span.AddEvent("About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
@@ -134,7 +132,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		span.AddEvent("Conversion done")
 
 		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 		admit = admission.WithAudit(admit)
@@ -213,7 +211,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			Name:            name,
 		}
 
-		trace.Step("About to store object in database")
+		span.AddEvent("About to store object in database")
 		wasCreated := false
 		requestFunc := func() (runtime.Object, error) {
 			obj, created, err := r.Update(
@@ -248,20 +246,21 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			}
 			return result, err
 		})
-		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
+			span.AddEvent("Write to database call failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("Write to database call succeeded", attribute.Int("len", len(body)))
 
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
-		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
+		span.AddEvent("About to write a response")
+		defer span.AddEvent("Writing http response done")
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 

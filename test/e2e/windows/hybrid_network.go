@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -56,13 +57,13 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
-			linuxPod = f.PodClient().CreateSync(linuxPod)
+			linuxPod = e2epod.NewPodClient(f).CreateSync(linuxPod)
 
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 
 			windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
 			ginkgo.By("creating a windows pod and waiting for it to be running")
-			windowsPod = f.PodClient().CreateSync(windowsPod)
+			windowsPod = e2epod.NewPodClient(f).CreateSync(windowsPod)
 
 			ginkgo.By("verifying pod internal connectivity to the cluster dataplane")
 
@@ -77,7 +78,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func() {
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
-			linuxPod = f.PodClient().CreateSync(linuxPod)
+			linuxPod = e2epod.NewPodClient(f).CreateSync(linuxPod)
 
 			ginkgo.By("verifying pod external connectivity to the internet")
 
@@ -88,7 +89,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func() {
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
-			windowsPod = f.PodClient().CreateSync(windowsPod)
+			windowsPod = e2epod.NewPodClient(f).CreateSync(windowsPod)
 
 			ginkgo.By("verifying pod external connectivity to the internet")
 
@@ -109,7 +110,7 @@ func assertConsistentConnectivity(f *framework.Framework, podName string, os str
 	connChecker := func() error {
 		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		// TODO, we should be retrying this similar to what is done in DialFromNode, in the test/e2e/networking/networking.go tests
-		stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
+		stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, os+"-container", cmd...)
 		if err != nil {
 			framework.Logf("Encountered error while running command: %v.\nStdout: %s\nStderr: %s\nErr: %v", cmd, stdout, stderr, err)
 		}

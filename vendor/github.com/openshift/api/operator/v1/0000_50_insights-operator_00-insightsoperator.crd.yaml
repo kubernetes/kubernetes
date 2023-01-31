@@ -201,6 +201,10 @@ spec:
                   description: insightsReport provides general Insights analysis results. When omitted, this means no data gathering has taken place yet.
                   type: object
                   properties:
+                    downloadedAt:
+                      description: downloadedAt is the time when the last Insights report was downloaded. An empty value means that there has not been any Insights report downloaded yet and it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).
+                      type: string
+                      format: date-time
                     healthChecks:
                       description: healthChecks provides basic information about active Insights health checks in a cluster.
                       type: array

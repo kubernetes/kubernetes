@@ -34,6 +34,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -43,8 +44,8 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func() {
 			node := getLocalNode(f)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			ginkgo.By("killing and restarting kubelet")
 			// Let's kill the kubelet
@@ -57,7 +58,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			framework.ExpectNoError(err)
 			// Restart kubelet
 			startKubelet()
-			framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.RestartNodeReadyAgainTimeout))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, framework.RestartNodeReadyAgainTimeout))
 			// If this happens right, node should have all the labels reset properly
 			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
 			framework.ExpectNoError(err)
@@ -65,8 +66,8 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 		ginkgo.It("should reconcile the OS and Arch labels when running", func() {
 
 			node := getLocalNode(f)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			// Update labels
 			newNode := node.DeepCopy()

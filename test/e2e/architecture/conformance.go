@@ -37,7 +37,7 @@ var _ = SIGDescribe("Conformance Tests", func() {
 	*/
 	framework.ConformanceIt("should have at least two untainted nodes", func() {
 		ginkgo.By("Getting node addresses")
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {

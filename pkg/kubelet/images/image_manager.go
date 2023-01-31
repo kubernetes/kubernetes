@@ -17,11 +17,13 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
@@ -31,6 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 )
 
+type ImagePodPullingTimeRecorder interface {
+	RecordImageStartedPulling(podUID types.UID)
+	RecordImageFinishedPulling(podUID types.UID)
+}
+
 // imageManager provides the functionalities for image pulling.
 type imageManager struct {
 	recorder     record.EventRecorder
@@ -38,12 +45,14 @@ type imageManager struct {
 	backOff      *flowcontrol.Backoff
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
 	puller imagePuller
+
+	podPullingTimeRecorder ImagePodPullingTimeRecorder
 }
 
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, qps float32, burst int) ImageManager {
+func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
@@ -53,10 +62,11 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 		puller = newParallelImagePuller(imageService)
 	}
 	return &imageManager{
-		recorder:     recorder,
-		imageService: imageService,
-		backOff:      imageBackOff,
-		puller:       puller,
+		recorder:               recorder,
+		imageService:           imageService,
+		backOff:                imageBackOff,
+		puller:                 puller,
+		podPullingTimeRecorder: podPullingTimeRecorder,
 	}
 }
 
@@ -86,7 +96,7 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 
 // EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
-func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
+func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
@@ -113,7 +123,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		Image:       image,
 		Annotations: podAnnotations,
 	}
-	imageRef, err := m.imageService.GetImageRef(spec)
+	imageRef, err := m.imageService.GetImageRef(ctx, spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
@@ -138,10 +148,11 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 		return "", msg, ErrImagePullBackOff
 	}
+	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
@@ -153,7 +164,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 
 		return "", imagePullResult.err.Error(), ErrImagePull
 	}
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v", container.Image, time.Since(startTime)), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting)", container.Image, imagePullResult.pullDuration, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
 }

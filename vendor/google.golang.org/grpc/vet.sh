@@ -147,7 +147,6 @@ grpc.NewGZIPDecompressor
 grpc.RPCCompressor
 grpc.RPCDecompressor
 grpc.ServiceConfig
-grpc.WithBalancerName
 grpc.WithCompressor
 grpc.WithDecompressor
 grpc.WithDialer

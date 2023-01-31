@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/utils/pointer"
 )
 
 // noopRecorder is an EventRecorder that does nothing. record.FakeRecorder has a fixed
@@ -838,7 +839,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Replicas:             func() *int32 { i := int32(replicas); return &i }(),
+			Replicas:             pointer.Int32(int32(replicas)),
 			Template:             template,
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
@@ -893,7 +894,7 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 				MatchLabels:      nil,
 				MatchExpressions: testMatchExpressions,
 			},
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 				WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,

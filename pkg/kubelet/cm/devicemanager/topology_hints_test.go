@@ -102,7 +102,7 @@ func TestGetTopologyHints(t *testing.T) {
 				return tc.expectedHints[r][i].LessThan(tc.expectedHints[r][j])
 			})
 			if !reflect.DeepEqual(hints[r], tc.expectedHints[r]) {
-				t.Errorf("%v: Expected result to be %v, got %v", tc.description, tc.expectedHints[r], hints[r])
+				t.Errorf("%v: Expected result to be %#v, got %#v", tc.description, tc.expectedHints[r], hints[r])
 			}
 		}
 	}
@@ -1006,6 +1006,8 @@ func getCommonTestCases() []topologyHintTestCase {
 				"testdevice": {
 					{ID: "Dev1"},
 					{ID: "Dev2"},
+					{ID: "Dev3", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{}}},
+					{ID: "Dev4", Topology: &pluginapi.TopologyInfo{Nodes: nil}},
 				},
 			},
 			expectedHints: map[string][]topologymanager.TopologyHint{

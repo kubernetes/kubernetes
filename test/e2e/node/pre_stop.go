@@ -155,9 +155,9 @@ func testPreStop(c clientset.Interface, ns string) {
 var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	/*

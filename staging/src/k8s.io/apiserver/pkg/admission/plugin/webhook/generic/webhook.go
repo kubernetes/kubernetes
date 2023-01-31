@@ -30,9 +30,9 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -219,7 +219,7 @@ func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { r
 
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
-	if rules.IsWebhookConfigurationResource(attr) {
+	if rules.IsExemptAdmissionConfigurationResource(attr) {
 		return nil
 	}
 	if !a.WaitForReady() {

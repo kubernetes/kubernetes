@@ -47,12 +47,6 @@ const (
 	http2MaxFrameLen = 16384 // 16KB frame
 	// http://http2.github.io/http2-spec/#SettingValues
 	http2InitHeaderTableSize = 4096
-	// baseContentType is the base content-type for gRPC.  This is a valid
-	// content-type on it's own, but can also include a content-subtype such as
-	// "proto" as a suffix after "+" or ";".  See
-	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-	// for more details.
-
 )
 
 var (
@@ -322,8 +316,6 @@ type bufWriter struct {
 	batchSize int
 	conn      net.Conn
 	err       error
-
-	onFlush func()
 }
 
 func newBufWriter(conn net.Conn, batchSize int) *bufWriter {
@@ -359,9 +351,6 @@ func (w *bufWriter) Flush() error {
 	}
 	if w.offset == 0 {
 		return nil
-	}
-	if w.onFlush != nil {
-		w.onFlush()
 	}
 	_, w.err = w.conn.Write(w.buf[:w.offset])
 	w.offset = 0

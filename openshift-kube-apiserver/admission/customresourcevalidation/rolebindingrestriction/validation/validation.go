@@ -77,6 +77,7 @@ func ValidateRoleBindingRestrictionUser(user *authorizationv1.UserRestriction, f
 	for i, selector := range user.Selectors {
 		allErrs = append(allErrs,
 			unversionedvalidation.ValidateLabelSelector(&selector,
+				unversionedvalidation.LabelSelectorValidationOptions{},
 				fld.Child("selector").Index(i))...)
 	}
 
@@ -94,6 +95,7 @@ func ValidateRoleBindingRestrictionGroup(group *authorizationv1.GroupRestriction
 	for i, selector := range group.Selectors {
 		allErrs = append(allErrs,
 			unversionedvalidation.ValidateLabelSelector(&selector,
+				unversionedvalidation.LabelSelectorValidationOptions{},
 				fld.Child("selector").Index(i))...)
 	}
 

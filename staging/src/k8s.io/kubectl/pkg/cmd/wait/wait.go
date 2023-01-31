@@ -229,7 +229,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 
 // newJSONPathParser will create a new JSONPath parser based on the jsonPathExpression
 func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
-	j := jsonpath.New("wait")
+	j := jsonpath.New("wait").AllowMissingKeys(true)
 	if jsonPathExpression == "" {
 		return nil, errors.New("jsonpath expression cannot be empty")
 	}
@@ -624,6 +624,9 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 	if err != nil {
 		return false, err
 	}
+	if len(parseResults) == 0 || len(parseResults[0]) == 0 {
+		return false, nil
+	}
 	if err := verifyParsedJSONPath(parseResults); err != nil {
 		return false, err
 	}
@@ -637,9 +640,6 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 // verifyParsedJSONPath verifies the JSON received from the API server is valid.
 // It will only accept a single JSON
 func verifyParsedJSONPath(results [][]reflect.Value) error {
-	if len(results) == 0 {
-		return errors.New("given jsonpath expression does not match any value")
-	}
 	if len(results) > 1 {
 		return errors.New("given jsonpath expression matches more than one list")
 	}

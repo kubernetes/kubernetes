@@ -251,7 +251,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	// Success cases are expected to pass validation.
 
 	for k, v := range successCases {
-		if errs := ValidateNetworkPolicy(v); len(errs) != 0 {
+		if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
 			t.Errorf("Expected success for the success validation test number %d, got %v", k, errs)
 		}
 	}
@@ -368,7 +368,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
-		if errs := ValidateNetworkPolicy(networkPolicy); len(errs) == 0 {
+		if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %s", testName)
 		}
 	}
@@ -423,7 +423,7 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
 			t.Errorf("expected success (%s): %v", testName, errs)
 		}
 	}
@@ -450,7 +450,7 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		errorCase.old.ObjectMeta.ResourceVersion = "1"
 		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -628,8 +628,8 @@ func TestValidateIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{IP: "127.0.0.1"},
 				},
 			},
@@ -1774,8 +1774,8 @@ func TestValidateIngressTLS(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.IngressLoadBalancerStatus{
+					Ingress: []networking.IngressLoadBalancerIngress{
 						{IP: "127.0.0.1"},
 					},
 				},
@@ -1926,8 +1926,8 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.IngressLoadBalancerStatus{
+					Ingress: []networking.IngressLoadBalancerIngress{
 						{IP: "127.0.0.1", Hostname: "foo.bar.com"},
 					},
 				},
@@ -1937,24 +1937,24 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	oldValue := newValid()
 	newValue := newValid()
 	newValue.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "127.0.0.2", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidIP := newValid()
 	invalidIP.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "abcd", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidHostname := newValid()
 	invalidHostname.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "127.0.0.1", Hostname: "127.0.0.1"},
 			},
 		},

@@ -29,6 +29,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -92,7 +94,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 				}
 
 				ginkgo.By("creating a pod with correct GMSA specs")
-				f.PodClient().CreateSync(pod)
+				e2epod.NewPodClient(f).CreateSync(pod)
 
 				ginkgo.By("checking the domain reported by nltest in the containers")
 				namespaceOption := fmt.Sprintf("--namespace=%s", f.Namespace.Name)
@@ -110,7 +112,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 					// note that the "eventually" part seems to be needed to account for the fact that powershell containers
 					// are a bit slow to become responsive, even when docker reports them as running.
 					gomega.Eventually(func() bool {
-						output, err = framework.RunKubectl(f.Namespace.Name, "exec", namespaceOption, podName, containerOption, "--", "nltest", "/PARENTDOMAIN")
+						output, err = e2ekubectl.RunKubectl(f.Namespace.Name, "exec", namespaceOption, podName, containerOption, "--", "nltest", "/PARENTDOMAIN")
 						return err == nil
 					}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 

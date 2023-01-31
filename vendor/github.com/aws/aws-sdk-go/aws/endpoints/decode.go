@@ -31,12 +31,12 @@ func (d *DecodeModelOptions) Set(optFns ...func(*DecodeModelOptions)) {
 // allow you to get a list of the partitions in the order the endpoints
 // will be resolved in.
 //
-//    resolver, err := endpoints.DecodeModel(reader)
+//	resolver, err := endpoints.DecodeModel(reader)
 //
-//    partitions := resolver.(endpoints.EnumPartitions).Partitions()
-//    for _, p := range partitions {
-//        // ... inspect partitions
-//    }
+//	partitions := resolver.(endpoints.EnumPartitions).Partitions()
+//	for _, p := range partitions {
+//	    // ... inspect partitions
+//	}
 func DecodeModel(r io.Reader, optFns ...func(*DecodeModelOptions)) (Resolver, error) {
 	var opts DecodeModelOptions
 	opts.Set(optFns...)
@@ -81,8 +81,6 @@ func decodeV3Endpoints(modelDef modelDefinition, opts DecodeModelOptions) (Resol
 	// Customization
 	for i := 0; i < len(ps); i++ {
 		p := &ps[i]
-		custAddEC2Metadata(p)
-		custAddS3DualStack(p)
 		custRegionalS3(p)
 		custRmIotDataService(p)
 		custFixAppAutoscalingChina(p)
@@ -90,15 +88,6 @@ func decodeV3Endpoints(modelDef modelDefinition, opts DecodeModelOptions) (Resol
 	}
 
 	return ps, nil
-}
-
-func custAddS3DualStack(p *partition) {
-	if !(p.ID == "aws" || p.ID == "aws-cn" || p.ID == "aws-us-gov") {
-		return
-	}
-
-	custAddDualstack(p, "s3")
-	custAddDualstack(p, "s3-control")
 }
 
 func custRegionalS3(p *partition) {
@@ -111,46 +100,26 @@ func custRegionalS3(p *partition) {
 		return
 	}
 
+	const awsGlobal = "aws-global"
+	const usEast1 = "us-east-1"
+
 	// If global endpoint already exists no customization needed.
-	if _, ok := service.Endpoints["aws-global"]; ok {
+	if _, ok := service.Endpoints[endpointKey{Region: awsGlobal}]; ok {
 		return
 	}
 
-	service.PartitionEndpoint = "aws-global"
-	service.Endpoints["us-east-1"] = endpoint{}
-	service.Endpoints["aws-global"] = endpoint{
+	service.PartitionEndpoint = awsGlobal
+	if _, ok := service.Endpoints[endpointKey{Region: usEast1}]; !ok {
+		service.Endpoints[endpointKey{Region: usEast1}] = endpoint{}
+	}
+	service.Endpoints[endpointKey{Region: awsGlobal}] = endpoint{
 		Hostname: "s3.amazonaws.com",
 		CredentialScope: credentialScope{
-			Region: "us-east-1",
+			Region: usEast1,
 		},
 	}
 
 	p.Services["s3"] = service
-}
-
-func custAddDualstack(p *partition, svcName string) {
-	s, ok := p.Services[svcName]
-	if !ok {
-		return
-	}
-
-	s.Defaults.HasDualStack = boxedTrue
-	s.Defaults.DualStackHostname = "{service}.dualstack.{region}.{dnsSuffix}"
-
-	p.Services[svcName] = s
-}
-
-func custAddEC2Metadata(p *partition) {
-	p.Services["ec2metadata"] = service{
-		IsRegionalized:    boxedFalse,
-		PartitionEndpoint: "aws-global",
-		Endpoints: endpoints{
-			"aws-global": endpoint{
-				Hostname:  "169.254.169.254/latest",
-				Protocols: []string{"http"},
-			},
-		},
-	}
 }
 
 func custRmIotDataService(p *partition) {
@@ -169,12 +138,13 @@ func custFixAppAutoscalingChina(p *partition) {
 	}
 
 	const expectHostname = `autoscaling.{region}.amazonaws.com`
-	if e, a := s.Defaults.Hostname, expectHostname; e != a {
+	serviceDefault := s.Defaults[defaultKey{}]
+	if e, a := expectHostname, serviceDefault.Hostname; e != a {
 		fmt.Printf("custFixAppAutoscalingChina: ignoring customization, expected %s, got %s\n", e, a)
 		return
 	}
-
-	s.Defaults.Hostname = expectHostname + ".cn"
+	serviceDefault.Hostname = expectHostname + ".cn"
+	s.Defaults[defaultKey{}] = serviceDefault
 	p.Services[serviceName] = s
 }
 
@@ -189,18 +159,25 @@ func custFixAppAutoscalingUsGov(p *partition) {
 		return
 	}
 
-	if a := s.Defaults.CredentialScope.Service; a != "" {
+	serviceDefault := s.Defaults[defaultKey{}]
+	if a := serviceDefault.CredentialScope.Service; a != "" {
 		fmt.Printf("custFixAppAutoscalingUsGov: ignoring customization, expected empty credential scope service, got %s\n", a)
 		return
 	}
 
-	if a := s.Defaults.Hostname; a != "" {
+	if a := serviceDefault.Hostname; a != "" {
 		fmt.Printf("custFixAppAutoscalingUsGov: ignoring customization, expected empty hostname, got %s\n", a)
 		return
 	}
 
-	s.Defaults.CredentialScope.Service = "application-autoscaling"
-	s.Defaults.Hostname = "autoscaling.{region}.amazonaws.com"
+	serviceDefault.CredentialScope.Service = "application-autoscaling"
+	serviceDefault.Hostname = "autoscaling.{region}.amazonaws.com"
+
+	if s.Defaults == nil {
+		s.Defaults = make(endpointDefaults)
+	}
+
+	s.Defaults[defaultKey{}] = serviceDefault
 
 	p.Services[serviceName] = s
 }

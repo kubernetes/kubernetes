@@ -165,7 +165,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 	createTimes := make(map[string]metav1.Time)
 	for _, pod := range pods {
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
-		go f.PodClient().Create(pod)
+		go e2epod.NewPodClient(f).Create(pod)
 		time.Sleep(interval)
 	}
 	return createTimes
@@ -273,7 +273,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
+			err := e2epod.NewPodClient(f).Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

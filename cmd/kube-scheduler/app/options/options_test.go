@@ -42,6 +42,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/utils/pointer"
 )
 
 func TestSchedulerOptions(t *testing.T) {
@@ -82,7 +83,7 @@ func TestSchedulerOptions(t *testing.T) {
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -114,7 +115,7 @@ users:
 apiVersion: componentconfig/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -125,7 +126,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -136,7 +137,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -147,7 +148,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/unknown
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -157,7 +158,7 @@ leaderElection:
 	if err := os.WriteFile(noVersionConfig, []byte(fmt.Sprintf(`
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -168,7 +169,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true
 foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -180,7 +181,7 @@ foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true
   leaderElect: false`, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -217,9 +218,12 @@ users:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
+    preEnqueue:
+      enabled:
+      - name: foo
     reserve:
       enabled:
       - name: foo
@@ -248,7 +252,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
     reserve:
@@ -279,7 +283,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
     reserve:
@@ -310,7 +314,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
@@ -337,7 +341,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
@@ -364,7 +368,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
@@ -395,7 +399,7 @@ profiles:
 
 	defaultPodInitialBackoffSeconds := int64(1)
 	defaultPodMaxBackoffSeconds := int64(10)
-	defaultPercentageOfNodesToScore := int32(0)
+	defaultPercentageOfNodesToScore := pointer.Int32(0)
 
 	testcases := []struct {
 		name             string
@@ -829,6 +833,11 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: kubeschedulerconfig.PluginSet{
+								Enabled: []kubeschedulerconfig.Plugin{
+									{Name: "foo"},
+								},
+							},
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
@@ -943,6 +952,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta3.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta3.QueueSort,
 							PreFilter:  defaults.PluginsV1beta3.PreFilter,
 							Filter:     defaults.PluginsV1beta3.Filter,
@@ -1064,6 +1074,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta2.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta2.QueueSort,
 							PreFilter:  defaults.PluginsV1beta2.PreFilter,
 							Filter:     defaults.PluginsV1beta2.Filter,
@@ -1426,6 +1437,7 @@ profiles:
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta2.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta2.QueueSort,
 							PreFilter:  defaults.PluginsV1beta2.PreFilter,
 							Filter:     defaults.PluginsV1beta2.Filter,

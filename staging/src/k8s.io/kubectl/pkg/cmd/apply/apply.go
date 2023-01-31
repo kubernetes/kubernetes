@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -44,6 +46,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -66,7 +69,10 @@ type ApplyFlags struct {
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
-	PruneWhitelist []string
+
+	// DEPRECATED: Use PruneAllowlist instead
+	PruneWhitelist []string // TODO: Remove this in kubectl 1.28 or later
+	PruneAllowlist []string
 
 	genericclioptions.IOStreams
 }
@@ -93,7 +99,6 @@ type ApplyOptions struct {
 	All                     bool
 	Overwrite               bool
 	OpenAPIPatch            bool
-	PruneWhitelist          []string
 
 	ValidationDirective string
 	Validator           validation.Schema
@@ -159,10 +164,13 @@ var (
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other config maps that are not in the file
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+		kubectl apply --prune -f manifest.yaml --all --prune-allowlist=core/v1/ConfigMap`))
 
 	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
 	warningChangesOnDeletingResource     = "Warning: Detected changes to resource %[1]s which is currently being deleted.\n"
+	warningMigrationLastAppliedFailed    = "Warning: failed to migrate kubectl.kubernetes.io/last-applied-configuration for Server-Side Apply. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
+	warningMigrationPatchFailed          = "Warning: server rejected managed fields migration to Server-Side Apply. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
+	warningMigrationReapplyFailed        = "Warning: failed to re-apply configuration after performing Server-Side Apply migration. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
 )
 
 // NewApplyFlags returns a default ApplyFlags
@@ -224,7 +232,9 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.Prune, "prune", flags.Prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().StringArrayVar(&flags.PruneAllowlist, "prune-allowlist", flags.PruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
+	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
+	cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 }
 
@@ -295,7 +305,8 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	}
 
 	if flags.Prune {
-		flags.PruneResources, err = prune.ParseResources(mapper, flags.PruneWhitelist)
+		pruneAllowlist := slice.ToSet(flags.PruneAllowlist, flags.PruneWhitelist)
+		flags.PruneResources, err = prune.ParseResources(mapper, pruneAllowlist)
 		if err != nil {
 			return nil, err
 		}
@@ -321,7 +332,6 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		All:             flags.All,
 		Overwrite:       flags.Overwrite,
 		OpenAPIPatch:    flags.OpenAPIPatch,
-		PruneWhitelist:  flags.PruneWhitelist,
 
 		Recorder:            recorder,
 		Namespace:           namespace,
@@ -542,6 +552,40 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 
 		info.Refresh(obj, true)
 
+		// Migrate managed fields if necessary.
+		//
+		// By checking afterward instead of fetching the object beforehand and
+		// unconditionally fetching we can make 3 network requests in the rare
+		// case of migration and 1 request if migration is unnecessary.
+		//
+		// To check beforehand means 2 requests for most operations, and 3
+		// requests in worst case.
+		if err = o.saveLastApplyAnnotationIfNecessary(helper, info); err != nil {
+			fmt.Fprintf(o.ErrOut, warningMigrationLastAppliedFailed, err.Error())
+		} else if performedMigration, err := o.migrateToSSAIfNecessary(helper, info); err != nil {
+			// Print-error as a warning.
+			// This is a non-fatal error because object was successfully applied
+			// above, but it might have issues since migration failed.
+			//
+			// This migration will be re-attempted if necessary upon next
+			// apply.
+			fmt.Fprintf(o.ErrOut, warningMigrationPatchFailed, err.Error())
+		} else if performedMigration {
+			if obj, err = helper.Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+				&options,
+			); err != nil {
+				// Re-send original SSA patch (this will allow dropped fields to
+				// finally be removed)
+				fmt.Fprintf(o.ErrOut, warningMigrationReapplyFailed, err.Error())
+			} else {
+				info.Refresh(obj, false)
+			}
+		}
+
 		WarnIfDeleting(info.Object, o.ErrOut)
 
 		if err := o.MarkObjectVisited(info); err != nil {
@@ -660,6 +704,183 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 	return nil
 }
 
+// Saves the last-applied-configuration annotation in a separate SSA field manager
+// to prevent it from being dropped by users who have transitioned to SSA.
+//
+// If this operation is not performed, then the last-applied-configuration annotation
+// would be removed from the object upon the first SSA usage. We want to keep it
+// around for a few releases since it is required to downgrade to
+// SSA per [1] and [2]. This code should be removed once the annotation is
+// deprecated.
+//
+// - [1] https://kubernetes.io/docs/reference/using-api/server-side-apply/#downgrading-from-server-side-apply-to-client-side-apply
+// - [2] https://github.com/kubernetes/kubernetes/pull/90187
+//
+// If the annotation is not already present, or if it is already managed by the
+// separate SSA fieldmanager, this is a no-op.
+func (o *ApplyOptions) saveLastApplyAnnotationIfNecessary(
+	helper *resource.Helper,
+	info *resource.Info,
+) error {
+	if o.FieldManager != fieldManagerServerSideApply {
+		// There is no point in preserving the annotation if the field manager
+		// will not remain default. This is because the server will not keep
+		// the annotation up to date.
+		return nil
+	}
+
+	// Send an apply patch with the last-applied-annotation
+	// so that it is not orphaned by SSA in the following patch:
+	accessor, err := meta.Accessor(info.Object)
+	if err != nil {
+		return err
+	}
+
+	// Get the current annotations from the object.
+	annots := accessor.GetAnnotations()
+	if annots == nil {
+		annots = map[string]string{}
+	}
+
+	fieldManager := fieldManagerLastAppliedAnnotation
+	originalAnnotation, hasAnnotation := annots[corev1.LastAppliedConfigAnnotation]
+
+	// If the annotation does not already exist, we do not do anything
+	if !hasAnnotation {
+		return nil
+	}
+
+	// If there is already an SSA field manager which owns the field, then there
+	// is nothing to do here.
+	if owners := csaupgrade.FindFieldsOwners(
+		accessor.GetManagedFields(),
+		metav1.ManagedFieldsOperationApply,
+		lastAppliedAnnotationFieldPath,
+	); len(owners) > 0 {
+		return nil
+	}
+
+	justAnnotation := &unstructured.Unstructured{}
+	justAnnotation.SetGroupVersionKind(info.Mapping.GroupVersionKind)
+	justAnnotation.SetName(accessor.GetName())
+	justAnnotation.SetNamespace(accessor.GetNamespace())
+	justAnnotation.SetAnnotations(map[string]string{
+		corev1.LastAppliedConfigAnnotation: originalAnnotation,
+	})
+
+	modified, err := runtime.Encode(unstructured.UnstructuredJSONScheme, justAnnotation)
+	if err != nil {
+		return nil
+	}
+
+	helperCopy := *helper
+	newObj, err := helperCopy.WithFieldManager(fieldManager).Patch(
+		info.Namespace,
+		info.Name,
+		types.ApplyPatchType,
+		modified,
+		nil,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return info.Refresh(newObj, false)
+}
+
+// Check if the returned object needs to have its kubectl-client-side-apply
+// managed fields migrated server-side-apply.
+//
+// field ownership metadata is stored in three places:
+//   - server-side managed fields
+//   - client-side managed fields
+//   - and the last_applied_configuration annotation.
+//
+// The migration merges the client-side-managed fields into the
+// server-side-managed fields, leaving the last_applied_configuration
+// annotation in place. Server will keep the annotation up to date
+// after every server-side-apply where the following conditions are ment:
+//
+//  1. field manager is 'kubectl'
+//  2. annotation already exists
+func (o *ApplyOptions) migrateToSSAIfNecessary(
+	helper *resource.Helper,
+	info *resource.Info,
+) (migrated bool, err error) {
+	accessor, err := meta.Accessor(info.Object)
+	if err != nil {
+		return false, err
+	}
+
+	// To determine which field managers were used by kubectl for client-side-apply
+	// we search for a manager used in `Update` operations which owns the
+	// last-applied-annotation.
+	//
+	// This is the last client-side-apply manager which changed the field.
+	//
+	// There may be multiple owners if multiple managers wrote the same exact
+	// configuration. In this case there are multiple owners, we want to migrate
+	// them all.
+	csaManagers := csaupgrade.FindFieldsOwners(
+		accessor.GetManagedFields(),
+		metav1.ManagedFieldsOperationUpdate,
+		lastAppliedAnnotationFieldPath)
+
+	managerNames := sets.New[string]()
+	for _, entry := range csaManagers {
+		managerNames.Insert(entry.Manager)
+	}
+
+	// Re-attempt patch as many times as it is conflicting due to ResourceVersion
+	// test failing
+	for i := 0; i < maxPatchRetry; i++ {
+		var patchData []byte
+		var obj runtime.Object
+
+		patchData, err = csaupgrade.UpgradeManagedFieldsPatch(
+			info.Object, managerNames, o.FieldManager)
+
+		if err != nil {
+			// If patch generation failed there was likely a bug.
+			return false, err
+		} else if patchData == nil {
+			// nil patch data means nothing to do - object is already migrated
+			return false, nil
+		}
+
+		// Send the patch to upgrade the managed fields if it is non-nil
+		obj, err = helper.Patch(
+			info.Namespace,
+			info.Name,
+			types.JSONPatchType,
+			patchData,
+			nil,
+		)
+
+		if err == nil {
+			// Stop retrying upon success.
+			info.Refresh(obj, false)
+			return true, nil
+		} else if !errors.IsConflict(err) {
+			// Only retry if there was a conflict
+			return false, err
+		}
+
+		// Refresh the object for next iteration
+		err = info.Get()
+		if err != nil {
+			// If there was an error fetching, return error
+			return false, err
+		}
+	}
+
+	// Reaching this point with non-nil error means there was a conflict and
+	// max retries was hit
+	// Return the last error witnessed (which will be a conflict)
+	return false, err
+}
+
 func (o *ApplyOptions) shouldPrintObject() bool {
 	// Print object only if output format other than "name" is specified
 	shouldPrint := false
@@ -766,6 +987,16 @@ const (
 	// for backward compatibility to not conflict with old versions
 	// of kubectl server-side apply where `kubectl` has already been the field manager.
 	fieldManagerServerSideApply = "kubectl"
+
+	fieldManagerLastAppliedAnnotation = "kubectl-last-applied"
+)
+
+var (
+	lastAppliedAnnotationFieldPath = fieldpath.NewSet(
+		fieldpath.MakePathOrDie(
+			"metadata", "annotations",
+			corev1.LastAppliedConfigAnnotation),
+	)
 )
 
 // GetApplyFieldManagerFlag gets the field manager for kubectl apply

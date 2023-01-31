@@ -72,16 +72,16 @@ message HTTPIngressRuleValue {
   repeated HTTPIngressPath paths = 1;
 }
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 message IPBlock {
   // CIDR is a string representing the IP Block
-  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+  // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
-  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+  // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
@@ -205,6 +205,53 @@ message IngressList {
   repeated Ingress items = 2;
 }
 
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+message IngressLoadBalancerIngress {
+  // IP is set for load-balancer ingress points that are IP based.
+  // +optional
+  optional string ip = 1;
+
+  // Hostname is set for load-balancer ingress points that are DNS based.
+  // +optional
+  optional string hostname = 2;
+
+  // Ports provides information about the ports exposed by this LoadBalancer.
+  // +listType=atomic
+  // +optional
+  repeated IngressPortStatus ports = 4;
+}
+
+// IngressLoadBalancerStatus represents the status of a load-balancer.
+message IngressLoadBalancerStatus {
+  // Ingress is a list containing ingress points for the load-balancer.
+  // +optional
+  repeated IngressLoadBalancerIngress ingress = 1;
+}
+
+// IngressPortStatus represents the error condition of a service port
+message IngressPortStatus {
+  // Port is the port number of the ingress port.
+  optional int32 port = 1;
+
+  // Protocol is the protocol of the ingress port.
+  // The supported values are: "TCP", "UDP", "SCTP"
+  optional string protocol = 2;
+
+  // Error is to record the problem with the service port
+  // The format of the error shall comply with the following rules:
+  // - built-in error values shall be specified in this file and those shall use
+  //   CamelCase names
+  // - cloud provider specific error values must have names that comply with the
+  //   format foo.example.com/CamelCase.
+  // ---
+  // The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+  // +optional
+  // +kubebuilder:validation:Required
+  // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+  // +kubebuilder:validation:MaxLength=316
+  optional string error = 3;
+}
+
 // IngressRule represents the rules mapping the paths under a specified host to
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
@@ -305,7 +352,7 @@ message IngressSpec {
 message IngressStatus {
   // LoadBalancer contains the current status of the load-balancer.
   // +optional
-  optional k8s.io.api.core.v1.LoadBalancerStatus loadBalancer = 1;
+  optional IngressLoadBalancerStatus loadBalancer = 1;
 }
 
 // IngressTLS describes the transport layer security associated with an Ingress.

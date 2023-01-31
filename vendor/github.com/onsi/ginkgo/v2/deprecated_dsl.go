@@ -13,7 +13,7 @@ import (
 Deprecated: Done Channel for asynchronous testing
 
 The Done channel pattern is no longer supported in Ginkgo 2.0.
-See here for better patterns for asynchronouse testing: https://onsi.github.io/ginkgo/#patterns-for-asynchronous-testing
+See here for better patterns for asynchronous testing: https://onsi.github.io/ginkgo/#patterns-for-asynchronous-testing
 
 For a migration guide see: https://onsi.github.io/ginkgo/MIGRATING_TO_V2#removed-async-testing
 */

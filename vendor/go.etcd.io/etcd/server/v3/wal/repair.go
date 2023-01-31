@@ -40,7 +40,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 	lg.Info("repairing", zap.String("path", f.Name()))
 
 	rec := &walpb.Record{}
-	decoder := newDecoder(f)
+	decoder := newDecoder(fileutil.NewFileReader(f.File))
 	for {
 		lastOffset := decoder.lastOffset()
 		err := decoder.decode(rec)

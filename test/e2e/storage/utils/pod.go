@@ -152,7 +152,10 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 				break
 			}
 		}
-		framework.ExpectEqual(isPidChanged, true, "Kubelet PID remained unchanged after restarting Kubelet")
+		if !isPidChanged {
+			framework.Fail("Kubelet PID remained unchanged after restarting Kubelet")
+		}
+
 		framework.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
 		time.Sleep(30 * time.Second)
 	}

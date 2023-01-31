@@ -22,13 +22,15 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -83,12 +85,12 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 	safeSysctl := "net.ipv4.ip_local_port_range"
 	safeSysctlValue := "1024 1042"
 	sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
-	validPod := f.PodClient().Create(t.validPod)
+	validPod := e2epod.NewPodClient(f).Create(t.validPod)
 
 	ginkgo.By("Making sure the valid pod launches")
-	_, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
+	_, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(t.validPod)
 	framework.ExpectNoError(err)
-	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
+	e2eoutput.TestContainerOutput(f, "pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
 	return validPod
 }
@@ -98,10 +100,10 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	invalidPod := sysctlTestPod("valid-sysctls-"+string(uuid.NewUUID()), map[string]string{
 		"fs.mount-max": "1000000",
 	})
-	invalidPod = f.PodClient().Create(invalidPod)
+	invalidPod = e2epod.NewPodClient(f).Create(invalidPod)
 
 	ginkgo.By("Making sure the invalid pod failed")
-	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
+	ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(invalidPod)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 

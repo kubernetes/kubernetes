@@ -151,3 +151,52 @@ func TestPrintConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestIsKubeadmConfigPresent(t *testing.T) {
+	var tcases = []struct {
+		name     string
+		gvkmap   kubeadmapi.DocumentMap
+		expected bool
+	}{
+		{
+			name: " Wrong Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
+			},
+			expected: false,
+		},
+		{
+			name: "Empty Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: false,
+		},
+		{
+			name:     "Nil value",
+			gvkmap:   nil,
+			expected: false,
+		},
+		{
+			name: "Correct Group value 1",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+		{
+			name: "Correct Group value 2",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
+				t.Error("unexpected result")
+			}
+		})
+	}
+}

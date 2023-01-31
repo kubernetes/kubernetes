@@ -291,7 +291,7 @@ type PersistentVolume struct {
 	// +optional
 	metav1.ObjectMeta
 
-	//Spec defines a persistent volume owned by the cluster
+	// Spec defines a persistent volume owned by the cluster
 	// +optional
 	Spec PersistentVolumeSpec
 
@@ -452,29 +452,54 @@ type PersistentVolumeClaimSpec struct {
 	// * An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
-	// If the AnyVolumeDataSource feature gate is enabled, this field will always have
-	// the same contents as the DataSourceRef field.
+	// When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
+	// and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+	// If the namespace is specified, then dataSourceRef will not be copied to dataSource.
 	// +optional
 	DataSource *TypedLocalObjectReference
 	// Specifies the object from which to populate the volume with data, if a non-empty
-	// volume is desired. This may be any local object from a non-empty API group (non
+	// volume is desired. This may be any object from a non-empty API group (non
 	// core object) or a PersistentVolumeClaim object.
 	// When this field is specified, volume binding will only succeed if the type of
 	// the specified object matches some installed volume populator or dynamic
 	// provisioner.
-	// This field will replace the functionality of the DataSource field and as such
+	// This field will replace the functionality of the dataSource field and as such
 	// if both fields are non-empty, they must have the same value. For backwards
-	// compatibility, both fields (DataSource and DataSourceRef) will be set to the same
+	// compatibility, when namespace isn't specified in dataSourceRef,
+	// both fields (dataSource and dataSourceRef) will be set to the same
 	// value automatically if one of them is empty and the other is non-empty.
-	// There are two important differences between DataSource and DataSourceRef:
-	// * While DataSource only allows two specific types of objects, DataSourceRef
+	// When namespace is specified in dataSourceRef,
+	// dataSource isn't set to the same value and must be empty.
+	// There are three important differences between dataSource and dataSourceRef:
+	// * While dataSource only allows two specific types of objects, dataSourceRef
 	//   allows any non-core object, as well as PersistentVolumeClaim objects.
-	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
+	// * While dataSource ignores disallowed values (dropping them), dataSourceRef
 	//   preserves all values, and generates an error if a disallowed value is
 	//   specified.
+	// * While dataSource only allows local objects, dataSourceRef allows objects
+	//   in any namespaces.
 	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference
+	DataSourceRef *TypedObjectReference
+}
+
+type TypedObjectReference struct {
+	// APIGroup is the group for the resource being referenced.
+	// If APIGroup is not specified, the specified Kind must be in the core API group.
+	// For any other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string
+	// Kind is the type of resource being referenced
+	Kind string
+	// Name is the name of resource being referenced
+	Name string
+	// Namespace is the namespace of resource being referenced
+	// Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
+	// (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+	// +featureGate=CrossNamespaceVolumeDataSource
+	// +optional
+	Namespace *string
 }
 
 // PersistentVolumeClaimConditionType defines the condition of PV claim.
@@ -1977,10 +2002,10 @@ type EnvFromSource struct {
 	// +optional
 	Prefix string
 	// The ConfigMap to select from.
-	//+optional
+	// +optional
 	ConfigMapRef *ConfigMapEnvSource
 	// The Secret to select from.
-	//+optional
+	// +optional
 	SecretRef *SecretEnvSource
 }
 
@@ -2160,6 +2185,25 @@ type ResourceRequirements struct {
 	// otherwise to an implementation-defined value
 	// +optional
 	Requests ResourceList
+	// Claims lists the names of resources, defined in spec.resourceClaims,
+	// that are used by this container.
+	//
+	// This is an alpha field and requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// This field is immutable.
+	//
+	// +featureGate=DynamicResourceAllocation
+	// +optional
+	Claims []ResourceClaim
+}
+
+// ResourceClaim references one entry in PodSpec.ResourceClaims.
+type ResourceClaim struct {
+	// Name must match the name of one entry in pod.spec.resourceClaims of
+	// the Pod where this field is used. It makes that resource available
+	// inside a container.
+	Name string
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -2428,12 +2472,14 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
+	// skips scheduling the pod because one or more scheduling gates are still present.
+	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
-	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
-	// The constant is to be renamed once the name is accepted within the KEP-3329.
-	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
+	DisruptionTarget PodConditionType = "DisruptionTarget"
 )
 
 // PodCondition represents pod's condition
@@ -2502,7 +2548,7 @@ const (
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
 type NodeSelector struct {
-	//Required. A list of node selector terms. The terms are ORed.
+	// Required. A list of node selector terms. The terms are ORed.
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
@@ -2997,6 +3043,68 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS
+
+	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
+	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	//
+	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+	// +optional
+	SchedulingGates []PodSchedulingGate
+	// ResourceClaims defines which ResourceClaims must be allocated
+	// and reserved before the Pod is allowed to start. The resources
+	// will be made available to those containers which consume them
+	// by name.
+	//
+	// This is an alpha field and requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// This field is immutable.
+	//
+	// +featureGate=DynamicResourceAllocation
+	// +optional
+	ResourceClaims []PodResourceClaim
+}
+
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
+// Containers that need access to the ResourceClaim reference it with this name.
+type PodResourceClaim struct {
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must be a DNS_LABEL.
+	Name string
+
+	// Source describes where to find the ResourceClaim.
+	Source ClaimSource
+}
+
+// ClaimSource describes a reference to a ResourceClaim.
+//
+// Exactly one of these fields should be set.  Consumers of this type must
+// treat an empty object as if it has an unknown value.
+type ClaimSource struct {
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace as this pod.
+	ResourceClaimName *string
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace as this pod.
+	//
+	// The template will be used to create a new ResourceClaim, which will
+	// be bound to this pod. When this pod is deleted, the ResourceClaim
+	// will also be deleted. The name of the ResourceClaim will be <pod
+	// name>-<resource name>, where <resource name> is the
+	// PodResourceClaim.Name. Pod validation will reject the pod if the
+	// concatenated name is not valid for a ResourceClaim (e.g. too long).
+	//
+	// An existing ResourceClaim with that name that is not owned by the
+	// pod will not be used for the pod to avoid using an unrelated
+	// resource by mistake. Scheduling and pod startup are then blocked
+	// until the unrelated ResourceClaim is removed.
+	//
+	// This field is immutable and no changes will be made to the
+	// corresponding ResourceClaim by the control plane after creating the
+	// ResourceClaim.
+	ResourceClaimTemplateName *string
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -3015,6 +3123,13 @@ type PodOS struct {
 	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
 	Name OSName
+}
+
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
+type PodSchedulingGate struct {
+	// Name of the scheduling gate.
+	// Each scheduling gate must have a unique name field.
+	Name string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -3131,8 +3246,11 @@ type PodSecurityContext struct {
 	// +optional
 	RunAsNonRoot *bool
 	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added to
-	// any container.
+	// to the container's primary GID, the fsGroup (if specified), and group memberships
+	// defined in the container image for the uid of the container process. If unspecified,
+	// no additional groups are added to any container. Note that group memberships
+	// defined in the container image for the uid of the container process are still effective,
+	// even if they are not included in this list.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64
@@ -3494,7 +3612,7 @@ type ReplicationControllerSpec struct {
 	// insufficient replicas are detected. This reference is ignored if a Template is set.
 	// Must be set before converting to a versioned API object
 	// +optional
-	//TemplateRef *ObjectReference
+	// TemplateRef *ObjectReference
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Internally, this takes precedence over a
@@ -3936,7 +4054,6 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
 	// +optional
 	LoadBalancerClass *string
 
@@ -3946,7 +4063,6 @@ type ServiceSpec struct {
 	// dropping the traffic if there are no local endpoints. The default value,
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
-	// +featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
 }
@@ -4161,7 +4277,7 @@ type NodeSpec struct {
 	// +optional
 	Taints []Taint
 
-	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.
+	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
 	// +optional
 	ConfigSource *NodeConfigSource
 
@@ -4831,7 +4947,7 @@ type ObjectReference struct {
 
 // LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
 type LocalObjectReference struct {
-	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	// TODO: Add other useful fields.  apiVersion, kind, uid?
 	Name string
 }
 
@@ -5737,7 +5853,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 	//
 	// If this value is nil, the behavior is equivalent to the Honor policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeAffinityPolicy *NodeInclusionPolicy
 	// NodeTaintsPolicy indicates how we will treat node taints when calculating
@@ -5747,7 +5863,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: node taints are ignored. All nodes are included.
 	//
 	// If this value is nil, the behavior is equivalent to the Ignore policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy
 	// MatchLabelKeys is a set of pod label keys to select the pods over which

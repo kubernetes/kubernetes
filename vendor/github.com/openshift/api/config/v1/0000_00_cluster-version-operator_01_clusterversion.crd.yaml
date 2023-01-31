@@ -70,6 +70,7 @@ spec:
                           - Insights
                           - Storage
                           - CSISnapshot
+                          - NodeTuning
                       x-kubernetes-list-type: atomic
                     baselineCapabilitySet:
                       description: baselineCapabilitySet selects an initial set of optional capabilities to enable, which can be extended via additionalEnabledCapabilities.  If unset, the cluster will choose a default, and the default may change over time. The current default is vCurrent.
@@ -78,6 +79,7 @@ spec:
                         - None
                         - v4.11
                         - v4.12
+                        - v4.13
                         - vCurrent
                 channel:
                   description: channel is an identifier for explicitly requesting that a non-default set of updates be applied to this cluster. The default channel will be contain stable updates that are appropriate for production clusters.
@@ -86,18 +88,29 @@ spec:
                   description: clusterID uniquely identifies this cluster. This is expected to be an RFC4122 UUID value (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx in hexadecimal values). This is a required field.
                   type: string
                 desiredUpdate:
-                  description: "desiredUpdate is an optional field that indicates the desired value of the cluster version. Setting this value will trigger an upgrade (if the current version does not match the desired version). The set of recommended update values is listed as part of available updates in status, and setting values outside that range may cause the upgrade to fail. You may specify the version field without setting image if an update exists with that version in the availableUpdates or history. \n If an upgrade fails the operator will halt and report status about the failing component. Setting the desired update value back to the previous version will cause a rollback to be attempted. Not all rollbacks will succeed."
+                  description: "desiredUpdate is an optional field that indicates the desired value of the cluster version. Setting this value will trigger an upgrade (if the current version does not match the desired version). The set of recommended update values is listed as part of available updates in status, and setting values outside that range may cause the upgrade to fail. \n Some of the fields are inter-related with restrictions and meanings described here. 1. image is specified, version is specified, architecture is specified. API validation error. 2. image is specified, version is specified, architecture is not specified. You should not do this. version is silently ignored and image is used. 3. image is specified, version is not specified, architecture is specified. API validation error. 4. image is specified, version is not specified, architecture is not specified. image is used. 5. image is not specified, version is specified, architecture is specified. version and desired architecture are used to select an image. 6. image is not specified, version is specified, architecture is not specified. version and current architecture are used to select an image. 7. image is not specified, version is not specified, architecture is specified. API validation error. 8. image is not specified, version is not specified, architecture is not specified. API validation error. \n If an upgrade fails the operator will halt and report status about the failing component. Setting the desired update value back to the previous version will cause a rollback to be attempted. Not all rollbacks will succeed."
                   type: object
                   properties:
+                    architecture:
+                      description: architecture is an optional field that indicates the desired value of the cluster architecture. In this context cluster architecture means either a single architecture or a multi architecture. architecture can only be set to Multi thereby only allowing updates from single to multi architecture. If architecture is set, image cannot be set and version must be set. Valid values are 'Multi' and empty.
+                      type: string
+                      enum:
+                        - Multi
+                        - ""
                     force:
                       description: force allows an administrator to update to an image that has failed verification or upgradeable checks. This option should only be used when the authenticity of the provided image has been verified out of band because the provided image will run with full administrative access to the cluster. Do not use this flag with images that comes from unknown or potentially malicious sources.
                       type: boolean
                     image:
-                      description: image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.
+                      description: image is a container image location that contains the update. image should be used when the desired version does not exist in availableUpdates or history. When image is set, version is ignored. When image is set, version should be empty. When image is set, architecture cannot be specified.
                       type: string
                     version:
-                      description: version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.
+                      description: version is a semantic version identifying the update version. version is ignored if image is specified and required if architecture is specified.
                       type: string
+                  x-kubernetes-validations:
+                    - rule: 'has(self.architecture) && has(self.image) ? (self.architecture == '''' || self.image == '''') : true'
+                      message: cannot set both Architecture and Image
+                    - rule: 'has(self.architecture) && self.architecture != '''' ? self.version != '''' : true'
+                      message: Version must be set if Architecture is set
                 overrides:
                   description: overrides is list of overides for components that are managed by cluster version operator. Marking a component unmanaged will prevent the operator from creating or updating the object.
                   type: array
@@ -157,7 +170,7 @@ spec:
                         description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
                         type: string
                       version:
-                        description: version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.
+                        description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
                         type: string
                   nullable: true
                 capabilities:
@@ -178,6 +191,7 @@ spec:
                           - Insights
                           - Storage
                           - CSISnapshot
+                          - NodeTuning
                       x-kubernetes-list-type: atomic
                     knownCapabilities:
                       description: knownCapabilities lists all the capabilities known to the current cluster.
@@ -193,6 +207,7 @@ spec:
                           - Insights
                           - Storage
                           - CSISnapshot
+                          - NodeTuning
                       x-kubernetes-list-type: atomic
                 conditionalUpdates:
                   description: conditionalUpdates contains the list of updates that may be recommended for this cluster if it meets specific required conditions. Consumers interested in the set of updates that are actually recommended for this cluster should use availableUpdates. This list may be empty if no updates are recommended, if the update service is unavailable, or if an empty or invalid channel has been specified.
@@ -267,7 +282,7 @@ spec:
                             description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
                             type: string
                           version:
-                            description: version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.
+                            description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
                             type: string
                       risks:
                         description: risks represents the range of issues associated with updating to the target release. The cluster-version operator will evaluate all entries, and only recommend the update if there is at least one entry and all entries recommend the update.
@@ -368,7 +383,7 @@ spec:
                       description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
                       type: string
                     version:
-                      description: version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.
+                      description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
                       type: string
                 history:
                   description: history contains a list of the most recent versions applied to the cluster. This value may be empty during cluster startup, and then will be updated when a new update is being applied. The newest update is first in the list and it is ordered by recency. Updates in the history have state Completed if the rollout completed - if an update was failing or halfway applied the state will be Partial. Only a limited amount of update history is preserved.
@@ -405,7 +420,7 @@ spec:
                         description: verified indicates whether the provided update was properly verified before it was installed. If this is false the cluster may not be trusted. Verified does not cover upgradeable checks that depend on the cluster state at the time when the update target was accepted.
                         type: boolean
                       version:
-                        description: version is a semantic versioning identifying the update version. If the requested image does not define a version, or if a failure occurs retrieving the image, this value may be empty.
+                        description: version is a semantic version identifying the update version. If the requested image does not define a version, or if a failure occurs retrieving the image, this value may be empty.
                         type: string
                 observedGeneration:
                   description: observedGeneration reports which version of the spec is being synced. If this value is not equal to metadata.generation, then the desired and conditions fields may represent a previous version.

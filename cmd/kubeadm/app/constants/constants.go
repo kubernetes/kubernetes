@@ -211,7 +211,7 @@ const (
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 5 * time.Minute
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
-	TLSBootstrapRetryInterval = 5 * time.Second
+	TLSBootstrapRetryInterval = 1 * time.Second
 	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write
 	APICallWithWriteTimeout = 40 * time.Second
 	// APICallWithReadTimeout specifies how long kubeadm should wait for api calls with only reads
@@ -253,10 +253,6 @@ const (
 
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
-
-	// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
 
 	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
 	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
@@ -313,7 +309,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.4-0"
+	DefaultEtcdVersion = "3.5.6-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -421,7 +417,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.8"
+	PauseVersion = "3.9"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -439,20 +435,6 @@ const (
 )
 
 var (
-	// OldControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleControlPlane,
@@ -494,10 +476,11 @@ var (
 		19: "3.4.13-0",
 		20: "3.4.13-0",
 		21: "3.4.13-0",
-		22: "3.5.4-0",
-		23: "3.5.4-0",
-		24: "3.5.4-0",
-		25: "3.5.4-0",
+		22: "3.5.6-0",
+		23: "3.5.6-0",
+		24: "3.5.6-0",
+		25: "3.5.6-0",
+		26: "3.5.6-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

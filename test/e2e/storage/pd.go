@@ -490,7 +490,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
 	e2enode.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
-	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
+	e2enode.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
 	nodes, err := e2enode.GetReadySchedulableNodes(c)
 	framework.ExpectNoError(err)
 	return len(nodes.Items)

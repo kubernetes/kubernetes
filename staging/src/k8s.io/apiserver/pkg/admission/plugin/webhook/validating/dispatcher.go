@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,8 +37,8 @@ import (
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -232,14 +234,14 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
 	}
-	trace := utiltrace.New("Call validating webhook",
-		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
-		utiltrace.Field{"webhook", h.Name},
-		utiltrace.Field{"resource", attr.GetResource()},
-		utiltrace.Field{"subresource", attr.GetSubresource()},
-		utiltrace.Field{"operation", attr.GetOperation()},
-		utiltrace.Field{"UID", uid})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	ctx, span := tracing.Start(ctx, "Call validating webhook",
+		attribute.String("configuration", invocation.Webhook.GetConfigurationName()),
+		attribute.String("webhook", h.Name),
+		attribute.Stringer("resource", attr.GetResource()),
+		attribute.String("subresource", attr.GetSubresource()),
+		attribute.String("operation", string(attr.GetOperation())),
+		attribute.String("UID", string(uid)))
+	defer span.End(500 * time.Millisecond)
 
 	// if the webhook has a specific timeout, wrap the context to apply it
 	if h.TimeoutSeconds != nil {
@@ -278,7 +280,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		}
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}
-	trace.Step("Request completed")
+	span.AddEvent("Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, false, response)
 	if err != nil {

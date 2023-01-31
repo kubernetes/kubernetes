@@ -42,6 +42,7 @@ func isEmpty(x, y interface{}) bool {
 // The fraction and margin must be non-negative.
 //
 // The mathematical expression used is equivalent to:
+//
 //	|x-y| ≤ max(fraction*min(|x|, |y|), margin)
 //
 // EquateApprox can be used in conjunction with EquateNaNs.

@@ -109,9 +109,6 @@ kubernetes.tar.gz
 # Phony test files used as part of coverage generation
 zz_generated_*_test.go
 
-# make-related metadata
-/.make/
-
 # Just in time generated data in the source, should never be committed
 /test/e2e/generated/bindata.go
 
@@ -126,3 +123,7 @@ vendordiff.patch
 
 # Ignore openshift source archives produced as part of rpm build
 openshift*.tar.gz
+
+# Ensure that openapi definitions are not ignored to ensure that
+# openshift/origin can vendor them.
+!pkg/generated/openapi/zz_generated.openapi.go

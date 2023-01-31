@@ -1043,7 +1043,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			jsonPathExp:  "{.foo.bar}",
 			jsonPathCond: "baz",
 
-			expectedErr: "foo is not found",
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
 		{
 			name: "compare boolean JSONPath entry",

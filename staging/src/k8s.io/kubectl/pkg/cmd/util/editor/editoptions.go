@@ -589,10 +589,7 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 		WithFieldValidation(o.ValidationDirective).
 		WithSubresource(o.Subresource)
 	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // GetApplyPatch is used to get and apply patches

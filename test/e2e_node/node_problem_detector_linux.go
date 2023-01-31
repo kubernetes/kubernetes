@@ -201,7 +201,7 @@ current-context: local-context
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathFileOrCreate
-			pod := f.PodClient().CreateSync(&v1.Pod{
+			pod := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -432,7 +432,7 @@ current-context: local-context
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
-			f.PodClient().Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
+			e2epod.NewPodClient(f).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
 			ginkgo.By("Wait for the node problem detector to disappear")
 			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")

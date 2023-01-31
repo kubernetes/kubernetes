@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -69,7 +70,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns
-		f.PodClient().CreateSync(getCadvisorPod())
+		e2epod.NewPodClient(f).CreateSync(getCadvisorPod())
 		// Resource collector monitors fine-grain CPU/memory usage by a standalone Cadvisor with
 		// 1s housingkeeping interval
 		rc = NewResourceCollector(containerStatsPollingPeriod)
@@ -426,7 +427,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	ginkgo.By("Creating a batch of background pods")
 
 	// CreatBatch is synchronized, all pods are running when it returns
-	f.PodClient().CreateBatch(bgPods)
+	e2epod.NewPodClient(f).CreateBatch(bgPods)
 
 	time.Sleep(sleepBeforeCreatePods)
 
@@ -453,7 +454,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 	for i := range pods {
 		pod := pods[i]
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
-		go f.PodClient().Create(pod)
+		go e2epod.NewPodClient(f).Create(pod)
 		time.Sleep(interval)
 	}
 	return createTimes
@@ -546,7 +547,7 @@ func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod, podType st
 	for _, pod := range pods {
 		create := metav1.Now()
 		createTimes[pod.Name] = create
-		p := f.PodClient().Create(pod)
+		p := e2epod.NewPodClient(f).Create(pod)
 		framework.ExpectNoError(wait.PollImmediate(2*time.Second, framework.PodStartTimeout, podWatchedRunning(watchTimes, p.Name)))
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: pod.Name, Latency: watchTimes[pod.Name].Time.Sub(create.Time)})

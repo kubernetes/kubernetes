@@ -9,11 +9,13 @@ type Reporter interface {
 	WillRun(report types.SpecReport)
 	DidRun(report types.SpecReport)
 	SuiteDidEnd(report types.Report)
+	EmitProgressReport(progressReport types.ProgressReport)
 }
 
 type NoopReporter struct{}
 
-func (n NoopReporter) SuiteWillBegin(report types.Report) {}
-func (n NoopReporter) WillRun(report types.SpecReport)    {}
-func (n NoopReporter) DidRun(report types.SpecReport)     {}
-func (n NoopReporter) SuiteDidEnd(report types.Report)    {}
+func (n NoopReporter) SuiteWillBegin(report types.Report)                     {}
+func (n NoopReporter) WillRun(report types.SpecReport)                        {}
+func (n NoopReporter) DidRun(report types.SpecReport)                         {}
+func (n NoopReporter) SuiteDidEnd(report types.Report)                        {}
+func (n NoopReporter) EmitProgressReport(progressReport types.ProgressReport) {}

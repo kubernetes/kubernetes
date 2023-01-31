@@ -22,10 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -219,19 +215,18 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizers)()
 			job := &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
 				Status: batch.JobStatus{
 					CompletedIndexes: tc.prevSucceeded,
 				},
 				Spec: batch.JobSpec{
 					Completions: pointer.Int32Ptr(tc.completions),
 				},
+			}
+			if tc.trackingWithFinalizers {
+				job.Annotations = map[string]string{
+					batch.JobTrackingFinalizer: "",
+				}
 			}
 			pods := hollowPodsWithIndexPhase(tc.pods)
 			for _, p := range pods {

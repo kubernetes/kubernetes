@@ -587,6 +587,73 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 	}
 }
 
+// Call MarkVolumeAsDetached() on a volume which mounted by pod(s) should be skipped
+func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
+	devicePath := "fake/device/path"
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	err := asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	podName := util.GetUniquePodName(pod)
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	asw.MarkVolumeAsDetached(generatedVolumeName, "" /* nodeName */)
+
+	// Assert
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+}
+
 func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -825,7 +892,8 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	verifyVolumeExistsAswWithSELinux(t, generatedVolumeName, "system_u:object_r:container_file_t:s0:c0,c1", asw)
 	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
-	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+	verifyPodExistsInVolumeAswWithSELinux(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, "system_u:object_r:container_file_t:s0:c0,c1", asw)
+	verifyPodExistsInVolumeSELinuxMismatch(t, podName, generatedVolumeName, "" /* wrong SELinux label */, asw)
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
 }
@@ -1087,8 +1155,18 @@ func verifyPodExistsInVolumeAsw(
 	expectedVolumeName v1.UniqueVolumeName,
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
+	verifyPodExistsInVolumeAswWithSELinux(t, expectedPodName, expectedVolumeName, expectedDevicePath, "", asw)
+}
+
+func verifyPodExistsInVolumeAswWithSELinux(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeName v1.UniqueVolumeName,
+	expectedDevicePath string,
+	expectedSELinuxLabel string,
+	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, "")
+		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1151,6 +1229,26 @@ func verifyPodDoesntExistInVolumeAsw(
 		t.Fatalf(
 			"Invalid devicePath. Expected: <\"\"> Actual: <%q> ",
 			devicePath)
+	}
+}
+
+func verifyPodExistsInVolumeSELinuxMismatch(
+	t *testing.T,
+	podToCheck volumetypes.UniquePodName,
+	volumeToCheck v1.UniqueVolumeName,
+	unexpectedSELinuxLabel string,
+	asw ActualStateOfWorld) {
+
+	podExistsInVolume, _, err := asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
+	if podExistsInVolume {
+		t.Errorf("expected Pod %s not to exists, but it does", podToCheck)
+	}
+	if err == nil {
+		t.Error("expected PodExistsInVolume to return error, but it returned nil")
+	}
+
+	if !IsSELinuxMountMismatchError(err) {
+		t.Errorf("expected PodExistsInVolume to return SELinuxMountMismatchError, got %s", err)
 	}
 }
 

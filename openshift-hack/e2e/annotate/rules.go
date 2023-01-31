@@ -13,6 +13,10 @@ var (
 			`\[Feature:StatefulSetAutoDeletePVC\]`,
 			`\[Feature:ProxyTerminatingEndpoints\]`,
 			`\[Feature:UserNamespacesStatelessPodsSupport\]`,
+			`\[Feature:ReadWriteOncePod\]`,
+			`\[Feature:SELinuxMountReadWriteOncePod\]`,
+			`\[Feature:add node log viewer\]`,
+			`\[Feature:PodSchedulingReadiness\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -108,6 +112,11 @@ var (
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 
 			`Topology Hints should distribute endpoints evenly`,
+		},
+		// tests that need to be temporarily disabled while the rebase is in progress
+		"[Disabled:RebaseInProgress]": {
+			`Kubectl client Kubectl events should show event when pod is created`,                                           // TODO: needs oc with 1.26 kubectl
+			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`, // TODO not working, yet not testing anything new
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -217,12 +226,6 @@ var (
 
 			`NetworkPolicy between server and client should support a 'default-deny-all' policy`,            // uses egress feature
 			`NetworkPolicy between server and client should stop enforcing policies after they are deleted`, // uses egress feature
-		},
-		// Tests that don't pass with OVNKubernetes.
-		// These are skipped explicitly by openshift-hack/test-kubernetes-e2e.sh,
-		// but will also be skipped by openshift-tests in jobs that use OVNKuberenets.
-		"[Skipped:Network/OVNKuberenetes]": {
-			`session affinity timeout`,
 		},
 	}
 

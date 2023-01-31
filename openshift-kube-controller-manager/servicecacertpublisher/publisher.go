@@ -19,7 +19,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 )
 
@@ -38,11 +37,6 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 	e := &Publisher{
 		client: cl,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service_ca_cert_publisher"),
-	}
-	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("service_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
 	}
 
 	cmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

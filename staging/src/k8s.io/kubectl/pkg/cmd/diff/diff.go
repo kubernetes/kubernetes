@@ -747,7 +747,7 @@ func (o *DiffOptions) Run() error {
 	})
 
 	if o.pruner != nil {
-		prunedObjs, err := o.pruner.pruneAll()
+		prunedObjs, err := o.pruner.pruneAll(o.CmdNamespace != "")
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
 		}

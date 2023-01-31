@@ -199,7 +199,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			framework.ExpectNoError(err)
 		}()
 
-		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
+		ginkgo.By("Accessing service through the external ip and examine got no response from the node without tags")
 		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
@@ -244,12 +244,12 @@ func assertNotReachableHTTPTimeout(ip, path string, port int, timeout time.Durat
 	}
 }
 
-// testHitNodesFromOutside checkes HTTP connectivity from outside.
+// testHitNodesFromOutside checks HTTP connectivity from outside.
 func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
 	return testHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
 }
 
-// testHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
+// testHitNodesFromOutsideWithCount checks HTTP connectivity from outside with count.
 func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
 	countToSucceed int) error {
 	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)

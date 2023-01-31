@@ -105,6 +105,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 		options.CfgPath,
 		options.KubeconfigDir,
 		options.KubernetesVersion,
+		options.DryRun,
 	}
 	if name == "all" || name == kubeadmconstants.KubeletKubeConfigFileName {
 		flags = append(flags,

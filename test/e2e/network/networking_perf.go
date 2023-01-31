@@ -33,6 +33,7 @@ import (
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -234,7 +235,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			podName := pod.Name
 			nodeName := pod.Spec.NodeName
 
-			iperfVersion := f.ExecShellInPod(podName, "iperf -v || true")
+			iperfVersion := e2epod.ExecShellInPod(f, podName, "iperf -v || true")
 			framework.Logf("iperf version: %s", iperfVersion)
 
 			for try := 0; ; try++ {
@@ -247,7 +248,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 				 */
 				command := fmt.Sprintf(`iperf %s -e -p %d --reportstyle C -i 1 -c %s && sleep 5`, familyStr, iperf2Port, serverServiceName)
 				framework.Logf("attempting to run command '%s' in client pod %s (node %s)", command, podName, nodeName)
-				output := f.ExecShellInPod(podName, command)
+				output := e2epod.ExecShellInPod(f, podName, command)
 				framework.Logf("output from exec on client pod %s (node %s): \n%s\n", podName, nodeName, output)
 
 				results, err := ParseIPerf2EnhancedResultsFromCSV(output)

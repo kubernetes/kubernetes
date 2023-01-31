@@ -281,6 +281,9 @@ func (c *AvailableConditionController) sync(key string) error {
 		Transport: restTransport,
 		// the request should happen quickly.
 		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	apiService := originalAPIService.DeepCopy()

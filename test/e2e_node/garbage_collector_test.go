@@ -28,6 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -154,7 +155,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		// Initialize the getContainerNames function to use CRI runtime client.
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+			containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 				LabelSelector: map[string]string{
 					types.KubernetesPodNameLabel:      pod.podName,
 					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
@@ -173,7 +174,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	ginkgo.Context(fmt.Sprintf("Garbage Collection Test: %s", test.testName), func() {
 		ginkgo.BeforeEach(func() {
 			realPods := getPods(test.testPods)
-			f.PodClient().CreateBatch(realPods)
+			e2epod.NewPodClient(f).CreateBatch(realPods)
 			ginkgo.By("Making sure all containers restart the specified number of times")
 			gomega.Eventually(func() error {
 				for _, podSpec := range test.testPods {
@@ -248,7 +249,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func() {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				e2epod.NewPodClient(f).DeleteSync(pod.podName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")

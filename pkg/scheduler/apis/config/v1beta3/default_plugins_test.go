@@ -24,6 +24,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta3"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -59,6 +60,39 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
 						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
+		{
+			name: "Feature gate PodSchedulingReadiness enabled",
+			features: map[featuregate.Feature]bool{
+				features.PodSchedulingReadiness: true,
+			},
+			wantConfig: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.EBSLimits},
+						{Name: names.GCEPDLimits},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.AzureDiskLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.DefaultBinder},
+						{Name: names.SchedulingGates},
 					},
 				},
 			},
@@ -240,8 +274,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -257,9 +291,9 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
 						{Name: "Plugin2"},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -269,8 +303,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
 					},
 				},
 			},
@@ -286,8 +320,8 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
 					},
 				},
@@ -299,9 +333,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 					},
 				},
 			},
@@ -318,9 +352,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 					},
 				},
 			},

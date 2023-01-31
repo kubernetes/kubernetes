@@ -22,9 +22,7 @@ import (
 	"math/big"
 	"net"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	netutils "k8s.io/utils/net"
 )
@@ -124,10 +122,7 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory)
 		metrics: &emptyMetricsRecorder{}, // disabled by default
 	}
 
-	offset := 0
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceIPStaticSubrange) {
-		offset = calculateRangeOffset(cidr)
-	}
+	offset := calculateRangeOffset(cidr)
 
 	var err error
 	r.alloc, err = allocatorFactory(r.max, rangeSpec, offset)

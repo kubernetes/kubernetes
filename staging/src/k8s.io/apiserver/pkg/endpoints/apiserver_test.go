@@ -254,7 +254,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -266,7 +266,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -278,7 +278,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -290,6 +290,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
 	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
+	handler = genericapifilters.WithAuditInit(handler)
 
 	return &defaultAPIServer{handler, container}
 }
@@ -405,8 +406,8 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+func (s *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (s *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
@@ -3223,7 +3224,7 @@ func TestCreateNotFound(t *testing.T) {
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
-			// See http://pr.k8s.io/486#discussion_r15037092.
+			// See https://pr.k8s.io/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 		},
 	})
@@ -3310,7 +3311,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if _, err := group.InstallREST(container); err == nil {
+	if _, _, err := group.InstallREST(container); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -3342,7 +3343,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if _, err := group.InstallREST(container); err != nil {
+	if _, _, err := group.InstallREST(container); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3820,7 +3821,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"}, false)
 	}))
 	defer server.Close()
 	// Decode error response behavior is dictated by
@@ -3999,16 +4000,6 @@ func runRequest(t testing.TB, path, verb string, data []byte, contentType string
 		t.Fatalf("unexpected error: %v", err)
 	}
 	return response
-}
-
-// encodeOrFatal is used by TestDryRun to parse an object and stop right
-// away if it fails.
-func encodeOrFatal(t *testing.T, obj runtime.Object) []byte {
-	data, err := runtime.Encode(testCodec, obj)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	return data
 }
 
 type SimpleRESTStorageWithDeleteCollection struct {
@@ -4272,57 +4263,6 @@ other: bar`)
 	}
 }
 
-func TestDryRunDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
-
-	tests := []struct {
-		path        string
-		verb        string
-		data        []byte
-		contentType string
-	}{
-		{path: "/namespaces/default/simples", verb: "POST", data: encodeOrFatal(t, &genericapitesting.Simple{Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PUT", data: encodeOrFatal(t, &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "id"}, Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8"},
-		{path: "/namespaces/default/simples/id", verb: "DELETE"},
-		{path: "/namespaces/default/simples", verb: "DELETE"},
-		{path: "/namespaces/default/simples/id/subsimple", verb: "DELETE"},
-	}
-
-	server := httptest.NewServer(handle(map[string]rest.Storage{
-		"simples": &SimpleRESTStorageWithDeleteCollection{
-			SimpleRESTStorage{
-				item: genericapitesting.Simple{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "id",
-						Namespace: "",
-						UID:       "uid",
-					},
-					Other: "bar",
-				},
-			},
-		},
-		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
-			item: genericapitesting.SimpleXGSubresource{
-				SubresourceInfo: "foo",
-			},
-			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
-		},
-	}))
-	defer server.Close()
-	for _, test := range tests {
-		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
-		if response.StatusCode == http.StatusBadRequest {
-			t.Fatalf("unexpected BadRequest: %#v", response)
-		}
-		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
-		if response.StatusCode != http.StatusBadRequest {
-			t.Fatalf("unexpected non BadRequest: %#v", response)
-		}
-	}
-}
-
 type SimpleXGSubresourceRESTStorage struct {
 	item    genericapitesting.SimpleXGSubresource
 	itemGVK schema.GroupVersionKind
@@ -4388,7 +4328,7 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if _, err := (&group).InstallREST(container); err != nil {
+	if _, _, err := (&group).InstallREST(container); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 

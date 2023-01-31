@@ -37,8 +37,13 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 	f := framework.NewDefaultFramework("csiinlinevolumes")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	// TODO: promote to framework.ConformanceIt
-	ginkgo.It("should support ephemeral VolumeLifecycleMode in CSIDriver API", func() {
+	/*
+		Release: v1.26
+		Testname: CSIInlineVolumes should support ephemeral CSIDrivers
+		Description: CSIDriver resources with ephemeral VolumeLifecycleMode
+		  should support create, get, list, and delete operations.
+	*/
+	framework.ConformanceIt("should support ephemeral VolumeLifecycleMode in CSIDriver API", func() {
 		// Create client
 		client := f.ClientSet.StorageV1().CSIDrivers()
 		defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
@@ -117,8 +122,13 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		}
 	})
 
-	// TODO: promote to framework.ConformanceIt
-	ginkgo.It("should support CSIVolumeSource in Pod API", func() {
+	/*
+		Release: v1.26
+		Testname: CSIInlineVolumes should support Pods with inline volumes
+		Description: Pod resources with CSIVolumeSource should support
+		  create, get, list, patch, and delete operations.
+	*/
+	framework.ConformanceIt("should support CSIVolumeSource in Pod API", func() {
 		// Create client
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
@@ -199,13 +209,6 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		patchedPod, err := client.Patch(context.TODO(), createdPod.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(patchedPod.Annotations["patched"], "true", "patched object should have the applied annotation")
-
-		ginkgo.By("updating")
-		podToUpdate := patchedPod.DeepCopy()
-		podToUpdate.Annotations["updated"] = "true"
-		updatedPod, err := client.Update(context.TODO(), podToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedPod.Annotations["updated"], "true", "updated object should have the applied annotation")
 
 		ginkgo.By("deleting")
 		err = client.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})

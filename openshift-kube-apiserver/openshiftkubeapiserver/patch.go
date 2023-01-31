@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managementcpusoverride"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
-	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
+	"k8s.io/kubernetes/openshift-kube-apiserver/filters/apirequestcount"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 
 	// magnet to get authorizer package in hack/update-vendor.sh
@@ -87,19 +87,19 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	// END ADMISSION
 
 	// HANDLER CHAIN (with oauth server and web console)
-	deprecatedAPIClient, err := apiclientv1.NewForConfig(makeJSONRESTConfig(genericConfig.LoopbackClientConfig))
+	apiserverClient, err := apiclientv1.NewForConfig(makeJSONRESTConfig(genericConfig.LoopbackClientConfig))
 	if err != nil {
 		return err
 	}
-	deprecatedAPIRequestController := deprecatedapirequest.NewController(deprecatedAPIClient.APIRequestCounts(), nodeFor())
-	genericConfig.AddPostStartHook("openshift.io-deprecated-api-requests-filter", func(context genericapiserver.PostStartHookContext) error {
-		go deprecatedAPIRequestController.Start(context.StopCh)
+	apiRequestCountController := apirequestcount.NewController(apiserverClient.APIRequestCounts(), nodeFor())
+	genericConfig.AddPostStartHook("openshift.io-api-request-count-filter", func(context genericapiserver.PostStartHookContext) error {
+		go apiRequestCountController.Start(context.StopCh)
 		return nil
 	})
 	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(
 		enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile,
 		kubeInformers.Core().V1().ConfigMaps(),
-		deprecatedAPIRequestController,
+		apiRequestCountController,
 	)
 	if err != nil {
 		return err

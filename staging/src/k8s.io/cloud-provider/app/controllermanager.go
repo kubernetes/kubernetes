@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -46,7 +47,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -58,6 +61,10 @@ import (
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
 )
+
+func init() {
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// ControllerStartJitter is the jitter value used when starting controller managers.
@@ -168,6 +175,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// Start the controller manager HTTP server
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+		}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -460,6 +470,7 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
+	controllersmetrics.Register()
 	return ctx, nil
 }
 

@@ -497,29 +497,54 @@ type PersistentVolumeClaimSpec struct {
 	// * An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
-	// If the AnyVolumeDataSource feature gate is enabled, this field will always have
-	// the same contents as the DataSourceRef field.
+	// When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
+	// and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+	// If the namespace is specified, then dataSourceRef will not be copied to dataSource.
 	// +optional
 	DataSource *TypedLocalObjectReference `json:"dataSource,omitempty" protobuf:"bytes,7,opt,name=dataSource"`
 	// dataSourceRef specifies the object from which to populate the volume with data, if a non-empty
-	// volume is desired. This may be any local object from a non-empty API group (non
+	// volume is desired. This may be any object from a non-empty API group (non
 	// core object) or a PersistentVolumeClaim object.
 	// When this field is specified, volume binding will only succeed if the type of
 	// the specified object matches some installed volume populator or dynamic
 	// provisioner.
-	// This field will replace the functionality of the DataSource field and as such
+	// This field will replace the functionality of the dataSource field and as such
 	// if both fields are non-empty, they must have the same value. For backwards
-	// compatibility, both fields (DataSource and DataSourceRef) will be set to the same
+	// compatibility, when namespace isn't specified in dataSourceRef,
+	// both fields (dataSource and dataSourceRef) will be set to the same
 	// value automatically if one of them is empty and the other is non-empty.
-	// There are two important differences between DataSource and DataSourceRef:
-	// * While DataSource only allows two specific types of objects, DataSourceRef
+	// When namespace is specified in dataSourceRef,
+	// dataSource isn't set to the same value and must be empty.
+	// There are three important differences between dataSource and dataSourceRef:
+	// * While dataSource only allows two specific types of objects, dataSourceRef
 	//   allows any non-core object, as well as PersistentVolumeClaim objects.
-	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
+	// * While dataSource ignores disallowed values (dropping them), dataSourceRef
 	//   preserves all values, and generates an error if a disallowed value is
 	//   specified.
+	// * While dataSource only allows local objects, dataSourceRef allows objects
+	//   in any namespaces.
 	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
+	DataSourceRef *TypedObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
+}
+
+type TypedObjectReference struct {
+	// APIGroup is the group for the resource being referenced.
+	// If APIGroup is not specified, the specified Kind must be in the core API group.
+	// For any other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Kind is the type of resource being referenced
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Name is the name of resource being referenced
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
+	// Namespace is the namespace of resource being referenced
+	// Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
+	// (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+	// +featureGate=CrossNamespaceVolumeDataSource
+	// +optional
+	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
@@ -1663,7 +1688,7 @@ type ServiceAccountTokenProjection struct {
 	// must identify itself with an identifier specified in the audience of the
 	// token, and otherwise should reject the token. The audience defaults to the
 	// identifier of the apiserver.
-	//+optional
+	// +optional
 	Audience string `json:"audience,omitempty" protobuf:"bytes,1,rep,name=audience"`
 	// expirationSeconds is the requested duration of validity of the service
 	// account token. As the token approaches expiration, the kubelet volume
@@ -1671,7 +1696,7 @@ type ServiceAccountTokenProjection struct {
 	// start trying to rotate the token if the token is older than 80 percent of
 	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
 	// and must be at least 10 minutes.
-	//+optional
+	// +optional
 	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
 	// path is the path relative to the mount point of the file to project the
 	// token into.
@@ -2289,6 +2314,26 @@ type ResourceRequirements struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+	// Claims lists the names of resources, defined in spec.resourceClaims,
+	// that are used by this container.
+	//
+	// This is an alpha field and requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// This field is immutable.
+	//
+	// +listType=set
+	// +featureGate=DynamicResourceAllocation
+	// +optional
+	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
+}
+
+// ResourceClaim references one entry in PodSpec.ResourceClaims.
+type ResourceClaim struct {
+	// Name must match the name of one entry in pod.spec.resourceClaims of
+	// the Pod where this field is used. It makes that resource available
+	// inside a container.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 const (
@@ -2654,10 +2699,9 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodScheduled represents status of the scheduling process for this pod.
 	PodScheduled PodConditionType = "PodScheduled"
-	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
-	// The constant is to be renamed once the name is accepted within the KEP-3329.
-	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
+	DisruptionTarget PodConditionType = "DisruptionTarget"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -2665,6 +2709,18 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+
+	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
+	// skips scheduling the pod because one or more scheduling gates are still present.
+	PodReasonSchedulingGated = "SchedulingGated"
+
+	// PodReasonSchedulerError reason in PodScheduled PodCondition means that some internal error happens
+	// during scheduling, for example due to nodeAffinity parsing errors.
+	PodReasonSchedulerError = "SchedulerError"
+
+	// TerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
+	// is initiated by kubelet
+	PodReasonTerminationByKubelet = "TerminationByKubelet"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -2739,7 +2795,7 @@ const (
 // by the node selector terms.
 // +structType=atomic
 type NodeSelector struct {
-	//Required. A list of node selector terms. The terms are ORed.
+	// Required. A list of node selector terms. The terms are ORed.
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
@@ -3311,6 +3367,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+
 	// Use the host's user namespace.
 	// Optional: Default to true.
 	// If set to true or not present, the pod will be run in the host user namespace, useful
@@ -3323,6 +3380,76 @@ type PodSpec struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
+
+	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
+	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	//
+	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
+	// ResourceClaims defines which ResourceClaims must be allocated
+	// and reserved before the Pod is allowed to start. The resources
+	// will be made available to those containers which consume them
+	// by name.
+	//
+	// This is an alpha field and requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// This field is immutable.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DynamicResourceAllocation
+	// +optional
+	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
+}
+
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
+// Containers that need access to the ResourceClaim reference it with this name.
+type PodResourceClaim struct {
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must be a DNS_LABEL.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Source describes where to find the ResourceClaim.
+	Source ClaimSource `json:"source,omitempty" protobuf:"bytes,2,name=source"`
+}
+
+// ClaimSource describes a reference to a ResourceClaim.
+//
+// Exactly one of these fields should be set.  Consumers of this type must
+// treat an empty object as if it has an unknown value.
+type ClaimSource struct {
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace as this pod.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,1,opt,name=resourceClaimName"`
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace as this pod.
+	//
+	// The template will be used to create a new ResourceClaim, which will
+	// be bound to this pod. When this pod is deleted, the ResourceClaim
+	// will also be deleted. The name of the ResourceClaim will be <pod
+	// name>-<resource name>, where <resource name> is the
+	// PodResourceClaim.Name. Pod validation will reject the pod if the
+	// concatenated name is not valid for a ResourceClaim (e.g. too long).
+	//
+	// An existing ResourceClaim with that name that is not owned by the
+	// pod will not be used for the pod to avoid using an unrelated
+	// resource by mistake. Scheduling and pod startup are then blocked
+	// until the unrelated ResourceClaim is removed.
+	//
+	// This field is immutable and no changes will be made to the
+	// corresponding ResourceClaim by the control plane after creating the
+	// ResourceClaim.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -3341,6 +3468,13 @@ type PodOS struct {
 	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
 	Name OSName `json:"name" protobuf:"bytes,1,opt,name=name"`
+}
+
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
+type PodSchedulingGate struct {
+	// Name of the scheduling gate.
+	// Each scheduling gate must have a unique name field.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // +enum
@@ -3459,7 +3593,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 	//
 	// If this value is nil, the behavior is equivalent to the Honor policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeAffinityPolicy *NodeInclusionPolicy `json:"nodeAffinityPolicy,omitempty" protobuf:"bytes,6,opt,name=nodeAffinityPolicy"`
 	// NodeTaintsPolicy indicates how we will treat node taints when calculating
@@ -3469,7 +3603,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: node taints are ignored. All nodes are included.
 	//
 	// If this value is nil, the behavior is equivalent to the Ignore policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy `json:"nodeTaintsPolicy,omitempty" protobuf:"bytes,7,opt,name=nodeTaintsPolicy"`
 	// MatchLabelKeys is a set of pod label keys to select the pods over which
@@ -3557,8 +3691,11 @@ type PodSecurityContext struct {
 	// +optional
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty" protobuf:"varint,3,opt,name=runAsNonRoot"`
 	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added to
-	// any container.
+	// to the container's primary GID, the fsGroup (if specified), and group memberships
+	// defined in the container image for the uid of the container process. If unspecified,
+	// no additional groups are added to any container. Note that group memberships
+	// defined in the container image for the uid of the container process are still effective,
+	// even if they are not included in this list.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
@@ -4079,7 +4216,7 @@ type ReplicationControllerSpec struct {
 // ReplicationControllerStatus represents the current status of a replication
 // controller.
 type ReplicationControllerStatus struct {
-	// Replicas is the most recently oberved number of replicas.
+	// Replicas is the most recently observed number of replicas.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
@@ -4522,7 +4659,7 @@ type ServiceSpec struct {
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
 
 	// TopologyKeys is tombstoned to show why 16 is reserved protobuf tag.
-	//TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
+	// TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
 
 	// IPFamily is tombstoned to show why 15 is a reserved protobuf tag.
 	// IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`
@@ -4578,7 +4715,6 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
 	// +optional
 	LoadBalancerClass *string `json:"loadBalancerClass,omitempty" protobuf:"bytes,21,opt,name=loadBalancerClass"`
 
@@ -4588,7 +4724,6 @@ type ServiceSpec struct {
 	// dropping the traffic if there are no local endpoints. The default value,
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
-	// +featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
 }
@@ -4895,7 +5030,7 @@ type NodeSpec struct {
 	// +optional
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
 
-	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.
+	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
 	// +optional
 	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
 
@@ -5069,7 +5204,7 @@ type NodeStatus struct {
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
 	// Note: This field is declared as mergeable, but the merge key is not sufficiently
 	// unique, which can cause data corruption when it is merged. Callers should instead
-	// use a full-replacement patch. See http://pr.k8s.io/79391 for an example.
+	// use a full-replacement patch. See https://pr.k8s.io/79391 for an example.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge

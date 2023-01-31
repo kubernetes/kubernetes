@@ -21,7 +21,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// LoadAvg represents an entry in /proc/loadavg
+// LoadAvg represents an entry in /proc/loadavg.
 type LoadAvg struct {
 	Load1  float64
 	Load5  float64

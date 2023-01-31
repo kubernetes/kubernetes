@@ -16,7 +16,7 @@ package procfs
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -82,7 +82,7 @@ func (fs FS) Self() (Proc, error) {
 
 // NewProc returns a process for the given pid.
 //
-// Deprecated: use fs.Proc() instead
+// Deprecated: Use fs.Proc() instead.
 func (fs FS) NewProc(pid int) (Proc, error) {
 	return fs.Proc(pid)
 }
@@ -142,7 +142,7 @@ func (p Proc) Wchan() (string, error) {
 	}
 	defer f.Close()
 
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}
@@ -185,7 +185,7 @@ func (p Proc) Cwd() (string, error) {
 	return wd, err
 }
 
-// RootDir returns the absolute path to the process's root directory (as set by chroot)
+// RootDir returns the absolute path to the process's root directory (as set by chroot).
 func (p Proc) RootDir() (string, error) {
 	rdir, err := os.Readlink(p.path("root"))
 	if os.IsNotExist(err) {
@@ -311,7 +311,7 @@ func (p Proc) FileDescriptorsInfo() (ProcFDInfos, error) {
 
 // Schedstat returns task scheduling information for the process.
 func (p Proc) Schedstat() (ProcSchedstat, error) {
-	contents, err := ioutil.ReadFile(p.path("schedstat"))
+	contents, err := os.ReadFile(p.path("schedstat"))
 	if err != nil {
 		return ProcSchedstat{}, err
 	}

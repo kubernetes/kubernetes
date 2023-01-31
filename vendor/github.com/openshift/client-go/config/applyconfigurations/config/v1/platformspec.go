@@ -16,7 +16,7 @@ type PlatformSpecApplyConfiguration struct {
 	BareMetal    *v1.BareMetalPlatformSpec              `json:"baremetal,omitempty"`
 	OpenStack    *v1.OpenStackPlatformSpec              `json:"openstack,omitempty"`
 	Ovirt        *v1.OvirtPlatformSpec                  `json:"ovirt,omitempty"`
-	VSphere      *v1.VSpherePlatformSpec                `json:"vsphere,omitempty"`
+	VSphere      *VSpherePlatformSpecApplyConfiguration `json:"vsphere,omitempty"`
 	IBMCloud     *v1.IBMCloudPlatformSpec               `json:"ibmcloud,omitempty"`
 	Kubevirt     *v1.KubevirtPlatformSpec               `json:"kubevirt,omitempty"`
 	EquinixMetal *v1.EquinixMetalPlatformSpec           `json:"equinixMetal,omitempty"`
@@ -90,8 +90,8 @@ func (b *PlatformSpecApplyConfiguration) WithOvirt(value v1.OvirtPlatformSpec) *
 // WithVSphere sets the VSphere field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VSphere field is set to the value of the last call.
-func (b *PlatformSpecApplyConfiguration) WithVSphere(value v1.VSpherePlatformSpec) *PlatformSpecApplyConfiguration {
-	b.VSphere = &value
+func (b *PlatformSpecApplyConfiguration) WithVSphere(value *VSpherePlatformSpecApplyConfiguration) *PlatformSpecApplyConfiguration {
+	b.VSphere = value
 	return b
 }
 

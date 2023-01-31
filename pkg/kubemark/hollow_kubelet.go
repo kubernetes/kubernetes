@@ -36,6 +36,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/git_repo"
-	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
@@ -73,7 +73,6 @@ func volumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cephfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
@@ -96,21 +95,22 @@ func NewHollowKubelet(
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
 	d := &kubelet.Dependencies{
-		KubeClient:           client,
-		HeartbeatClient:      heartbeatClient,
-		ProbeManager:         probetest.FakeManager{},
-		RemoteRuntimeService: runtimeService,
-		RemoteImageService:   imageService,
-		CAdvisorInterface:    cadvisorInterface,
-		Cloud:                nil,
-		OSInterface:          &containertest.FakeOS{},
-		ContainerManager:     containerManager,
-		VolumePlugins:        volumePlugins(),
-		TLSOptions:           nil,
-		OOMAdjuster:          oom.NewFakeOOMAdjuster(),
-		Mounter:              &mount.FakeMounter{},
-		Subpather:            &subpath.FakeSubpath{},
-		HostUtil:             hostutil.NewFakeHostUtil(nil),
+		KubeClient:               client,
+		HeartbeatClient:          heartbeatClient,
+		ProbeManager:             probetest.FakeManager{},
+		RemoteRuntimeService:     runtimeService,
+		RemoteImageService:       imageService,
+		CAdvisorInterface:        cadvisorInterface,
+		Cloud:                    nil,
+		OSInterface:              &containertest.FakeOS{},
+		ContainerManager:         containerManager,
+		VolumePlugins:            volumePlugins(),
+		TLSOptions:               nil,
+		OOMAdjuster:              oom.NewFakeOOMAdjuster(),
+		Mounter:                  &mount.FakeMounter{},
+		Subpather:                &subpath.FakeSubpath{},
+		HostUtil:                 hostutil.NewFakeHostUtil(nil),
+		PodStartupLatencyTracker: kubeletutil.NewPodStartupLatencyTracker(),
 	}
 
 	return &HollowKubelet{

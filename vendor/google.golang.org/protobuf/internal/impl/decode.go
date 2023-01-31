@@ -12,9 +12,8 @@ import (
 	"google.golang.org/protobuf/internal/flags"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	preg "google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/runtime/protoiface"
-	piface "google.golang.org/protobuf/runtime/protoiface"
 )
 
 var errDecode = errors.New("cannot parse invalid wire-format data")
@@ -38,14 +37,16 @@ func (o unmarshalOptions) Options() proto.UnmarshalOptions {
 	}
 }
 
-func (o unmarshalOptions) DiscardUnknown() bool { return o.flags&piface.UnmarshalDiscardUnknown != 0 }
+func (o unmarshalOptions) DiscardUnknown() bool {
+	return o.flags&protoiface.UnmarshalDiscardUnknown != 0
+}
 
 func (o unmarshalOptions) IsDefault() bool {
-	return o.flags == 0 && o.resolver == preg.GlobalTypes
+	return o.flags == 0 && o.resolver == protoregistry.GlobalTypes
 }
 
 var lazyUnmarshalOptions = unmarshalOptions{
-	resolver: preg.GlobalTypes,
+	resolver: protoregistry.GlobalTypes,
 	depth:    protowire.DefaultRecursionLimit,
 }
 
@@ -55,7 +56,7 @@ type unmarshalOutput struct {
 }
 
 // unmarshal is protoreflect.Methods.Unmarshal.
-func (mi *MessageInfo) unmarshal(in piface.UnmarshalInput) (piface.UnmarshalOutput, error) {
+func (mi *MessageInfo) unmarshal(in protoiface.UnmarshalInput) (protoiface.UnmarshalOutput, error) {
 	var p pointer
 	if ms, ok := in.Message.(*messageState); ok {
 		p = ms.pointer()
@@ -67,11 +68,11 @@ func (mi *MessageInfo) unmarshal(in piface.UnmarshalInput) (piface.UnmarshalOutp
 		resolver: in.Resolver,
 		depth:    in.Depth,
 	})
-	var flags piface.UnmarshalOutputFlags
+	var flags protoiface.UnmarshalOutputFlags
 	if out.initialized {
-		flags |= piface.UnmarshalInitialized
+		flags |= protoiface.UnmarshalInitialized
 	}
-	return piface.UnmarshalOutput{
+	return protoiface.UnmarshalOutput{
 		Flags: flags,
 	}, err
 }
@@ -210,7 +211,7 @@ func (mi *MessageInfo) unmarshalExtension(b []byte, num protowire.Number, wtyp p
 		var err error
 		xt, err = opts.resolver.FindExtensionByNumber(mi.Desc.FullName(), num)
 		if err != nil {
-			if err == preg.NotFound {
+			if err == protoregistry.NotFound {
 				return out, errUnknown
 			}
 			return out, errors.New("%v: unable to resolve extension %v: %v", mi.Desc.FullName(), num, err)

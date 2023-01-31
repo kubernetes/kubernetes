@@ -128,18 +128,17 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		driverInfo = driver.GetDriverInfo()
 		snapshottableDriver, _ = driver.(storageframework.SnapshottableTestDriver)
 		cs = f.ClientSet
-		config, driverCleanup := driver.PrepareTest(f)
+		config := driver.PrepareTest(f)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		stressTest = &snapshottableStressTest{
-			config:        config,
-			driverCleanup: driverCleanup,
-			volumes:       []*storageframework.VolumeResource{},
-			snapshots:     []*storageframework.SnapshotResource{},
-			pods:          []*v1.Pod{},
-			testOptions:   *driverInfo.VolumeSnapshotStressTestOptions,
-			ctx:           ctx,
-			cancel:        cancel,
+			config:      config,
+			volumes:     []*storageframework.VolumeResource{},
+			snapshots:   []*storageframework.SnapshotResource{},
+			pods:        []*v1.Pod{},
+			testOptions: *driverInfo.VolumeSnapshotStressTestOptions,
+			ctx:         ctx,
+			cancel:      cancel,
 		}
 	}
 
@@ -248,12 +247,8 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 
 	ginkgo.BeforeEach(func() {
 		init()
+		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes()
-	})
-
-	// See #96177, this is necessary for cleaning up resources when tests are interrupted.
-	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
-		cleanup()
 	})
 
 	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", func() {

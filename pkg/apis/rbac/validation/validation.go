@@ -55,7 +55,11 @@ func ValidateRoleUpdate(role *rbac.Role, oldRole *rbac.Role) field.ErrorList {
 	return allErrs
 }
 
-func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
+type ClusterRoleValidationOptions struct {
+	AllowInvalidLabelValueInSelector bool
+}
+
+func ValidateClusterRole(role *rbac.ClusterRole, opts ClusterRoleValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
 
@@ -65,13 +69,15 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 		}
 	}
 
+	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
+
 	if role.AggregationRule != nil {
 		if len(role.AggregationRule.ClusterRoleSelectors) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("aggregationRule", "clusterRoleSelectors"), "at least one clusterRoleSelector required if aggregationRule is non-nil"))
 		}
 		for i, selector := range role.AggregationRule.ClusterRoleSelectors {
 			fieldPath := field.NewPath("aggregationRule", "clusterRoleSelectors").Index(i)
-			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, fieldPath)...)
+			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, labelSelectorValidationOptions, fieldPath)...)
 
 			selector, err := metav1.LabelSelectorAsSelector(&selector)
 			if err != nil {
@@ -86,8 +92,8 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	return nil
 }
 
-func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole) field.ErrorList {
-	allErrs := ValidateClusterRole(role)
+func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole, opts ClusterRoleValidationOptions) field.ErrorList {
+	allErrs := ValidateClusterRole(role, opts)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&role.ObjectMeta, &oldRole.ObjectMeta, field.NewPath("metadata"))...)
 
 	return allErrs

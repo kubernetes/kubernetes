@@ -257,10 +257,12 @@ func ListUsersInConfig(toComplete string) []string {
 }
 
 // compGetResourceList returns the list of api resources which begin with `toComplete`.
-func compGetResourceList(f cmdutil.Factory, cmd *cobra.Command, toComplete string) []string {
+func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string) []string {
 	buf := new(bytes.Buffer)
 	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
+
+	o.Complete(restClientGetter, cmd, nil)
 
 	// Get the list of resources
 	o.Output = "name"
@@ -269,7 +271,7 @@ func compGetResourceList(f cmdutil.Factory, cmd *cobra.Command, toComplete strin
 	// TODO:Should set --request-timeout=5s
 
 	// Ignore errors as the output may still be valid
-	o.RunAPIResources(cmd, f)
+	o.RunAPIResources()
 
 	// Resources can be a comma-separated list.  The last element is then
 	// the one we should complete.  For example if toComplete=="pods,secre"

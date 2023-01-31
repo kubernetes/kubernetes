@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,6 +64,8 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -122,6 +125,12 @@ type portsByPodName map[string][]int
 // portsByPodUID is a map that maps pod name to container ports.
 type portsByPodUID map[types.UID][]int
 
+// fullPortsByPodName is a map that maps pod name to container ports including their protocols.
+type fullPortsByPodName map[string][]v1.ContainerPort
+
+// fullPortsByPodUID is a map that maps pod name to container ports.
+type fullPortsByPodUID map[types.UID][]v1.ContainerPort
+
 // affinityCheckFromPod returns interval, timeout and function pinging the service and
 // returning pinged hosts for pinging the service from execPod.
 func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (time.Duration, time.Duration, func() []string) {
@@ -133,7 +142,7 @@ func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (t
 	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	getHosts := func() []string {
-		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
 			return nil
@@ -316,7 +325,7 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 }
 
 // verifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the
-// the host exec pod of host network type and from the exec pod of container network type.
+// host exec pod of host network type and from the exec pod of container network type.
 // Each pod in the service is expected to echo its name. These names are compared with the
 // given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods []string, serviceIP string, servicePort int) error {
@@ -342,7 +351,7 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 			50*len(expectedPods), wgetCmd, serviceIPPort)
 		framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, podName)
 		// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-		output, err := framework.RunHostCmd(ns, podName, cmd)
+		output, err := e2eoutput.RunHostCmd(ns, podName, cmd)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, podName, err, output)
 		}
@@ -405,7 +414,7 @@ func verifyServeHostnameServiceDown(c clientset.Interface, ns string, serviceIP 
 		"curl -g -s --connect-timeout 2 http://%s && echo service-down-failed", ipPort)
 
 	for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
-		output, err := framework.RunHostCmd(ns, hostExecPod.Name, command)
+		output, err := e2eoutput.RunHostCmd(ns, hostExecPod.Name, command)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", command, ns, hostExecPod.Name, err, output)
 		}
@@ -753,22 +762,9 @@ var _ = common.SIGDescribe("Services", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
-	serviceLBNames := []string{}
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-	})
-
-	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentSpecReport().Failed() {
-			DescribeSvc(f.Namespace.Name)
-		}
-		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning load balancer resource for %s", lb)
-			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
-		}
-		//reset serviceLBNames
-		serviceLBNames = []string{}
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -1173,6 +1169,44 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying service " + svc3 + " is up")
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames3, svc3IP, servicePort))
+	})
+
+	ginkgo.It("should work after the service has been recreated", func() {
+		serviceName := "service-deletion"
+		ns := f.Namespace.Name
+		numPods, servicePort := 1, defaultServeHostnameServicePort
+
+		ginkgo.By("creating the service " + serviceName + " in namespace " + ns)
+		defer func() {
+			framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, serviceName))
+		}()
+		podNames, svcIP, _ := StartServeHostnameService(cs, getServeHostnameService(serviceName), ns, numPods)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svcIP, servicePort))
+
+		ginkgo.By("deleting the service " + serviceName + " in namespace " + ns)
+		err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the service " + serviceName + " in namespace " + ns + " to disappear")
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.RespondingTimeout, func() (bool, error) {
+			_, err := cs.CoreV1().Services(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.Logf("Service %s/%s is gone.", ns, serviceName)
+					return true, nil
+				}
+				return false, err
+			}
+			framework.Logf("Service %s/%s still exists", ns, serviceName)
+			return false, nil
+		}); pollErr != nil {
+			framework.Failf("Failed to wait for service to disappear: %v", pollErr)
+		}
+
+		ginkgo.By("recreating the service " + serviceName + " in namespace " + ns)
+		svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), getServeHostnameService(serviceName), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
@@ -1723,7 +1757,7 @@ var _ = common.SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			stdout, err = e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
 				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 				return false, nil
@@ -1816,7 +1850,7 @@ var _ = common.SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -1839,7 +1873,7 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -1859,7 +1893,7 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -2114,7 +2148,7 @@ var _ = common.SIGDescribe("Services", func() {
 		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			if err != nil {
 				return true, nil
 			}
@@ -2130,15 +2164,15 @@ var _ = common.SIGDescribe("Services", func() {
 		// connect 3 times every 5 seconds to the Service and expect a failure
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
-			_, err = framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
-			_, err = framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
 
 			time.Sleep(5 * time.Second)
@@ -2160,17 +2194,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	/*
-		Release: v1.19
-		Testname: Service, ClusterIP type, session affinity to ClientIP with timeout
-		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set. Service creation MUST be successful by assigning "ClusterIP" to the service.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
-		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout expires.
-		After timeout, requests MUST be served from different pods of the replica.
-		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
-		[LinuxOnly]: Windows does not support session affinity.
-	*/
-	framework.ConformanceIt("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
@@ -2207,18 +2231,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	/*
-		Release: v1.19
-		Testname: Service, NodePort type, session affinity to ClientIP with timeout
-		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set.
-		Service creation MUST be successful by assigning a "ClusterIP" to service and allocating NodePort on all nodes.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
-		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout.
-		After timeout, requests MUST be served from different pods of the replica.
-		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
-		[LinuxOnly]: Windows does not support session affinity.
-	*/
-	framework.ConformanceIt("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
@@ -2371,7 +2384,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
@@ -2413,7 +2426,7 @@ var _ = common.SIGDescribe("Services", func() {
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
 		}
-		f.PodClient().Create(evictedPod)
+		e2epod.NewPodClient(f).Create(evictedPod)
 		err = e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, evictedPod.Name, "Evicted", f.Namespace.Name)
 		if err != nil {
 			framework.Failf("error waiting for pod to be evicted: %v", err)
@@ -2462,7 +2475,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v expected to be refused", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
@@ -2551,7 +2564,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2631,7 +2644,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2714,7 +2727,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 
@@ -2743,7 +2756,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2808,7 +2821,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
-			out, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
 				return false, err
 			}
@@ -2829,7 +2842,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// validate that the health check node port from kube-proxy returns 503 when there are no ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
-			out, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
 				return false, err
 			}
@@ -3011,7 +3024,7 @@ var _ = common.SIGDescribe("Services", func() {
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
 
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 
 			time.Sleep(5 * time.Second)
@@ -3187,7 +3200,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
 			// connections are neither internal nor external and always get Cluster traffic policy.
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
-			_, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
@@ -3711,11 +3724,82 @@ var _ = common.SIGDescribe("Services", func() {
 
 		framework.Logf("Collection of services has been deleted")
 	})
+	/*
+		Release: v1.26
+		Testname: Service, same ports with different protocols on a Load Balancer Service
+		Description: Create a LoadBalancer service with two ports that have the same value but use different protocols. Add a Pod that listens on both ports. The Pod must be reachable via the ClusterIP and both ports
+	*/
+	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func() {
+		serviceName := "multiprotocol-lb-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		svc1port := "svc1"
+		svc2port := "svc2"
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		svc, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "portname2",
+					Port:       80,
+					TargetPort: intstr.FromString(svc2port),
+					Protocol:   v1.ProtocolUDP,
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		containerPort := 100
+
+		names := map[string]bool{}
+		defer func() {
+			for name := range names {
+				err := cs.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
+			}
+		}()
+
+		containerPorts := []v1.ContainerPort{
+			{
+				Name:          svc1port,
+				ContainerPort: int32(containerPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          svc2port,
+				ContainerPort: int32(containerPort),
+				Protocol:      v1.ProtocolUDP,
+			},
+		}
+
+		podname1 := "pod1"
+
+		createPodOrFail(f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+
+		ginkgo.By("Checking if the Service forwards traffic to pods")
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+		e2epod.DeletePodOrFail(cs, ns, podname1)
+	})
 
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created and a short timeout will be configured so
 // session affinity must change after the timeout expirese.
 func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
@@ -3781,7 +3865,7 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	hosts := sets.NewString()
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
 	for i := 0; i < 10; i++ {
-		hostname, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		hostname, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err == nil {
 			hosts.Insert(hostname)
 			if hosts.Len() > 1 {
@@ -3814,7 +3898,7 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 }
 
 // execAffinityTestForNonLBServiceWithOptionalTransition is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created. If parameter isTransitionTest is true,
 // session affinity will be switched off/on and test if the service converges
 // to a stable affinity state.
@@ -3960,7 +4044,7 @@ func createPodOrFail(f *framework.Framework, ns, name string, labels map[string]
 	// Add a dummy environment variable to work around a docker issue.
 	// https://github.com/docker/docker/issues/14203
 	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
-	f.PodClient().CreateSync(pod)
+	e2epod.NewPodClient(f).CreateSync(pod)
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
@@ -3979,7 +4063,7 @@ func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
 			return false, nil
@@ -3998,11 +4082,11 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 func proxyMode(f *framework.Framework) (string, error) {
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
 	pod.Spec.HostNetwork = true
-	f.PodClient().CreateSync(pod)
-	defer f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+	e2epod.NewPodClient(f).CreateSync(pod)
+	defer e2epod.NewPodClient(f).DeleteSync(pod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	stdout, err := e2eoutput.RunHostCmd(pod.Namespace, pod.Name, cmd)
 	if err != nil {
 		return "", err
 	}
@@ -4120,7 +4204,7 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 		if err != nil {
 			return err
 		}
-		return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+		return e2eproviders.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 	}
 
 	return restartComponent(cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
@@ -4142,6 +4226,108 @@ func restartComponent(cs clientset.Interface, cName, ns string, matchLabels map[
 
 	_, err = e2epod.PodsCreatedByLabel(cs, ns, cName, int32(len(pods)), labels.SelectorFromSet(matchLabels))
 	return err
+}
+
+// validateEndpointsPortsWithProtocolsOrFail validates that the given service exists and is served by the given expectedEndpoints.
+func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints fullPortsByPodName) {
+	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
+	expectedPortsByPodUID, err := translatePortsByPodNameToPortsByPodUID(c, namespace, expectedEndpoints)
+	framework.ExpectNoError(err, "failed to translate pod name to UID, ns:%s, expectedEndpoints:%v", namespace, expectedEndpoints)
+
+	var (
+		pollErr error
+		i       = 0
+	)
+	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
+		i++
+
+		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Failed go get Endpoints object: %v", err)
+			// Retry the error
+			return false, nil
+		}
+		portsByUID := fullPortsByPodUID(e2eendpoints.GetFullContainerPortsByPodUID(ep))
+		if err := validatePortsAndProtocols(portsByUID, expectedPortsByPodUID); err != nil {
+			if i%5 == 0 {
+				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
+			}
+			return false, nil
+		}
+
+		// If EndpointSlice API is enabled, then validate if appropriate EndpointSlice objects
+		// were also create/updated/deleted.
+		if _, err := c.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String()); err == nil {
+			opts := metav1.ListOptions{
+				LabelSelector: "kubernetes.io/service-name=" + serviceName,
+			}
+			es, err := c.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), opts)
+			if err != nil {
+				framework.Logf("Failed go list EndpointSlice objects: %v", err)
+				// Retry the error
+				return false, nil
+			}
+			portsByUID = fullPortsByPodUID(e2eendpointslice.GetFullContainerPortsByPodUID(es.Items))
+			if err := validatePortsAndProtocols(portsByUID, expectedPortsByPodUID); err != nil {
+				if i%5 == 0 {
+					framework.Logf("Unexpected endpoint slices: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
+				}
+				return false, nil
+			}
+		}
+		framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v",
+			serviceName, namespace, expectedEndpoints)
+		return true, nil
+	}); pollErr != nil {
+		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
+			for _, pod := range pods.Items {
+				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			}
+		} else {
+			framework.Logf("Can't list pod debug info: %v", err)
+		}
+	}
+	framework.ExpectNoError(pollErr, "error waithing for service %s in namespace %s to expose endpoints %v: %v", serviceName, namespace, expectedEndpoints)
+}
+
+func translatePortsByPodNameToPortsByPodUID(c clientset.Interface, ns string, expectedEndpoints fullPortsByPodName) (fullPortsByPodUID, error) {
+	portsByUID := make(fullPortsByPodUID)
+	for name, portList := range expectedEndpoints {
+		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
+		}
+		portsByUID[pod.ObjectMeta.UID] = portList
+	}
+	return portsByUID, nil
+}
+
+func validatePortsAndProtocols(ep, expectedEndpoints fullPortsByPodUID) error {
+	if len(ep) != len(expectedEndpoints) {
+		// should not happen because we check this condition before
+		return fmt.Errorf("invalid number of endpoints got %v, expected %v", ep, expectedEndpoints)
+	}
+	for podUID := range expectedEndpoints {
+		if _, ok := ep[podUID]; !ok {
+			return fmt.Errorf("endpoint %v not found", podUID)
+		}
+		if len(ep[podUID]) != len(expectedEndpoints[podUID]) {
+			return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
+		}
+		var match bool
+		for _, epPort := range ep[podUID] {
+			match = false
+			for _, expectedPort := range expectedEndpoints[podUID] {
+				if epPort.ContainerPort == expectedPort.ContainerPort && epPort.Protocol == expectedPort.Protocol {
+					match = true
+				}
+			}
+			if !match {
+				return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
+			}
+		}
+	}
+	return nil
 }
 
 var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
@@ -4227,7 +4413,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		e2epod.SetNodeSelection(&podSpec.Spec, nodeSelection)
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
-		f.PodClient().CreateSync(podSpec)
+		e2epod.NewPodClient(f).CreateSync(podSpec)
 		defer func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)

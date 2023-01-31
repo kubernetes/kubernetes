@@ -21,9 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"text/template"
 
-	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -46,46 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-)
-
-var (
-	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-		Your Kubernetes control-plane has initialized successfully!
-
-		To start using your cluster, you need to run the following as a regular user:
-
-		  mkdir -p $HOME/.kube
-		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
-		  sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-		Alternatively, if you are the root user, you can run:
-
-		  export KUBECONFIG=/etc/kubernetes/admin.conf
-
-		You should now deploy a pod network to the cluster.
-		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
-		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
-
-		{{if .ControlPlaneEndpoint -}}
-		{{if .UploadCerts -}}
-		You can now join any number of the control-plane node running the following command on each as root:
-
-		  {{.joinControlPlaneCommand}}
-
-		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
-		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
-		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
-
-		{{else -}}
-		You can now join any number of control-plane nodes by copying certificate authorities
-		and service account keys on each node and then running the following as root:
-
-		  {{.joinControlPlaneCommand}}
-
-		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
-
-		{{.joinWorkerCommand}}
-		`)))
 )
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
@@ -151,11 +109,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			data := c.(*initData)
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
-			if err := initRunner.Run(args); err != nil {
-				return err
-			}
-
-			return showJoinCommand(data, out)
+			return initRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -191,6 +145,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
+	initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -564,40 +519,4 @@ func (d *initData) PatchesDir() string {
 		return d.cfg.Patches.Directory
 	}
 	return ""
-}
-
-func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
-	if err != nil {
-		return err
-	}
-
-	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(adminKubeConfigPath, token, i.skipTokenPrint)
-	if err != nil {
-		return err
-	}
-
-	ctx := map[string]interface{}{
-		"KubeConfigPath":          adminKubeConfigPath,
-		"ControlPlaneEndpoint":    i.Cfg().ControlPlaneEndpoint,
-		"UploadCerts":             i.uploadCerts,
-		"joinControlPlaneCommand": joinControlPlaneCommand,
-		"joinWorkerCommand":       joinWorkerCommand,
-	}
-
-	return initDoneTempl.Execute(out, ctx)
-}
-
-// showJoinCommand prints the join command after all the phases in init have finished
-func showJoinCommand(i *initData, out io.Writer) error {
-	adminKubeConfigPath := i.KubeConfigPath()
-
-	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range i.Tokens() {
-		if err := printJoinCommand(out, adminKubeConfigPath, token, i); err != nil {
-			return errors.Wrap(err, "failed to print join command")
-		}
-	}
-
-	return nil
 }

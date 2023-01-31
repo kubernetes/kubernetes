@@ -68,8 +68,9 @@ func UnHealthyTargetsTotal(target string) {
 // ReadyzProtocolRequestTotal increments the total number of requests issues by the health monitor that violate the "readyz" protocol
 //
 // the "readyz" protocol defines the following HTTP status code:
-//   HTTP 200 - when the server operates normally
-//   HTTP 500 - when the server is not ready, for example, is undergoing a shutdown
+//
+//	HTTP 200 - when the server operates normally
+//	HTTP 500 - when the server is not ready, for example, is undergoing a shutdown
 func ReadyzProtocolRequestTotal(code, target string) {
 	readyzViolationRequestTotal.WithLabelValues(code, target).Add(1)
 }

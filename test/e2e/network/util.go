@@ -29,7 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -73,7 +75,7 @@ func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, ho
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
+	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
 }
@@ -117,7 +119,7 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
 			continue
@@ -155,7 +157,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
 			continue

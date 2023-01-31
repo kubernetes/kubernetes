@@ -288,8 +288,6 @@ func (p *Parser) parseExactValue() (string, error) {
 // KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL
 // VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 64 character.
 // Delimiter is white space: (' ', '\t')
-//
-//
 func Parse(selector string) (map[string]string, error) {
 	p := &Parser{l: &Lexer{s: selector, pos: 0}}
 	labels, error := p.parse()

@@ -145,7 +145,7 @@ func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 			case string:
 				writeStringValue(b, true, value)
 			default:
-				writeStringValue(b, false, fmt.Sprintf("%+v", v))
+				writeStringValue(b, false, fmt.Sprintf("%+v", value))
 			}
 		case []byte:
 			// In https://github.com/kubernetes/klog/pull/237 it was decided

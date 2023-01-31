@@ -223,6 +223,30 @@ func (a *Assertions) ErrorAsf(err error, target interface{}, msg string, args ..
 	ErrorAsf(a.t, err, target, msg, args...)
 }
 
+// ErrorContains asserts that a function returned an error (i.e. not `nil`)
+// and that the error contains the specified substring.
+//
+//   actualObj, err := SomeFunction()
+//   a.ErrorContains(err,  expectedErrorSubString)
+func (a *Assertions) ErrorContains(theError error, contains string, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorContains(a.t, theError, contains, msgAndArgs...)
+}
+
+// ErrorContainsf asserts that a function returned an error (i.e. not `nil`)
+// and that the error contains the specified substring.
+//
+//   actualObj, err := SomeFunction()
+//   a.ErrorContainsf(err,  expectedErrorSubString, "error message %s", "formatted")
+func (a *Assertions) ErrorContainsf(theError error, contains string, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorContainsf(a.t, theError, contains, msg, args...)
+}
+
 // ErrorIs asserts that at least one of the errors in err's chain matches target.
 // This is a wrapper for errors.Is.
 func (a *Assertions) ErrorIs(err error, target error, msgAndArgs ...interface{}) {
@@ -1436,6 +1460,26 @@ func (a *Assertions) WithinDurationf(expected time.Time, actual time.Time, delta
 		h.Helper()
 	}
 	WithinDurationf(a.t, expected, actual, delta, msg, args...)
+}
+
+// WithinRange asserts that a time is within a time range (inclusive).
+//
+//   a.WithinRange(time.Now(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+func (a *Assertions) WithinRange(actual time.Time, start time.Time, end time.Time, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	WithinRange(a.t, actual, start, end, msgAndArgs...)
+}
+
+// WithinRangef asserts that a time is within a time range (inclusive).
+//
+//   a.WithinRangef(time.Now(), time.Now().Add(-time.Second), time.Now().Add(time.Second), "error message %s", "formatted")
+func (a *Assertions) WithinRangef(actual time.Time, start time.Time, end time.Time, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	WithinRangef(a.t, actual, start, end, msg, args...)
 }
 
 // YAMLEq asserts that two YAML strings are equivalent.

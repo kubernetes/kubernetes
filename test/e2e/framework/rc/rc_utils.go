@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -83,7 +83,7 @@ func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGette
 // and will wait for all pods it spawns to become "Running".
 func RunRC(config testutils.RCConfig) error {
 	ginkgo.By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
+	config.NodeDumpFunc = e2edebug.DumpNodeDebugInfo
 	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 	return testutils.RunRC(config)
 }

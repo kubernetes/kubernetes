@@ -179,8 +179,8 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 
 	for _, test := range tests {
 		result, err := normalizeStorageAccountType(test.storageAccountType)
-		assert.Equal(t, result, test.expectedAccountType)
-		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
+		assert.Equal(t, test.expectedAccountType, result)
+		assert.Equal(t, test.expectError, err != nil, fmt.Sprintf("error msg: %v", err))
 	}
 }
 
@@ -219,7 +219,7 @@ func TestGetDiskNum(t *testing.T) {
 
 	for _, test := range tests {
 		result, err := getDiskNum(test.deviceInfo)
-		assert.Equal(t, result, test.expectedNum)
-		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
+		assert.Equal(t, test.expectedNum, result)
+		assert.Equal(t, test.expectError, err != nil, fmt.Sprintf("error msg: %v", err))
 	}
 }

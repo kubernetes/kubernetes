@@ -88,6 +88,8 @@ func (a *APIServer) Start() error {
 	o.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	o.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
+	o.KubeletConfig.PreferredAddressTypes = []string{"InternalIP"}
+
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)

@@ -25,6 +25,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,8 +98,179 @@ var _ = SIGDescribe("Job", func() {
 				successes++
 			}
 		}
-		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
+		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
 	})
+
+	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func() {
+
+		// We fail the Job's pod only once to ensure the backoffLimit is not
+		// reached and thus the job is failed due to the pod failure policy
+		// with FailJob action.
+		// In order to ensure a Job's pod fails once before succeeding we force
+		// the Job's Pods to be scheduled to a single Node and use a hostPath
+		// volume to persist data across new Pods.
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJobOnNode("failOnce", "pod-failure-failjob", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					Action: batchv1.PodFailurePolicyActionFailJob,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+			},
+		}
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job fails")
+		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
+	})
+
+	ginkgo.It("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func() {
+
+		// We set the backoffLimit to 0 so that any pod failure would trigger
+		// job failure if not for the pod failure policy to ignore the failed
+		// pods from counting them towards the backoffLimit. Also, we fail the
+		// pod only once so that the job eventually succeeds.
+		// In order to ensure a Job's pod fails once before succeeding we force
+		// the Job's Pods to be scheduled to a single Node and use a hostPath
+		// volume to persist data across new Pods.
+		backoffLimit := int32(0)
+
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJobOnNode("failOnce", "pod-failure-ignore", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					Action: batchv1.PodFailurePolicyActionIgnore,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+			},
+		}
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+	})
+
+	// This test is using an indexed job. The pod corresponding to the 0th index
+	// creates a marker file on the host and runs 'forever' until evicted. We use
+	// the non-0-indexed pods to determine if the marker file is already
+	// created by the 0th indexed pod - the non-0-indexed pods fail and restart
+	// until the marker file is created (their potential failures are ignored
+	// based on the exit code). Once the marker file is created the 0th indexed
+	// pod is evicted (DisruptionTarget condition is added in the process),
+	// after restart it runs to successful completion.
+	// Steps:
+	// 1. Select a node to run all Job's pods to ensure the host marker file is accessible by all pods
+	// 2. Create the indexed job
+	// 3. Await for all non-0-indexed pods to succeed to ensure the marker file is created by the 0-indexed pod
+	// 4. Make sure the 0-indexed pod is running
+	// 5. Evict the 0-indexed pod
+	// 6. Await for the job to successfully complete
+	ginkgo.DescribeTable("Using a pod failure policy to not count some failures towards the backoffLimit",
+		func(policy *batchv1.PodFailurePolicy) {
+			mode := batchv1.IndexedCompletion
+
+			// We set the backoffLimit to 0 so that any pod failure would trigger
+			// job failure if not for the pod failure policy to ignore the failed
+			// pods from counting them towards the backoffLimit.
+			backoffLimit := int32(0)
+
+			ginkgo.By("Looking for a node to schedule job pods")
+			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a job")
+			job := e2ejob.NewTestJobOnNode("notTerminateOnce", "pod-disruption-failure-ignore", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+			job.Spec.CompletionMode = &mode
+			job.Spec.PodFailurePolicy = policy
+			job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Awaiting for all non 0-indexed pods to succeed to ensure the marker file is created")
+			err = e2ejob.WaitForJobPodsSucceeded(f.ClientSet, f.Namespace.Name, job.Name, completions-1)
+			framework.ExpectNoError(err, "failed to await for all non 0-indexed pods to succeed for job: %s/%s", job.Name, job.Namespace)
+
+			ginkgo.By("Awaiting for the 0-indexed pod to be running")
+			err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
+			framework.ExpectNoError(err, "failed to await for the 0-indexed pod to be running for the job: %s/%s", job.Name, job.Namespace)
+
+			pods, err := e2ejob.GetAllRunningJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
+			framework.ExpectEqual(len(pods), 1, "Exactly one running pod is expected")
+			pod := pods[0]
+			ginkgo.By(fmt.Sprintf("Evicting the running pod: %s/%s", pod.Name, pod.Namespace))
+			evictTarget := &policyv1.Eviction{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+				},
+			}
+			f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(context.TODO(), evictTarget)
+			framework.ExpectNoError(err, "failed to evict the pod: %s/%s", pod.Name, pod.Namespace)
+
+			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
+			err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
+			framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
+
+			ginkgo.By("Ensuring job reaches completions")
+			err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+			framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+		},
+		ginkgo.Entry("Ignore DisruptionTarget condition", &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					// Ignore failures of the non 0-indexed pods which fail until the marker file is created
+					Action: batchv1.PodFailurePolicyActionIgnore,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+				{
+					// Ignore the pod failure caused by the eviction
+					Action: batchv1.PodFailurePolicyActionIgnore,
+					OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+						{
+							Type:   v1.DisruptionTarget,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+		}),
+		ginkgo.Entry("Ignore exit code 137", &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					// Ignore failures of the non 0-indexed pods which fail until the marker file is created
+					// And the 127 in the 0-indexed pod due to eviction.
+					Action: batchv1.PodFailurePolicyActionIgnore,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1, 137},
+					},
+				},
+			},
+		}),
+	)
 
 	ginkgo.It("should not create pods when created in suspend state", func() {
 		ginkgo.By("Creating a job with suspend=true")
@@ -145,8 +317,8 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
-		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
+		err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
 		ginkgo.By("Updating the job with suspend=true")
@@ -223,7 +395,7 @@ var _ = SIGDescribe("Job", func() {
 
 	/*
 		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
-		Description: Create a job and ensure the associated pod count is equal to paralellism count. Delete the
+		Description: Create a job and ensure the associated pod count is equal to parallelism count. Delete the
 		job and ensure if the pods associated with the job have been removed
 	*/
 	ginkgo.It("should remove pods when job is deleted", func() {
@@ -232,8 +404,8 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
-		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
+		err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
 		ginkgo.By("Delete the job")
@@ -304,7 +476,7 @@ var _ = SIGDescribe("Job", func() {
 	/*
 		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
-		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
+		Description: Create a job. Ensure the active pods reflect parallelism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
 	framework.ConformanceIt("should delete a job", func() {
 		ginkgo.By("Creating a job")
@@ -313,7 +485,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring active pods == parallelism")
-		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("delete a job")
@@ -343,7 +515,7 @@ var _ = SIGDescribe("Job", func() {
 		job.Kind = kind
 
 		ginkgo.By("Ensuring active pods == parallelism")
-		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Orphaning one of the Job's Pods")
@@ -351,7 +523,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		gomega.Expect(pods.Items).To(gomega.HaveLen(int(parallelism)))
 		pod := pods.Items[0]
-		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+		e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 			pod.OwnerReferences = nil
 		})
 
@@ -370,7 +542,7 @@ var _ = SIGDescribe("Job", func() {
 		)).To(gomega.Succeed(), "wait for pod %q to be readopted", pod.Name)
 
 		ginkgo.By("Removing the labels from the Job's Pod")
-		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+		e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 			pod.Labels = nil
 		})
 
@@ -432,7 +604,7 @@ var _ = SIGDescribe("Job", func() {
 			job.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": testNodeName}
 		}
 
-		framework.Logf("Creating job %q with a node hostname selector %q wth cpu request %q", job.Name, testNodeName, cpuRequest)
+		framework.Logf("Creating job %q with a node hostname selector %q with cpu request %q", job.Name, testNodeName, cpuRequest)
 		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -471,8 +643,8 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
-		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
+		err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
 		// /status subresource operations

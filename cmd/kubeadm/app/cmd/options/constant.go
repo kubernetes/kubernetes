@@ -148,4 +148,7 @@ const (
 
 	// Print the addon manifests to STDOUT instead of installing them.
 	PrintManifest = "print-manifest"
+
+	// CleanupTmpDir flag indicates whether reset will cleanup the tmp dir
+	CleanupTmpDir = "cleanup-tmp-dir"
 )

@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-// TODO: Those tests should be splitted by SIG and moved to SIG-owned directories,
+// TODO: Those tests should be split by SIG and moved to SIG-owned directories,
 //
 //	however that involves also splitting the actual upgrade jobs too.
 //	Figure out the eventual solution for it.

@@ -448,6 +448,68 @@ func TestDump(t *testing.T) {
 	}
 }
 
+// TestAddPodAlwaysUpdatePodInfoInNodeInfo tests that AddPod method always updates PodInfo in NodeInfo,
+// even when the Pod is assumed one.
+func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
+	ttl := 10 * time.Second
+	now := time.Now()
+	p1 := makeBasePod(t, "node1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+
+	p2 := p1.DeepCopy()
+	p2.Status.Conditions = append(p1.Status.Conditions, v1.PodCondition{
+		Type:   v1.PodScheduled,
+		Status: v1.ConditionTrue,
+	})
+
+	tests := []struct {
+		podsToAssume         []*v1.Pod
+		podsToAddAfterAssume []*v1.Pod
+		nodeInfo             map[string]*framework.NodeInfo
+	}{
+		{
+			podsToAssume:         []*v1.Pod{p1},
+			podsToAddAfterAssume: []*v1.Pod{p2},
+			nodeInfo: map[string]*framework.NodeInfo{
+				"node1": newNodeInfo(
+					&framework.Resource{
+						MilliCPU: 100,
+						Memory:   500,
+					},
+					&framework.Resource{
+						MilliCPU: 100,
+						Memory:   500,
+					},
+					[]*v1.Pod{p2},
+					newHostPortInfoBuilder().add("TCP", "0.0.0.0", 80).build(),
+					make(map[string]*framework.ImageStateSummary),
+				),
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			cache := newCache(ttl, time.Second, nil)
+			for _, podToAssume := range tt.podsToAssume {
+				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
+					t.Fatalf("assumePod failed: %v", err)
+				}
+			}
+			for _, podToAdd := range tt.podsToAddAfterAssume {
+				if err := cache.AddPod(podToAdd); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			}
+			for nodeName, expected := range tt.nodeInfo {
+				n := cache.nodes[nodeName]
+				if err := deepEqualWithoutGeneration(n, expected); err != nil {
+					t.Errorf("node %q: %v", nodeName, err)
+				}
+			}
+		})
+	}
+}
+
 // TestAddPodWillReplaceAssumed tests that a pod being Add()ed will replace any assumed pod.
 func TestAddPodWillReplaceAssumed(t *testing.T) {
 	now := time.Now()

@@ -1,7 +1,0 @@
-Heketi code is released under various licenses:
-
-The REST API client code (in go and python) is released
-under a dual license of Apache 2.0 or LGPLv3+.
-
-The other parts of heketi (server, cli, tests, ...) are released
-under a dual license of LGPLv3+ or GPLv2.

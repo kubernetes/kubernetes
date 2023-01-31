@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "env"}, envVars, nil, nil)
 
-		f.TestContainerOutput("env composition", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
@@ -78,7 +79,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""}, envVars, nil, nil)
 
-		f.TestContainerOutput("substitution in container's command", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "substitution in container's command", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -98,7 +99,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod([]string{"sh", "-c"}, envVars, nil, nil)
 		pod.Spec.Containers[0].Args = []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""}
 
-		f.TestContainerOutput("substitution in container's args", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "substitution in container's args", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		envVars[0].Value = pod.ObjectMeta.Name
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "test -d /testcontainer/" + pod.ObjectMeta.Name + ";echo $?"}
 
-		f.TestContainerOutput("substitution in volume subpath", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "substitution in volume subpath", pod, 0, []string{
 			"0",
 		})
 	})
@@ -261,7 +262,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod.ObjectMeta.Annotations = map[string]string{"notmysubpath": "mypath"}
 
 		ginkgo.By("creating the pod with failed condition")
-		var podClient *framework.PodClient = f.PodClient()
+		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(pod)
 
 		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
@@ -333,7 +334,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "mypath"}
 
 		ginkgo.By("creating the pod")
-		var podClient *framework.PodClient = f.PodClient()
+		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(pod)
 
 		ginkgo.By("waiting for pod running")
@@ -342,14 +343,14 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("creating a file in subpath")
 		cmd := "touch /volume_mount/mypath/foo/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to write to subpath")
 		}
 
 		ginkgo.By("test for file in mounted path")
 		cmd = "test -f /subpath_mount/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to verify file")
 		}
@@ -370,7 +371,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 })
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
-	var podClient *framework.PodClient = f.PodClient()
+	podClient := e2epod.NewPodClient(f)
 	pod = podClient.Create(pod)
 
 	defer func() {

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/utils/clock"
 )
 
@@ -75,6 +75,9 @@ const (
 	// Once the timeout is reached, this controller attempts to set the status
 	// of the condition to False.
 	stalePodDisruptionTimeout = 2 * time.Minute
+
+	// field manager used to disable the pod failure condition
+	fieldManager = "DisruptionController"
 )
 
 type updater func(context.Context, *policy.PodDisruptionBudget) error
@@ -645,7 +648,7 @@ func (dc *DisruptionController) processNextStalePodDisruptionWorkItem(ctx contex
 	defer dc.stalePodDisruptionQueue.Done(key)
 	err := dc.syncStalePodDisruption(ctx, key.(string))
 	if err == nil {
-		dc.queue.Forget(key)
+		dc.stalePodDisruptionQueue.Forget(key)
 		return true
 	}
 	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %v", key.(string), err))
@@ -748,15 +751,16 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 		return nil
 	}
 
-	newStatus := pod.Status.DeepCopy()
-	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
-		Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
-		Status: v1.ConditionFalse,
-	})
-	if !updated {
-		return nil
-	}
-	if _, _, _, err := utilpod.PatchPodStatus(ctx, dc.kubeClient, namespace, name, pod.UID, pod.Status, *newStatus); err != nil {
+	podApply := corev1apply.Pod(pod.Name, pod.Namespace).
+		WithStatus(corev1apply.PodStatus()).
+		WithResourceVersion(pod.ResourceVersion)
+	podApply.Status.WithConditions(corev1apply.PodCondition().
+		WithType(v1.DisruptionTarget).
+		WithStatus(v1.ConditionFalse).
+		WithLastTransitionTime(metav1.Now()),
+	)
+
+	if _, err := dc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 		return err
 	}
 	klog.V(2).InfoS("Reset stale DisruptionTarget condition to False", "pod", klog.KObj(pod))
@@ -994,8 +998,11 @@ func (dc *DisruptionController) nonTerminatingPodHasStaleDisruptionCondition(pod
 	if pod.DeletionTimestamp != nil {
 		return false, 0
 	}
-	_, cond := apipod.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
-	if cond == nil || cond.Status != v1.ConditionTrue {
+	_, cond := apipod.GetPodCondition(&pod.Status, v1.DisruptionTarget)
+	// Pod disruption conditions added by kubelet are never considered stale because the condition might take
+	// arbitrarily long before the pod is terminating (has deletion timestamp). Also, pod conditions present
+	// on pods in terminal phase are not stale to avoid unnecessary status updates.
+	if cond == nil || cond.Status != v1.ConditionTrue || cond.Reason == v1.PodReasonTerminationByKubelet || apipod.IsPodPhaseTerminal(pod.Status.Phase) {
 		return false, 0
 	}
 	waitFor := dc.stalePodDisruptionTimeout - dc.clock.Since(cond.LastTransitionTime.Time)

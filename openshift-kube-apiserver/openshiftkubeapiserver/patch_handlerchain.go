@@ -8,7 +8,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	patchfilters "k8s.io/kubernetes/openshift-kube-apiserver/filters"
-	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
+	"k8s.io/kubernetes/openshift-kube-apiserver/filters/apirequestcount"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 )
@@ -19,7 +19,7 @@ const (
 )
 
 // TODO switch back to taking a kubeapiserver config.  For now make it obviously safe for 3.11
-func BuildHandlerChain(oauthMetadataFile string, cmInformer coreinformers.ConfigMapInformer, deprecatedAPIRequestController deprecatedapirequest.APIRequestLogger) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
+func BuildHandlerChain(oauthMetadataFile string, cmInformer coreinformers.ConfigMapInformer, requestLogger apirequestcount.APIRequestLogger) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
 	// load the oauthmetadata when we can return an error
 	oAuthMetadata := []byte{}
 	if len(oauthMetadataFile) > 0 {
@@ -35,7 +35,7 @@ func BuildHandlerChain(oauthMetadataFile string, cmInformer coreinformers.Config
 			handler := withOAuthInfo(apiHandler, oAuthMetadata)
 
 			// after normal chain, so that user is in context
-			handler = patchfilters.WithDeprecatedApiRequestLogging(handler, deprecatedAPIRequestController)
+			handler = patchfilters.WithAPIRequestCountLogging(handler, requestLogger)
 
 			// this is the normal kube handler chain
 			handler = genericapiserver.DefaultBuildHandlerChain(handler, genericConfig)

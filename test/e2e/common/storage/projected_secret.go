@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -200,7 +201,7 @@ var _ = SIGDescribe("Projected secret", func() {
 		}
 
 		fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", nil)
-		f.TestContainerOutputRegexp("consume secrets", pod, 0, []string{
+		e2epodoutput.TestContainerOutputRegexp(f, "consume secrets", pod, 0, []string{
 			"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 			fileModeRegexp,
 		})
@@ -367,7 +368,7 @@ var _ = SIGDescribe("Projected secret", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2epod.NewPodClient(f).CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
@@ -504,7 +505,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 		fileModeRegexp,
 	}
 
-	f.TestContainerOutputRegexp("consume secrets", pod, 0, expectedOutput)
+	e2epodoutput.TestContainerOutputRegexp(f, "consume secrets", pod, 0, expectedOutput)
 }
 
 func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
@@ -581,5 +582,5 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 		fileModeRegexp,
 	}
 
-	f.TestContainerOutputRegexp("consume secrets", pod, 0, expectedOutput)
+	e2epodoutput.TestContainerOutputRegexp(f, "consume secrets", pod, 0, expectedOutput)
 }
