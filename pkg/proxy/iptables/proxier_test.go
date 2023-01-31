@@ -408,6 +408,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
+		needFullSync:             true,
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",
 		localDetector:            detectLocal,
