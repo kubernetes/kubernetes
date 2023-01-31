@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
@@ -264,7 +263,7 @@ func (o *PatchOptions) RunPatch() error {
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				if apierrors.IsUnsupportedMediaType(err) {
-					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+					return fmt.Errorf("%s is not supported by %s: %w", patchType, mapping.GroupVersionKind, err)
 				}
 				return err
 			}
