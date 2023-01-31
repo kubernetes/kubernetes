@@ -84,7 +84,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	})
 
 	/*
-		    Release: v1.17, v1.21
+		    Release: v1.17, v1.21, v1.27
 		    Testname: aggregator-supports-the-sample-apiserver
 		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
