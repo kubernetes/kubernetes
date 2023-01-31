@@ -109,9 +109,9 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
@@ -132,9 +132,9 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
@@ -155,16 +155,15 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 	})
 })
 
-func getCPUManagerMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
-	// we are running out of good names, so we need to be unnecessarily specific to avoid clashes
-	ginkgo.By("getting CPU Manager metrics from the metrics API")
+func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
+	ginkgo.By("getting Kubelet metrics from the metrics API")
 	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, framework.TestContext.NodeName+":10255", "/metrics")
 }
 
