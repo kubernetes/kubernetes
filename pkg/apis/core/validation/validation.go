@@ -4760,8 +4760,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(portPath, port.Port, fmt.Sprintf("may not expose port %v externally since it is used by kubelet", ports.KubeletPort)))
 			}
 		}
-		if isHeadlessService(service) {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIPs").Index(0), service.Spec.ClusterIPs[0], "may not be set to 'None' for LoadBalancer services"))
+		if _, ok := service.ObjectMeta.Labels["service.kubernetes.io/service-proxy-name"]; !ok {
+			if isHeadlessService(service) {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIPs").Index(0), service.Spec.ClusterIPs[0], "may not be set to 'None' for LoadBalancer services"))
+			}
 		}
 	case core.ServiceTypeNodePort:
 		if isHeadlessService(service) {
