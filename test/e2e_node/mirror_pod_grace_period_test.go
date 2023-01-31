@@ -157,7 +157,7 @@ spec:
   terminationGracePeriodSeconds: 20
   containers:
   - name: m-test
-    image: busybox:1.31.1
+    image: %s
     command:
       - /bin/sh
     args:
@@ -171,7 +171,7 @@ spec:
         sleep 1000
 `
 	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace)
+	podYaml := fmt.Sprintf(template, name, namespace, imageutils.GetE2EImage(imageutils.BusyBox))
 
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
