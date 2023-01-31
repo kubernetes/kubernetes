@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -100,7 +99,7 @@ func (s *SimpleBackendHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	s.requestHeader = req.Header
 	s.requestMethod = req.Method
 	var err error
-	s.requestBody, err = ioutil.ReadAll(req.Body)
+	s.requestBody, err = io.ReadAll(req.Body)
 	if err != nil {
 		s.t.Errorf("Unexpected error: %v", err)
 		return
@@ -370,7 +369,7 @@ func TestServeHTTP(t *testing.T) {
 			validateHeaders(t, test.name+" backend headers", res.Header, test.expectedRespHeader, test.notExpectedRespHeader)
 
 			// Validate Body
-			responseBody, err := ioutil.ReadAll(res.Body)
+			responseBody, err := io.ReadAll(res.Body)
 			if err != nil {
 				t.Errorf("Unexpected error reading response body: %v", err)
 			}
@@ -601,7 +600,7 @@ func TestProxyUpgradeConnectionErrorResponse(t *testing.T) {
 	// Expect error response.
 	assert.True(t, responder.called)
 	assert.Equal(t, fakeStatusCode, resp.StatusCode)
-	msg, err := ioutil.ReadAll(resp.Body)
+	msg, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(msg), expectedErr.Error())
 }
@@ -640,7 +639,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			// Verify we get the correct response and full message body content
 			resp, err := http.ReadResponse(bufferedReader, nil)
 			require.NoError(t, err)
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			require.Equal(t, resp.StatusCode, code)
 			require.Equal(t, data, []byte(`some data`))
@@ -790,7 +789,7 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 			resp, err := http.ReadResponse(bufferedReader, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectStatusCode, resp.StatusCode)
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectBody, data)
 			assert.Equal(t, int64(len(tc.expectBody)), resp.ContentLength)
@@ -976,7 +975,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			}
 
 			// Read body
-			body, err := ioutil.ReadAll(req.Body)
+			body, err := io.ReadAll(req.Body)
 			if err != nil {
 				t.Errorf("%s: unexpected error %v", k, err)
 			}
@@ -1039,7 +1038,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		}
 
 		// Read response
-		response, err := ioutil.ReadAll(conn)
+		response, err := io.ReadAll(conn)
 		if err != nil {
 			t.Errorf("%s: unexpected error %v", k, err)
 			continue

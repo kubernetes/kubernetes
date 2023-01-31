@@ -19,7 +19,6 @@ package roundtrip
 import (
 	"bytes"
 	gojson "encoding/json"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -333,11 +332,11 @@ func (c *CompatibilityTestOptions) encode(t *testing.T, obj runtime.Object) (jso
 
 func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.String) (json, yaml, proto []byte, err error) {
 	jsonFilename := makeName(gvk) + suffix + ".json"
-	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, jsonFilename))
+	actualJSON, jsonErr := os.ReadFile(filepath.Join(dir, jsonFilename))
 	yamlFilename := makeName(gvk) + suffix + ".yaml"
-	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, yamlFilename))
+	actualYAML, yamlErr := os.ReadFile(filepath.Join(dir, yamlFilename))
 	protoFilename := makeName(gvk) + suffix + ".pb"
-	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, protoFilename))
+	actualProto, protoErr := os.ReadFile(filepath.Join(dir, protoFilename))
 	if usedFiles != nil {
 		usedFiles.Insert(jsonFilename)
 		usedFiles.Insert(yamlFilename)
@@ -359,7 +358,7 @@ func writeFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, ex
 	if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
 		t.Fatal("error making directory", err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(dir, makeName(gvk)+suffix+"."+extension), data, os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, makeName(gvk)+suffix+"."+extension), data, os.FileMode(0644)); err != nil {
 		t.Fatalf("error writing %s: %v", extension, err)
 	}
 }
