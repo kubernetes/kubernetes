@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -293,7 +294,14 @@ func (c *celAdmissionController) Validate(
 				}
 			}
 
-			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
+			versionedAttr, err := whgeneric.NewVersionedAttributes(a, matchKind, o)
+			if err != nil {
+				wrappedErr := fmt.Errorf("failed to convert object version: %w", err)
+				addConfigError(wrappedErr, definition, binding)
+				continue
+			}
+
+			decisions, err := bindingInfo.validator.Validate(versionedAttr, param)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)

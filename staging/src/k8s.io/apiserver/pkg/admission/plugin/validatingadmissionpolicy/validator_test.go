@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 func TestCompile(t *testing.T) {
@@ -550,7 +551,12 @@ func TestValidate(t *testing.T) {
 			CompilationResults := validator.(*CELValidator).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
-			policyResults, err := validator.Validate(tc.attributes, newObjectInterfacesForTest(), tc.params, tc.attributes.GetKind())
+			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
+			if err != nil {
+				t.Fatalf("unexpected error on conversion: %v", err)
+			}
+
+			policyResults, err := validator.Validate(versionedAttr, tc.params)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -168,15 +168,11 @@ func policyDecisionActionForError(f v1alpha1.FailurePolicyType) PolicyDecisionAc
 // An error will be returned if failed to convert the object/oldObject/params/request to unstructured.
 // Each PolicyDecision will have a decision and a message.
 // policyDecision.message will be empty if the decision is allowed and no error met.
-func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
+func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
-
 	decisions := make([]PolicyDecision, len(v.compilationResults))
 	var err error
-	versionedAttr, err := generic.NewVersionedAttributes(a, matchKind, o)
-	if err != nil {
-		return nil, err
-	}
+
 	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
 		return nil, err
@@ -189,6 +185,7 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 	if err != nil {
 		return nil, err
 	}
+
 	request := createAdmissionRequest(versionedAttr.Attributes)
 	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {

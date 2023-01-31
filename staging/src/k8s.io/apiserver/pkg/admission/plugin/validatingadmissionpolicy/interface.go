@@ -21,13 +21,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 // Validator defines the func used to validate the cel expressions
 // matchKind provides the GroupVersionKind that the object should be
 // validated by CEL expressions as.
 type Validator interface {
-	Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error)
+	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
 }
 
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`

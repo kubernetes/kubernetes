@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/features"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
@@ -173,11 +174,11 @@ func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.Obj
 		namespace: namespace,
 	}
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a), schema.GroupVersionKind{}, nil
+		return fun(definition, a), a.GetKind(), nil
 	}
 
 	// Default is match everything
-	return f.DefaultMatch, schema.GroupVersionKind{}, nil
+	return f.DefaultMatch, a.GetKind(), nil
 }
 
 // Matches says whether this policy definition matches the provided admission
@@ -656,16 +657,16 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	require.ErrorContains(t, err, `Denied`)
 }
 
-type validatorFunc func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error)
+type validatorFunc func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
 
-func (f validatorFunc) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
-	return f(a, o, params, matchKind)
+func (f validatorFunc) Validate(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
+	return f(versionedAttr, versionedParams)
 }
 
 type testValidator struct {
 }
 
-func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
+func (v testValidator) Validate(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 	// Policy always denies
 	return []PolicyDecision{
 		{
@@ -1142,7 +1143,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	compiler.RegisterDefinition(&policy1, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles1.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 			evaluations1.Add(1)
 			return []PolicyDecision{
 				{
@@ -1155,7 +1156,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	compiler.RegisterDefinition(&policy2, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles2.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 			evaluations2.Add(1)
 			return []PolicyDecision{
 				{
@@ -1256,7 +1257,7 @@ func TestNativeTypeParam(t *testing.T) {
 	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, params runtime.Object) ([]PolicyDecision, error) {
 			evaluations.Add(1)
 
 			// show that the passed params was a ConfigMap native type
