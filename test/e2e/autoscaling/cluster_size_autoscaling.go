@@ -1166,7 +1166,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
-		return fmt.Errorf("Failed to enable autoscaling: %v", err)
+		return fmt.Errorf("Failed to enable autoscaling: %w", err)
 	}
 	klog.Infof("Config update result: %s", output)
 
@@ -1190,7 +1190,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
-		return fmt.Errorf("Failed to disable autoscaling: %v", err)
+		return fmt.Errorf("Failed to disable autoscaling: %w", err)
 	}
 	klog.Infof("Config update result: %s", output)
 
@@ -1384,7 +1384,7 @@ func waitForCaPodsReadyInNamespace(ctx context.Context, f *framework.Framework, 
 	for start := time.Now(); time.Now().Before(start.Add(scaleUpTimeout)) && ctx.Err() == nil; time.Sleep(20 * time.Second) {
 		pods, err := c.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get pods: %v", err)
+			return fmt.Errorf("failed to get pods: %w", err)
 		}
 		notready = make([]string, 0)
 		for _, pod := range pods.Items {

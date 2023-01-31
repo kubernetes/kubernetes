@@ -45,18 +45,18 @@ func InitNodeE2ERemote() TestSuite {
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
-		return fmt.Errorf("failed to build the dependencies: %v", err)
+		return fmt.Errorf("failed to build the dependencies: %w", err)
 	}
 
 	// Make sure we can find the newly built binaries
 	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
+		return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
 	}
 
 	rootDir, err := utils.GetK8sRootDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
+		return fmt.Errorf("failed to locate kubernetes root directory: %w", err)
 	}
 
 	// Copy binaries
@@ -64,7 +64,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {
-			return fmt.Errorf("failed to locate test binary %s: %v", bin, err)
+			return fmt.Errorf("failed to locate test binary %s: %w", bin, err)
 		}
 		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
 		if err != nil {
@@ -76,7 +76,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		// Copy system spec file
 		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
 		if _, err := os.Stat(source); err != nil {
-			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
+			return fmt.Errorf("failed to locate system spec %q: %w", source, err)
 		}
 		out, err := exec.Command("cp", source, tardir).CombinedOutput()
 		if err != nil {

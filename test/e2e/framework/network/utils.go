@@ -1026,7 +1026,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ret.Status = HTTPError
-		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)
+		ret.Error = fmt.Errorf("error reading HTTP body: %w", err)
 		framework.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
@@ -1191,7 +1191,7 @@ func WaitForService(ctx context.Context, c clientset.Interface, namespace, name 
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+		return fmt.Errorf("error waiting for service %s/%s %s: %w", namespace, name, stateMsg[exist], err)
 	}
 	return nil
 }

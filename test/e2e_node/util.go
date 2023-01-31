@@ -89,14 +89,14 @@ func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	}
 	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build http request: %v", err)
+		return nil, fmt.Errorf("failed to build http request: %w", err)
 	}
 	req.Header.Add("Accept", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get /stats/summary: %v", err)
+		return nil, fmt.Errorf("failed to get /stats/summary: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -117,11 +117,11 @@ func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
+		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
 	client, conn, err := podresources.GetV1alpha1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting grpc client: %v", err)
+		return nil, fmt.Errorf("Error getting grpc client: %w", err)
 	}
 	defer conn.Close()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -136,11 +136,11 @@ func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.L
 func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
+		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
 	client, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting gRPC client: %v", err)
+		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
 	}
 	defer conn.Close()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

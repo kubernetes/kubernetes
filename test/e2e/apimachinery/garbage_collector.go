@@ -181,7 +181,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "Pods":
 			pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %w", err)
 			}
 			if len(pods.Items) != num {
 				ret = false
@@ -190,7 +190,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "Deployments":
 			deployments, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list deployments: %v", err)
+				return false, fmt.Errorf("failed to list deployments: %w", err)
 			}
 			if len(deployments.Items) != num {
 				ret = false
@@ -199,7 +199,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "ReplicaSets":
 			rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %w", err)
 			}
 			if len(rs.Items) != num {
 				ret = false
@@ -208,7 +208,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "ReplicationControllers":
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list replication controllers: %v", err)
+				return false, fmt.Errorf("failed to list replication controllers: %w", err)
 			}
 			if len(rcs.Items) != num {
 				ret = false
@@ -217,7 +217,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "CronJobs":
 			cronJobs, err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list cronjobs: %v", err)
+				return false, fmt.Errorf("failed to list cronjobs: %w", err)
 			}
 			if len(cronJobs.Items) != num {
 				ret = false
@@ -226,7 +226,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 		case "Jobs":
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list jobs: %v", err)
+				return false, fmt.Errorf("failed to list jobs: %w", err)
 			}
 			if len(jobs.Items) != num {
 				ret = false
@@ -325,7 +325,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			pods, err := podClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %w", err)
 			}
 			// We intentionally don't wait the number of pods to reach
 			// rc.Spec.Replicas. We want to see if the garbage collector and the
@@ -383,7 +383,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
 			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %w", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -410,7 +410,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 120*time.Second+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
 			rcs, err := rcClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list rcs: %v", err)
+				return false, fmt.Errorf("failed to list rcs: %w", err)
 			}
 			if len(rcs.Items) != 0 {
 				return false, nil
@@ -452,7 +452,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
 			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %w", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -505,7 +505,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %w", err)
 			}
 			return len(rsList.Items) > 0, nil
 
@@ -530,7 +530,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			errList = append(errList, err)
 			remainingRSs, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %w", err))
 			} else {
 				errList = append(errList, fmt.Errorf("remaining rs are: %#v", remainingRSs))
 			}
@@ -565,7 +565,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %w", err)
 			}
 			if len(rsList.Items) > 0 {
 				replicaset = rsList.Items[0]
@@ -599,7 +599,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
 			dList, err := deployClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list deployments: %v", err)
+				return false, fmt.Errorf("failed to list deployments: %w", err)
 			}
 			return len(dList.Items) == 0, nil
 		})
@@ -616,13 +616,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			errList := make([]error, 0)
 			remainingRSs, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %w", err))
 			} else {
 				errList = append(errList, fmt.Errorf("remaining rs post mortem: %#v", remainingRSs))
 			}
 			remainingDSs, err := deployClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
-				errList = append(errList, fmt.Errorf("failed to list Deployments post mortem: %v", err))
+				errList = append(errList, fmt.Errorf("failed to list Deployments post mortem: %w", err))
 			} else {
 				errList = append(errList, fmt.Errorf("remaining deployment's post mortem: %#v", remainingDSs))
 			}
@@ -663,7 +663,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
 			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %w", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -758,7 +758,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
 			rc1, err := rcClient.Get(ctx, rc1.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %w", err)
 			}
 			if rc1.Status.Replicas == *rc1.Spec.Replicas {
 				return true, nil
@@ -889,7 +889,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 90*time.Second+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
 			pods, err2 = podClient.List(ctx, metav1.ListOptions{})
 			if err2 != nil {
-				return false, fmt.Errorf("failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %w", err)
 			}
 			if len(pods.Items) == 0 {
 				return true, nil
@@ -1125,7 +1125,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return false, nil
 			}
 			if err != nil && !apierrors.IsNotFound(err) {
-				return false, fmt.Errorf("failed to get owner: %v", err)
+				return false, fmt.Errorf("failed to get owner: %w", err)
 			}
 			return true, nil
 		}); err != nil {
@@ -1153,7 +1153,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 2*time.Minute, func(ctx context.Context) (bool, error) {
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("failed to list jobs: %v", err)
+				return false, fmt.Errorf("failed to list jobs: %w", err)
 			}
 			return len(jobs.Items) > 0, nil
 		})
