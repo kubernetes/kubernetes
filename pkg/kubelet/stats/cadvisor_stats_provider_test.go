@@ -40,11 +40,6 @@ import (
 )
 
 func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	const (
 		seedPastPod0Infra      = 1000
 		seedPastPod0Container0 = 2000
@@ -98,7 +93,16 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
 	}
-	for _, c := range []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0", "c1"} {
+
+	expectedInfoKeys := []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0"}
+	// NOTE: on Windows, IsSystemdStyleName will return false, which means that the Container Info will
+	// not be assembled by cgroup key.
+	if runtime.GOOS != "windows" {
+		expectedInfoKeys = append(expectedInfoKeys, "c1")
+	} else {
+		expectedInfoKeys = append(expectedInfoKeys, "pod1-c1.slice")
+	}
+	for _, c := range expectedInfoKeys {
 		if _, found := allInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
