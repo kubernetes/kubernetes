@@ -41,7 +41,7 @@ func init() {
 				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.Sysctls = nil }),
 				// sysctls with name="kernel.shm_rmid_forced" ,"net.ipv4.ip_local_port_range"
 				// "net.ipv4.tcp_syncookies", "net.ipv4.ping_group_range",
-				// "net.ipv4.ip_unprivileged_port_start"
+				// "net.ipv4.ip_unprivileged_port_start", "net.ipv4.ip_local_reserved_ports"
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{
 						{Name: "kernel.shm_rmid_forced", Value: "0"},
@@ -49,6 +49,7 @@ func init() {
 						{Name: "net.ipv4.tcp_syncookies", Value: "0"},
 						{Name: "net.ipv4.ping_group_range", Value: "1 0"},
 						{Name: "net.ipv4.ip_unprivileged_port_start", Value: "1024"},
+						{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024 4999"},
 					}
 				}),
 			}

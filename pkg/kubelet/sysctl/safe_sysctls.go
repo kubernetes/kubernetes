@@ -28,5 +28,6 @@ func SafeSysctlAllowlist() []string {
 		"net.ipv4.tcp_syncookies",
 		"net.ipv4.ping_group_range",
 		"net.ipv4.ip_unprivileged_port_start",
+		"net.ipv4.ip_local_reserved_ports",
 	}
 }
