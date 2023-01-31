@@ -41,6 +41,8 @@ import (
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
+type nodeUpdateRetryBackoffStrategy func(count int) time.Duration
+
 type rangeAllocator struct {
 	client clientset.Interface
 	// cluster cidrs as passed in during controller creation
@@ -59,6 +61,8 @@ type rangeAllocator struct {
 	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing map[string]*nodeProcessingInfo
+	// Configurable backoff strategy for testing
+	nodeUpdateRetryTimeout nodeUpdateRetryBackoffStrategy
 }
 
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDRs for node (one from each of clusterCIDRs)
@@ -67,6 +71,10 @@ type rangeAllocator struct {
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
 func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
+	return newCIDRRangeAllocator(client, nodeInformer, allocatorParams, nodeList, nodeUpdateRetryTimeout)
+}
+
+func newCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList, nodeUpdateRetryTimeout nodeUpdateRetryBackoffStrategy) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
@@ -86,15 +94,16 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	}
 
 	ra := &rangeAllocator{
-		client:                client,
-		clusterCIDRs:          allocatorParams.ClusterCIDRs,
-		cidrSets:              cidrSets,
-		nodeLister:            nodeInformer.Lister(),
-		nodesSynced:           nodeInformer.Informer().HasSynced,
-		nodeCIDRUpdateChannel: make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
-		broadcaster:           eventBroadcaster,
-		recorder:              recorder,
-		nodesInProcessing:     map[string]*nodeProcessingInfo{},
+		client:                 client,
+		clusterCIDRs:           allocatorParams.ClusterCIDRs,
+		cidrSets:               cidrSets,
+		nodeLister:             nodeInformer.Lister(),
+		nodesSynced:            nodeInformer.Informer().HasSynced,
+		nodeCIDRUpdateChannel:  make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
+		broadcaster:            eventBroadcaster,
+		recorder:               recorder,
+		nodesInProcessing:      map[string]*nodeProcessingInfo{},
+		nodeUpdateRetryTimeout: nodeUpdateRetryTimeout,
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -237,7 +246,7 @@ func (r *rangeAllocator) retryParams(nodeName string) (bool, time.Duration) {
 	}
 	r.nodesInProcessing[nodeName].retries = count
 
-	return true, nodeUpdateRetryTimeout(count)
+	return true, r.nodeUpdateRetryTimeout(count)
 }
 
 func (r *rangeAllocator) removeNodeFromProcessing(nodeName string) {
