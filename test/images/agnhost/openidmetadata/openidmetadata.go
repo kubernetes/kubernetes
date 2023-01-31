@@ -20,6 +20,7 @@ package openidmetadata
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -169,12 +170,14 @@ func gettoken() (string, error) {
 func withExternalOAuth2Client(ctx context.Context) (context.Context, error) {
 	// Use the default http transport with the system root bundle,
 	// since it's validating against the external internet.
+	client := &http.Client{
+		Transport: http.DefaultTransport,
+	}
+	client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	return context.WithValue(ctx,
 		// The `oidc` library respects the oauth2.HTTPClient context key; if it is set,
 		// the library will use the provided http.Client rather than the default HTTP client.
-		oauth2.HTTPClient, &http.Client{
-			Transport: http.DefaultTransport,
-		}), nil
+		oauth2.HTTPClient, client), nil
 }
 
 func withInClusterOauth2Client(ctx context.Context) (context.Context, error) {
