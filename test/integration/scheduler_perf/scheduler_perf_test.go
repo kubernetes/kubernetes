@@ -43,6 +43,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -584,8 +585,25 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		b.Run(tc.Name, func(b *testing.B) {
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
+					// Because we run sequentially, it is
+					// possible to change the global klog
+					// logger and redirect log
+					// output. Quite a lot of code still
+					// uses it instead of supporting
+					// contextual logging.
+					output := framework.RedirectKlog(b)
+
+					// In addition to redirection klog
+					// output, also enable contextual
+					// logging.
+					_, ctx := ktesting.NewTestContext(b)
+
+					// Now that we are ready to run, start
+					// etcd.
+					framework.StartEtcd(b, output)
+
 					// 30 minutes should be plenty enough even for the 5000-node tests.
-					ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Minute)
+					ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 					b.Cleanup(cancel)
 
 					for feature, flag := range tc.FeatureGates {

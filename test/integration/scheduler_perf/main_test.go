@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
@@ -30,5 +29,5 @@ func TestMain(m *testing.M) {
 	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
 	flag.Parse()
 
-	framework.EtcdMain(m.Run)
+	m.Run()
 }
