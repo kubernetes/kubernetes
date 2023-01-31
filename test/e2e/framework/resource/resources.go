@@ -57,7 +57,7 @@ func ScaleResource(
 ) error {
 	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
 	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
-		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
+		return fmt.Errorf("error while scaling RC %s to %d replicas: %w", name, size, err)
 	}
 	if !wait {
 		return nil
@@ -131,7 +131,7 @@ func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObje
 		if err == nil || apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to delete object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to delete object with non-retriable error: %w", err)
 	}); err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObje
 
 	err = waitForPodsInactive(ctx, ps, interval, timeout)
 	if err != nil {
-		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
+		return fmt.Errorf("error while waiting for pods to become inactive %s: %w", name, err)
 	}
 	terminatePodTime := time.Since(startTime) - deleteTime
 	framework.Logf("Terminating %v %s pods took: %v", description, name, terminatePodTime)
@@ -167,7 +167,7 @@ func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObje
 	// restart VM in that case and delete the pod.
 	err = waitForPodsGone(ctx, ps, interval, 20*time.Minute)
 	if err != nil {
-		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
+		return fmt.Errorf("error while waiting for pods gone %s: %w", name, err)
 	}
 	return nil
 }
@@ -231,7 +231,7 @@ func WaitForControlledPodsRunning(ctx context.Context, c clientset.Interface, ns
 	}
 	err = testutils.WaitForEnoughPodsWithLabelRunning(c, ns, selector, int(replicas))
 	if err != nil {
-		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", name, err)
+		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %w", name, err)
 	}
 	return nil
 }

@@ -210,9 +210,9 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
-				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %w", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
-				err = fmt.Errorf("pod %q never run: %v", pod.Name, err)
+				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
 			}
 		}
 		framework.ExpectNoError(err)

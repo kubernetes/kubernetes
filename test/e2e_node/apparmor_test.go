@@ -122,13 +122,13 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 func loadTestProfiles() error {
 	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
-		return fmt.Errorf("failed to open temp file: %v", err)
+		return fmt.Errorf("failed to open temp file: %w", err)
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
 
 	if _, err := f.WriteString(testProfiles); err != nil {
-		return fmt.Errorf("failed to write profiles to file: %v", err)
+		return fmt.Errorf("failed to write profiles to file: %w", err)
 	}
 
 	cmd := exec.Command("apparmor_parser", "-r", "-W", f.Name())
@@ -143,7 +143,7 @@ func loadTestProfiles() error {
 		if len(out) > 0 {
 			klog.Infof("apparmor_parser: %s", out)
 		}
-		return fmt.Errorf("failed to load profiles: %v", err)
+		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 	klog.V(2).Infof("Loaded profiles: %v", out)
 	return nil

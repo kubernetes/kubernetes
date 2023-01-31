@@ -1382,7 +1382,7 @@ metadata:
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
-					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
+					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
 				}
 				return len(cj.Items) > 0, nil
 			})
@@ -2026,11 +2026,11 @@ func checkContainersImage(containers []v1.Container, expectImage string) bool {
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 	body, err := curl(apiEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("Failed http.Get of %s: %v", apiEndpoint, err)
+		return nil, fmt.Errorf("Failed http.Get of %s: %w", apiEndpoint, err)
 	}
 	var apiVersions metav1.APIVersions
 	if err := json.Unmarshal([]byte(body), &apiVersions); err != nil {
-		return nil, fmt.Errorf("Failed to parse /api output %s: %v", body, err)
+		return nil, fmt.Errorf("Failed to parse /api output %s: %w", body, err)
 	}
 	return &apiVersions, nil
 }
@@ -2048,7 +2048,7 @@ func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	buf := make([]byte, 128)
 	var n int
 	if n, err = stdout.Read(buf); err != nil {
-		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %v", err)
+		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %w", err)
 	}
 	output := string(buf[:n])
 	match := proxyRegexp.FindStringSubmatch(output)
@@ -2266,17 +2266,17 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ginkgo.By("successfully create CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "create", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to create CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	ginkgo.By("successfully apply CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "apply", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to apply CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	return nil
 }

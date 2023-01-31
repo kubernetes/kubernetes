@@ -133,7 +133,7 @@ func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *
 	framework.ExpectNoError(wait.PollWithContext(ctx, time.Millisecond*500, time.Second*30, func(ctx context.Context) (bool, error) {
 		pod, err := c.PodInterface.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
+			return false, fmt.Errorf("failed to get pod %q: %w", name, err)
 		}
 		updateFn(pod)
 		_, err = c.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
@@ -145,7 +145,7 @@ func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *
 			framework.Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
+		return false, fmt.Errorf("failed to update pod %q: %w", name, err)
 	}))
 }
 
@@ -261,7 +261,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(ctx context.Context, pod *v1.Pod)
 	err := wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
-			return false, fmt.Errorf("error in listing events: %s", err)
+			return false, fmt.Errorf("error in listing events: %w", err)
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
@@ -288,7 +288,7 @@ func (c *PodClient) MatchContainerOutput(ctx context.Context, name string, conta
 	}
 	regex, err := regexp.Compile(expectedRegexp)
 	if err != nil {
-		return fmt.Errorf("failed to compile regexp %q: %v", expectedRegexp, err)
+		return fmt.Errorf("failed to compile regexp %q: %w", expectedRegexp, err)
 	}
 	if !regex.MatchString(output) {
 		return fmt.Errorf("failed to match regexp %q in output %q", expectedRegexp, output)

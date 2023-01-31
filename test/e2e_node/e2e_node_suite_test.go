@@ -253,14 +253,14 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
 func validateSystem() error {
 	testBin, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("can't get current binary: %v", err)
+		return fmt.Errorf("can't get current binary: %w", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
 	output, err := exec.Command(testBin, append([]string{"--system-validate-mode"}, os.Args[1:]...)...).CombinedOutput()
 	// The output of system validation should have been formatted, directly print here.
 	fmt.Print(string(output))
 	if err != nil {
-		return fmt.Errorf("system validation failed: %v", err)
+		return fmt.Errorf("system validation failed: %w", err)
 	}
 	return nil
 }
@@ -291,7 +291,7 @@ func waitForNodeReady(ctx context.Context) {
 	gomega.Eventually(ctx, func() error {
 		node, err := getNode(client)
 		if err != nil {
-			return fmt.Errorf("failed to get node: %v", err)
+			return fmt.Errorf("failed to get node: %w", err)
 		}
 		if !isNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
@@ -307,12 +307,12 @@ func updateTestContext(ctx context.Context) error {
 
 	client, err := getAPIServerClient()
 	if err != nil {
-		return fmt.Errorf("failed to get apiserver client: %v", err)
+		return fmt.Errorf("failed to get apiserver client: %w", err)
 	}
 	// Update test context with current node object.
 	node, err := getNode(client)
 	if err != nil {
-		return fmt.Errorf("failed to get node: %v", err)
+		return fmt.Errorf("failed to get node: %w", err)
 	}
 	framework.TestContext.NodeName = node.Name // Set node name.
 	// Update test context with current kubelet configuration.
@@ -320,7 +320,7 @@ func updateTestContext(ctx context.Context) error {
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
 	kubeletCfg, err := getCurrentKubeletConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get kubelet configuration: %v", err)
+		return fmt.Errorf("failed to get kubelet configuration: %w", err)
 	}
 	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
@@ -344,11 +344,11 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 func getAPIServerClient() (*clientset.Clientset, error) {
 	config, err := framework.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %v", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 	client, err := clientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 	return client, nil
 }

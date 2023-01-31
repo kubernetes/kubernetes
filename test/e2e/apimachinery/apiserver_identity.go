@@ -73,7 +73,7 @@ func restartAPIServer(ctx context.Context, node *v1.Node) error {
 	result, err := e2essh.SSH(ctx, cmd, net.JoinHostPort(controlPlaneAddress, e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kube-apiserver: %v", err)
+		return fmt.Errorf("couldn't restart kube-apiserver: %w", err)
 	}
 	return nil
 }

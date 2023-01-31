@@ -230,12 +230,12 @@ func getGPUDevicePluginImage(ctx context.Context) (string, error) {
 func getSampleDevicePluginImage() (string, error) {
 	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the sample plugin yaml: %v", err)
+		return "", fmt.Errorf("failed to read the sample plugin yaml: %w", err)
 	}
 
 	ds, err := e2emanifest.DaemonSetFromData(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse daemon set for sample plugin: %v", err)
+		return "", fmt.Errorf("failed to parse daemon set for sample plugin: %w", err)
 	}
 
 	if len(ds.Spec.Template.Spec.Containers) < 1 {

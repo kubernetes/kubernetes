@@ -342,7 +342,7 @@ func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout ti
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error waiting for all PVCs to be bound: %v", err)
+		return nil, fmt.Errorf("error waiting for all PVCs to be bound: %w", err)
 	}
 	return pvNames, nil
 }
@@ -411,7 +411,7 @@ func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *stora
 		return true, nil
 	})
 	if err != nil {
-		return 0, fmt.Errorf("could not get CSINode limit for driver %s: %v", driverInfo.Name, err)
+		return 0, fmt.Errorf("could not get CSINode limit for driver %s: %w", driverInfo.Name, err)
 	}
 	return limit, nil
 }

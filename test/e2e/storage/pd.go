@@ -526,7 +526,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 	} else if framework.TestContext.Provider == "aws" {
 		awsSession, err := session.NewSession()
 		if err != nil {
-			return fmt.Errorf("error creating session: %v", err)
+			return fmt.Errorf("error creating session: %w", err)
 		}
 		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
@@ -536,7 +536,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		}
 		_, err = client.DetachVolume(&request)
 		if err != nil {
-			return fmt.Errorf("error detaching EBS volume: %v", err)
+			return fmt.Errorf("error detaching EBS volume: %w", err)
 		}
 		return nil
 
@@ -561,7 +561,7 @@ func attachPD(nodeName types.NodeName, pdName string) error {
 	} else if framework.TestContext.Provider == "aws" {
 		awsSession, err := session.NewSession()
 		if err != nil {
-			return fmt.Errorf("error creating session: %v", err)
+			return fmt.Errorf("error creating session: %w", err)
 		}
 		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
@@ -569,7 +569,7 @@ func attachPD(nodeName types.NodeName, pdName string) error {
 		ebsUtil := utils.NewEBSUtil(client)
 		err = ebsUtil.AttachDisk(awsVolumeID, string(nodeName))
 		if err != nil {
-			return fmt.Errorf("error attaching volume %s to node %s: %v", awsVolumeID, nodeName, err)
+			return fmt.Errorf("error attaching volume %s to node %s: %w", awsVolumeID, nodeName, err)
 		}
 		return nil
 	} else {

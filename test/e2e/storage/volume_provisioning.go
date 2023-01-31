@@ -72,7 +72,7 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 
 	awsSession, err := session.NewSession()
 	if err != nil {
-		return fmt.Errorf("error creating session: %v", err)
+		return fmt.Errorf("error creating session: %w", err)
 	}
 
 	if len(zone) > 0 {
@@ -90,7 +90,7 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 	}
 	info, err := client.DescribeVolumes(request)
 	if err != nil {
-		return fmt.Errorf("error querying ec2 for volume %q: %v", volumeID, err)
+		return fmt.Errorf("error querying ec2 for volume %q: %w", volumeID, err)
 	}
 	if len(info.Volumes) == 0 {
 		return fmt.Errorf("no volumes found for volume %q", volumeID)
@@ -737,7 +737,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
-					return false, fmt.Errorf("could not list PVC events in %s: %v", claim.Namespace, err)
+					return false, fmt.Errorf("could not list PVC events in %s: %w", claim.Namespace, err)
 				}
 				for _, event := range events.Items {
 					if strings.Contains(event.Message, "failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key") {
@@ -894,7 +894,7 @@ func waitForProvisionedVolumesDeleted(ctx context.Context, c clientset.Interface
 		return true, nil // No PVs remain
 	})
 	if err != nil {
-		return remainingPVs, fmt.Errorf("Error waiting for PVs to be deleted: %v", err)
+		return remainingPVs, fmt.Errorf("Error waiting for PVs to be deleted: %w", err)
 	}
 	return nil, nil
 }

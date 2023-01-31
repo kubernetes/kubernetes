@@ -507,7 +507,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			tokenCount, err := ParseInClusterClientLogs(logs)
 			if err != nil {
-				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+				return false, fmt.Errorf("inclusterclient reported an error: %w", err)
 			}
 			if tokenCount < 2 {
 				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)

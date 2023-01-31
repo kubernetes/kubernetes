@@ -79,7 +79,7 @@ func buildConformanceTest(binDir, systemSpecName string) error {
 	// Get node conformance directory.
 	conformancePath, err := getConformanceDirectory()
 	if err != nil {
-		return fmt.Errorf("failed to get node conformance directory: %v", err)
+		return fmt.Errorf("failed to get node conformance directory: %w", err)
 	}
 	// Build docker image.
 	cmd := exec.Command("make", "-C", conformancePath, "BIN_DIR="+binDir,
@@ -104,7 +104,7 @@ func buildConformanceTest(binDir, systemSpecName string) error {
 func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
-		return fmt.Errorf("failed to build the dependencies: %v", err)
+		return fmt.Errorf("failed to build the dependencies: %w", err)
 	}
 
 	// Make sure we can find the newly built binaries
@@ -115,7 +115,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 
 	// Build node conformance tarball.
 	if err := buildConformanceTest(buildOutputDir, systemSpecName); err != nil {
-		return fmt.Errorf("failed to build node conformance test: %v", err)
+		return fmt.Errorf("failed to build node conformance test: %w", err)
 	}
 
 	// Copy files
@@ -123,7 +123,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 	for _, file := range requiredFiles {
 		source := filepath.Join(buildOutputDir, file)
 		if _, err := os.Stat(source); err != nil {
-			return fmt.Errorf("failed to locate test file %s: %v", file, err)
+			return fmt.Errorf("failed to locate test file %s: %w", file, err)
 		}
 		output, err := exec.Command("cp", source, filepath.Join(tardir, file)).CombinedOutput()
 		if err != nil {
@@ -188,7 +188,7 @@ func launchKubelet(host, workspace, results, testArgs, bearerToken string) error
 	var cmd []string
 	systemd, err := isSystemd(host)
 	if err != nil {
-		return fmt.Errorf("failed to check systemd: %v", err)
+		return fmt.Errorf("failed to check systemd: %w", err)
 	}
 	if systemd {
 		cmd = []string{
