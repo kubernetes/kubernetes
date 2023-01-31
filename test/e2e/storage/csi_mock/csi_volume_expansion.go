@@ -46,6 +46,7 @@ const (
 	expansionFailed
 	expansionFailedOnController
 	expansionFailedOnNode
+	expansionFailedMissingStagingPath
 )
 
 const (
@@ -78,25 +79,35 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			nodeExpansionRequired   bool
 			disableAttach           bool
 			disableResizingOnDriver bool
+			simulatedCSIDriverError expansionStatus
 			expectFailure           bool
 		}{
 			{
-				name:                  "should expand volume without restarting pod if nodeExpansion=off",
-				nodeExpansionRequired: false,
+				name:                    "should expand volume without restarting pod if nodeExpansion=off",
+				nodeExpansionRequired:   false,
+				simulatedCSIDriverError: expansionSuccess,
 			},
 			{
-				name:                  "should expand volume by restarting pod if attach=on, nodeExpansion=on",
-				nodeExpansionRequired: true,
+				name:                    "should expand volume by restarting pod if attach=on, nodeExpansion=on",
+				nodeExpansionRequired:   true,
+				simulatedCSIDriverError: expansionSuccess,
 			},
 			{
-				name:                  "should expand volume by restarting pod if attach=off, nodeExpansion=on",
-				disableAttach:         true,
-				nodeExpansionRequired: true,
+				name:                    "should not have staging_path missing in node expand volume pod if attach=on, nodeExpansion=on",
+				nodeExpansionRequired:   true,
+				simulatedCSIDriverError: expansionFailedMissingStagingPath,
+			},
+			{
+				name:                    "should expand volume by restarting pod if attach=off, nodeExpansion=on",
+				disableAttach:           true,
+				nodeExpansionRequired:   true,
+				simulatedCSIDriverError: expansionSuccess,
 			},
 			{
 				name:                    "should not expand volume if resizingOnDriver=off, resizingOnSC=on",
 				disableResizingOnDriver: true,
 				expectFailure:           true,
+				simulatedCSIDriverError: expansionSuccess,
 			},
 		}
 		for _, t := range tests {
@@ -113,6 +124,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					tp.disableAttach = true
 					tp.registerDriver = true
 				}
+				tp.hooks = createExpansionHook(test.simulatedCSIDriverError)
 
 				m.init(ctx, tp)
 				ginkgo.DeferCleanup(m.cleanup)
@@ -172,8 +184,12 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					}
 
 					ginkgo.By("Deleting the previously created pod")
-					err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
-					framework.ExpectNoError(err, "while deleting pod for resizing")
+					if test.simulatedCSIDriverError == expansionFailedMissingStagingPath {
+						e2epod.DeletePodOrFail(ctx, m.cs, pod.Namespace, pod.Name)
+					} else {
+						err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
+						framework.ExpectNoError(err, "while deleting pod for resizing")
+					}
 
 					ginkgo.By("Creating a new pod with same volume")
 					pod2, err := m.createPodWithPVC(pvc)
@@ -445,6 +461,15 @@ func createExpansionHook(expectedExpansionStatus expansionStatus) *drivers.Hooks
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, method string, request interface{}) (reply interface{}, err error) {
 			switch expectedExpansionStatus {
+			case expansionFailedMissingStagingPath:
+				expansionRequest, ok := request.(*csipbv1.NodeExpandVolumeRequest)
+				if ok {
+					stagingPath := expansionRequest.StagingTargetPath
+					if stagingPath == "" {
+						return nil, status.Error(codes.InvalidArgument, "invalid node expansion request, missing staging path")
+					}
+
+				}
 			case expansionFailedOnController:
 				expansionRequest, ok := request.(*csipbv1.ControllerExpandVolumeRequest)
 				if ok {
