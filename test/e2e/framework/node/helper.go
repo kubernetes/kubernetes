@@ -107,7 +107,7 @@ func NodeHasTaint(ctx context.Context, c clientset.Interface, nodeName string, t
 // default test add-ons.
 func AllNodesReady(ctx context.Context, c clientset.Interface, timeout time.Duration) error {
 	if err := allNodesReady(ctx, c, timeout); err != nil {
-		return fmt.Errorf("checking for ready nodes: %v", err)
+		return fmt.Errorf("checking for ready nodes: %w", err)
 	}
 	return nil
 }

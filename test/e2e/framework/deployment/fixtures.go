@@ -75,12 +75,12 @@ func CreateDeployment(ctx context.Context, client clientset.Interface, replicas 
 	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
 	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q Create API error: %w", deploymentSpec.Name, err)
 	}
 	framework.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q failed to complete: %w", deploymentSpec.Name, err)
 	}
 	return deployment, nil
 }

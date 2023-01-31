@@ -930,7 +930,7 @@ func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, ne
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
 	if err != nil {
-		return fmt.Errorf("failed to create merge patch for node %q: %v", old.Name, err)
+		return fmt.Errorf("failed to create merge patch for node %q: %w", old.Name, err)
 	}
 	_, err = client.CoreV1().Nodes().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
@@ -948,7 +948,7 @@ func patchPriorityClass(ctx context.Context, cs clientset.Interface, old, new *s
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1.PriorityClass{})
 	if err != nil {
-		return fmt.Errorf("failed to create merge patch for PriorityClass %q: %v", old.Name, err)
+		return fmt.Errorf("failed to create merge patch for PriorityClass %q: %w", old.Name, err)
 	}
 	_, err = cs.SchedulingV1().PriorityClasses().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err

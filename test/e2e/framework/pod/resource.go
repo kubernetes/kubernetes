@@ -533,7 +533,7 @@ func VerifyPodHasConditionWithType(ctx context.Context, f *framework.Framework, 
 func getNodeTTLAnnotationValue(ctx context.Context, c clientset.Interface) (time.Duration, error) {
 	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil || len(nodes.Items) == 0 {
-		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %v", err)
+		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %w", err)
 	}
 	// Since TTL the kubelet is using is stored in node object, for the timeout
 	// purpose we take it from the first node (all of them should be the same).

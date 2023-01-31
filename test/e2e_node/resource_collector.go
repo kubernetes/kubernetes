@@ -480,18 +480,18 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 func getPidFromPidFile(pidFile string) (int, error) {
 	file, err := os.Open(pidFile)
 	if err != nil {
-		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
+		return 0, fmt.Errorf("error opening pid file %s: %w", pidFile, err)
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
+		return 0, fmt.Errorf("error reading pid file %s: %w", pidFile, err)
 	}
 
 	pid, err := strconv.Atoi(string(data))
 	if err != nil {
-		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
+		return 0, fmt.Errorf("error parsing %s as a number: %w", string(data), err)
 	}
 
 	return pid, nil

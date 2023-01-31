@@ -68,7 +68,7 @@ func factory() (framework.ProviderInterface, error) {
 	if region == "" {
 		region, err = gcecloud.GetGCERegion(zone)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+			return nil, fmt.Errorf("error parsing GCE/GKE region from zone %q: %w", zone, err)
 		}
 	}
 	managedZones := []string{} // Manage all zones in the region
@@ -95,7 +95,7 @@ func factory() (framework.ProviderInterface, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("Error building GCE/GKE provider: %v", err)
+		return nil, fmt.Errorf("Error building GCE/GKE provider: %w", err)
 	}
 
 	// Arbitrarily pick one of the zones we have nodes in, looking at prepopulated zones first.
@@ -189,7 +189,7 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ctx context.Context, ip, p
 	project := framework.TestContext.CloudConfig.ProjectID
 	region, err := gcecloud.GetGCERegion(framework.TestContext.CloudConfig.Zone)
 	if err != nil {
-		return fmt.Errorf("could not get region for zone %q: %v", framework.TestContext.CloudConfig.Zone, err)
+		return fmt.Errorf("could not get region for zone %q: %w", framework.TestContext.CloudConfig.Zone, err)
 	}
 
 	return wait.PollWithContext(ctx, 10*time.Second, 5*time.Minute, func(ctx context.Context) (bool, error) {
@@ -304,7 +304,7 @@ func (p *Provider) cleanupGCEResources(ctx context.Context, c clientset.Interfac
 		var err error
 		region, err = gcecloud.GetGCERegion(zone)
 		if err != nil {
-			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %w", zone, err)
 		}
 	}
 	if err := p.gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
@@ -404,7 +404,7 @@ func GetGCECloud() (*gcecloud.Cloud, error) {
 func GetClusterID(ctx context.Context, c clientset.Interface) (string, error) {
 	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, gcecloud.UIDConfigMapName, metav1.GetOptions{})
 	if err != nil || cm == nil {
-		return "", fmt.Errorf("error getting cluster ID: %v", err)
+		return "", fmt.Errorf("error getting cluster ID: %w", err)
 	}
 	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
 	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]

@@ -233,7 +233,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			}
 			timeoutSeconds, err := strconv.Atoi(line[2])
 			if err != nil {
-				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %v", line[2], err)
+				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %w", line[2], err)
 			}
 			if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
 				return true, nil
