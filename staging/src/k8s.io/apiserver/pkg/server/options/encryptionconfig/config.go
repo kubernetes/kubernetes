@@ -161,7 +161,7 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*E
 		kmsHealthChecks = []healthz.HealthChecker{kmsHealthChecker(kmsHealthChecks)}
 	}
 
-	// KMSTimeout is the duration we will wait before closing old transformers.
+	// KMSCloseGracePeriod is the duration we will wait before closing old transformers.
 	// The way we calculate is as follows:
 	// 1. Sum all timeouts across all KMS plugins. (check kmsPrefixTransformer for differences between v1 and v2)
 	// 2. Multiply that by 2 (to allow for some buffer)
