@@ -732,8 +732,8 @@ func (r *multiCIDRRangeAllocator) updateCIDRsAllocation(data multiCIDRNodeReserv
 // defaultNodeSelector generates a label with defaultClusterCIDRKey as the key and
 // defaultClusterCIDRValue as the value, it is an internal nodeSelector matching all
 // nodes. Only used if no ClusterCIDR selects the node.
-func defaultNodeSelector() ([]byte, error) {
-	nodeSelector := &v1.NodeSelector{
+func defaultNodeSelector() *v1.NodeSelector {
+	return &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{
 			{
 				MatchExpressions: []v1.NodeSelectorRequirement{
@@ -746,13 +746,6 @@ func defaultNodeSelector() ([]byte, error) {
 			},
 		},
 	}
-
-	marshalledSelector, err := nodeSelector.Marshal()
-	if err != nil {
-		return nil, err
-	}
-
-	return marshalledSelector, nil
 }
 
 // prioritizedCIDRs returns a list of CIDRs to be allocated to the node.
@@ -883,7 +876,7 @@ func (r *multiCIDRRangeAllocator) orderedMatchingClusterCIDRs(node *v1.Node, occ
 	pq := make(PriorityQueue, 0)
 
 	for label, clusterCIDRList := range r.cidrMap {
-		labelsMatch, matchCnt, err := r.matchCIDRLabels(node, []byte(label))
+		labelsMatch, matchCnt, err := r.matchCIDRLabels(node, label)
 		if err != nil {
 			return nil, err
 		}
@@ -916,11 +909,11 @@ func (r *multiCIDRRangeAllocator) orderedMatchingClusterCIDRs(node *v1.Node, occ
 	}
 
 	// Append the catch all CIDR config.
-	defaultSelector, err := defaultNodeSelector()
+	defaultSelector, err := v1helper.NodeSelectorAsSelector(defaultNodeSelector())
 	if err != nil {
 		return nil, err
 	}
-	if clusterCIDRList, ok := r.cidrMap[string(defaultSelector)]; ok {
+	if clusterCIDRList, ok := r.cidrMap[defaultSelector.String()]; ok {
 		matchingCIDRs = append(matchingCIDRs, clusterCIDRList...)
 	}
 	return matchingCIDRs, nil
@@ -928,21 +921,14 @@ func (r *multiCIDRRangeAllocator) orderedMatchingClusterCIDRs(node *v1.Node, occ
 
 // matchCIDRLabels Matches the Node labels to CIDR Configs.
 // Returns true only if all the labels match, also returns the count of matching labels.
-func (r *multiCIDRRangeAllocator) matchCIDRLabels(node *v1.Node, label []byte) (bool, int, error) {
+func (r *multiCIDRRangeAllocator) matchCIDRLabels(node *v1.Node, label string) (bool, int, error) {
 	var labelSet labels.Set
 	var matchCnt int
-
 	labelsMatch := false
-	selector := &v1.NodeSelector{}
-	err := selector.Unmarshal(label)
-	if err != nil {
-		klog.Errorf("Unable to unmarshal node selector for label %v: %v", label, err)
-		return labelsMatch, 0, err
-	}
 
-	ls, err := v1helper.NodeSelectorAsSelector(selector)
+	ls, err := labels.Parse(label)
 	if err != nil {
-		klog.Errorf("Unable to convert NodeSelector to labels.Selector: %v", err)
+		klog.Errorf("Unable to parse label %s to labels.Selector: %v", label, err)
 		return labelsMatch, 0, err
 	}
 	reqs, selectable := ls.Requirements()
@@ -959,7 +945,7 @@ func (r *multiCIDRRangeAllocator) matchCIDRLabels(node *v1.Node, label []byte) (
 			labelsMatch = true
 		}
 	}
-	return labelsMatch, matchCnt, err
+	return labelsMatch, matchCnt, nil
 }
 
 // Methods for handling ClusterCIDRs.
@@ -1234,20 +1220,20 @@ func (r *multiCIDRRangeAllocator) deleteClusterCIDR(clusterCIDR *networkingv1alp
 }
 
 func (r *multiCIDRRangeAllocator) nodeSelectorKey(clusterCIDR *networkingv1alpha1.ClusterCIDR) (string, error) {
-	var nodeSelector []byte
+	var nodeSelector labels.Selector
 	var err error
 
 	if clusterCIDR.Spec.NodeSelector != nil {
-		nodeSelector, err = clusterCIDR.Spec.NodeSelector.Marshal()
+		nodeSelector, err = v1helper.NodeSelectorAsSelector(clusterCIDR.Spec.NodeSelector)
 	} else {
-		nodeSelector, err = defaultNodeSelector()
+		nodeSelector, err = v1helper.NodeSelectorAsSelector(defaultNodeSelector())
 	}
 
 	if err != nil {
 		return "", err
 	}
 
-	return string(nodeSelector), nil
+	return nodeSelector.String(), nil
 }
 
 func listClusterCIDRs(kubeClient clientset.Interface) (*networkingv1alpha1.ClusterCIDRList, error) {
