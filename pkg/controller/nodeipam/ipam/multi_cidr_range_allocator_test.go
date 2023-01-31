@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	cidrset "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/multicidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
@@ -82,8 +83,8 @@ func getTestNodeSelector(requirements []testNodeSelectorRequirement) string {
 		testNodeSelector.NodeSelectorTerms = append(testNodeSelector.NodeSelectorTerms, nst)
 	}
 
-	marshalledSelector, _ := testNodeSelector.Marshal()
-	return string(marshalledSelector)
+	selector, _ := v1helper.NodeSelectorAsSelector(testNodeSelector)
+	return selector.String()
 }
 
 func getTestCidrMap(testClusterCIDRMap map[string][]*testClusterCIDR) map[string][]*cidrset.ClusterCIDR {
