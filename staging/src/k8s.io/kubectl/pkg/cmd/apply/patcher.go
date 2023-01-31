@@ -51,7 +51,7 @@ const (
 	triesBeforeBackOff = 1
 )
 
-var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:, err: %w"
+var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 
 // Patcher defines options to patch OpenAPI objects.
 type Patcher struct {
