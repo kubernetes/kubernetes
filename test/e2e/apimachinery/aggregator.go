@@ -32,16 +32,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -54,6 +57,9 @@ import (
 
 const (
 	aggregatorServicePort = 7443
+
+	apiServiceRetryPeriod  = 1 * time.Second
+	apiServiceRetryTimeout = 2 * time.Minute
 )
 
 var _ = SIGDescribe("Aggregator", func() {
@@ -78,7 +84,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	})
 
 	/*
-		    Release: v1.17, v1.21
+		    Release: v1.17, v1.21, v1.27
 		    Testname: aggregator-supports-the-sample-apiserver
 		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
@@ -131,57 +137,59 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	_, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating secret %s in namespace %s", secretName, namespace)
 
-	// kubectl create -f clusterrole.yaml
-	_, err = client.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
+	if e2eauth.IsRBACEnabled(ctx, client.RbacV1()) {
+		// kubectl create -f clusterrole.yaml
+		_, err = client.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
 
-		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
-		},
-	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
-
-	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wardler:" + namespace + ":sample-apiserver-reader",
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "sample-apiserver-reader",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				APIGroup:  "",
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespace,
+			ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
 			},
-		},
-	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":sample-apiserver-reader")
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
 
-	// kubectl create -f authDelegator.yaml
-	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wardler:" + namespace + ":auth-delegator",
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "system:auth-delegator",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				APIGroup:  "",
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespace,
+		_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "wardler:" + namespace + ":sample-apiserver-reader",
 			},
-		},
-	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":auth-delegator")
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "sample-apiserver-reader",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					APIGroup:  "",
+					Kind:      "ServiceAccount",
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":sample-apiserver-reader")
+
+		// kubectl create -f authDelegator.yaml
+		_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "wardler:" + namespace + ":auth-delegator",
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "system:auth-delegator",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					APIGroup:  "",
+					Kind:      "ServiceAccount",
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":auth-delegator")
+	}
 
 	// kubectl create -f deploy.yaml
 	deploymentName := "sample-apiserver-deployment"
@@ -288,28 +296,30 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	_, err = client.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating service account %s in namespace %s", "sample-apiserver", namespace)
 
-	// kubectl create -f auth-reader.yaml
-	_, err = client.RbacV1().RoleBindings("kube-system").Create(ctx, &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wardler-auth-reader",
-			Annotations: map[string]string{
-				rbacv1.AutoUpdateAnnotationKey: "true",
+	if e2eauth.IsRBACEnabled(ctx, client.RbacV1()) {
+		// kubectl create -f auth-reader.yaml
+		_, err = client.RbacV1().RoleBindings("kube-system").Create(ctx, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "wardler-auth-reader",
+				Annotations: map[string]string{
+					rbacv1.AutoUpdateAnnotationKey: "true",
+				},
 			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "",
-			Kind:     "Role",
-			Name:     "extension-apiserver-authentication-reader",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespace,
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "",
+				Kind:     "Role",
+				Name:     "extension-apiserver-authentication-reader",
 			},
-		},
-	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "creating role binding %s in namespace %s", "wardler-auth-reader", "kube-system")
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating role binding %s in namespace %s", "wardler-auth-reader", "kube-system")
+	}
 
 	// Wait for the extension apiserver to be up and healthy
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
@@ -325,7 +335,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
-				Port:      pointer.Int32Ptr(aggregatorServicePort),
+				Port:      pointer.Int32(aggregatorServicePort),
 			},
 			Group:                "wardle.example.com",
 			Version:              "v1alpha1",
@@ -515,7 +525,92 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		framework.Failf("Unable to find v1alpha1.wardle.example.com in APIServiceList")
 	}
 
+	// As the APIService doesn't have any labels currently set we need to
+	// set one so that we can select it later when we call deleteCollection
+	ginkgo.By("Adding a label to the APIService")
+	apiServiceName := "v1alpha1.wardle.example.com"
+	apiServiceClient := aggrclient.ApiregistrationV1().APIServices()
+	apiServiceLabel := map[string]string{"e2e-apiservice": "patched"}
+	apiServiceLabelSelector := labels.SelectorFromSet(apiServiceLabel).String()
+	apiServicePatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": apiServiceLabel,
+		},
+	})
+	framework.ExpectNoError(err, "failed to Marshal APIService JSON patch")
+	_, err = apiServiceClient.Patch(ctx, apiServiceName, types.StrategicMergePatchType, []byte(apiServicePatch), metav1.PatchOptions{})
+	framework.ExpectNoError(err, "failed to patch APIService")
+
+	patchedApiService, err := apiServiceClient.Get(ctx, apiServiceName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Unable to retrieve api service %s", apiServiceName)
+	framework.Logf("APIService labels: %v", patchedApiService.Labels)
+
+	ginkgo.By("Updating APIService Status")
+	var updatedStatus, wardle *apiregistrationv1.APIService
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var statusToUpdate *apiregistrationv1.APIService
+		statusContent, err = restClient.Get().
+			AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+			SetHeader("Accept", "application/json").DoRaw(ctx)
+		framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+
+		err = json.Unmarshal([]byte(statusContent), &statusToUpdate)
+		framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
+
+		statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, apiregistrationv1.APIServiceCondition{
+			Type:    "StatusUpdated",
+			Status:  "True",
+			Reason:  "E2E",
+			Message: "Set from e2e test",
+		})
+
+		updatedStatus, err = apiServiceClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(err, "Failed to update status. %v", err)
+	framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+	ginkgo.By("Confirm that v1alpha1.wardle.example.com /status was updated")
+	statusContent, err = restClient.Get().
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		SetHeader("Accept", "application/json").DoRaw(ctx)
+	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+
+	err = json.Unmarshal([]byte(statusContent), &wardle)
+	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
+
+	foundUpdatedStatusCondition := false
+	for _, cond := range wardle.Status.Conditions {
+		if cond.Type == "StatusUpdated" && cond.Reason == "E2E" && cond.Message == "Set from e2e test" {
+			framework.Logf("Found APIService %v with Labels: %v & Condition: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
+			foundUpdatedStatusCondition = true
+			break
+		} else {
+			framework.Logf("Observed APIService %v with Labels: %v & Condition: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
+		}
+	}
+	framework.ExpectEqual(foundUpdatedStatusCondition, true, "The updated status condition was not found. %#v", wardle.Status.Conditions)
+	framework.Logf("Found updated status condition for %s", wardle.ObjectMeta.Name)
+
+	ginkgo.By(fmt.Sprintf("Replace APIService %s", apiServiceName))
+	var updatedApiService *apiregistrationv1.APIService
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		currentApiService, err := apiServiceClient.Get(ctx, apiServiceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Unable to get APIService %s", apiServiceName)
+		currentApiService.Labels = map[string]string{
+			apiServiceName: "updated",
+		}
+		updatedApiService, err = apiServiceClient.Update(ctx, currentApiService, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(updatedApiService.Labels[apiServiceName], "updated", "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
+	framework.Logf("Found updated apiService label for %q", apiServiceName)
+
 	// kubectl delete flunder test-flunder
+	ginkgo.By(fmt.Sprintf("Delete APIService %q", flunderName))
 	err = dynamicClient.Delete(ctx, flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(ctx, f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
@@ -525,6 +620,88 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	if len(unstructuredList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
+
+	ginkgo.By("Recreating test-flunder before removing endpoint via deleteCollection")
+	jsonFlunder, err = json.Marshal(testFlunder)
+	framework.ExpectNoError(err, "marshalling test-flunder for create using dynamic client")
+	unstruct = &unstructured.Unstructured{}
+	err = unstruct.UnmarshalJSON(jsonFlunder)
+	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
+	_, err = dynamicClient.Create(ctx, unstruct, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "listing flunders using dynamic client")
+
+	// kubectl get flunders
+	unstructuredList, err = dynamicClient.List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err, "listing flunders using dynamic client")
+	if len(unstructuredList.Items) != 1 {
+		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
+	}
+
+	ginkgo.By("Read v1alpha1.wardle.example.com /status before patching it")
+	statusContent, err = restClient.Get().
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		SetHeader("Accept", "application/json").DoRaw(ctx)
+	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+
+	wardle.Reset()
+	err = json.Unmarshal([]byte(statusContent), &wardle)
+	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
+
+	ginkgo.By("Patch APIService Status")
+	patch := map[string]interface{}{
+		"status": map[string]interface{}{
+			"conditions": append(wardle.Status.Conditions, apiregistrationv1.APIServiceCondition{
+				Type:    "StatusPatched",
+				Status:  "True",
+				Reason:  "E2E",
+				Message: "Set by e2e test",
+			}),
+		},
+	}
+	payload, err := json.Marshal(patch)
+	framework.ExpectNoError(err, "Failed to marshal JSON. %v", err)
+
+	_, err = restClient.Patch(types.MergePatchType).
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		SetHeader("Accept", "application/json").
+		Body([]byte(payload)).
+		DoRaw(ctx)
+	framework.ExpectNoError(err, "Patch failed for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+
+	ginkgo.By("Confirm that v1alpha1.wardle.example.com /status was patched")
+	statusContent, err = restClient.Get().
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		SetHeader("Accept", "application/json").DoRaw(ctx)
+	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+
+	wardle.Reset()
+	err = json.Unmarshal([]byte(statusContent), &wardle)
+	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
+
+	foundPatchedStatusCondition := false
+	for _, cond := range wardle.Status.Conditions {
+		if cond.Type == "StatusPatched" && cond.Reason == "E2E" && cond.Message == "Set by e2e test" {
+			framework.Logf("Found APIService %v with Labels: %v & Conditions: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
+			foundPatchedStatusCondition = true
+			break
+		} else {
+			framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
+		}
+	}
+	framework.ExpectEqual(foundPatchedStatusCondition, true, "The patched status condition was not found. %#v", wardle.Status.Conditions)
+	framework.Logf("Found patched status condition for %s", wardle.ObjectMeta.Name)
+
+	ginkgo.By(fmt.Sprintf("APIService deleteCollection with labelSelector: %q", apiServiceLabelSelector))
+
+	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(ctx,
+		metav1.DeleteOptions{},
+		metav1.ListOptions{LabelSelector: apiServiceLabelSelector})
+	framework.ExpectNoError(err, "Unable to delete apiservice %s", apiServiceName)
+
+	ginkgo.By("Confirm that the generated APIService has been deleted")
+	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
+	framework.ExpectNoError(err, "failed to count the required APIServices")
+	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
 	cleanTest(ctx, client, aggrclient, namespace)
 }
@@ -566,4 +743,23 @@ func generateFlunderName(base string) string {
 		return base
 	}
 	return fmt.Sprintf("%s-%d", base, id)
+}
+
+func checkApiServiceListQuantity(ctx context.Context, aggrclient *aggregatorclient.Clientset, label string, quantity int) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		framework.Logf("Requesting list of APIServices to confirm quantity")
+
+		list, err := aggrclient.ApiregistrationV1().APIServices().List(ctx, metav1.ListOptions{LabelSelector: label})
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			return false, err
+		}
+		framework.Logf("Found %d APIService with label %q", quantity, label)
+		return true, nil
+	}
 }
