@@ -493,7 +493,9 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 func (b *builder) buildListSchema(v2 bool) *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
-	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
+	s := new(spec.Schema).
+		Typed("object", "").
+		WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
 		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))

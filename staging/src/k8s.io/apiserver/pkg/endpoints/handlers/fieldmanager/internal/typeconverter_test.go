@@ -14,22 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal_test
+package internal
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestTypeConverter(t *testing.T) {
-	dtc := internal.NewDeducedTypeConverter()
+	dtc := NewDeducedTypeConverter()
 
 	testCases := []struct {
 		name string
@@ -106,7 +109,7 @@ spec:
 	}
 }
 
-func testObjectToTyped(t *testing.T, tc internal.TypeConverter, y string) {
+func testObjectToTyped(t *testing.T, tc TypeConverter, y string) {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
 		t.Fatalf("Failed to parse yaml object: %v", err)
@@ -168,4 +171,147 @@ spec:
 		}
 	}
 	result = *r
+}
+
+func TestIndexModels(t *testing.T) {
+	myDefs := map[string]*spec.Schema{
+		// Show empty GVK extension is ignored
+		"def0": {
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{},
+				},
+			},
+		},
+		// Show nil GVK is ignored
+		"def0.0": {
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": nil,
+				},
+			},
+		},
+		// Show this is ignored
+		"def0.1": {},
+		// Show allows binding a single GVK
+		"def1": {
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
+							"group":   "mygroup",
+							"version": "v1",
+							"kind":    "MyKind",
+						},
+					},
+				},
+			},
+		},
+		// Show allows bindings with two versions
+		"def2": {
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
+							"group":   "mygroup",
+							"version": "v1",
+							"kind":    "MyOtherKind",
+						},
+						map[string]interface{}{
+							"group":   "mygroup",
+							"version": "v2",
+							"kind":    "MyOtherKind",
+						},
+					},
+				},
+			},
+		},
+		// Show that we can mix and match GVKs from other definitions, and
+		// that both map[interface{}]interface{} and map[string]interface{}
+		// are allowed
+		"def3": {
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
+							"group":   "mygroup",
+							"version": "v3",
+							"kind":    "MyKind",
+						},
+						map[interface{}]interface{}{
+							"group":   "mygroup",
+							"version": "v3",
+							"kind":    "MyOtherKind",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	myTypes := []smdschema.TypeDef{
+		{
+			Name: "def0",
+			Atom: smdschema.Atom{},
+		},
+		{
+			Name: "def0.1",
+			Atom: smdschema.Atom{},
+		},
+		{
+			Name: "def0.2",
+			Atom: smdschema.Atom{},
+		},
+		{
+			Name: "def1",
+			Atom: smdschema.Atom{},
+		},
+		{
+			Name: "def2",
+			Atom: smdschema.Atom{},
+		},
+		{
+			Name: "def3",
+			Atom: smdschema.Atom{},
+		},
+	}
+
+	parser := typed.Parser{Schema: smdschema.Schema{Types: myTypes}}
+	gvkIndex := indexModels(&parser, myDefs)
+
+	require.Len(t, gvkIndex, 5)
+
+	resultNames := map[schema.GroupVersionKind]string{}
+	for k, v := range gvkIndex {
+		require.NotNil(t, v.TypeRef.NamedType)
+		resultNames[k] = *v.TypeRef.NamedType
+	}
+
+	require.Equal(t, resultNames, map[schema.GroupVersionKind]string{
+		{
+			Group:   "mygroup",
+			Version: "v1",
+			Kind:    "MyKind",
+		}: "def1",
+		{
+			Group:   "mygroup",
+			Version: "v1",
+			Kind:    "MyOtherKind",
+		}: "def2",
+		{
+			Group:   "mygroup",
+			Version: "v2",
+			Kind:    "MyOtherKind",
+		}: "def2",
+		{
+			Group:   "mygroup",
+			Version: "v3",
+			Kind:    "MyKind",
+		}: "def3",
+		{
+			Group:   "mygroup",
+			Version: "v3",
+			Kind:    "MyOtherKind",
+		}: "def3",
+	})
 }
