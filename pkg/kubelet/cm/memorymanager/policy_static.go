@@ -372,14 +372,24 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		return nil
 	}
 
-	for _, ctn := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		containerBlocks := s.GetMemoryBlocks(string(pod.UID), ctn.Name)
+	var result map[string][]topologymanager.TopologyHint
+	found := false
+
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+		containerBlocks := s.GetMemoryBlocks(string(pod.UID), container.Name)
 		// Short circuit to regenerate the same hints if there are already
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(pod, &ctn, containerBlocks, reqRsrcs)
+			result = regenerateHints(pod, container, containerBlocks, reqRsrcs)
+			found = true
+			return false
 		}
+		return true
+	})
+
+	if found {
+		return result
 	}
 
 	// the pod topology hints calculated only once for all containers, so no need to pass re-usable state

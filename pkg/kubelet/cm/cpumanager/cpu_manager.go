@@ -29,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -370,9 +371,10 @@ func (m *manager) removeStaleState() {
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activeAndAdmittedPods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
-		}
+			return true
+		})
 	}
 
 	// Loop through the CPUManager state. Remove any state for containers not
@@ -415,28 +417,26 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			continue
 		}
 
-		allContainers := pod.Spec.InitContainers
-		allContainers = append(allContainers, pod.Spec.Containers...)
-		for _, container := range allContainers {
+		podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 			containerID, err := findContainerIDByName(&pstatus, container.Name)
 			if err != nil {
 				klog.V(4).InfoS("ReconcileState: skipping container; ID not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				continue
+				return true
 			}
 
 			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
 			if err != nil {
 				klog.V(4).InfoS("ReconcileState: skipping container; container status not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				continue
+				return true
 			}
 
 			if cstatus.State.Waiting != nil ||
 				(cstatus.State.Waiting == nil && cstatus.State.Running == nil && cstatus.State.Terminated == nil) {
 				klog.V(4).InfoS("ReconcileState: skipping container; container still in the waiting state", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				continue
+				return true
 			}
 
 			m.Lock()
@@ -451,7 +451,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 					klog.V(4).InfoS("ReconcileState: ignoring terminated container", "pod", klog.KObj(pod), "containerID", containerID)
 				}
 				m.Unlock()
-				continue
+				return true
 			}
 
 			// Once we make it here we know we have a running container.
@@ -465,7 +465,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				// NOTE: This should not happen outside of tests.
 				klog.V(4).InfoS("ReconcileState: skipping container; assigned cpuset is empty", "pod", klog.KObj(pod), "containerName", container.Name)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-				continue
+				return true
 			}
 
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
@@ -475,12 +475,14 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				if err != nil {
 					klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
 					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-					continue
+					return true
 				}
 				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
-		}
+
+			return true
+		})
 	}
 	return success, failure
 }

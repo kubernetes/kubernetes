@@ -539,8 +539,9 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 
 	assignedCPUs := cpuset.New()
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		requestedByContainer := p.guaranteedCPUs(pod, &container)
+	var foundError bool
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+		requestedByContainer := p.guaranteedCPUs(pod, container)
 		// Short circuit to regenerate the same hints if there are already
 		// guaranteed CPUs allocated to the Container. This might happen after a
 		// kubelet restart, for example.
@@ -550,14 +551,21 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 				// An empty list of hints will be treated as a preference that cannot be satisfied.
 				// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
 				// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
-				return map[string][]topologymanager.TopologyHint{
-					string(v1.ResourceCPU): {},
-				}
+				foundError = true
+				return false
 			}
 			// A set of CPUs already assigned to containers in this pod
 			assignedCPUs = assignedCPUs.Union(allocated)
 		}
+		return true
+	})
+
+	if foundError {
+		return map[string][]topologymanager.TopologyHint{
+			string(v1.ResourceCPU): {},
+		}
 	}
+
 	if assignedCPUs.Size() == requested {
 		klog.InfoS("Regenerating TopologyHints for CPUs already allocated", "pod", klog.KObj(pod))
 		return map[string][]topologymanager.TopologyHint{

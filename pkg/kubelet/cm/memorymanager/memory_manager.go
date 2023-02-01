@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -324,9 +325,10 @@ func (m *manager) removeStaleState() {
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activeAndAdmittedPods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
-		}
+			return true
+		})
 	}
 
 	// Loop through the MemoryManager state. Remove any state for containers not

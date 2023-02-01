@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -694,9 +695,10 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		pod := testCase.pod
 
 		// allocate
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			policy.Allocate(st, pod, &container)
-		}
+		podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+			policy.Allocate(st, pod, container)
+			return true
+		})
 		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
 				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)

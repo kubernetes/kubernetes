@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -408,21 +409,25 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 		}
 	}
 
+	var resultErr error
+
 	// In some rare cases init containers can also consume Huge pages
-	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 		// We can take request because limit and requests must match.
 		for requestName := range container.Resources.Requests {
 			if !v1helper.IsHugePageResourceName(requestName) {
-				continue
+				return true
 			}
 			currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
 			if err != nil {
-				return "", err
+				resultErr = err
+				return false
 			}
 			if medium == v1.StorageMediumHugePages { // medium is: Hugepages, size is not specified
 				// PageSize for all volumes in a POD must be equal if medium is "Hugepages"
 				if pageSizeFound && pageSize.Cmp(currentPageSize) != 0 {
-					return "", fmt.Errorf("medium: %s can't be used if container requests multiple huge page sizes", medium)
+					resultErr = fmt.Errorf("medium: %s can't be used if container requests multiple huge page sizes", medium)
+					return false
 				}
 
 				pageSizeFound = true
@@ -434,6 +439,11 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 				}
 			}
 		}
+		return true
+	})
+
+	if resultErr != nil {
+		return "", resultErr
 	}
 
 	if !pageSizeFound {

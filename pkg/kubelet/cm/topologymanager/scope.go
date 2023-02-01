@@ -19,8 +19,9 @@ package topologymanager
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -134,12 +135,22 @@ func (s *scope) RemoveContainer(containerID string) error {
 }
 
 func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(pod, &container)
+	var result lifecycle.PodAdmitResult
+	found := false
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+		err := s.allocateAlignedResources(pod, container)
 		if err != nil {
-			return admission.GetPodAdmitResult(err)
+			result = admission.GetPodAdmitResult(err)
+			found = true
+			return false
 		}
+		return true
+	})
+
+	if found {
+		return result
 	}
+
 	return admission.GetPodAdmitResult(nil)
 }
 

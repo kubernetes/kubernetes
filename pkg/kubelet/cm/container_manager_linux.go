@@ -49,6 +49,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
@@ -709,25 +710,39 @@ type resourceAllocator struct {
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := m.deviceManager.Allocate(pod, &container)
+	var result lifecycle.PodAdmitResult
+	found := false
+
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+		err := m.deviceManager.Allocate(pod, container)
 		if err != nil {
-			return admission.GetPodAdmitResult(err)
+			result = admission.GetPodAdmitResult(err)
+			found = true
+			return false
 		}
 
 		if m.cpuManager != nil {
-			err = m.cpuManager.Allocate(pod, &container)
+			err = m.cpuManager.Allocate(pod, container)
 			if err != nil {
-				return admission.GetPodAdmitResult(err)
+				result = admission.GetPodAdmitResult(err)
+				found = true
+				return false
 			}
 		}
 
 		if m.memoryManager != nil {
-			err = m.memoryManager.Allocate(pod, &container)
+			err = m.memoryManager.Allocate(pod, container)
 			if err != nil {
-				return admission.GetPodAdmitResult(err)
+				result = admission.GetPodAdmitResult(err)
+				found = true
+				return false
 			}
 		}
+		return true
+	})
+
+	if found {
+		return result
 	}
 
 	return admission.GetPodAdmitResult(nil)

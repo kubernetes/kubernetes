@@ -17,8 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -57,15 +58,25 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		return admission.GetPodAdmitResult(&TopologyAffinityError{})
 	}
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	var result lifecycle.PodAdmitResult
+	found := false
+
+	podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(pod, container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-			return admission.GetPodAdmitResult(err)
+			result = admission.GetPodAdmitResult(err)
+			found = true
+			return false
 		}
+		return true
+	})
+
+	if found {
+		return result
 	}
 	return admission.GetPodAdmitResult(nil)
 }
