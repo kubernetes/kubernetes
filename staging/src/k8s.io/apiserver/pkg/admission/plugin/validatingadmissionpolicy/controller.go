@@ -248,7 +248,7 @@ func (c *celAdmissionController) Validate(
 			// is scoped outside of the param loop so we only convert once. We defer
 			// conversion so that it is only performed when we know a policy matches,
 			// saving the cost of converting non-matching requests.
-			var versionedAttributes *whgeneric.VersionedAttributes
+			var versionedAttr *whgeneric.VersionedAttributes
 
 			// If definition has paramKind, paramRef is required in binding.
 			// If definition has no paramKind, paramRef set in binding will be ignored.
