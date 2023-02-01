@@ -53564,7 +53564,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -54691,7 +54691,7 @@ func schema_k8sio_kube_scheduler_config_v1beta2_KubeSchedulerConfiguration(ref c
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -55797,7 +55797,7 @@ func schema_k8sio_kube_scheduler_config_v1beta3_KubeSchedulerConfiguration(ref c
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -57308,7 +57308,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true. Default: false",
+							Description: "enableContentionProfiling enables block profiling, if enableDebuggingHandlers is true. Default: false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
