@@ -69,13 +69,15 @@ func NodeSupportsPreconfiguredRuntimeClassHandler(ctx context.Context, f *framew
 	// If the `runtimes.test-handler` substring is found in the runtime config, it is assumed that the handler is configured.
 	cmd := fmt.Sprintf(`if [ -e '/etc/containerd/config.toml' ]; then
 grep -q 'runtimes.%s' /etc/containerd/config.toml
-  return
+  exit
 fi
 
 if [ -e '/etc/crio/crio.conf' ]; then
   grep -q 'runtimes.%s' /etc/crio/crio.conf
-  return
+  exit
 fi
+
+exit 1
 `, PreconfiguredRuntimeClassHandler, PreconfiguredRuntimeClassHandler)
 
 	_, err = hostExec.IssueCommandWithResult(ctx, cmd, node)
