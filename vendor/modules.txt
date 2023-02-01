@@ -2372,6 +2372,8 @@ k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1
 k8s.io/sample-apiserver/pkg/apis/wardle/validation
 k8s.io/sample-apiserver/pkg/apiserver
 k8s.io/sample-apiserver/pkg/cmd/server
+k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1
+k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1
 k8s.io/sample-apiserver/pkg/generated/clientset/versioned
 k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme
 k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1
