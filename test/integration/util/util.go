@@ -66,11 +66,16 @@ import (
 type ShutdownFunc func()
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
+// and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
+// will keep running until the context is canceled.
 func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer) {
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
+	go func() {
+		<-ctx.Done()
+		evtBroadcaster.Shutdown()
+	}()
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
