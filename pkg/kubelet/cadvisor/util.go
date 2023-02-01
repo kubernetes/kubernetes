@@ -19,9 +19,12 @@ package cadvisor
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -40,6 +43,9 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		v1.ResourceMemory: *resource.NewQuantity(
 			int64(info.MemoryCapacity),
 			resource.BinarySI),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		c[nodev1.ResourceSwap] = *resource.NewQuantity(int64(info.SwapCapacity), resource.BinarySI)
 	}
 
 	// if huge pages are enabled, we report them as a schedulable resource on the node

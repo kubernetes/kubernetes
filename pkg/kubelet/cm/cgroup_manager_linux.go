@@ -34,6 +34,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	nodev1 "k8s.io/api/node/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -265,7 +266,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// once resolved, we can remove this code.
 	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && swapControllerAvailable() {
-		allowlistControllers.Insert("swap")
+		allowlistControllers.Insert(string(nodev1.ResourceSwap))
 	}
 
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
@@ -590,7 +591,7 @@ func swapControllerAvailable() bool {
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := parseCgroupFileUnified("/proc/self/cgroup")
+			unified, err := parseCgroupFileUnified("/proc/self/cgroup")
 			if err != nil {
 				err = fmt.Errorf("failed to parse /proc/self/cgroup: %w", err)
 				klog.V(5).ErrorS(err, warn)
@@ -609,20 +610,18 @@ func swapControllerAvailable() bool {
 	return swapControllerAvailability
 }
 
-// parseCgroupFileUnified returns legacy subsystem paths as the first value,
-// and returns the unified path as the second value.
-func parseCgroupFileUnified(path string) (map[string]string, string, error) {
+// parseCgroupFileUnified returns the unified path.
+func parseCgroupFileUnified(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	defer f.Close()
 	return parseCgroupFromReaderUnified(f)
 }
 
-func parseCgroupFromReaderUnified(r io.Reader) (map[string]string, string, error) {
+func parseCgroupFromReaderUnified(r io.Reader) (string, error) {
 	var (
-		cgroups = make(map[string]string)
 		unified = ""
 		s       = bufio.NewScanner(r)
 	)
@@ -632,18 +631,16 @@ func parseCgroupFromReaderUnified(r io.Reader) (map[string]string, string, error
 			parts = strings.SplitN(text, ":", 3)
 		)
 		if len(parts) < 3 {
-			return nil, unified, fmt.Errorf("invalid cgroup entry: %q", text)
+			return unified, fmt.Errorf("invalid cgroup entry: %q", text)
 		}
 		for _, subs := range strings.Split(parts[1], ",") {
 			if subs == "" {
 				unified = parts[2]
-			} else {
-				cgroups[subs] = parts[2]
 			}
 		}
 	}
 	if err := s.Err(); err != nil {
-		return nil, unified, err
+		return unified, err
 	}
-	return cgroups, unified, nil
+	return unified, nil
 }

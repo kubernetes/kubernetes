@@ -1276,7 +1276,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative %q", k, v)
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %q", k, v)
 			}
 			rl[v1.ResourceName(k)] = q
 

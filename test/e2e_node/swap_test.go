@@ -54,40 +54,37 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 			if initialConfig.SystemReserved == nil {
 				initialConfig.SystemReserved = map[string]string{}
 			}
+			framework.Logf("System reserved swap is: %q", reservedSwapSize)
 			initialConfig.SystemReserved[string(nodev1.ResourceSwap)] = reservedSwapSize
 		})
-		runSystemReservedSwapTests(f)
+		ginkgo.It("node should not allocate reserved swap size", func(ctx context.Context) {
+			hostMemInfo, err := getHostMemInfo()
+			framework.ExpectNoError(err)
+			if hostMemInfo.swapTotal <= revervedSwapSizeBytes {
+				ginkgo.Skip("skipping test when swap is not enough on host")
+			}
+
+			ginkgo.By("by check node status")
+			nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			// Assuming that there is only one node, because this is a node e2e test.
+			framework.ExpectEqual(len(nodeList.Items), 1)
+			allocateble := nodev1.Swap(nodeList.Items[0].Status.Allocatable)
+			capacity := nodev1.Swap(nodeList.Items[0].Status.Capacity)
+			reserved := resource.MustParse(reservedSwapSize)
+			reserved.Add(*allocateble)
+			framework.ExpectEqual(reserved.Cmp(*capacity), 0)
+			// check cgroup limit
+			limitsize, unified, err := getCgroupLimit()
+			framework.ExpectNoError(err)
+			if unified {
+				framework.ExpectEqual(hostMemInfo.swapTotal-revervedSwapSizeBytes, limitsize, "total swap - systemreserved swap = cgourpv2 swap limit")
+			} else {
+				framework.ExpectEqual(hostMemInfo.swapTotal-revervedSwapSizeBytes, limitsize-hostMemInfo.memTotal, "total swap - systemreserved swap = cgroupv1 swap limit")
+			}
+		})
 	})
 })
-
-func runSystemReservedSwapTests(f *framework.Framework) {
-	ginkgo.It("node should not allocate reserved swap size", func() {
-		hostMemInfo, err := getHostMemInfo()
-		framework.ExpectNoError(err)
-		if hostMemInfo.swapTotal <= revervedSwapSizeBytes {
-			ginkgo.Skip("skipping test when swap is not enough on host")
-		}
-
-		ginkgo.By("by check node status")
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		// Assuming that there is only one node, because this is a node e2e test.
-		framework.ExpectEqual(len(nodeList.Items), 1)
-		allocateble := nodev1.Swap(nodeList.Items[0].Status.Allocatable)
-		capacity := nodev1.Swap(nodeList.Items[0].Status.Capacity)
-		reserved := resource.MustParse(reservedSwapSize)
-		reserved.Add(*allocateble)
-		framework.ExpectEqual(reserved.Cmp(*capacity), 0)
-		// check cgroup limit
-		limitsize, unified, err := getCgroupLimit()
-		framework.ExpectNoError(err)
-		if unified {
-			framework.ExpectEqual(hostMemInfo.swapTotal-revervedSwapSizeBytes, limitsize, "total swap - systemreserved swap = cgourpv2 swap limit")
-		} else {
-			framework.ExpectEqual(hostMemInfo.swapTotal-revervedSwapSizeBytes, limitsize-hostMemInfo.memTotal, "total swap - systemreserved swap = cgroupv1 swap limit")
-		}
-	})
-}
 
 type hostMemInfo struct {
 	swapTotal uint64
