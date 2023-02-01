@@ -24,9 +24,9 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
-// Validator defines the func used to validate the cel expressions
-// matchKind provides the GroupVersionKind that the object should be
-// validated by CEL expressions as.
+// Validator defines the func used to validate an object against the validator's rules.
+// It expects the inbound object to already have been converted to the version expected
+// by the underlying CEL code (which is indicated by the match criteria of a policy definition).
 type Validator interface {
 	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
 }
