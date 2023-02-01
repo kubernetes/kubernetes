@@ -29,6 +29,10 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
+const (
+	annotationIngressClass = "kubernetes.io/ingress.class"
+)
+
 // ingressStrategy implements verification logic for Replication Ingress.
 type ingressStrategy struct {
 	runtime.ObjectTyper
@@ -93,7 +97,15 @@ func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	var warnings []string
+	ingress := obj.(*networking.Ingress)
+	_, annotationIsSet := ingress.Annotations[annotationIngressClass]
+	if annotationIsSet && ingress.Spec.IngressClassName != nil {
+		warnings = append(warnings, "ingressClass annotation and IngressClassName should not be set at the same time")
+	}
+	return warnings
+}
 
 // Canonicalize normalizes the object after validation.
 func (ingressStrategy) Canonicalize(obj runtime.Object) {
