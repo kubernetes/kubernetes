@@ -77,9 +77,9 @@ var (
 		&k8smetrics.CounterOpts{
 			Name:           "rest_client_requests_total",
 			StabilityLevel: k8smetrics.ALPHA,
-			Help:           "Number of HTTP requests, partitioned by status code, method, and host.",
+			Help:           "Number of HTTP requests, partitioned by status code, verb, and host.",
 		},
-		[]string{"code", "method", "host"},
+		[]string{"code", "verb", "host"},
 	)
 
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
