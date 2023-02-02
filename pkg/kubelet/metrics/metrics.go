@@ -94,6 +94,7 @@ const (
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
+	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_ms"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -573,6 +574,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
+	TopologyManagerAdmissionDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TopologyManagerAdmissionDurationKey,
+			Help:           "Duration in milliseconds to serve a pod admission request.",
+			Buckets:        metrics.ExponentialBuckets(.05, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -626,6 +638,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
+		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
 
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
