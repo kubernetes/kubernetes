@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -190,21 +191,21 @@ func (c *celAdmissionController) Validate(
 				message = fmt.Errorf("failed to configure binding: %w", err).Error()
 			}
 			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-				policyDecision: policyDecision{
-					action:  actionDeny,
-					message: message,
+				PolicyDecision: PolicyDecision{
+					Action:  ActionDeny,
+					Message: message,
 				},
-				definition: definition,
-				binding:    binding,
+				Definition: definition,
+				Binding:    binding,
 			})
 		default:
 			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-				policyDecision: policyDecision{
-					action:  actionDeny,
-					message: fmt.Errorf("unrecognized failure policy: '%v'", policy).Error(),
+				PolicyDecision: PolicyDecision{
+					Action:  ActionDeny,
+					Message: fmt.Errorf("unrecognized failure policy: '%v'", policy).Error(),
 				},
-				definition: definition,
-				binding:    binding,
+				Definition: definition,
+				Binding:    binding,
 			})
 		}
 	}
@@ -242,6 +243,12 @@ func (c *celAdmissionController) Validate(
 			}
 
 			var param runtime.Object
+
+			// versionedAttributes will be set to non-nil inside of the loop, but
+			// is scoped outside of the param loop so we only convert once. We defer
+			// conversion so that it is only performed when we know a policy matches,
+			// saving the cost of converting non-matching requests.
+			var versionedAttr *whgeneric.VersionedAttributes
 
 			// If definition has paramKind, paramRef is required in binding.
 			// If definition has no paramKind, paramRef set in binding will be ignored.
@@ -293,7 +300,17 @@ func (c *celAdmissionController) Validate(
 				}
 			}
 
-			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
+			if versionedAttr == nil {
+				va, err := whgeneric.NewVersionedAttributes(a, matchKind, o)
+				if err != nil {
+					wrappedErr := fmt.Errorf("failed to convert object version: %w", err)
+					addConfigError(wrappedErr, definition, binding)
+					continue
+				}
+				versionedAttr = va
+			}
+
+			decisions, err := bindingInfo.validator.Validate(versionedAttr, param)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
@@ -302,21 +319,21 @@ func (c *celAdmissionController) Validate(
 			}
 
 			for _, decision := range decisions {
-				switch decision.action {
-				case actionAdmit:
-					if decision.evaluation == evalError {
-						celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.elapsed, definition.Name, binding.Name, "active")
+				switch decision.Action {
+				case ActionAdmit:
+					if decision.Evaluation == EvalError {
+						celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 					}
-				case actionDeny:
+				case ActionDeny:
 					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-						definition:     definition,
-						binding:        binding,
-						policyDecision: decision,
+						Definition:     definition,
+						Binding:        binding,
+						PolicyDecision: decision,
 					})
-					celmetrics.Metrics.ObserveRejection(ctx, decision.elapsed, definition.Name, binding.Name, "active")
+					celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 				default:
 					return fmt.Errorf("unrecognized evaluation decision '%s' for ValidatingAdmissionPolicyBinding '%s' with ValidatingAdmissionPolicy '%s'",
-						decision.action, binding.Name, definition.Name)
+						decision.Action, binding.Name, definition.Name)
 				}
 			}
 		}
@@ -326,18 +343,18 @@ func (c *celAdmissionController) Validate(
 		// TODO: refactor admission.NewForbidden so the name extraction is reusable but the code/reason is customizable
 		var message string
 		deniedDecision := deniedDecisions[0]
-		if deniedDecision.binding != nil {
-			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.binding.Name, deniedDecision.message)
+		if deniedDecision.Binding != nil {
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.Definition.Name, deniedDecision.Binding.Name, deniedDecision.Message)
 		} else {
-			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.message)
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.Definition.Name, deniedDecision.Message)
 		}
 		err := admission.NewForbidden(a, errors.New(message)).(*k8serrors.StatusError)
-		reason := deniedDecision.reason
+		reason := deniedDecision.Reason
 		if len(reason) == 0 {
 			reason = metav1.StatusReasonInvalid
 		}
 		err.ErrStatus.Reason = reason
-		err.ErrStatus.Code = reasonToCode(reason)
+		err.ErrStatus.Code = ReasonToCode(reason)
 		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Message: message})
 		return err
 	}

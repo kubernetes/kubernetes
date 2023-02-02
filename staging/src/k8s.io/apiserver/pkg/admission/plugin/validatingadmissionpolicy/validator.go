@@ -157,26 +157,22 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	return v.Object, nil
 }
 
-func policyDecisionActionForError(f v1alpha1.FailurePolicyType) policyDecisionAction {
+func policyDecisionActionForError(f v1alpha1.FailurePolicyType) PolicyDecisionAction {
 	if f == v1alpha1.Ignore {
-		return actionAdmit
+		return ActionAdmit
 	}
-	return actionDeny
+	return ActionDeny
 }
 
 // Validate validates all cel expressions in Validator and returns a PolicyDecision for each CEL expression or returns an error.
 // An error will be returned if failed to convert the object/oldObject/params/request to unstructured.
 // Each PolicyDecision will have a decision and a message.
 // policyDecision.message will be empty if the decision is allowed and no error met.
-func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
-
-	decisions := make([]policyDecision, len(v.compilationResults))
+	decisions := make([]PolicyDecision, len(v.compilationResults))
 	var err error
-	versionedAttr, err := generic.NewVersionedAttributes(a, matchKind, o)
-	if err != nil {
-		return nil, err
-	}
+
 	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
 		return nil, err
@@ -189,6 +185,7 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 	if err != nil {
 		return nil, err
 	}
+
 	request := createAdmissionRequest(versionedAttr.Attributes)
 	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
@@ -214,41 +211,41 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 		var policyDecision = &decisions[i]
 
 		if compilationResult.Error != nil {
-			policyDecision.action = policyDecisionActionForError(f)
-			policyDecision.evaluation = evalError
-			policyDecision.message = fmt.Sprintf("compilation error: %v", compilationResult.Error)
+			policyDecision.Action = policyDecisionActionForError(f)
+			policyDecision.Evaluation = EvalError
+			policyDecision.Message = fmt.Sprintf("compilation error: %v", compilationResult.Error)
 			continue
 		}
 		if compilationResult.Program == nil {
-			policyDecision.action = policyDecisionActionForError(f)
-			policyDecision.evaluation = evalError
-			policyDecision.message = "unexpected internal error compiling expression"
+			policyDecision.Action = policyDecisionActionForError(f)
+			policyDecision.Evaluation = EvalError
+			policyDecision.Message = "unexpected internal error compiling expression"
 			continue
 		}
 		t1 := time.Now()
 		evalResult, _, err := compilationResult.Program.Eval(va)
 		elapsed := time.Since(t1)
-		policyDecision.elapsed = elapsed
+		policyDecision.Elapsed = elapsed
 		if err != nil {
-			policyDecision.action = policyDecisionActionForError(f)
-			policyDecision.evaluation = evalError
-			policyDecision.message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
+			policyDecision.Action = policyDecisionActionForError(f)
+			policyDecision.Evaluation = EvalError
+			policyDecision.Message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
 		} else if evalResult != celtypes.True {
-			policyDecision.action = actionDeny
+			policyDecision.Action = ActionDeny
 			if validation.Reason == nil {
-				policyDecision.reason = metav1.StatusReasonInvalid
+				policyDecision.Reason = metav1.StatusReasonInvalid
 			} else {
-				policyDecision.reason = *validation.Reason
+				policyDecision.Reason = *validation.Reason
 			}
 			if len(validation.Message) > 0 {
-				policyDecision.message = strings.TrimSpace(validation.Message)
+				policyDecision.Message = strings.TrimSpace(validation.Message)
 			} else {
-				policyDecision.message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
+				policyDecision.Message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
 			}
 
 		} else {
-			policyDecision.action = actionAdmit
-			policyDecision.evaluation = evalAdmit
+			policyDecision.Action = ActionAdmit
+			policyDecision.Evaluation = EvalAdmit
 		}
 	}
 
