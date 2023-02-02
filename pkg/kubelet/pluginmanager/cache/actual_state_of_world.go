@@ -54,8 +54,10 @@ type ActualStateOfWorld interface {
 	// If a plugin does not exist with the given socket path, this is a no-op.
 	RemovePlugin(socketPath string)
 
-	// Deprecated: PluginExistsWithCorrectTimestamp checks if the given plugin exists in the current actual
-	// state of world cache with the correct timestamp
+	// PluginExistsWithCorrectTimestamp checks if the given plugin exists in the current actual
+	// state of world cache with the correct timestamp.
+	// Deprecated: please use `PluginExistsWithCorrectUUID` instead as it provides a better
+	// cross-platform support
 	PluginExistsWithCorrectTimestamp(pluginInfo PluginInfo) bool
 
 	// PluginExistsWithCorrectUUID checks if the given plugin exists in the current actual
