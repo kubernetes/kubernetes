@@ -745,6 +745,14 @@ func (c *Cacher) GuaranteedUpdate(
 
 // Count implements storage.Interface.
 func (c *Cacher) Count(pathPrefix string) (int64, error) {
+	if !c.ready.check() {
+		return c.storage.Count(pathPrefix)
+	}
+	keys := c.watchCache.ListKeys()
+	if len(keys) > 0 {
+		klog.V(4).Infof("cacher (%v): Count (%v) objects from watchCache.", c.objectType.String(), len(keys))
+		return int64(len(keys)), nil
+	}
 	return c.storage.Count(pathPrefix)
 }
 
