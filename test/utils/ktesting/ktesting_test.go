@@ -60,10 +60,17 @@ line2`},
 	actual = hexRe.ReplaceAllString(actual, `<hex>`)
 	expected := `I <header> You see me.
 I <header> You see me too.
-I <header> Some values ints=[1 2 3] strings=<
-	[a b c line 1
-	line2]
- > pointers=[<hex> <hex> <hex>] pod={TypeMeta:{Kind: APIVersion:} ObjectMeta:{Name: GenerateName: Namespace: SelfLink: UID: ResourceVersion: Generation:0 CreationTimestamp:0001-01-01 00:00:00 +0000 UTC DeletionTimestamp:<nil> DeletionGracePeriodSeconds:<nil> Labels:map[] Annotations:map[] OwnerReferences:[] Finalizers:[] ManagedFields:[]} Spec:{Volumes:[] InitContainers:[] Containers:[] EphemeralContainers:[] RestartPolicy: TerminationGracePeriodSeconds:<nil> ActiveDeadlineSeconds:<nil> DNSPolicy: NodeSelector:map[] ServiceAccountName: DeprecatedServiceAccount: AutomountServiceAccountToken:<nil> NodeName: HostNetwork:false HostPID:false HostIPC:false ShareProcessNamespace:<nil> SecurityContext:nil ImagePullSecrets:[] Hostname: Subdomain: Affinity:nil SchedulerName: Tolerations:[] HostAliases:[] PriorityClassName: Priority:<nil> DNSConfig:nil ReadinessGates:[] RuntimeClassName:<nil> EnableServiceLinks:<nil> PreemptionPolicy:<nil> Overhead:map[] TopologySpreadConstraints:[] SetHostnameAsFQDN:<nil> OS:nil HostUsers:<nil> SchedulingGates:[] ResourceClaims:[]} Status:{Phase: Conditions:[] Message: Reason: NominatedNodeName: HostIP: PodIP: PodIPs:[] StartTime:<nil> InitContainerStatuses:[] ContainerStatuses:[] QOSClass: EphemeralContainerStatuses:[] Resize:}}
+I <header> Some values ints=<[]int | len:3, cap:3>: [1, 2, 3] strings=<
+	<[]string | len:4, cap:4>: [a, b, c, line 1
+	    line2]
+ > pointers=<[]*int | len:3, cap:3>: [1, 2, 3] pod=<
+	<v1.Pod>: 
+	    metadata:
+	      creationTimestamp: null
+	    spec:
+	      containers: null
+	    status: {}
+ >
 `
 	assert.Equal(t, expected, actual)
 }

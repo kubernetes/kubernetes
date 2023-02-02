@@ -78,3 +78,8 @@ func useYAML(t reflect.Type) bool {
 		return false
 	}
 }
+
+// AnyToString is a wrapper around format.Object with zero indention.
+func AnyToString(value interface{}) string {
+	return format.Object(value, 0)
+}
