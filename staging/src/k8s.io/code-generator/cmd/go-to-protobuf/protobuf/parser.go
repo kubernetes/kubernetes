@@ -62,11 +62,11 @@ func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast
 	if err != nil {
 		return err
 	}
-
+	defer f.close()
 	if _, err := f.Write(body); err != nil {
 		return err
 	}
-	return f.Close()
+	return f.Sync()
 }
 
 // ExtractFunc extracts information from the provided TypeSpec and returns true if the type should be
