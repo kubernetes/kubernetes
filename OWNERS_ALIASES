@@ -400,6 +400,7 @@ aliases:
     - soltysh
     - jsafrane
     - dims
+    - cici37
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   sig-api-machinery-api-reviewers:
@@ -407,6 +408,7 @@ aliases:
     - deads2k
     - jpbetz
     - sttts
+    - cici37
   sig-apps-api-reviewers:
     - janetkuo
     - kow3ns
