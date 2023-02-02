@@ -261,6 +261,7 @@ replace (
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20230202135820-3d08fb4095bf
 	k8s.io/kms => ./staging/src/k8s.io/kms
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

@@ -19,6 +19,7 @@ package klog
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 )
@@ -31,7 +32,12 @@ type ObjectRef struct {
 
 func (ref ObjectRef) String() string {
 	if ref.Namespace != "" {
-		return fmt.Sprintf("%s/%s", ref.Namespace, ref.Name)
+		var builder strings.Builder
+		builder.Grow(len(ref.Namespace) + len(ref.Name) + 1)
+		builder.WriteString(ref.Namespace)
+		builder.WriteRune('/')
+		builder.WriteString(ref.Name)
+		return builder.String()
 	}
 	return ref.Name
 }

@@ -319,6 +319,11 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 `: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{"test":true}}
 {"caller":"test/output.go:<LINE>","msg":"map keys","v":0}
 `,
+
+		// zapr does not support vmodule checks and thus always
+		// discards these messages.
+		`I output.go:<LINE>] "v=11: you see me because of -vmodule output=11"
+`: ``,
 	} {
 		mapping[key] = value
 	}

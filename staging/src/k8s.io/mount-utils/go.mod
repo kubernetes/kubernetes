@@ -21,4 +21,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/mount-utils => ../mount-utils
+replace (
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20230202135820-3d08fb4095bf
+	k8s.io/mount-utils => ../mount-utils
+)

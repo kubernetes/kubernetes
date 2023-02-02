@@ -40,4 +40,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	k8s.io/code-generator => ../code-generator
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20230202135820-3d08fb4095bf
+)

@@ -114,6 +114,7 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20230202135820-3d08fb4095bf
 	k8s.io/kms => ../kms
 	k8s.io/kube-aggregator => ../kube-aggregator
 )
