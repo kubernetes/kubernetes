@@ -1060,6 +1060,12 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		return nil, err
 	}
 
+	if minTLSVersion == tls.VersionTLS13 {
+		if len(tlsCipherSuites) != 0 {
+			klog.Warning("TLS 1.3 cipher suites are not configurable, ignoring --tls-cipher-suites")
+		}
+	}
+
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
 			MinVersion:   minTLSVersion,
