@@ -1957,6 +1957,8 @@ k8s.io/cloud-provider/config
 k8s.io/cloud-provider/config/install
 k8s.io/cloud-provider/config/v1alpha1
 k8s.io/cloud-provider/controllers/node
+k8s.io/cloud-provider/controllers/node/config
+k8s.io/cloud-provider/controllers/node/config/v1alpha1
 k8s.io/cloud-provider/controllers/nodelifecycle
 k8s.io/cloud-provider/controllers/route
 k8s.io/cloud-provider/controllers/service

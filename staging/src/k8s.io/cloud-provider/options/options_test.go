@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
+	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	componentbaseconfig "k8s.io/component-base/config"
 	cmconfig "k8s.io/controller-manager/config"
@@ -82,6 +83,11 @@ func TestDefaultFlags(t *testing.T) {
 					Name:            "",
 					CloudConfigFile: "",
 				},
+			},
+		},
+		NodeController: &NodeControllerOptions{
+			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs: 1,
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -169,6 +175,7 @@ func TestAddFlags(t *testing.T) {
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
+		"--concurrent-node-syncs=5",
 	}
 	err = fs.Parse(args)
 	if err != nil {
@@ -220,6 +227,11 @@ func TestAddFlags(t *testing.T) {
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
+			},
+		},
+		NodeController: &NodeControllerOptions{
+			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs: 5,
 			},
 		},
 		ServiceController: &ServiceControllerOptions{

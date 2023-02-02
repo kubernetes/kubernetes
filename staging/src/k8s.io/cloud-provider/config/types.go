@@ -18,6 +18,7 @@ package config
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cmconfig "k8s.io/controller-manager/config"
 )
@@ -33,6 +34,10 @@ type CloudControllerManagerConfiguration struct {
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+
+	// NodeController holds configuration for node controller
+	// related features.
+	NodeController nodeconfig.NodeControllerConfiguration
 
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
