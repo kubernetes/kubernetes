@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -172,15 +173,16 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMet
 		return
 	}
 
-	// The periodic loop for updateNodeStatus communicates with the APIServer with a worst case complexity
-	// of O(num_nodes) per cycle. These functions are justified here because these events fire
-	// very infrequently. DO NOT MODIFY this to perform frequent operations.
+	// The periodic loop for updateNodeStatus polls the Cloud Provider periodically
+	// to reconcile the nodes addresses and labels.
 	go wait.Until(func() {
 		if err := cnc.UpdateNodeStatus(context.TODO()); err != nil {
 			klog.Errorf("failed to update node status: %v", err)
 		}
 	}, cnc.nodeStatusUpdateFrequency, stopCh)
 
+	// These workers initialize the nodes added to the cluster,
+	// those that are Tainted with TaintExternalCloudProvider.
 	for i := int32(0); i < cnc.workerCount; i++ {
 		go wait.Until(cnc.runWorker, time.Second, stopCh)
 	}
@@ -251,28 +253,40 @@ func (cnc *CloudNodeController) syncHandler(key string) error {
 
 // UpdateNodeStatus updates the node status, such as node addresses
 func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
-	nodes, err := cnc.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
+	start := time.Now()
+	nodes, err := cnc.nodesLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error monitoring node status: %v", err)
 		return err
 	}
+	defer func() {
+		klog.V(2).Infof("Update %d nodes status took %v.", len(nodes), time.Since(start))
+	}()
 
-	for i := range nodes.Items {
-		instanceMetadata, err := cnc.getInstanceNodeAddresses(ctx, &nodes.Items[i])
+	updateNodeFunc := func(piece int) {
+		node := nodes[piece].DeepCopy()
+		// Do not process nodes that are still tainted, those will be processed by syncNode()
+		cloudTaint := getCloudTaint(node.Spec.Taints)
+		if cloudTaint != nil {
+			klog.V(5).Infof("This node %s is still tainted. Will not process.", node.Name)
+			return
+		}
+
+		instanceMetadata, err := cnc.getInstanceNodeAddresses(ctx, node)
 		if err != nil {
 			klog.Errorf("Error getting instance metadata for node addresses: %v", err)
-			continue
+			return
 		}
-		cnc.updateNodeAddress(ctx, &nodes.Items[i], instanceMetadata)
-	}
 
-	for _, node := range nodes.Items {
+		cnc.updateNodeAddress(ctx, node, instanceMetadata)
+
 		err = cnc.reconcileNodeLabels(node.Name)
 		if err != nil {
 			klog.Errorf("Error reconciling node labels for node %q, err: %v", node.Name, err)
 		}
 	}
 
+	workqueue.ParallelizeUntil(ctx, int(cnc.workerCount), len(nodes), updateNodeFunc)
 	return nil
 }
 
