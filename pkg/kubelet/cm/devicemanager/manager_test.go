@@ -988,6 +988,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 func TestPodContainerDeviceToAllocate(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
 	as := require.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
@@ -1010,11 +1011,19 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
 		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
 
 	// no healthy devices for resourceName1 and devices corresponding to
 	// resource2 are intentionally omitted to simulate that the resource
 	// hasn't been registered.
 	testManager.healthyDevices[resourceName1] = sets.NewString()
+	testManager.healthyDevices[resourceName3] = sets.NewString()
+	// dev5 is no longer in the list of healthy devices
+	testManager.healthyDevices[resourceName3].Insert("dev7")
+	testManager.healthyDevices[resourceName3].Insert("dev8")
 
 	testCases := []struct {
 		description              string
@@ -1045,6 +1054,16 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 			reusableDevices:          sets.NewString(),
 			expectedAllocatedDevices: nil,
 			expErr:                   fmt.Errorf("can't allocate unregistered device %s", resourceName2),
+		},
+		{
+			description:              "Admission error in case resource not devices previously allocated no longer healthy",
+			podUID:                   "pod3",
+			contName:                 "con3",
+			resource:                 resourceName3,
+			required:                 1,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("previously allocated devices are no longer healthy; can't allocate unhealthy devices %s", resourceName3),
 		},
 	}
 

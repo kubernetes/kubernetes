@@ -558,6 +558,11 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, fmt.Errorf("can't allocate unhealthy devices %s", resource)
 	}
 
+	// Check if all the previously allocated devices are healthy
+	if !healthyDevices.IsSuperset(devices) {
+		return nil, fmt.Errorf("previously allocated devices are no longer healthy; can't allocate unhealthy devices %s", resource)
+	}
+
 	if needed == 0 {
 		// No change, no work.
 		return nil, nil
