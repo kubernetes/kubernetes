@@ -28,6 +28,7 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -58,6 +59,7 @@ import (
 	// Do some initialization to decode the query parameters correctly.
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -1525,9 +1527,6 @@ func TestCadvisorMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(b, &containerInfoMap))
 
-	expected, err := ioutil.ReadFile("testdata/expected-cadvisor-metrics.txt")
-	require.NoError(t, err)
-
 	fw := newServerTest()
 	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) { return mi, nil }
 	fw.fakeKubelet.reqContainersInfoFunc = func(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
@@ -1535,20 +1534,14 @@ func TestCadvisorMetrics(t *testing.T) {
 	}
 	defer fw.testHTTPServer.Close()
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/metrics/cadvisor")
+	expected, err := os.Open("testdata/expected-cadvisor-metrics.txt")
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	err = testutil.ScrapeAndCompare(fw.testHTTPServer.URL+"/metrics/cadvisor", expected)
+	require.NoError(t, err)
 
-	body, err := ioutil.ReadAll(resp.Body)
-	require.NoError(t, err)
-	// TODO(bwplotka): Add ScrapeAndCompare utility to prometheus/client_golang (https://github.com/prometheus/client_golang/issues/993).
-	assert.Equal(t, string(expected), string(body))
 	// Second call should lead the same result.
-	resp, err = http.Get(fw.testHTTPServer.URL + "/metrics/cadvisor")
+	expected, err = os.Open("testdata/expected-cadvisor-metrics.txt")
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	body, err = ioutil.ReadAll(resp.Body)
+	err = testutil.ScrapeAndCompare(fw.testHTTPServer.URL+"/metrics/cadvisor", expected)
 	require.NoError(t, err)
-	assert.Equal(t, string(expected), string(body))
 }
