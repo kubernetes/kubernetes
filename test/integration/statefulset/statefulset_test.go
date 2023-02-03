@@ -434,12 +434,14 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 func TestAutodeleteOwnerRefs(t *testing.T) {
 	tests := []struct {
 		name              string
+		namespace         string
 		policy            appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
 		expectPodOwnerRef bool
 		expectSetOwnerRef bool
 	}{
 		{
-			name: "always retain",
+			name:      "always retain",
+			namespace: "always-retain",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -448,7 +450,8 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: false,
 		},
 		{
-			name: "delete on scaledown only",
+			name:      "delete on scaledown only",
+			namespace: "delete-on-scaledown-only",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -457,7 +460,8 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: false,
 		},
 		{
-			name: "delete with set only",
+			name:      "delete with set only",
+			namespace: "delete-with-set-only",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -466,7 +470,8 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: true,
 		},
 		{
-			name: "always delete",
+			name:      "always delete",
+			namespace: "always-delete",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -475,16 +480,18 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: true,
 		},
 	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
+	defer closeFn()
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-			_, ctx := ktesting.NewTestContext(t)
-			closeFn, rm, informers, c := scSetup(ctx, t)
-			defer closeFn()
-			ns := framework.CreateNamespaceOrDie(c, "test-autodelete-ownerrefs", t)
+			ns := framework.CreateNamespaceOrDie(c, test.namespace, t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
-			cancel := runControllerAndInformers(rm, informers)
-			defer cancel()
 
 			sts := newSTS("sts", ns.Name, 3)
 			sts.Spec.PersistentVolumeClaimRetentionPolicy = &test.policy
