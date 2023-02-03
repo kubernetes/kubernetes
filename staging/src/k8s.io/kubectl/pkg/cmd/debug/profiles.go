@@ -254,8 +254,9 @@ func AllowProcessTracing(p *corev1.Pod, containerName string, mask ContainerType
 	})
 }
 
-// modifyContainer performs the modifier function m against a container from cs
-// which has the name of containerName and the type satisfying the mask.
+// modifyContainer performs the modifier function m against a container from the
+// the input pod spec which has the name of containerName and the type satisfying
+// the mask.
 func modifyContainer(pod *corev1.Pod, containerName string, mask ContainerType, m func(*corev1.Container)) {
 	if mask&Containers != 0 {
 		for i, c := range pod.Spec.Containers {
