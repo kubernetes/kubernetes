@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -155,8 +156,17 @@ func (a *ApplySet) deleteObjects(ctx context.Context, dynamicClient dynamic.Inte
 			}
 		}
 
-		opt.Printer.PrintObj(pruneObject.Object, opt.IOStreams.Out)
+		// PartialObjectMeta doesn't have the type information we print.
+		// Also in yaml or json mode we print the full object.
+		// TODO: Really delete should return the object, or we should pre-fetch before actually deleting
+		apiVersion, kind := mapping.GroupVersionKind.ToAPIVersionAndKind()
+		printObj := &unstructured.Unstructured{}
+		printObj.SetAPIVersion(apiVersion)
+		printObj.SetKind(kind)
+		printObj.SetNamespace(namespace)
+		printObj.SetName(name)
 
+		opt.Printer.PrintObj(printObj, opt.IOStreams.Out)
 	}
 	return nil
 }
