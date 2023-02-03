@@ -59,6 +59,8 @@ const (
 	stylePodCopy
 	// debug node
 	styleNode
+	// unsupported debug methodology
+	styleUnsupported
 )
 
 func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
@@ -73,7 +75,7 @@ func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	case *corev1.Node:
 		return styleNode, nil
 	}
-	return debugStyle(-1), fmt.Errorf("objects of type %T are not supported", target)
+	return styleUnsupported, fmt.Errorf("objects of type %T are not supported", target)
 }
 
 func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
