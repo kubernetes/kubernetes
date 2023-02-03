@@ -192,6 +192,7 @@ var (
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1750851
 			// should be serial if/when it's re-enabled
 			`\[HPA\] Horizontal pod autoscaling \(scale resource: Custom Metrics from Stackdriver\)`,
+			`\[Feature:CustomMetricsAutoscaling\]`,
 		},
 		"[sig-node]": {
 			`\[NodeConformance\]`,

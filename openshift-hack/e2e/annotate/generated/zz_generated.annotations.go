@@ -655,29 +655,29 @@ var Annotations = map[string]string{
 
 	"[sig-autoscaling] [Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior) with short downscale stabilization window should scale down soon after the stabilization period": " [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Object from Stackdriver should scale down to 0": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Object from Stackdriver should scale down to 0": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Object from Stackdriver should scale down": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Object from Stackdriver should scale down": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale down with Prometheus": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale down with Prometheus": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale down": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale down": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale up with two metrics": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with Custom Metric of type Pod from Stackdriver should scale up with two metrics": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale down with target average value": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale down with target average value": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale down with target value": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale down with target value": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale up with two metrics": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with External Metric from Stackdriver should scale up with two metrics": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should not scale down when one metric is missing (Container Resource and External Metrics)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should not scale down when one metric is missing (Container Resource and External Metrics)": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should not scale down when one metric is missing (Pod and Object Metrics)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should not scale down when one metric is missing (Pod and Object Metrics)": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should scale up when one metric is missing (Pod and External metrics)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should scale up when one metric is missing (Pod and External metrics)": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should scale up when one metric is missing (Resource and Object metrics)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-autoscaling] [HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) with multiple metrics of different types should scale up when one metric is missing (Resource and Object metrics)": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl Port forwarding With a server listening on 0.0.0.0 should support forwarding over websockets": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
