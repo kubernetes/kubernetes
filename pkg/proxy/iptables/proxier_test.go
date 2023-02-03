@@ -124,7 +124,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 	// Create a fake executor for the conntrack utility. This should only be
 	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
 	fcmd := fakeexec.FakeCmd{}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	execFunc := func(cmd string, args ...string) exec.Cmd {
@@ -147,7 +147,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.exec = &fexec
+	fp.exec = fexec
 
 	for _, tc := range testCases {
 		makeServiceMap(fp,
@@ -267,7 +267,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 	// Create a fake executor for the conntrack utility. This should only be
 	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
 	fcmd := fakeexec.FakeCmd{}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	execFunc := func(cmd string, args ...string) exec.Cmd {
@@ -290,7 +290,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 
 	ipt := iptablestest.NewIPv6Fake()
 	fp := NewFakeProxier(ipt)
-	fp.exec = &fexec
+	fp.exec = fexec
 
 	for _, tc := range testCases {
 		makeServiceMap(fp,
@@ -5340,7 +5340,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 
 func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	execFunc := func(cmd string, args ...string) exec.Cmd {
@@ -5364,7 +5364,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.exec = &fexec
+	fp.exec = fexec
 
 	svcIP := "172.30.0.41"
 	extIP := "192.168.99.11"

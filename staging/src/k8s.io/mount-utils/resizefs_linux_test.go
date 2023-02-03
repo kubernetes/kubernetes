@@ -459,14 +459,14 @@ backup_roots[4]:
 					func() ([]byte, []byte, error) { return []byte(test.cmdOutput), nil, nil },
 				},
 			}
-			fexec := fakeexec.FakeExec{
+			fexec := &fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd {
 						return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 					},
 				},
 			}
-			resizefs := ResizeFs{exec: &fexec}
+			resizefs := ResizeFs{exec: fexec}
 
 			var blockSize uint64
 			var fsSize uint64
@@ -563,7 +563,7 @@ func TestNeedResize(t *testing.T) {
 					},
 				},
 			}
-			fexec := fakeexec.FakeExec{
+			fexec := &fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -571,7 +571,7 @@ func TestNeedResize(t *testing.T) {
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 				},
 			}
-			resizefs := ResizeFs{exec: &fexec}
+			resizefs := ResizeFs{exec: fexec}
 
 			needResize, err := resizefs.NeedResize(test.devicePath, test.deviceMountPath)
 			if !test.expectError && err != nil {

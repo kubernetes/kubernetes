@@ -353,7 +353,7 @@ func TestImagesPull(t *testing.T) {
 		},
 	}
 
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -364,7 +364,7 @@ func TestImagesPull(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}

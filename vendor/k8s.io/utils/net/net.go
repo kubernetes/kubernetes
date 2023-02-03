@@ -29,136 +29,14 @@ import (
 // order is maintained
 func ParseCIDRs(cidrsString []string) ([]*net.IPNet, error) {
 	cidrs := make([]*net.IPNet, 0, len(cidrsString))
-	for _, cidrString := range cidrsString {
+	for i, cidrString := range cidrsString {
 		_, cidr, err := ParseCIDRSloppy(cidrString)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse cidr value:%q with error:%v", cidrString, err)
+			return nil, fmt.Errorf("invalid CIDR[%d]: %v (%v)", i, cidr, err)
 		}
 		cidrs = append(cidrs, cidr)
 	}
 	return cidrs, nil
-}
-
-// IsDualStackIPs returns if a slice of ips is:
-// - all are valid ips
-// - at least one ip from each family (v4 or v6)
-func IsDualStackIPs(ips []net.IP) (bool, error) {
-	v4Found := false
-	v6Found := false
-	for _, ip := range ips {
-		if ip == nil {
-			return false, fmt.Errorf("ip %v is invalid", ip)
-		}
-
-		if v4Found && v6Found {
-			continue
-		}
-
-		if IsIPv6(ip) {
-			v6Found = true
-			continue
-		}
-
-		v4Found = true
-	}
-
-	return (v4Found && v6Found), nil
-}
-
-// IsDualStackIPStrings returns if
-// - all are valid ips
-// - at least one ip from each family (v4 or v6)
-func IsDualStackIPStrings(ips []string) (bool, error) {
-	parsedIPs := make([]net.IP, 0, len(ips))
-	for _, ip := range ips {
-		parsedIP := ParseIPSloppy(ip)
-		parsedIPs = append(parsedIPs, parsedIP)
-	}
-	return IsDualStackIPs(parsedIPs)
-}
-
-// IsDualStackCIDRs returns if
-// - all are valid cidrs
-// - at least one cidr from each family (v4 or v6)
-func IsDualStackCIDRs(cidrs []*net.IPNet) (bool, error) {
-	v4Found := false
-	v6Found := false
-	for _, cidr := range cidrs {
-		if cidr == nil {
-			return false, fmt.Errorf("cidr %v is invalid", cidr)
-		}
-
-		if v4Found && v6Found {
-			continue
-		}
-
-		if IsIPv6(cidr.IP) {
-			v6Found = true
-			continue
-		}
-		v4Found = true
-	}
-
-	return v4Found && v6Found, nil
-}
-
-// IsDualStackCIDRStrings returns if
-// - all are valid cidrs
-// - at least one cidr from each family (v4 or v6)
-func IsDualStackCIDRStrings(cidrs []string) (bool, error) {
-	parsedCIDRs, err := ParseCIDRs(cidrs)
-	if err != nil {
-		return false, err
-	}
-	return IsDualStackCIDRs(parsedCIDRs)
-}
-
-// IsIPv6 returns if netIP is IPv6.
-func IsIPv6(netIP net.IP) bool {
-	return netIP != nil && netIP.To4() == nil
-}
-
-// IsIPv6String returns if ip is IPv6.
-func IsIPv6String(ip string) bool {
-	netIP := ParseIPSloppy(ip)
-	return IsIPv6(netIP)
-}
-
-// IsIPv6CIDRString returns if cidr is IPv6.
-// This assumes cidr is a valid CIDR.
-func IsIPv6CIDRString(cidr string) bool {
-	ip, _, _ := ParseCIDRSloppy(cidr)
-	return IsIPv6(ip)
-}
-
-// IsIPv6CIDR returns if a cidr is ipv6
-func IsIPv6CIDR(cidr *net.IPNet) bool {
-	ip := cidr.IP
-	return IsIPv6(ip)
-}
-
-// IsIPv4 returns if netIP is IPv4.
-func IsIPv4(netIP net.IP) bool {
-	return netIP != nil && netIP.To4() != nil
-}
-
-// IsIPv4String returns if ip is IPv4.
-func IsIPv4String(ip string) bool {
-	netIP := ParseIPSloppy(ip)
-	return IsIPv4(netIP)
-}
-
-// IsIPv4CIDR returns if a cidr is ipv4
-func IsIPv4CIDR(cidr *net.IPNet) bool {
-	ip := cidr.IP
-	return IsIPv4(ip)
-}
-
-// IsIPv4CIDRString returns if cidr is IPv4.
-// This assumes cidr is a valid CIDR.
-func IsIPv4CIDRString(cidr string) bool {
-	ip, _, _ := ParseCIDRSloppy(cidr)
-	return IsIPv4(ip)
 }
 
 // ParsePort parses a string representing an IP port.  If the string is not a
