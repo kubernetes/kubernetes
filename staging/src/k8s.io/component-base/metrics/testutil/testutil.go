@@ -67,6 +67,13 @@ func CustomCollectAndCompare(c metrics.StableCollector, expected io.Reader, metr
 	return GatherAndCompare(registry, expected, metricNames...)
 }
 
+// ScrapeAndCompare calls a remote exporter's endpoint which is expected to return some metrics in
+// plain text format. Then it compares it with the results that the `expected` would return.
+// If the `metricNames` is not empty it would filter the comparison only to the given metric names.
+func ScrapeAndCompare(url string, expected io.Reader, metricNames ...string) error {
+	return testutil.ScrapeAndCompare(url, expected, metricNames...)
+}
+
 // NewFakeKubeRegistry creates a fake `KubeRegistry` that takes the input version as `build in version`.
 // It should only be used in testing scenario especially for the deprecated metrics.
 // The input version format should be `major.minor.patch`, e.g. '1.18.0'.
