@@ -31,6 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/util/feature"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -122,6 +123,8 @@ type Interface interface {
 	// Note that both `state` and `nodeInfo` are deep copied.
 	SelectVictimsOnNode(ctx context.Context, state *framework.CycleState,
 		pod *v1.Pod, nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status)
+	// DeletePod deletes the given victim pod from API server for preemption.
+	DeletePod(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error
 }
 
 type Evaluator struct {
@@ -372,7 +375,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 					return
 				}
 			}
-			if err := util.DeletePod(ctx, cs, victim); err != nil {
+			if err := ev.DeletePod(ctx, cs, victim, pod); err != nil {
 				klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 				errCh.SendErrorWithCancel(err, cancel)
 				return

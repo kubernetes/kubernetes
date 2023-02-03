@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -336,4 +337,8 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 
 func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
 	return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
+}
+
+func (pl *DefaultPreemption) DeletePod(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error {
+	return util.DeletePod(ctx, cs, victim)
 }
