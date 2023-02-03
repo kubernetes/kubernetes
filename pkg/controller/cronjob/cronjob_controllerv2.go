@@ -76,7 +76,8 @@ type ControllerV2 struct {
 	cronJobListerSynced cache.InformerSynced
 
 	// now is a function that returns current time, done to facilitate unit tests
-	now func() time.Time
+	now         func() time.Time
+	syncHandler func(context.Context, *batchv1.CronJob, []*batchv1.Job) (*batchv1.CronJob, *time.Duration, bool, error)
 }
 
 // NewControllerV2 creates and initializes a new Controller.
@@ -118,6 +119,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 			jm.enqueueController(obj)
 		},
 	})
+	jm.syncHandler = jm.syncCronJob
 
 	metrics.Register()
 
@@ -196,7 +198,7 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 		return nil, err
 	}
 
-	cronJobCopy, requeueAfter, updateStatus, err := jm.syncCronJob(ctx, cronJob, jobsToBeReconciled)
+	cronJobCopy, requeueAfter, updateStatus, err := jm.syncHandler(ctx, cronJob, jobsToBeReconciled)
 	if err != nil {
 		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", err)
 		if updateStatus {
@@ -389,7 +391,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
 	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone) {
-		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
+		// schedule changed, change the requeue time, pass nil recorder so that syncHandler will output any warnings
 		sched, err := cron.ParseStandard(formatSchedule(newCJ, nil))
 		if err != nil {
 			// this is likely a user error in defining the spec value

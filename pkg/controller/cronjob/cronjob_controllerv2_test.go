@@ -25,19 +25,25 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -53,6 +59,8 @@ var (
 
 	errorTimeZone = "bad timezone"
 	newYork       = "America/New_York"
+	realClock     = &clock.RealClock{}
+	alwaysReady   = func() bool { return true }
 )
 
 // returns a cronJob with some fields filled in.
@@ -65,6 +73,7 @@ func cronJob() batchv1.CronJob {
 			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
 		},
 		Spec: batchv1.CronJobSpec{
+			TimeZone:          pointer.String("UTC"),
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: "Allow",
 			JobTemplate: batchv1.JobTemplateSpec{
@@ -165,6 +174,23 @@ func weekAfterTheHour() time.Time {
 		panic("test setup error")
 	}
 	return T1
+}
+
+func newControllerFromClient(ctx context.Context, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*ControllerV2, informers.SharedInformerFactory) {
+	return newControllerFromClientWithClock(ctx, kubeClient, resyncPeriod, realClock)
+}
+
+func newControllerFromClientWithClock(ctx context.Context, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker) (*ControllerV2, informers.SharedInformerFactory) {
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	jm, _ := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+	jm.now = justASecondBeforeTheHour
+	queue := &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")}
+	jm.queue = queue
+	jm.jobControl = &fakeJobControl{}
+	jm.cronJobControl = &fakeCJControl{}
+	jm.recorder = record.NewFakeRecorder(10)
+
+	return jm, sharedInformers
 }
 
 func TestControllerV2SyncCronJob(t *testing.T) {
@@ -1669,4 +1695,48 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWatchCronJobs(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewSimpleClientset()
+	fakeWatch := watch.NewFake()
+	clientset.PrependWatchReactor("cronjobs", core.DefaultWatchReactor(fakeWatch, nil))
+	manager, sharedInformerFactory := newControllerFromClient(ctx, clientset, controller.NoResyncPeriodFunc)
+	manager.cronJobListerSynced = alwaysReady
+	manager.jobListerSynced = alwaysReady
+
+	var testCronJob batchv1.CronJob
+	received := make(chan struct{})
+
+	// The update sent through the fakeWatcher should make its way into the workqueue,
+	// and eventually into the syncHandler.
+	manager.syncHandler = func(ctx context.Context, cronJob *batchv1.CronJob, _ []*batchv1.Job) (*batchv1.CronJob, *time.Duration, bool, error) {
+		defer close(received)
+		updateStatus := false
+		ns := cronJob.Namespace
+		name := cronJob.Name
+		cronjob, err := manager.cronJobLister.CronJobs(ns).Get(name)
+		if err != nil || cronjob == nil {
+			t.Errorf("Expected to find cronjob under name %v: %v", cronJob.Name, err)
+			return nil, nil, updateStatus, err
+		}
+		if !apiequality.Semantic.DeepDerivative(*cronjob, testCronJob) {
+			updateStatus = true
+			t.Errorf("Expected %#v, but got %#v", testCronJob, *cronjob)
+		}
+		return cronjob, nil, updateStatus, err
+	}
+	// Start only the cronjob watcher and the workqueue, send a watch event,
+	// and make sure it hits the sync method.
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	sharedInformerFactory.Start(stopCh)
+	go manager.Run(context.TODO(), 1)
+
+	// We're sending new cronjob to see if it reaches syncHandler.
+	testCronJob = cronJob()
+	fakeWatch.Add(&testCronJob)
+	t.Log("Waiting for cronjob to reach syncHandler")
+	<-received
 }
