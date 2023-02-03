@@ -257,7 +257,7 @@ func scaleDown(ctx context.Context, name string, kind schema.GroupVersionKind, r
 	}
 	st := &HPAScaleTest{
 		initPods:         5,
-		perPodCPURequest: 500,
+		perPodCPURequest: 501,
 		perPodMemRequest: 500,
 		targetValue:      getTargetValueByType(150, 30, metricTargetType),
 		minPods:          1,
