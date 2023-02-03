@@ -2192,6 +2192,9 @@ function start-kube-controller-manager {
     params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
     params+=("--configure-cloud-routes=false")
   fi
+  if [[ "${ENABLE_MULTI_CIDR_RANGE_ALLOCATOR:-}" == 'true' ]]; then
+      params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
+  fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=("--feature-gates=${FEATURE_GATES}")
   fi
