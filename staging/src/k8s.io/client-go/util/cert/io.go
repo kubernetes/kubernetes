@@ -58,7 +58,7 @@ func canReadFile(path string) bool {
 }
 
 // WriteCert writes the pem-encoded certificate data to certPath.
-// The certificate file will be created with file mode 000.
+// The certificate file will be created with file mode 0600.
 // If the certificate file already exists, it will be overwritten.
 // The parent directory of the certPath will be created as needed with file mode 0700.
 func WriteCert(certPath string, data []byte) error {
