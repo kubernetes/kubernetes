@@ -22,9 +22,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-// maxMsgSize use 16MB as the default message size limit.
+// maxMsgSize use 32MB as the default message size limit.
 // grpc library default is 4MB
-const maxMsgSize = 1024 * 1024 * 16
+const maxMsgSize = 1024 * 1024 * 32
 
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
