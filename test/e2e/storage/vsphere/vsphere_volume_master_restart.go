@@ -84,7 +84,7 @@ func restartKubelet(ctx context.Context, host string) error {
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kubelet: %v", err)
+		return fmt.Errorf("couldn't restart kubelet: %w", err)
 	}
 	return nil
 }

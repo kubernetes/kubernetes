@@ -64,16 +64,16 @@ func NewEBSUtil(client *ec2.EC2) *EBSUtil {
 func (ebs *EBSUtil) AttachDisk(volumeID string, nodeName string) error {
 	instance, err := findInstanceByNodeName(nodeName, ebs.client)
 	if err != nil {
-		return fmt.Errorf("error finding node %s: %v", nodeName, err)
+		return fmt.Errorf("error finding node %s: %w", nodeName, err)
 	}
 	err = ebs.waitForAvailable(volumeID)
 	if err != nil {
-		return fmt.Errorf("error waiting volume %s to be available: %v", volumeID, err)
+		return fmt.Errorf("error waiting volume %s to be available: %w", volumeID, err)
 	}
 
 	device, err := ebs.findFreeDevice(instance)
 	if err != nil {
-		return fmt.Errorf("error finding free device on node %s: %v", nodeName, err)
+		return fmt.Errorf("error finding free device on node %s: %w", nodeName, err)
 	}
 	hostDevice := "/dev/xvd" + string(device)
 	attachInput := &ec2.AttachVolumeInput{
@@ -83,7 +83,7 @@ func (ebs *EBSUtil) AttachDisk(volumeID string, nodeName string) error {
 	}
 	_, err = ebs.client.AttachVolume(attachInput)
 	if err != nil {
-		return fmt.Errorf("error attaching volume %s to node %s: %v", volumeID, nodeName, err)
+		return fmt.Errorf("error attaching volume %s to node %s: %w", volumeID, nodeName, err)
 	}
 	return ebs.waitForAttach(volumeID)
 }
@@ -245,7 +245,7 @@ func describeInstances(request *ec2.DescribeInstancesInput, cloud *ec2.EC2) ([]*
 	for {
 		response, err := cloud.DescribeInstances(request)
 		if err != nil {
-			return nil, fmt.Errorf("error listing AWS instances: %v", err)
+			return nil, fmt.Errorf("error listing AWS instances: %w", err)
 		}
 
 		for _, reservation := range response.Reservations {

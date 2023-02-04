@@ -493,9 +493,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		framework.Logf("created pod")
-		if !e2epod.CheckPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
-		}
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, time.Minute))
 
 		framework.Logf("pod is ready")
 
@@ -509,7 +507,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			tokenCount, err := ParseInClusterClientLogs(logs)
 			if err != nil {
-				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+				return false, fmt.Errorf("inclusterclient reported an error: %w", err)
 			}
 			if tokenCount < 2 {
 				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)

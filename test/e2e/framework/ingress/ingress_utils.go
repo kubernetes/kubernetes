@@ -309,7 +309,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 	}
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to generate key: %v", err)
+		return nil, nil, fmt.Errorf("Failed to generate key: %w", err)
 	}
 	notBefore := time.Now()
 	notAfter := notBefore.Add(validFor)
@@ -318,7 +318,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %w", err)
 	}
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -351,13 +351,13 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 	var keyOut, certOut bytes.Buffer
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("Failed to create certificate: %w", err)
 	}
 	if err := pem.Encode(&certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		return nil, nil, fmt.Errorf("Failed creating cert: %v", err)
+		return nil, nil, fmt.Errorf("Failed creating cert: %w", err)
 	}
 	if err := pem.Encode(&keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, fmt.Errorf("Failed creating key: %v", err)
+		return nil, nil, fmt.Errorf("Failed creating key: %w", err)
 	}
 	return certOut.Bytes(), keyOut.Bytes(), nil
 }
@@ -532,11 +532,11 @@ func ingressFromManifest(fileName string) (*networkingv1.Ingress, error) {
 func ingressToManifest(ing *networkingv1.Ingress, path string) error {
 	serialized, err := marshalToYaml(ing, networkingv1.SchemeGroupVersion)
 	if err != nil {
-		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
+		return fmt.Errorf("failed to marshal ingress %v to YAML: %w", ing, err)
 	}
 
 	if err := os.WriteFile(path, serialized, 0600); err != nil {
-		return fmt.Errorf("error in writing ingress to file: %s", err)
+		return fmt.Errorf("error in writing ingress to file: %w", err)
 	}
 	return nil
 }
@@ -1150,17 +1150,17 @@ func (j *TestJig) DeleteTestResource(ctx context.Context, cs clientset.Interface
 	var errs []error
 	if ing != nil {
 		if err := j.runDelete(ctx, ing); err != nil {
-			errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %w", ing.Namespace, ing.Name, err))
 		}
 	}
 	if svc != nil {
 		if err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{}); err != nil {
-			errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %w", svc.Namespace, svc.Name, err))
 		}
 	}
 	if deploy != nil {
 		if err := cs.AppsV1().Deployments(deploy.Namespace).Delete(ctx, deploy.Name, metav1.DeleteOptions{}); err != nil {
-			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", deploy.Namespace, deploy.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %w", deploy.Namespace, deploy.Name, err))
 		}
 	}
 	return errs

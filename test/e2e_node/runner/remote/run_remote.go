@@ -326,14 +326,14 @@ func prepareGceImages() (*internalImageConfig, error) {
 
 		imageConfigData, err := os.ReadFile(configPath)
 		if err != nil {
-			return nil, fmt.Errorf("Could not read image config file provided: %v", err)
+			return nil, fmt.Errorf("Could not read image config file provided: %w", err)
 		}
 		// Unmarshal the given image config file. All images for this test run will be organized into a map.
 		// shortName->GCEImage, e.g cos-stable->cos-stable-81-12871-103-0.
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
-			return nil, fmt.Errorf("Could not parse image config file: %v", err)
+			return nil, fmt.Errorf("Could not parse image config file: %w", err)
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
@@ -472,7 +472,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFla
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive: %v", err),
+			err: fmt.Errorf("unable to create test archive: %w", err),
 		}
 	}
 
@@ -511,7 +511,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 				}
 				creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
 				if err != nil {
-					return fmt.Errorf("failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+					return fmt.Errorf("failed to parse instance creation timestamp %q: %w", instance.CreationTimestamp, err)
 				}
 				io := imageObj{
 					creationTime: creationTime,
@@ -522,7 +522,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 			return nil
 		},
 	); err != nil {
-		return "", fmt.Errorf("failed to list images in project %q: %v", project, err)
+		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
 
 	// Pick the latest image after sorting.
@@ -590,7 +590,7 @@ func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult 
 func createInstance(imageConfig *internalGCEImage) (string, error) {
 	p, err := computeService.Projects.Get(*project).Do()
 	if err != nil {
-		return "", fmt.Errorf("failed to get project info %q: %v", *project, err)
+		return "", fmt.Errorf("failed to get project info %q: %w", *project, err)
 	}
 	// Use default service account
 	serviceAccount := p.DefaultServiceAccount
