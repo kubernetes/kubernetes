@@ -433,14 +433,12 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 
 func TestAutodeleteOwnerRefs(t *testing.T) {
 	tests := []struct {
-		name              string
 		namespace         string
 		policy            appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
 		expectPodOwnerRef bool
 		expectSetOwnerRef bool
 	}{
 		{
-			name:      "always retain",
 			namespace: "always-retain",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -450,7 +448,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: false,
 		},
 		{
-			name:      "delete on scaledown only",
 			namespace: "delete-on-scaledown-only",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -460,7 +457,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: false,
 		},
 		{
-			name:      "delete with set only",
 			namespace: "delete-with-set-only",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -470,7 +466,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 			expectSetOwnerRef: true,
 		},
 		{
-			name:      "always delete",
 			namespace: "always-delete",
 			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -489,7 +484,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 	defer cancel()
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.namespace, func(t *testing.T) {
 			ns := framework.CreateNamespaceOrDie(c, test.namespace, t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
 
