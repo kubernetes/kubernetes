@@ -16640,6 +16640,11 @@
                   "type": "string"
                 }
               },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "text/plain": {
                 "schema": {
                   "type": "string"

@@ -65,6 +65,7 @@ func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	// the "produces" section for pods/{name}/log
 	return []string{
 		"text/plain",
+		"text/event-stream",
 	}
 }
 
@@ -90,13 +91,17 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}
 	location, transport, err := pod.LogLocation(ctx, r.Store, r.KubeletConn, name, logOpts)
+	contentType := "text/plain"
+	if logOpts.Follow {
+		contentType = "text/event-stream"
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &genericrest.LocationStreamer{
 		Location:                              location,
 		Transport:                             transport,
-		ContentType:                           "text/plain",
+		ContentType:                           contentType,
 		Flush:                                 logOpts.Follow,
 		ResponseChecker:                       genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
 		RedirectChecker:                       genericrest.PreventRedirects,
