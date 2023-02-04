@@ -2637,7 +2637,7 @@ func TestPermitPlugins(t *testing.T) {
 }
 
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metricsRecorder) Option {
+func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = recorder
 	}
@@ -2793,7 +2793,7 @@ func TestRecordingMetrics(t *testing.T) {
 			}
 
 			stopCh := make(chan struct{})
-			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				PercentageOfNodesToScore: pointer.Int32(testPercentageOfNodesToScore),
 				SchedulerName:            testProfileName,
@@ -2809,9 +2809,9 @@ func TestRecordingMetrics(t *testing.T) {
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
 			close(stopCh)
-			<-recorder.isStoppedCh
+			<-recorder.IsStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
-			recorder.flushMetrics()
+			recorder.FlushMetrics()
 
 			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
@@ -2905,7 +2905,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
 			stopCh := make(chan struct{})
-			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName:            testProfileName,
 				PercentageOfNodesToScore: pointer.Int32(testPercentageOfNodesToScore),
@@ -2924,9 +2924,9 @@ func TestRunBindPlugins(t *testing.T) {
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
 			close(stopCh)
-			<-recorder.isStoppedCh
+			<-recorder.IsStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
-			recorder.flushMetrics()
+			recorder.FlushMetrics()
 			collectAndCompareFrameworkMetrics(t, "Bind", tt.wantStatus)
 		})
 	}
