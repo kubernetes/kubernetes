@@ -41,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -436,4 +438,30 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 	return func() {
 		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
 	}
+}
+
+// waitForAllContainerRemoval waits until all the containers on a given pod are really gone.
+// This is needed by the e2e tests which involve exclusive resource allocation (cpu, topology manager; podresources; etc.)
+// In these cases, we need to make sure the tests clean up after themselves to make sure each test runs in
+// a pristine environment. The only way known so far to do that is to introduce this wait.
+// Worth noting, however, that this makes the test runtime much bigger.
+func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
+	rs, _, err := getCRIClient()
+	framework.ExpectNoError(err)
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{
+				types.KubernetesPodNameLabel:      podName,
+				types.KubernetesPodNamespaceLabel: podNS,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("got error waiting for all containers to be removed from CRI: %v", err)
+		}
+
+		if len(containers) > 0 {
+			return fmt.Errorf("expected all containers to be removed from CRI but %v containers still remain. Containers: %+v", len(containers), containers)
+		}
+		return nil
+	}, 2*time.Minute, 1*time.Second).Should(gomega.Succeed())
 }
