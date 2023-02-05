@@ -1780,6 +1780,19 @@
             ],
             "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
           },
+          "resizePolicy": {
+            "description": "Resources resize policy for the container.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerResizePolicy"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "resources": {
             "allOf": [
               {
@@ -1893,6 +1906,26 @@
         },
         "required": [
           "containerPort"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ContainerResizePolicy": {
+        "description": "ContainerResizePolicy represents resource resize policy for a single container.",
+        "properties": {
+          "policy": {
+            "default": "",
+            "description": "Resource resize policy applicable to the specified resource name. If not specified, it defaults to RestartNotRequired.",
+            "type": "string"
+          },
+          "resourceName": {
+            "default": "",
+            "description": "Name of the resource type to which this resource resize policy applies. Supported values: cpu, memory.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resourceName",
+          "policy"
         ],
         "type": "object"
       },
@@ -2180,6 +2213,19 @@
               }
             ],
             "description": "Probes are not allowed for ephemeral containers."
+          },
+          "resizePolicy": {
+            "description": "Resources resize policy for the container.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerResizePolicy"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "resources": {
             "allOf": [

@@ -579,6 +579,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ContainerImageApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerPort"):
 		return &applyconfigurationscorev1.ContainerPortApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerResizePolicy"):
+		return &applyconfigurationscorev1.ContainerResizePolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerState"):
 		return &applyconfigurationscorev1.ContainerStateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerStateRunning"):

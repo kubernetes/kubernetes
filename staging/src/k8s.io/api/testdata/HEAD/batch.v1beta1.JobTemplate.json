@@ -619,6 +619,12 @@
                   }
                 ]
               },
+              "resizePolicy": [
+                {
+                  "resourceName": "resourceNameValue",
+                  "policy": "policyValue"
+                }
+              ],
               "volumeMounts": [
                 {
                   "name": "nameValue",
@@ -896,6 +902,12 @@
                   }
                 ]
               },
+              "resizePolicy": [
+                {
+                  "resourceName": "resourceNameValue",
+                  "policy": "policyValue"
+                }
+              ],
               "volumeMounts": [
                 {
                   "name": "nameValue",
@@ -1173,6 +1185,12 @@
                   }
                 ]
               },
+              "resizePolicy": [
+                {
+                  "resourceName": "resourceNameValue",
+                  "policy": "policyValue"
+                }
+              ],
               "volumeMounts": [
                 {
                   "name": "nameValue",

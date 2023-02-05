@@ -722,6 +722,12 @@ message Container {
   // +optional
   optional ResourceRequirements resources = 8;
 
+  // Resources resize policy for the container.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  // +listType=atomic
+  repeated ContainerResizePolicy resizePolicy = 23;
+
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
   // +optional
@@ -862,6 +868,17 @@ message ContainerPort {
   optional string hostIP = 5;
 }
 
+// ContainerResizePolicy represents resource resize policy for a single container.
+message ContainerResizePolicy {
+  // Name of the resource type to which this resource resize policy applies.
+  // Supported values: cpu, memory.
+  optional string resourceName = 1;
+
+  // Resource resize policy applicable to the specified resource name.
+  // If not specified, it defaults to RestartNotRequired.
+  optional string policy = 2;
+}
+
 // ContainerState holds a possible state of container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
@@ -964,6 +981,19 @@ message ContainerStatus {
   // Is always true when no startupProbe is defined.
   // +optional
   optional bool started = 9;
+
+  // ResourcesAllocated represents the compute resources allocated for this container by the
+  // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
+  // and after successfully admitting desired pod resize.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> resourcesAllocated = 10;
+
+  // Resources represents the compute resource requests and limits that have been successfully
+  // enacted on the running container after it has been started or has been successfully resized.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  optional ResourceRequirements resources = 11;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1319,6 +1349,12 @@ message EphemeralContainerCommon {
   // already allocated to the pod.
   // +optional
   optional ResourceRequirements resources = 8;
+
+  // Resources resize policy for the container.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  // +listType=atomic
+  repeated ContainerResizePolicy resizePolicy = 23;
 
   // Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
   // Cannot be updated.
@@ -3935,6 +3971,13 @@ message PodStatus {
   // Status for any ephemeral containers that have run in this pod.
   // +optional
   repeated ContainerStatus ephemeralContainerStatuses = 13;
+
+  // Status of resources resize desired for pod's containers.
+  // It is empty if no resources resize is pending.
+  // Any changes to container resources will automatically set this to "Proposed"
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  optional string resize = 14;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
