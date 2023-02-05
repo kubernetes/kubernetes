@@ -51,3 +51,7 @@ func (f fakeStorageFactory) ResourcePrefix(groupResource schema.GroupResource) s
 func (f fakeStorageFactory) Backends() []storage.Backend {
 	return []storage.Backend{{Server: "etcd-0"}}
 }
+
+func (f fakeStorageFactory) CohabitatingResources(_ schema.GroupResource) []schema.GroupResource {
+	return nil
+}

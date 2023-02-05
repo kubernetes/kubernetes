@@ -55,6 +55,10 @@ type StorageFactory interface {
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []Backend
+
+	// CohabitatingResources returns the complete, priority ordered list
+	// of resources that are equivalent to the input groupResource.
+	CohabitatingResources(groupResource schema.GroupResource) []schema.GroupResource
 }
 
 // DefaultStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
@@ -346,4 +350,13 @@ func (s *DefaultStorageFactory) ResourcePrefix(groupResource schema.GroupResourc
 	}
 
 	return etcdResourcePrefix
+}
+
+func (s *DefaultStorageFactory) CohabitatingResources(groupResource schema.GroupResource) []schema.GroupResource {
+	cohabitatingResources := s.Overrides[groupResource].cohabitatingResources
+	if len(cohabitatingResources) == 0 {
+		return nil
+	}
+	// return a copy so that the caller cannot mutate this slice
+	return append(make([]schema.GroupResource, 0, len(cohabitatingResources)), cohabitatingResources...)
 }

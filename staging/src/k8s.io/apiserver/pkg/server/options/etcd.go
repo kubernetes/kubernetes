@@ -446,6 +446,10 @@ func (s *SimpleStorageFactory) Backends() []serverstorage.Backend {
 	return serverstorage.Backends(s.StorageConfig)
 }
 
+func (s *SimpleStorageFactory) CohabitatingResources(_ schema.GroupResource) []schema.GroupResource {
+	return nil // all resources are distinct
+}
+
 var _ serverstorage.StorageFactory = &transformerStorageFactory{}
 
 type transformerStorageFactory struct {
@@ -473,4 +477,8 @@ func (t *transformerStorageFactory) ResourcePrefix(resource schema.GroupResource
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
 	return t.delegate.Backends()
+}
+
+func (t *transformerStorageFactory) CohabitatingResources(groupResource schema.GroupResource) []schema.GroupResource {
+	return t.delegate.CohabitatingResources(groupResource)
 }
