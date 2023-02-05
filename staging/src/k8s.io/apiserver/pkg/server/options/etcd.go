@@ -276,7 +276,7 @@ func (s *EtcdOptions) Complete(
 			s.resourceTransformers = dynamicTransformers
 			s.kmsPluginHealthzChecks = []healthz.HealthChecker{dynamicTransformers}
 		} else {
-			s.resourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
+			s.resourceTransformers = encryptionConfiguration.Transformers
 			s.kmsPluginHealthzChecks = encryptionConfiguration.HealthChecks
 		}
 	}

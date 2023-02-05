@@ -244,12 +244,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	}
 
 	// Pick the transformer for any of the returned resources.
-	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
-	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
-	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
-	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
-	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
-	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
 
 	dataCtx := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
@@ -802,10 +802,11 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(encryptionConfiguration.Transformers) != 1 {
+	transformers := encryptionConfiguration.Transformers.(staticTransformers)
+	if len(transformers) != 1 {
 		t.Fatalf("input config does not have exactly one resource: %s", encryptionConfigPath)
 	}
-	for _, transformer := range encryptionConfiguration.Transformers {
+	for _, transformer := range transformers {
 		return transformer
 	}
 	panic("unreachable")
