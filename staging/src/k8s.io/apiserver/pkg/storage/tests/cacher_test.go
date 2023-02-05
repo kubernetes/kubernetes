@@ -179,6 +179,18 @@ func TestList(t *testing.T) {
 	storagetesting.RunTestList(ctx, t, cacher, true)
 }
 
+func TestClusterScopedWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.TestClusterScopedWatch(ctx, t, cacher)
+}
+
+func TestNamespaceScopedWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.TestNamespaceScopedWatch(ctx, t, cacher)
+}
+
 func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType, eventObject runtime.Object) {
 	_, _, line, _ := goruntime.Caller(1)
 	select {
@@ -759,6 +771,7 @@ type tearDownFunc func()
 type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
+	indexerFuncs   map[string]storage.IndexerFunc
 	clock          clock.Clock
 }
 
@@ -770,6 +783,24 @@ func withDefaults(options *setupOptions) {
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
 	options.clock = clock.RealClock{}
+}
+
+func withClusterScopedKeyFunc(options *setupOptions) {
+	options.keyFunc = func(obj runtime.Object) (string, error) {
+		return storage.NoNamespaceKeyFunc(options.resourcePrefix, obj)
+	}
+}
+
+func withSpecNodeNameIndexerFuncs(options *setupOptions) {
+	options.indexerFuncs = map[string]storage.IndexerFunc{
+		"spec.nodeName": func(obj runtime.Object) string {
+			pod, ok := obj.(*example.Pod)
+			if !ok {
+				return ""
+			}
+			return pod.Spec.NodeName
+		},
+	}
 }
 
 func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstorage.Cacher, tearDownFunc) {
@@ -795,6 +826,7 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 		GetAttrsFunc:   GetPodAttrs,
 		NewFunc:        newPod,
 		NewListFunc:    newPodList,
+		IndexerFuncs:   setupOpts.indexerFuncs,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          setupOpts.clock,
 	}
