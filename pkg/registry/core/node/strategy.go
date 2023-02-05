@@ -223,16 +223,10 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchNode returns a generic matcher for a given label and field selector.
 func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
-		Label:       label,
-		Field:       field,
-		GetAttrs:    GetAttrs,
-		IndexFields: []string{"metadata.name"},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
-}
-
-// NameTriggerFunc returns value metadata.namespace of given object.
-func NameTriggerFunc(obj runtime.Object) string {
-	return obj.(*api.Node).ObjectMeta.Name
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
