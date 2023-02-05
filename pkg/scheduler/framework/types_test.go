@@ -28,6 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestNewResource(t *testing.T) {
@@ -1456,5 +1459,103 @@ func TestFitError_Error(t *testing.T) {
 				t.Errorf("Error() = Got: %v Want: %v", gotReasonMsg, tt.wantReasonMsg)
 			}
 		})
+	}
+}
+
+func TestCalculatePodResourcesWithResize(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	cpu500m := resource.MustParse("500m")
+	mem500M := resource.MustParse("500Mi")
+	cpu700m := resource.MustParse("700m")
+	mem800M := resource.MustParse("800Mi")
+	testpod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "pod_resize_test",
+			Name:      "testpod",
+			UID:       types.UID("testpod"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase:  v1.PodRunning,
+			Resize: "",
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name               string
+		requests           v1.ResourceList
+		resourcesAllocated v1.ResourceList
+		resizeStatus       v1.PodResizeStatus
+		expectedResource   Resource
+		expectedNon0CPU    int64
+		expectedNon0Mem    int64
+	}{
+		{
+			name:               "Pod with no pending resize",
+			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:       "",
+			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:    cpu500m.MilliValue(),
+			expectedNon0Mem:    mem500M.Value(),
+		},
+		{
+			name:               "Pod with resize in progress",
+			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:       v1.PodResizeStatusInProgress,
+			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:    cpu500m.MilliValue(),
+			expectedNon0Mem:    mem500M.Value(),
+		},
+		{
+			name:               "Pod with deferred resize",
+			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:       v1.PodResizeStatusDeferred,
+			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedNon0CPU:    cpu700m.MilliValue(),
+			expectedNon0Mem:    mem800M.Value(),
+		},
+		{
+			name:               "Pod with infeasible resize",
+			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:       v1.PodResizeStatusInfeasible,
+			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:    cpu500m.MilliValue(),
+			expectedNon0Mem:    mem500M.Value(),
+		},
+	}
+
+	for _, tt := range tests {
+		pod := testpod.DeepCopy()
+		pod.Spec.Containers[0].Resources.Requests = tt.requests
+		pod.Status.ContainerStatuses[0].ResourcesAllocated = tt.resourcesAllocated
+		pod.Status.Resize = tt.resizeStatus
+
+		res, non0CPU, non0Mem := calculateResource(pod)
+		if !reflect.DeepEqual(tt.expectedResource, res) {
+			t.Errorf("Test: %s expected resource: %+v, got: %+v", tt.name, tt.expectedResource, res)
+		}
+		if non0CPU != tt.expectedNon0CPU {
+			t.Errorf("Test: %s expected non0CPU: %d, got: %d", tt.name, tt.expectedNon0CPU, non0CPU)
+		}
+		if non0Mem != tt.expectedNon0Mem {
+			t.Errorf("Test: %s expected non0Mem: %d, got: %d", tt.name, tt.expectedNon0Mem, non0Mem)
+		}
 	}
 }
