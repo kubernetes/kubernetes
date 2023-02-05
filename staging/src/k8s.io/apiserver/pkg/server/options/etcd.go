@@ -465,7 +465,7 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 
 	configCopy := *config
 	resourceConfig := configCopy.Config
-	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource)
+	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource, t.delegate.CohabitatingResources(resource))
 	configCopy.Config = resourceConfig
 
 	return &configCopy, nil

@@ -244,12 +244,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	}
 
 	// Pick the transformer for any of the returned resources.
-	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
-	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
-	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
-	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
-	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
-	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"))
+	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
 
 	dataCtx := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
