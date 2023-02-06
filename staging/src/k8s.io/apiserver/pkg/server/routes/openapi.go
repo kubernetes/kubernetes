@@ -24,6 +24,7 @@ import (
 	builder2 "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -36,7 +37,7 @@ type OpenAPI struct {
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*handler.OpenAPIService, *spec.Swagger) {
-	spec, err := builder2.BuildOpenAPISpec(c.RegisteredWebServices(), oa.Config)
+	spec, err := builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(c.RegisteredWebServices()), oa.Config)
 	if err != nil {
 		klog.Fatalf("Failed to build open api spec for root: %v", err)
 	}
@@ -75,7 +76,7 @@ func (oa OpenAPI) InstallV3(c *restful.Container, mux *mux.PathRecorderMux) *han
 	}
 
 	for gv, ws := range grouped {
-		spec, err := builder3.BuildOpenAPISpec(ws, oa.Config)
+		spec, err := builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(ws), oa.Config)
 		if err != nil {
 			klog.Errorf("Failed to build OpenAPI v3 for group %s, %q", gv, err)
 
