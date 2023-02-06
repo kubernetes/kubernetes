@@ -67,12 +67,18 @@ func (b *backend) ProcessEvents(events ...*auditinternal.Event) bool {
 	return success
 }
 
-func (b *backend) logEvent(ev *auditinternal.Event) bool {
+func (b *backend) logEvent(ev *auditinternal.Event) (ok bool) {
 	line := ""
 	switch b.format {
 	case FormatLegacy:
 		line = audit.EventString(ev) + "\n"
 	case FormatJson:
+		defer func() {
+			if e := recover(); e != nil {
+				ok = false
+				audit.HandlePluginError(PluginName, nil, ev)
+			}
+		}()
 		bs, err := runtime.Encode(b.encoder, ev)
 		if err != nil {
 			audit.HandlePluginError(PluginName, err, ev)
