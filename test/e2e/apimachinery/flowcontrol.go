@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -282,14 +281,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, nomin
 }
 
 func getPriorityLevelNominalConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
-	req := c.CoreV1().RESTClient().Get()
-	reqURL := req.URL()
-	// That URL will end with "/api/v1", because we asked for CoreV1 above.
-	// Replace that part with "/metrics" and leave everything before that unchanged
-	// because that is what routes to the server.
-	reqPathOrig := reqURL.EscapedPath()
-	reqPathMetrics := strings.TrimSuffix(reqPathOrig, "api/v1") + "metrics"
-	req = req.RequestURI(reqPathMetrics)
+	req := c.CoreV1().RESTClient().Get().AbsPath("/metrics")
 	resp, err := req.DoRaw(context.TODO())
 	if err != nil {
 		return 0, fmt.Errorf("error requesting metrics; request=%#+v, request.URL()=%s: %w", req, req.URL(), err)
