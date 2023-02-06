@@ -708,12 +708,21 @@ func (d *DynamicTransformers) Name() string {
 }
 
 // TransformerForResource returns the transformer for the given resource.
-func (d *DynamicTransformers) TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) value.Transformer {
-	return &resourceTransformer{
+func (d *DynamicTransformers) TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) (value.Transformer, error) {
+	rt := &resourceTransformer{
 		resource:              resource,
 		cohabitatingResources: cohabitatingResources,
 		transformTracker:      d.transformTracker,
 	}
+
+	// this allows us to statically validate the config on API server startup
+	// but if an invalid config is loaded after startup, it will break the
+	// running server since our static validation is not able to detect this
+	if _, err := rt.transformer(); err != nil {
+		return nil, fmt.Errorf("invalid transformer config: %w", err)
+	}
+
+	return rt, nil
 }
 
 // Set sets the transformer overrides. This method is not go routine safe and must only be called by the same, single caller throughout the lifetime of this object.
@@ -752,51 +761,60 @@ type resourceTransformer struct {
 }
 
 func (r *resourceTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	return r.transformer().TransformFromStorage(ctx, data, dataCtx)
+	transformer, err := r.transformer()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid transformer config: %w", err)
+	}
+	return transformer.TransformFromStorage(ctx, data, dataCtx)
 }
 
 func (r *resourceTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	return r.transformer().TransformToStorage(ctx, data, dataCtx)
+	transformer, err := r.transformer()
+	if err != nil {
+		return nil, fmt.Errorf("invalid transformer config: %w", err)
+	}
+	return transformer.TransformToStorage(ctx, data, dataCtx)
 }
 
-func (r *resourceTransformer) transformer() value.Transformer {
+func (r *resourceTransformer) transformer() (value.Transformer, error) {
 	return r.transformTracker.Load().(*transformTracker).transformerOverrides.TransformerForResource(r.resource, r.cohabitatingResources)
 }
 
 type ResourceTransformers interface {
-	TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) value.Transformer
+	TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) (value.Transformer, error)
 }
 
 var _ ResourceTransformers = &staticTransformers{}
 
 type staticTransformers map[schema.GroupResource]value.Transformer
 
-func (s staticTransformers) TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) value.Transformer {
+func (s staticTransformers) TransformerForResource(resource schema.GroupResource, cohabitatingResources []schema.GroupResource) (value.Transformer, error) {
 	// first consult the (possibly empty) priority ordered list of cohabitating resources
-
-	// TODO we cannot return an error here because this is called dynamically when the
-	//  the encryption config is automatically reloaded, and while it would be okay for
-	//  an error to prevent API server startup, it seems like a poor choice to let an
-	//  encryption config be parsed and loaded as valid but then break the API server,
-	//  though perhaps it could be argued that this falls into one of the many config
-	//  mistakes that we cannot prevent (i.e. it is similar to removing the identity
-	//  transformer while unencrypted data is still present in storage).  This means
-	//  that currently we do not error when conflicting cohabitating resources are
-	//  specified (but we do consistently use the same transformer for all cohabitating
-	//  resources).  Maybe it is better to fail loudly in these rare edge cases?
-
 	// TODO we will need to cache this lookup when combined with wildcard support since it is on the critical path
+	var cohabitatingResourceTransformer value.Transformer
+	var overlappingCohabitatingResources []schema.GroupResource
 	for _, cohabitatingResource := range cohabitatingResources {
 		cohabitatingResource := cohabitatingResource
 		if transformer := s[cohabitatingResource]; transformer != nil {
-			return transformer
+			cohabitatingResourceTransformer = transformer
+			overlappingCohabitatingResources = append(overlappingCohabitatingResources, cohabitatingResource)
 		}
+	}
+
+	switch len(overlappingCohabitatingResources) {
+	case 0:
+		// no cohabitating resources
+	case 1:
+		return cohabitatingResourceTransformer, nil
+	default:
+		return nil, fmt.Errorf("overlapping transformers detected for %v: %v (these resources must not overlap: %v)",
+			resource, overlappingCohabitatingResources, cohabitatingResources)
 	}
 
 	// otherwise fallback to the direct resource based lookup
 	transformer := s[resource]
 	if transformer == nil {
-		return identity.NewEncryptCheckTransformer()
+		return identity.NewEncryptCheckTransformer(), nil
 	}
-	return transformer
+	return transformer, nil
 }

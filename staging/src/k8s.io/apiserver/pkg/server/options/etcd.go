@@ -463,9 +463,16 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 		return nil, err
 	}
 
+	cohabitatingResources := t.delegate.CohabitatingResources(resource)
+	transformer, err := t.resourceTransformers.TransformerForResource(resource, cohabitatingResources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transformer for %v with %v as cohabitating resources: %w",
+			resource, cohabitatingResources, err)
+	}
+
 	configCopy := *config
 	resourceConfig := configCopy.Config
-	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource, t.delegate.CohabitatingResources(resource))
+	resourceConfig.Transformer = transformer
 	configCopy.Config = resourceConfig
 
 	return &configCopy, nil

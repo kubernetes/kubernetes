@@ -244,12 +244,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	}
 
 	// Pick the transformer for any of the returned resources.
-	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
-	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
-	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
-	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
-	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
-	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	identityFirstTransformer := getSecretsTransformer(t, identityFirstEncryptionConfiguration.Transformers)
+	aesGcmFirstTransformer := getSecretsTransformer(t, aesGcmFirstEncryptionConfiguration.Transformers)
+	aesCbcFirstTransformer := getSecretsTransformer(t, aesCbcFirstEncryptionConfiguration.Transformers)
+	secretboxFirstTransformer := getSecretsTransformer(t, secretboxFirstEncryptionConfiguration.Transformers)
+	kmsFirstTransformer := getSecretsTransformer(t, kmsFirstEncryptionConfiguration.Transformers)
+	kmsv2FirstTransformer := getSecretsTransformer(t, kmsv2FirstEncryptionConfiguration.Transformers)
 
 	dataCtx := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
@@ -285,6 +285,17 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 			}
 		}
 	}
+}
+
+func getSecretsTransformer(t *testing.T, transformers ResourceTransformers) value.Transformer {
+	t.Helper()
+
+	transformer, err := transformers.TransformerForResource(schema.ParseGroupResource("secrets"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return transformer
 }
 
 func TestKMSMaxTimeout(t *testing.T) {
