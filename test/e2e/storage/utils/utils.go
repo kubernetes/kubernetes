@@ -177,7 +177,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(ctx, KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, clientPod.Name, f.Timeouts.PodDelete)
 	if err != nil {
 		framework.ExpectNoError(err, "Expected pod to be not found.")
 	}
@@ -207,7 +207,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 		CheckReadFromPath(f, secondPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
 		err = c.CoreV1().Pods(secondPod.Namespace).Delete(context.TODO(), secondPod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "when deleting the second pod")
-		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, secondPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, secondPod.Name, f.Timeouts.PodDelete)
 		framework.ExpectNoError(err, "when waiting for the second pod to disappear")
 	}
 
@@ -285,7 +285,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(ctx context.Context, c client
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(ctx, KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, clientPod.Name, f.Timeouts.PodDelete)
 	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {

@@ -1007,7 +1007,7 @@ func StopPodAndDependents(ctx context.Context, c clientset.Interface, timeouts *
 		framework.Logf("pod Delete API error: %v", err)
 	}
 	framework.Logf("Wait up to %v for pod %q to be fully deleted", timeouts.PodDelete, pod.Name)
-	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, c, pod.Name, pod.Namespace, timeouts.PodDelete))
+	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, c, pod.Namespace, pod.Name, timeouts.PodDelete))
 	if len(podPVs) > 0 {
 		for _, pv := range podPVs {
 			// As with CSI inline volumes, we use the pod delete timeout here because conceptually

@@ -228,7 +228,7 @@ var _ = SIGDescribe("Job", func() {
 			framework.ExpectNoError(err, "failed to evict the pod: %s/%s", pod.Name, pod.Namespace)
 
 			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Namespace, pod.Name, f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
 
 			ginkgo.By("Ensuring job reaches completions")

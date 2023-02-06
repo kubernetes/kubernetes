@@ -68,7 +68,7 @@ func DeletePodWithWaitByName(ctx context.Context, c clientset.Interface, podName
 		return fmt.Errorf("pod Delete API error: %w", err)
 	}
 	framework.Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
-	err = WaitForPodNotFoundInNamespace(ctx, c, podName, podNamespace, PodDeleteTimeout)
+	err = WaitForPodNotFoundInNamespace(ctx, c, podNamespace, podName, PodDeleteTimeout)
 	if err != nil {
 		return fmt.Errorf("pod %q was not deleted: %w", podName, err)
 	}

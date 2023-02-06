@@ -777,15 +777,15 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 
 			testCanConnect(ctx, f, f.Namespace, "client-a", service, clientAAllowedPort)
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "client-a", f.Namespace.Name, f.Timeouts.PodDelete)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, "client-a", f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(ctx, f, f.Namespace, "client-b", service, clientAAllowedPort)
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "client-b", f.Namespace.Name, f.Timeouts.PodDelete)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, "client-b", f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(ctx, f, f.Namespace, "client-a", service, clientANotAllowedPort)
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "client-a", f.Namespace.Name, f.Timeouts.PodDelete)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, "client-a", f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			const (
@@ -824,7 +824,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			ginkgo.DeferCleanup(cleanupNetworkPolicy, f, policy)
 
 			testCannotConnect(ctx, f, f.Namespace, "client-b", service, clientBNotAllowedPort)
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "client-b", f.Namespace.Name, f.Timeouts.PodDelete)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, "client-b", f.Timeouts.PodDelete)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(ctx, f, f.Namespace, "client-a", service, clientBNotAllowedPort)

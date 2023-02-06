@@ -528,7 +528,7 @@ func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface
 // Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
 // api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
 // than "not found" and that error is final, that error is returned and the wait stops.
-func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, podName, ns string, timeout time.Duration) error {
+func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, ns, podName string, timeout time.Duration) error {
 	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
