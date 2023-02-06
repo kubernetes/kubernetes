@@ -47,6 +47,8 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -64,6 +66,7 @@ import (
 
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 const (
@@ -77,6 +80,8 @@ const (
 // controllerInitFuncConstructors is a map of controller name(as defined by controllers flag in https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/#options) to their InitFuncConstructor.
 // additionalFlags provides controller specific flags to be included in the complete set of controller manager flags
 func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, controllerInitFuncConstructors map[string]ControllerInitFuncConstructor, additionalFlags cliflag.NamedFlagSets, stopCh <-chan struct{}) *cobra.Command {
+	logOptions := logs.NewOptions()
+
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
 		Long: `The Cloud controller manager is a daemon that embeds
@@ -84,6 +89,11 @@ the cloud specific control loops shipped with Kubernetes.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
+
+			if err := logsapi.ValidateAndApply(logOptions, utilfeature.DefaultFeatureGate); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				return err
+			}
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
 			if err != nil {
@@ -113,8 +123,11 @@ the cloud specific control loops shipped with Kubernetes.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
-	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+
+	globalFlagSet := namedFlagSets.FlagSet("global")
+	verflag.AddFlags(globalFlagSet)
+	logsapi.AddFlags(logOptions, globalFlagSet)
+	globalflag.AddGlobalFlags(globalFlagSet, cmd.Name(), logs.SkipLoggingConfigurationFlags())
 
 	if flag.CommandLine.Lookup("cloud-provider-gce-lb-src-cidrs") != nil {
 		// hoist this flag from the global flagset to preserve the commandline until
