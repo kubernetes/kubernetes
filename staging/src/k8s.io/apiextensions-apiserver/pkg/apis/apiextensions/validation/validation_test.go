@@ -8624,6 +8624,30 @@ func TestSchemaHasDefaults(t *testing.T) {
 	}
 }
 
+func BenchmarkSchemaHas(b *testing.B) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	if err := apiextensions.AddToScheme(scheme); err != nil {
+		b.Fatal(err)
+	}
+	fuzzerFuncs := fuzzer.MergeFuzzerFuncs(apiextensionsfuzzer.Funcs)
+	seed := int64(5577006791947779410)
+	f := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
+	// fuzz internal types
+	schema := &apiextensions.JSONSchemaProps{}
+	f.NilChance(0).NumElements(10, 10).MaxDepth(10).Fuzz(schema)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if SchemaHas(schema, func(_ *apiextensions.JSONSchemaProps) bool {
+			return false
+		}) {
+			b.Errorf("Function returned true")
+		}
+	}
+}
+
 var example = apiextensions.JSON(`"This is an example"`)
 
 var validValidationSchema = &apiextensions.JSONSchemaProps{
