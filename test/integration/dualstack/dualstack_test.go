@@ -256,12 +256,14 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 				return
 			}
 			// validate the service was created correctly if it was not expected to fail
+			svcName := svc.Name
 			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
-				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+				t.Errorf("Unexpected error to get the service %s %v", svcName, err)
+				return
 			}
 			if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
-				t.Errorf("Unexpected error validating the service %s\n%+v\n%v", svc.Name, svc, err)
+				t.Errorf("Unexpected error validating the service %s\n%+v\n%v", svcName, svc, err)
 			}
 		})
 	}
