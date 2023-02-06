@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -475,6 +477,100 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 				} else {
 					verifyOwnerRef(t, pvc, "Pod", test.expectPodOwnerRef)
 				}
+			}
+		})
+	}
+}
+
+func TestStatefulSetStartOrdinal(t *testing.T) {
+	tests := []struct {
+		ordinals         *appsv1.StatefulSetOrdinals
+		name             string
+		namespace        string
+		replicas         int
+		expectedPodNames []string
+	}{
+		{
+			name:             "default start ordinal, no ordinals set",
+			namespace:        "no-ordinals",
+			replicas:         3,
+			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+		},
+		{
+			name:             "default start ordinal",
+			namespace:        "no-start-ordinals",
+			ordinals:         &appsv1.StatefulSetOrdinals{},
+			replicas:         3,
+			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+		},
+		{
+			name:      "start ordinal 4",
+			namespace: "start-ordinal-4",
+			ordinals: &appsv1.StatefulSetOrdinals{
+				Start: 4,
+			},
+			replicas:         4,
+			expectedPodNames: []string{"sts-4", "sts-5", "sts-6", "sts-7"},
+		},
+		{
+			name:      "start ordinal 5",
+			namespace: "start-ordinal-5",
+			ordinals: &appsv1.StatefulSetOrdinals{
+				Start: 2,
+			},
+			replicas:         7,
+			expectedPodNames: []string{"sts-2", "sts-3", "sts-4", "sts-5", "sts-6", "sts-7", "sts-8"},
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	closeFn, rm, informers, c := scSetup(t)
+	defer closeFn()
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(c, test.namespace, t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+			// Label map is the map of pod labels used in newSTS()
+			labelMap := labelMap()
+			sts := newSTS("sts", ns.Name, test.replicas)
+			sts.Spec.Ordinals = test.ordinals
+			stss := createSTSs(t, c, []*appsv1.StatefulSet{sts})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
+
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap)
+			if len(pods.Items) != test.replicas {
+				t.Errorf("len(pods) = %v, want %v", len(pods.Items), test.replicas)
+			}
+
+			var podNames []string
+			for _, pod := range pods.Items {
+				podNames = append(podNames, pod.Name)
+			}
+			ignoreOrder := cmpopts.SortSlices(func(a, b string) bool {
+				return a < b
+			})
+
+			// Validate all the expected pods were created.
+			if diff := cmp.Diff(test.expectedPodNames, podNames, ignoreOrder); diff != "" {
+				t.Errorf("Unexpected pod names: (-want +got): %v", diff)
+			}
+
+			// Scale down to 1 pod and verify it matches the first pod.
+			scaleSTS(t, c, sts, 1)
+			waitSTSStable(t, c, sts)
+
+			pods = getPods(t, podClient, labelMap)
+			if len(pods.Items) != 1 {
+				t.Errorf("len(pods) = %v, want %v", len(pods.Items), 1)
+			}
+			if pods.Items[0].Name != test.expectedPodNames[0] {
+				t.Errorf("Unexpected singleton pod name: got = %v, want %v", pods.Items[0].Name, test.expectedPodNames[0])
 			}
 		})
 	}

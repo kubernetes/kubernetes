@@ -178,17 +178,17 @@ func createNginxPod(ctx context.Context, client clientset.Interface, namespace s
 	pod := makeNginxPod(namespace, nodeSelector, pvclaims)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to be running
 	err = e2epod.WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }

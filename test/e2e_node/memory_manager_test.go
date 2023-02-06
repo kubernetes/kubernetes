@@ -144,12 +144,12 @@ func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
 
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat %s", memoryManagerStateFile)).Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command 'cat %s': out: %s, err: %v", memoryManagerStateFile, out, err)
+		return nil, fmt.Errorf("failed to run command 'cat %s': out: %s, err: %w", memoryManagerStateFile, out, err)
 	}
 
 	memoryManagerCheckpoint := &state.MemoryManagerCheckpoint{}
 	if err := json.Unmarshal(out, memoryManagerCheckpoint); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal memory manager state file: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal memory manager state file: %w", err)
 	}
 	return memoryManagerCheckpoint, nil
 }

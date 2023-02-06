@@ -244,7 +244,7 @@ func checkMirrorPodDisappear(ctx context.Context, cl clientset.Interface, name, 
 func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, namespace string) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
 	}
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
@@ -263,7 +263,7 @@ func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Du
 	err = wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		pod, err = cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+			return false, fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
 		}
 		if pod.Status.Phase != v1.PodRunning {
 			return false, fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
@@ -292,7 +292,7 @@ func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Du
 func checkMirrorPodRecreatedAndRunning(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
 	}
 	if pod.UID == oUID {
 		return fmt.Errorf("expected the uid of mirror pod %q to be changed, got %q", name, pod.UID)
@@ -328,7 +328,7 @@ func validateMirrorPod(ctx context.Context, cl clientset.Interface, mirrorPod *v
 	}
 	node, err := cl.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to fetch test node: %v", err)
+		return fmt.Errorf("failed to fetch test node: %w", err)
 	}
 
 	controller := true

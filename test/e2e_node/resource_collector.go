@@ -39,7 +39,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -384,8 +383,7 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
 			}
 
-			gomega.Expect(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, 10*time.Minute))
 		}()
 	}
 	wg.Wait()
@@ -482,18 +480,18 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 func getPidFromPidFile(pidFile string) (int, error) {
 	file, err := os.Open(pidFile)
 	if err != nil {
-		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
+		return 0, fmt.Errorf("error opening pid file %s: %w", pidFile, err)
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
+		return 0, fmt.Errorf("error reading pid file %s: %w", pidFile, err)
 	}
 
 	pid, err := strconv.Atoi(string(data))
 	if err != nil {
-		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
+		return 0, fmt.Errorf("error parsing %s as a number: %w", string(data), err)
 	}
 
 	return pid, nil

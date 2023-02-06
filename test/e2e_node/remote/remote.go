@@ -78,13 +78,13 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 
 	err = copyKubeletConfigIfExists(kubeletConfigFile, tardir)
 	if err != nil {
-		return "", fmt.Errorf("failed to copy kubelet config: %v", err)
+		return "", fmt.Errorf("failed to copy kubelet config: %w", err)
 	}
 
 	// Call the suite function to setup the test package.
 	err = suite.SetupTestPackage(tardir, systemSpecName)
 	if err != nil {
-		return "", fmt.Errorf("failed to setup test package %q: %v", tardir, err)
+		return "", fmt.Errorf("failed to setup test package %q: %w", tardir, err)
 	}
 
 	// Build the tar
@@ -196,7 +196,7 @@ func GetTimestampFromWorkspaceDir(dir string) string {
 func getTestArtifacts(host, testDir string) error {
 	logPath := filepath.Join(*resultsDir, host)
 	if err := os.MkdirAll(logPath, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+		return fmt.Errorf("failed to create log directory %q: %w", logPath, err)
 	}
 	// Copy logs to artifacts/hostname
 	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
@@ -250,7 +250,7 @@ func collectSystemLog(host string) {
 func WriteLog(host, filename, content string) error {
 	logPath := filepath.Join(*resultsDir, host)
 	if err := os.MkdirAll(logPath, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+		return fmt.Errorf("failed to create log directory %q: %w", logPath, err)
 	}
 	f, err := os.Create(filepath.Join(logPath, filename))
 	if err != nil {

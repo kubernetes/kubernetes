@@ -55,7 +55,7 @@ func getOOMScoreForPid(pid int) (int, error) {
 func validateOOMScoreAdjSetting(pid int, expectedOOMScoreAdj int) error {
 	oomScore, err := getOOMScoreForPid(pid)
 	if err != nil {
-		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
+		return fmt.Errorf("failed to get oom_score_adj for %d: %w", pid, err)
 	}
 	if expectedOOMScoreAdj != oomScore {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
@@ -129,7 +129,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					gomega.Eventually(ctx, func() error {
 						pausePids, err = getPidsForProcess("pause", "")
 						if err != nil {
-							return fmt.Errorf("failed to get list of pause pids: %v", err)
+							return fmt.Errorf("failed to get list of pause pids: %w", err)
 						}
 						for _, pid := range pausePids {
 							if existingPausePIDSet.Has(pid) {
@@ -147,7 +147,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					gomega.Eventually(ctx, func() error {
 						shPids, err = getPidsForProcess("agnhost", "")
 						if err != nil {
-							return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
+							return fmt.Errorf("failed to get list of serve hostname process pids: %w", err)
 						}
 						if len(shPids) != 1 {
 							return fmt.Errorf("expected only one agnhost process; found %d", len(shPids))
@@ -203,7 +203,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				gomega.Eventually(ctx, func() error {
 					ngPids, err = getPidsForProcess("nginx", "")
 					if err != nil {
-						return fmt.Errorf("failed to get list of nginx process pids: %v", err)
+						return fmt.Errorf("failed to get list of nginx process pids: %w", err)
 					}
 					for _, pid := range ngPids {
 						if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
@@ -245,7 +245,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				gomega.Eventually(ctx, func() error {
 					wsPids, err = getPidsForProcess("agnhost", "")
 					if err != nil {
-						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
+						return fmt.Errorf("failed to get list of test-webserver process pids: %w", err)
 					}
 					for _, pid := range wsPids {
 						if err := validateOOMScoreAdjSettingIsInRange(pid, 2, 1000); err != nil {

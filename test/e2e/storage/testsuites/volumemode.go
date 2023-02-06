@@ -506,7 +506,7 @@ func listPodDirectory(ctx context.Context, h storageutils.HostExec, path string,
 	cmd := fmt.Sprintf("find %s -mindepth 2 -maxdepth 2", path)
 	out, err := h.IssueCommandWithResult(ctx, cmd, node)
 	if err != nil {
-		return nil, fmt.Errorf("error checking directory %s on node %s: %s", path, node.Name, err)
+		return nil, fmt.Errorf("error checking directory %s on node %s: %w", path, node.Name, err)
 	}
 	return strings.Split(out, "\n"), nil
 }

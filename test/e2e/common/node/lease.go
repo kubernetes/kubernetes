@@ -39,15 +39,15 @@ import (
 func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 	oldData, err := json.Marshal(oldLease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldData: %v", err)
+		return nil, fmt.Errorf("failed to Marshal oldData: %w", err)
 	}
 	newData, err := json.Marshal(newLease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newData: %v", err)
+		return nil, fmt.Errorf("failed to Marshal newData: %w", err)
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, coordinationv1.Lease{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch: %v", err)
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch: %w", err)
 	}
 	return patchBytes, nil
 }

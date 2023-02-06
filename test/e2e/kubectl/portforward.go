@@ -389,7 +389,7 @@ func doTestOverWebSockets(ctx context.Context, bindAddress string, f *framework.
 	gomega.Eventually(ctx, func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %w", url.String(), err)
 		}
 		if channel != 0 {
 			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
@@ -403,7 +403,7 @@ func doTestOverWebSockets(ctx context.Context, bindAddress string, f *framework.
 	gomega.Eventually(ctx, func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %w", url.String(), err)
 		}
 		if channel != 1 {
 			return fmt.Errorf("got message from server that didn't start with channel 1 (error): %v", msg)
@@ -426,7 +426,7 @@ func doTestOverWebSockets(ctx context.Context, bindAddress string, f *framework.
 	gomega.Eventually(ctx, func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %w", url.String(), err)
 		}
 		if channel != 0 {
 			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)

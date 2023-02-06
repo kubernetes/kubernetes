@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -846,7 +845,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		e2epod.DeletePodOrFail(ctx, t.Client, pod.Namespace, pod.Name)
-		return e2epod.WaitForPodToDisappear(ctx, t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, t.Timeouts.PodDelete)
+		return e2epod.WaitForPodNotFoundInNamespace(ctx, t.Client, pod.Namespace, pod.Name, t.Timeouts.PodDelete)
 	})
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.
