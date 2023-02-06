@@ -255,8 +255,8 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 			if err != nil {
 				return
 			}
-			// validate the service was created correctly if it was not expected to fail
 			svcName := svc.Name
+			// validate the service was created correctly if it was not expected to fail
 			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Unexpected error to get the service %s %v", svcName, err)
