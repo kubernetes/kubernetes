@@ -107,7 +107,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 			return out, nil
 		}
 		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %w", elapsed, err)
+			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
 		}
 		framework.Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
 		time.Sleep(interval)
@@ -166,7 +166,7 @@ func MatchContainerOutput(
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get pod status: %w", err)
+		return fmt.Errorf("failed to get pod status: %v", err)
 	}
 
 	if podErr != nil {
@@ -192,14 +192,14 @@ func MatchContainerOutput(
 	if err != nil {
 		framework.Logf("Failed to get logs from node %q pod %q container %q. %v",
 			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %w", podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
 	}
 
 	for _, expected := range expectedOutput {
 		m := matcher(expected)
 		matches, err := m.Match(logs)
 		if err != nil {
-			return fmt.Errorf("expected %q in container output: %w", expected, err)
+			return fmt.Errorf("expected %q in container output: %v", expected, err)
 		} else if !matches {
 			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
 		}

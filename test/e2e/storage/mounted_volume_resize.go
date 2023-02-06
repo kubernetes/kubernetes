@@ -165,7 +165,7 @@ func waitForDeploymentToRecreatePod(ctx context.Context, client clientset.Interf
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 		if err != nil {
-			return false, fmt.Errorf("failed to get pods for deployment: %w", err)
+			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
 		}
 		for _, pod := range podList.Items {
 			switch pod.Status.Phase {

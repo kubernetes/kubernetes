@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -100,7 +101,7 @@ func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCoun
 			go func(config *staticPVTestConfig) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
-				err := e2epod.WaitForPodNotFoundInNamespace(ctx, c, ns, config.pod.Name, f.Timeouts.PodDelete)
+				err := e2epod.WaitForPodToDisappear(ctx, c, ns, config.pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
 				framework.ExpectNoError(err, "while waiting for pod to disappear")
 				errs := e2epv.PVPVCCleanup(ctx, c, ns, config.pv, config.pvc)
 				framework.ExpectNoError(utilerrors.NewAggregate(errs), "while cleaning up PVs and PVCs")

@@ -561,7 +561,7 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	})
 	crd, err := crd.CreateMultiVersionTestCRD(f, group, options...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CRD: %w", err)
+		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
 
 	for _, v := range crd.Crd.Spec.Versions {
@@ -623,7 +623,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %w", name, err)
+		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %v", name, err)
 	}
 	return nil
 }
@@ -637,7 +637,7 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %w", name, err)
+		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %v", name, err)
 	}
 	return nil
 }
@@ -718,7 +718,7 @@ func dropDefaults(s *spec.Schema) {
 func verifyKubectlExplain(ns, name, pattern string) error {
 	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
 	if err != nil {
-		return fmt.Errorf("failed to explain %s: %w", name, err)
+		return fmt.Errorf("failed to explain %s: %v", name, err)
 	}
 	r := regexp.MustCompile(pattern)
 	if !r.Match([]byte(result)) {

@@ -178,7 +178,7 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 
 	kc, err := baseKubeConfiguration(kubeletConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load base kubelet configuration: %w", err)
+		return nil, fmt.Errorf("failed to load base kubelet configuration: %v", err)
 	}
 
 	// Apply overrides to allow access to the Kubelet API from the test suite.
@@ -327,11 +327,11 @@ func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path s
 func createPodDirectory() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
+		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
 	path, err := os.MkdirTemp(cwd, "static-pods")
 	if err != nil {
-		return "", fmt.Errorf("failed to create static pod directory: %w", err)
+		return "", fmt.Errorf("failed to create static pod directory: %v", err)
 	}
 	return path, nil
 }
@@ -375,7 +375,7 @@ func createRootDirectory(path string) error {
 func kubeconfigCWDPath() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
+		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
 	return filepath.Join(cwd, "kubeconfig"), nil
 }
@@ -383,7 +383,7 @@ func kubeconfigCWDPath() (string, error) {
 func kubeletConfigCWDPath() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
+		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
 	// DO NOT name this file "kubelet" - you will overwrite the kubelet binary and be very confused :)
 	return filepath.Join(cwd, "kubelet-config"), nil
