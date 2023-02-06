@@ -26,13 +26,13 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
-	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
@@ -200,7 +200,7 @@ func TestAddFlags(t *testing.T) {
 				string(kapi.NodeExternalIP),
 			},
 			HTTPTimeout: time.Duration(5) * time.Second,
-			TLSClientConfig: restclient.TLSClientConfig{
+			TLSClientConfig: kubeletclient.KubeletTLSConfig{
 				CertFile: "/var/run/kubernetes/ceserver.crt",
 				KeyFile:  "/var/run/kubernetes/server.key",
 				CAFile:   "/var/run/kubernetes/caserver.crt",
