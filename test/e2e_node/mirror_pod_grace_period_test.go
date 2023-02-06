@@ -187,7 +187,7 @@ spec:
 func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
+		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}
 	if pod.UID != oUID {
 		return fmt.Errorf("expected the uid of mirror pod %q to be same, got %q", name, pod.UID)

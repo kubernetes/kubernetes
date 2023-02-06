@@ -68,7 +68,7 @@ func (p *Provider) GroupSize(group string) (int, error) {
 	client := autoscaling.New(awsSession)
 	instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
 	if err != nil {
-		return -1, fmt.Errorf("error describing instance group: %w", err)
+		return -1, fmt.Errorf("error describing instance group: %v", err)
 	}
 	if instanceGroup == nil {
 		return -1, fmt.Errorf("instance group not found: %s", group)
@@ -157,7 +157,7 @@ func (p *Provider) DeletePD(pdName string) error {
 		if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
 			framework.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 		} else {
-			return fmt.Errorf("error deleting EBS volumes: %w", err)
+			return fmt.Errorf("error deleting EBS volumes: %v", err)
 		}
 	}
 	return nil

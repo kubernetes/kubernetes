@@ -4163,7 +4163,7 @@ func translatePodNameToUID(ctx context.Context, c clientset.Interface, ns string
 	for name, portList := range expectedEndpoints {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %w", name, err)
+			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
 		portsByUID[pod.ObjectMeta.UID] = portList
 	}
@@ -4249,14 +4249,14 @@ func restartApiserver(ctx context.Context, namespace string, cs clientset.Interf
 func restartComponent(ctx context.Context, cs clientset.Interface, cName, ns string, matchLabels map[string]string) error {
 	pods, err := e2epod.GetPods(ctx, cs, ns, matchLabels)
 	if err != nil {
-		return fmt.Errorf("failed to get %s's pods, err: %w", cName, err)
+		return fmt.Errorf("failed to get %s's pods, err: %v", cName, err)
 	}
 	if len(pods) == 0 {
 		return fmt.Errorf("%s pod count is 0", cName)
 	}
 
 	if err := e2epod.DeletePodsWithGracePeriod(ctx, cs, pods, 0); err != nil {
-		return fmt.Errorf("failed to restart component: %s, err: %w", cName, err)
+		return fmt.Errorf("failed to restart component: %s, err: %v", cName, err)
 	}
 
 	_, err = e2epod.PodsCreatedByLabel(ctx, cs, ns, cName, int32(len(pods)), labels.SelectorFromSet(matchLabels))
@@ -4330,7 +4330,7 @@ func translatePortsByPodNameToPortsByPodUID(c clientset.Interface, ns string, ex
 	for name, portList := range expectedEndpoints {
 		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %w", name, err)
+			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
 		portsByUID[pod.ObjectMeta.UID] = portList
 	}

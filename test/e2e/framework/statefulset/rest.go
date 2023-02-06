@@ -215,7 +215,7 @@ func CheckMount(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulS
 		fmt.Sprintf("touch %v", filepath.Join(mountPath, fmt.Sprintf("%v", time.Now().UnixNano()))),
 	} {
 		if err := ExecInStatefulPods(ctx, c, ss, cmd); err != nil {
-			return fmt.Errorf("failed to execute %v, error: %w", cmd, err)
+			return fmt.Errorf("failed to execute %v, error: %v", cmd, err)
 		}
 	}
 	return nil

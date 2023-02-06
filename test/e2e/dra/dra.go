@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			gomega.Consistently(func() error {
 				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				if err != nil {
-					return fmt.Errorf("expected the test pod %s to exist: %w", pod.Name, err)
+					return fmt.Errorf("expected the test pod %s to exist: %v", pod.Name, err)
 				}
 				if testPod.Status.Phase != v1.PodPending {
 					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod.Name, testPod.Status.Phase, v1.PodPending)

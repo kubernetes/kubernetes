@@ -1250,7 +1250,7 @@ func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func(ctx con
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
-			return false, fmt.Errorf("failed to get failed daemon pod %q: %w", pod.Name, err)
+			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)
 		}
 		return false, nil
 	}

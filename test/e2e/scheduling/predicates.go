@@ -869,7 +869,7 @@ func patchPod(cs clientset.Interface, old, new *v1.Pod) (*v1.Pod, error) {
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create merge patch for Pod %q: %w", old.Name, err)
+		return nil, fmt.Errorf("failed to create merge patch for Pod %q: %v", old.Name, err)
 	}
 	return cs.CoreV1().Pods(new.Namespace).Patch(context.TODO(), new.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 }

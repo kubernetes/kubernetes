@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -512,9 +513,9 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
-				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %w", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
-				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
+				err = fmt.Errorf("pod %q never run: %v", pod.Name, err)
 			}
 		}
 		framework.ExpectNoError(err)
@@ -527,7 +528,13 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
+	retryTimeout := 2 * time.Minute
+	retryInterval := 5 * time.Second
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	err = wait.PollWithContext(ctx, retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	if err != nil {
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+	}
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.

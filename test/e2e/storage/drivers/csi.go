@@ -751,7 +751,7 @@ func (m *mockCSIDriver) GetCalls(ctx context.Context) ([]MockCSICall, error) {
 	// Load logs of driver pod
 	log, err := e2epod.GetPodLogs(ctx, m.clientSet, m.driverNamespace.Name, driverPodName, driverContainerName)
 	if err != nil {
-		return nil, fmt.Errorf("could not load CSI driver logs: %w", err)
+		return nil, fmt.Errorf("could not load CSI driver logs: %s", err)
 	}
 
 	logLines := strings.Split(log, "\n")
