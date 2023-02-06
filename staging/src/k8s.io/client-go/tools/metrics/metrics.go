@@ -58,6 +58,12 @@ type CallsMetric interface {
 	Increment(exitCode int, callStatus string)
 }
 
+// RetryMetric counts the number of retries sent to the server
+// partitioned by code, method, and host.
+type RetryMetric interface {
+	IncrementRetry(ctx context.Context, code string, method string, host string)
+}
+
 var (
 	// ClientCertExpiry is the expiry time of a client certificate
 	ClientCertExpiry ExpiryMetric = noopExpiry{}
@@ -76,6 +82,9 @@ var (
 	// ExecPluginCalls is the number of calls made to an exec plugin, partitioned by
 	// exit code and call status.
 	ExecPluginCalls CallsMetric = noopCalls{}
+	// RequestRetry is the retry metric that tracks the number of
+	// retries sent to the server.
+	RequestRetry RetryMetric = noopRetry{}
 )
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
@@ -88,6 +97,7 @@ type RegisterOpts struct {
 	RateLimiterLatency    LatencyMetric
 	RequestResult         ResultMetric
 	ExecPluginCalls       CallsMetric
+	RequestRetry          RetryMetric
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -118,6 +128,9 @@ func Register(opts RegisterOpts) {
 		if opts.ExecPluginCalls != nil {
 			ExecPluginCalls = opts.ExecPluginCalls
 		}
+		if opts.RequestRetry != nil {
+			RequestRetry = opts.RequestRetry
+		}
 	})
 }
 
@@ -144,3 +157,7 @@ func (noopResult) Increment(context.Context, string, string, string) {}
 type noopCalls struct{}
 
 func (noopCalls) Increment(int, string) {}
+
+type noopRetry struct{}
+
+func (noopRetry) IncrementRetry(context.Context, string, string, string) {}

@@ -2991,6 +2991,7 @@ type withRateLimiterBackoffManagerAndMetrics struct {
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
+	metrics.RetryMetric
 
 	invokeOrderGot []string
 	sleepsGot      []string
@@ -3023,6 +3024,14 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Increment(ctx context.Context
 	// we are interested in the request context that is marked by this test
 	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
 		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestResult.Increment")
+		lb.statusCodesGot = append(lb.statusCodesGot, code)
+	}
+}
+
+func (lb *withRateLimiterBackoffManagerAndMetrics) IncrementRetry(ctx context.Context, code, _, _ string) {
+	// we are interested in the request context that is marked by this test
+	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
+		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestRetry.IncrementRetry")
 		lb.statusCodesGot = append(lb.statusCodesGot, code)
 	}
 }
@@ -3072,13 +3081,17 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		"Client.Do",
 
 		// it's a success, so do the following:
-		//  - call metrics and update backoff parameters
+		// count the result metric, and since it's a retry,
+		// count the retry metric, and then update backoff parameters.
 		"RequestResult.Increment",
+		"RequestRetry.IncrementRetry",
 		"BackoffManager.UpdateBackoff",
 	}
 	statusCodesWant := []string{
+		// first attempt (A): we count the result metric only
 		"500",
-		"200",
+		// final attempt (B): we count the result metric, and the retry metric
+		"200", "200",
 	}
 
 	tests := []struct {
@@ -3192,10 +3205,13 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 			//  to override as well, and we want tests to be able to run in
 			//  parallel then we will need to provide a way for tests to
 			//  register/deregister their own metric inerfaces.
-			old := metrics.RequestResult
+			oldRequestResult := metrics.RequestResult
+			oldRequestRetry := metrics.RequestRetry
 			metrics.RequestResult = interceptor
+			metrics.RequestRetry = interceptor
 			defer func() {
-				metrics.RequestResult = old
+				metrics.RequestResult = oldRequestResult
+				metrics.RequestRetry = oldRequestRetry
 			}()
 
 			ctx, cancel := context.WithCancel(context.Background())
