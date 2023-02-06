@@ -416,7 +416,7 @@ func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, e
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
-			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
+			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %v", pvc.Name, err)
 		}
 
 		actualResizeStatus = updatedPVC.Status.ResizeStatus
@@ -442,7 +442,7 @@ func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup,
 		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
-			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
+			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %v", pvc.Name, err)
 		}
 		actualAllocatedSize := updatedPVC.Status.AllocatedResources.Storage()
 		if actualAllocatedSize != nil && actualAllocatedSize.Equal(expectedQuantity) {

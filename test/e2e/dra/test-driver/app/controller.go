@@ -148,7 +148,7 @@ func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resou
 func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
 	configMap, err := c.clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("get config map: %w", err)
+		return nil, fmt.Errorf("get config map: %v", err)
 	}
 	return configMap.Data, nil
 }
@@ -221,7 +221,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 	toEnvVars("admin", classParameters, p.EnvVars)
 	data, err := json.Marshal(p)
 	if err != nil {
-		return nil, fmt.Errorf("encode parameters: %w", err)
+		return nil, fmt.Errorf("encode parameters: %v", err)
 	}
 	allocation.ResourceHandle = string(data)
 	var nodes []string

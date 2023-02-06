@@ -51,6 +51,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
@@ -463,7 +464,7 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(ctx, client, clientPod.Namespace, clientPod.Name)
-		_ = e2epod.WaitForPodNotFoundInNamespace(ctx, client, clientPod.Namespace, clientPod.Name, timeouts.PodDelete)
+		_ = e2epod.WaitForPodToDisappear(ctx, client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 		return nil, err
 	}
 	return clientPod, nil
@@ -541,7 +542,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 		// testVolumeClient might get used more than once per test, therefore
 		// we have to clean up before returning.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete))
 	}()
 
 	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
@@ -576,7 +577,7 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 		// This pod must get deleted before the function returns becaue the test relies on
 		// the volume not being in use.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete))
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")

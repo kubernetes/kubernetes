@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -118,7 +119,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 				LabelSelector: labelSelectorStr,
 				FieldSelector: fields.OneTermNotEqualSelector("spec.nodeName", oldNodeName).String(),
 			}
-			_, err = e2epod.WaitForPods(ctx, c, ns, podListOpts, e2epod.Range{MinMatching: 1}, framework.PodStartTimeout, "be running and ready", e2epod.RunningReady)
+			_, err = e2epod.WaitForAllPodsCondition(ctx, c, ns, podListOpts, 1, "running and ready", framework.PodStartTimeout, testutils.PodRunningReady)
 			framework.ExpectNoError(err)
 
 			// Bring the node back online and remove the taint

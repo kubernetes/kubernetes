@@ -81,11 +81,11 @@ func getInternalIP(node *v1.Node) (string, error) {
 func getSubnetPrefix(ctx context.Context, c clientset.Interface) (*net.IPNet, error) {
 	node, err := getReadySchedulableWorkerNode(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %w", err)
+		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %v", err)
 	}
 	internalIP, err := getInternalIP(node)
 	if err != nil {
-		return nil, fmt.Errorf("error getting Node internal IP, err: %w", err)
+		return nil, fmt.Errorf("error getting Node internal IP, err: %v", err)
 	}
 	ip := netutils.ParseIPSloppy(internalIP)
 	if ip == nil {

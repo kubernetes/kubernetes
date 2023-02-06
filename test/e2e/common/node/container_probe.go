@@ -608,7 +608,7 @@ done
 		})
 
 		// verify pods are running and ready
-		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart)
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
 		framework.ExpectNoError(err)
 
 		// Shutdown pod. Readiness should change to false
@@ -690,7 +690,7 @@ done
 		})
 
 		// verify pods are running and ready
-		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart)
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
 		framework.ExpectNoError(err)
 
 		// Shutdown pod. Readiness should change to false
