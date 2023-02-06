@@ -383,7 +383,7 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
 			}
 
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, 10*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name, 10*time.Minute))
 		}()
 	}
 	wg.Wait()

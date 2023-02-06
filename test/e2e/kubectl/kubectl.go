@@ -734,7 +734,7 @@ metadata:
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
-				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, ns, "failure-3", 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "failure-3", ns, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
 			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {

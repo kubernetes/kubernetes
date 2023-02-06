@@ -433,7 +433,7 @@ current-context: local-context
 			ginkgo.By("Delete the node problem detector")
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)))
 			ginkgo.By("Wait for the node problem detector to disappear")
-			gomega.Expect(e2epod.WaitForPodNotFoundInNamespace(ctx, c, ns, name, pollTimeout)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodNotFoundInNamespace(ctx, c, name, ns, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
 			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}))
 			ginkgo.By("Clean up the events")

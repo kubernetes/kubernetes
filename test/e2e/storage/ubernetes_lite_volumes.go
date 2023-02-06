@@ -100,7 +100,7 @@ func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCoun
 			go func(config *staticPVTestConfig) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
-				err := e2epod.WaitForPodNotFoundInNamespace(ctx, c, ns, config.pod.Name, f.Timeouts.PodDelete)
+				err := e2epod.WaitForPodNotFoundInNamespace(ctx, c, config.pod.Name, ns, f.Timeouts.PodDelete)
 				framework.ExpectNoError(err, "while waiting for pod to disappear")
 				errs := e2epv.PVPVCCleanup(ctx, c, ns, config.pv, config.pvc)
 				framework.ExpectNoError(utilerrors.NewAggregate(errs), "while cleaning up PVs and PVCs")

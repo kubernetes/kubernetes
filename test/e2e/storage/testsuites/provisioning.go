@@ -845,7 +845,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		e2epod.DeletePodOrFail(ctx, t.Client, pod.Namespace, pod.Name)
-		return e2epod.WaitForPodNotFoundInNamespace(ctx, t.Client, pod.Namespace, pod.Name, t.Timeouts.PodDelete)
+		return e2epod.WaitForPodNotFoundInNamespace(ctx, t.Client, pod.Name, pod.Namespace, t.Timeouts.PodDelete)
 	})
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.

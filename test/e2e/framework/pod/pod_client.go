@@ -181,7 +181,7 @@ func (c *PodClient) DeleteSync(ctx context.Context, name string, options metav1.
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
-	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, namespace, name, timeout), "wait for pod %q to disappear", name)
+	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, name, namespace, timeout), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.

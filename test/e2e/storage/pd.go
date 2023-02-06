@@ -195,7 +195,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(ctx, host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
-					e2epod.WaitForPodNotFoundInNamespace(ctx, cs, host0Pod.Namespace, host0Pod.Name, f.Timeouts.PodDelete)
+					e2epod.WaitForPodNotFoundInNamespace(ctx, cs, host0Pod.Name, host0Pod.Namespace, f.Timeouts.PodDelete)
 					framework.Logf("deleted host0Pod %q disappeared", host0Pod.Name)
 				}
 
