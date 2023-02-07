@@ -114,6 +114,26 @@ run_kubectl_diff_tests() {
     kubectl delete -f hack/testdata/pod.yaml
     kubectl delete -f hack/testdata/prune/b.yaml
 
+    ## kubectl diff --prune with label selector
+    kubectl create ns nsbprune
+    kubectl apply --namespace nsbprune -f hack/testdata/prune/a_selector.yaml
+    kube::test::get_object_assert 'pods a -n nsbprune' "{{${id_field:?}}}" 'a'
+    kube::test::get_object_assert 'pods b -n nsbprune' "{{${id_field:?}}}" 'b'
+    kube::test::get_object_assert 'pods c -n nsbprune' "{{${id_field:?}}}" 'c'
+    # Make sure that kubectl diff does not return neither pod 'b' nor pod 'c' without prune flag
+    output_message=$(kubectl diff -l prune-group=true -f hack/testdata/prune/a_selector_prune.yaml)
+    kube::test::if_has_not_string "${output_message}" "name: b"
+    kube::test::if_has_not_string "${output_message}" "name: c"
+    # the exist code for diff is 1 because pod name 'b' is found in the given label selector but not 'c'
+    output_message=$(kubectl diff --prune -l prune-group=true -f hack/testdata/prune/a_selector_prune.yaml || test $? -eq 1)
+    # pod 'b' should be in output, it is pruned. On the other hand, 'c' should not be, it's label selector is different
+    kube::test::if_has_string "${output_message}" 'name: b'
+    kube::test::if_has_not_string "${output_message}" "name: c"
+
+    # Cleanup
+    kubectl delete -f hack/testdata/prune/a_selector.yaml
+
+
     set +o nounset
     set +o errexit
 }
