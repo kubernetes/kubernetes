@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -42,11 +42,13 @@ func (dc *DeploymentController) syncRolloutStatus(ctx context.Context, allRSs []
 		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
 	}
 
-	// If there is only one replica set that is active then that means we are not running
-	// a new rollout and this is a resync where we don't need to estimate any progress.
-	// In such a case, we should simply not estimate any progress for this deployment.
+	// If the strategy is not `Recreate` and there is only one replica set that is
+	// active then that means we are not running a new rollout and this is a
+	// resync where we don't need to estimate any progress. In such a case, we
+	// should simply not estimate any progress for this deployment.
 	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
-	isCompleteDeployment := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
+	isCompleteDeployment := d.Spec.Strategy.Type != apps.RecreateDeploymentStrategyType &&
+		newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
 	// Check for progress only if there is a progress deadline set and the latest rollout
 	// hasn't completed yet.
 	if util.HasProgressDeadline(d) && !isCompleteDeployment {
