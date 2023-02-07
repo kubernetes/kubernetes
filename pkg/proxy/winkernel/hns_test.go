@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 
 	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/stretchr/testify/assert"
 
 	"strings"
 	"testing"
@@ -37,6 +38,7 @@ const (
 	gatewayAddress    = "192.168.1.1"
 	epMacAddress      = "00-11-22-33-44-55"
 	epIpAddress       = "192.168.1.3"
+	epIpv6Address     = "192::3"
 	epIpAddressB      = "192.168.1.4"
 	epIpAddressRemote = "192.168.2.3"
 	epPaAddress       = "10.0.0.3"
@@ -56,6 +58,51 @@ func TestGetNetworkByName(t *testing.T) {
 
 	if !strings.EqualFold(network.id, Network.Id) {
 		t.Errorf("%v does not match %v", network.id, Network.Id)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetAllEndpointsByNetwork(t *testing.T) {
+	hns := hns{}
+	Network := mustTestNetwork(t)
+
+	ipv4Config := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	ipv6Config := &hcn.IpConfig{
+		IpAddress: epIpv6Address,
+	}
+	Endpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	Endpoint, err := Network.CreateEndpoint(Endpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointIpv4, ipv4EpPresent := mapEndpointsInfo[ipv4Config.IpAddress]
+	assert.True(t, ipv4EpPresent, "IPV4 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.ip, epIpAddress, "IPV4 IP is missing in Dualstack mode")
+
+	endpointIpv6, ipv6EpPresent := mapEndpointsInfo[ipv6Config.IpAddress]
+	assert.True(t, ipv6EpPresent, "IPV6 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.ip, epIpv6Address, "IPV6 IP is missing in Dualstack mode")
+
+	err = Endpoint.Delete()
+	if err != nil {
+		t.Error(err)
 	}
 	err = Network.Delete()
 	if err != nil {
