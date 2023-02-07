@@ -325,7 +325,7 @@ func (t *topologyTestSuite) createResources(ctx context.Context, cs clientset.In
 	podConfig := e2epod.Config{
 		NS:            l.config.Framework.Namespace.Name,
 		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
+		NodeSelection: e2epod.NodeSelection{Affinity: affinity, Selector: l.config.ClientNodeSelection.Selector},
 		SeLinuxLabel:  e2epod.GetLinuxLabel(),
 		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
