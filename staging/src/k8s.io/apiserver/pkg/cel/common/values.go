@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package common
 
 import (
 	"fmt"
@@ -28,21 +28,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/cel"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // UnstructuredToVal converts a Kubernetes unstructured data element to a CEL Val.
 // The root schema of custom resource schema is expected contain type meta and object meta schemas.
 // If Embedded resources do not contain type meta and object meta schemas, they will be added automatically.
-func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
+func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 	if unstructured == nil {
-		if schema.Nullable {
+		if schema.Nullable() {
 			return types.NullValue
 		}
 		return types.NewErr("invalid data, got null for schema with nullable=false")
 	}
-	if isXIntOrString(schema) {
+	if schema.IsXIntOrString() {
 		switch v := unstructured.(type) {
 		case string:
 			return types.String(v)
@@ -55,42 +54,42 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 		}
 		return types.NewErr("invalid data, expected XIntOrString value to be either a string or integer")
 	}
-	if schema.Type.Contains("object") {
+	if schema.Type() == "object" {
 		m, ok := unstructured.(map[string]interface{})
 		if !ok {
 			return types.NewErr("invalid data, expected a map for the provided schema with type=object")
 		}
-		if isXEmbeddedResource(schema) || schema.Properties != nil {
-			if isXEmbeddedResource(schema) {
-				schema = WithTypeAndObjectMeta(schema)
+		if schema.IsXEmbeddedResource() || schema.Properties() != nil {
+			if schema.IsXEmbeddedResource() {
+				schema = schema.WithTypeAndObjectMeta()
 			}
 			return &unstructuredMap{
 				value:  m,
 				schema: schema,
-				propSchema: func(key string) (*spec.Schema, bool) {
-					if schema, ok := schema.Properties[key]; ok {
-						return &schema, true
+				propSchema: func(key string) (Schema, bool) {
+					if schema, ok := schema.Properties()[key]; ok {
+						return schema, true
 					}
 					return nil, false
 				},
 			}
 		}
-		if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+		if schema.AdditionalProperties() != nil && schema.AdditionalProperties().Schema() != nil {
 			return &unstructuredMap{
 				value:  m,
 				schema: schema,
-				propSchema: func(key string) (*spec.Schema, bool) {
-					return schema.AdditionalProperties.Schema, true
+				propSchema: func(key string) (Schema, bool) {
+					return schema.AdditionalProperties().Schema(), true
 				},
 			}
 		}
 		// A object with x-kubernetes-preserve-unknown-fields but no properties or additionalProperties is treated
 		// as an empty object.
-		if isXPreserveUnknownFields(schema) {
+		if schema.IsXPreserveUnknownFields() {
 			return &unstructuredMap{
 				value:  m,
 				schema: schema,
-				propSchema: func(key string) (*spec.Schema, bool) {
+				propSchema: func(key string) (Schema, bool) {
 					return nil, false
 				},
 			}
@@ -98,20 +97,20 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 		return types.NewErr("invalid object type, expected either Properties or AdditionalProperties with Allows=true and non-empty Schema")
 	}
 
-	if schema.Type.Contains("array") {
+	if schema.Type() == "array" {
 		l, ok := unstructured.([]interface{})
 		if !ok {
 			return types.NewErr("invalid data, expected an array for the provided schema with type=array")
 		}
-		if schema.Items == nil {
+		if schema.Items() == nil {
 			return types.NewErr("invalid array type, expected Items with a non-empty Schema")
 		}
-		typedList := unstructuredList{elements: l, itemsSchema: schema.Items.Schema}
-		listType := getXListType(schema)
+		typedList := unstructuredList{elements: l, itemsSchema: schema.Items()}
+		listType := schema.XListType()
 		if listType != "" {
 			switch listType {
 			case "map":
-				mapKeys := getXListMapKeys(schema)
+				mapKeys := schema.XListMapKeys()
 				return &unstructuredMapList{unstructuredList: typedList, escapedKeyProps: escapeKeyProps(mapKeys)}
 			case "set":
 				return &unstructuredSetList{unstructuredList: typedList}
@@ -124,12 +123,12 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 		return &typedList
 	}
 
-	if schema.Type.Contains("string") {
+	if schema.Type() == "string" {
 		str, ok := unstructured.(string)
 		if !ok {
 			return types.NewErr("invalid data, expected string, got %T", unstructured)
 		}
-		switch schema.Format {
+		switch schema.Format() {
 		case "duration":
 			d, err := strfmt.ParseDuration(str)
 			if err != nil {
@@ -159,7 +158,7 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 
 		return types.String(str)
 	}
-	if schema.Type.Contains("number") {
+	if schema.Type() == "number" {
 		switch v := unstructured.(type) {
 		// float representations of whole numbers (e.g. 1.0, 0.0) can convert to int representations (e.g. 1, 0) in yaml
 		// to json translation, and then get parsed as int64s
@@ -178,7 +177,7 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 			return types.NewErr("invalid data, expected float, got %T", unstructured)
 		}
 	}
-	if schema.Type.Contains("integer") {
+	if schema.Type() == "integer" {
 		switch v := unstructured.(type) {
 		case int:
 			return types.Int(v)
@@ -190,7 +189,7 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 			return types.NewErr("invalid data, expected int, got %T", unstructured)
 		}
 	}
-	if schema.Type.Contains("boolean") {
+	if schema.Type() == "boolean" {
 		b, ok := unstructured.(bool)
 		if !ok {
 			return types.NewErr("invalid data, expected bool, got %T", unstructured)
@@ -198,11 +197,11 @@ func UnstructuredToVal(unstructured interface{}, schema *spec.Schema) ref.Val {
 		return types.Bool(b)
 	}
 
-	if isXPreserveUnknownFields(schema) {
+	if schema.IsXPreserveUnknownFields() {
 		return &unknownPreserved{u: unstructured}
 	}
 
-	return types.NewErr("invalid type, expected object, array, number, integer, boolean or string, or no type with x-kubernetes-int-or-string or x-kubernetes-preserve-unknown-fields is true, got %s", schema.Type)
+	return types.NewErr("invalid type, expected object, array, number, integer, boolean or string, or no type with x-kubernetes-int-or-string or x-kubernetes-preserve-unknown-fields is true, got %s", schema.Type())
 }
 
 // unknownPreserved represents unknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields.
@@ -418,7 +417,7 @@ func (t *unstructuredSetList) Add(other ref.Val) ref.Val {
 // unstructuredList represents an unstructured data instance of an OpenAPI array with x-kubernetes-list-type=atomic (the default).
 type unstructuredList struct {
 	elements    []interface{}
-	itemsSchema *spec.Schema
+	itemsSchema Schema
 }
 
 var _ = traits.Lister(&unstructuredList{})
@@ -548,9 +547,9 @@ func (t *unstructuredList) Size() ref.Val {
 // unstructuredMap represented an unstructured data instance of an OpenAPI object.
 type unstructuredMap struct {
 	value  map[string]interface{}
-	schema *spec.Schema
+	schema Schema
 	// propSchema finds the schema to use for a particular map key.
-	propSchema func(key string) (*spec.Schema, bool)
+	propSchema func(key string) (Schema, bool)
 }
 
 var _ = traits.Mapper(&unstructuredMap{})
@@ -636,7 +635,7 @@ func (t *unstructuredMap) Get(key ref.Val) ref.Val {
 }
 
 func (t *unstructuredMap) Iterator() traits.Iterator {
-	isObject := t.schema.Properties != nil
+	isObject := t.schema.Properties() != nil
 	keys := make([]ref.Val, len(t.value))
 	i := 0
 	for k := range t.value {
@@ -675,7 +674,7 @@ func (t *unstructuredMap) Size() ref.Val {
 }
 
 func (t *unstructuredMap) Find(key ref.Val) (ref.Val, bool) {
-	isObject := t.schema.Properties != nil
+	isObject := t.schema.Properties() != nil
 	keyStr, ok := key.(types.String)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(key), true

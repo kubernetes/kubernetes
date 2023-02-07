@@ -19,14 +19,14 @@ package cel
 import (
 	"github.com/google/cel-go/common/types/ref"
 
-	celopenapi "k8s.io/apiserver/pkg/cel/openapi"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	celopenapi "k8s.io/apiserver/pkg/cel/common"
 )
 
 // UnstructuredToVal converts a Kubernetes unstructured data element to a CEL Val.
 // The root schema of custom resource schema is expected contain type meta and object meta schemas.
 // If Embedded resources do not contain type meta and object meta schemas, they will be added automatically.
 func UnstructuredToVal(unstructured interface{}, schema *structuralschema.Structural) ref.Val {
-	return celopenapi.UnstructuredToVal(unstructured, schema.ToKubeOpenAPI())
+	return celopenapi.UnstructuredToVal(unstructured, &model.Structural{Structural: schema})
 }

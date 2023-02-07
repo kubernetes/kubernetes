@@ -29,6 +29,8 @@ func isExtension(schema *spec.Schema, key string) bool {
 }
 
 func isXIntOrString(schema *spec.Schema) bool {
+	// built-in types have the Format while CRDs use extension
+	// both are valid, checking both
 	return schema.Format == intOrStringFormat || isExtension(schema, extIntOrString)
 }
 
@@ -46,32 +48,11 @@ func getXListType(schema *spec.Schema) string {
 }
 
 func getXListMapKeys(schema *spec.Schema) []string {
-	items, ok := schema.Extensions[extListMapKeys]
+	mapKeys, ok := schema.Extensions.GetStringSlice(extListMapKeys)
 	if !ok {
 		return nil
 	}
-	// items may be any of
-	// - a slice of string
-	// - a slice of interface{}, a.k.a any, but item's real type is string
-	// there is no direct conversion, so do that manually
-	switch items.(type) {
-	case []string:
-		return items.([]string)
-	case []any:
-		a := items.([]any)
-		result := make([]string, 0, len(a))
-		for _, item := range a {
-			// item must be a string
-			s, ok := item.(string)
-			if !ok {
-				return nil
-			}
-			result = append(result, s)
-		}
-		return result
-	}
-	// no further attempt of handling unexpected type
-	return nil
+	return mapKeys
 }
 
 const extIntOrString = "x-kubernetes-int-or-string"

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package common
 
 import (
 	"time"
@@ -37,11 +37,11 @@ const maxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
 // if their schema is not exposed.
 //
 // The CEL declaration for objects with XPreserveUnknownFields does not expose unknown fields.
-func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType {
+func SchemaDeclType(s Schema, isResourceRoot bool) *apiservercel.DeclType {
 	if s == nil {
 		return nil
 	}
-	if isXIntOrString(s) {
+	if s.IsXIntOrString() {
 		// schemas using XIntOrString are not required to have a type.
 
 		// intOrStringType represents the x-kubernetes-int-or-string union type in CEL expressions.
@@ -67,24 +67,19 @@ func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType 
 		// 'apiVersion', 'kind', 'metadata.name' and 'metadata.generateName' are always accessible to validator rules
 		// at the root of resources, even if not specified in the schema.
 		// This includes the root of a custom resource and the root of XEmbeddedResource objects.
-		s = WithTypeAndObjectMeta(s)
+		s = s.WithTypeAndObjectMeta()
 	}
 
-	// If the schema is not an "int-or-string", type must present.
-	if len(s.Type) == 0 {
-		return nil
-	}
-
-	switch s.Type[0] {
+	switch s.Type() {
 	case "array":
-		if s.Items != nil {
-			itemsType := SchemaDeclType(s.Items.Schema, isXEmbeddedResource(s.Items.Schema))
+		if s.Items() != nil {
+			itemsType := SchemaDeclType(s.Items(), s.Items().IsXEmbeddedResource())
 			if itemsType == nil {
 				return nil
 			}
 			var maxItems int64
-			if s.MaxItems != nil {
-				maxItems = zeroIfNegative(*s.MaxItems)
+			if s.MaxItems() != nil {
+				maxItems = zeroIfNegative(*s.MaxItems())
 			} else {
 				maxItems = estimateMaxArrayItemsFromMinSize(itemsType.MinSerializedSize)
 			}
@@ -92,12 +87,12 @@ func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType 
 		}
 		return nil
 	case "object":
-		if s.AdditionalProperties != nil && s.AdditionalProperties.Schema != nil {
-			propsType := SchemaDeclType(s.AdditionalProperties.Schema, isXEmbeddedResource(s.AdditionalProperties.Schema))
+		if s.AdditionalProperties() != nil && s.AdditionalProperties().Schema() != nil {
+			propsType := SchemaDeclType(s.AdditionalProperties().Schema(), s.AdditionalProperties().Schema().IsXEmbeddedResource())
 			if propsType != nil {
 				var maxProperties int64
-				if s.MaxProperties != nil {
-					maxProperties = zeroIfNegative(*s.MaxProperties)
+				if s.MaxProperties() != nil {
+					maxProperties = zeroIfNegative(*s.MaxProperties())
 				} else {
 					maxProperties = estimateMaxAdditionalPropertiesFromMinSize(propsType.MinSerializedSize)
 				}
@@ -105,32 +100,32 @@ func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType 
 			}
 			return nil
 		}
-		fields := make(map[string]*apiservercel.DeclField, len(s.Properties))
+		fields := make(map[string]*apiservercel.DeclField, len(s.Properties()))
 
 		required := map[string]bool{}
-		if s.Required != nil {
-			for _, f := range s.Required {
+		if s.Required() != nil {
+			for _, f := range s.Required() {
 				required[f] = true
 			}
 		}
 		// an object will always be serialized at least as {}, so account for that
 		minSerializedSize := int64(2)
-		for name, prop := range s.Properties {
+		for name, prop := range s.Properties() {
 			var enumValues []interface{}
-			if prop.Enum != nil {
-				for _, e := range prop.Enum {
+			if prop.Enum() != nil {
+				for _, e := range prop.Enum() {
 					enumValues = append(enumValues, e)
 				}
 			}
-			if fieldType := SchemaDeclType(&prop, isXEmbeddedResource(&prop)); fieldType != nil {
+			if fieldType := SchemaDeclType(prop, prop.IsXEmbeddedResource()); fieldType != nil {
 				if propName, ok := apiservercel.Escape(name); ok {
-					fields[propName] = apiservercel.NewDeclField(propName, fieldType, required[name], enumValues, prop.Default)
+					fields[propName] = apiservercel.NewDeclField(propName, fieldType, required[name], enumValues, prop.Default())
 				}
 				// the min serialized size for an object is 2 (for {}) plus the min size of all its required
 				// properties
 				// only include required properties without a default value; default values are filled in
 				// server-side
-				if required[name] && prop.Default == nil {
+				if required[name] && prop.Default() == nil {
 					minSerializedSize += int64(len(name)) + fieldType.MinSerializedSize + 4
 				}
 			}
@@ -139,11 +134,11 @@ func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType 
 		objType.MinSerializedSize = minSerializedSize
 		return objType
 	case "string":
-		switch s.Format {
+		switch s.Format() {
 		case "byte":
 			byteWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("bytes", cel.BytesType, types.Bytes([]byte{}), apiservercel.MinStringSize)
-			if s.MaxLength != nil {
-				byteWithMaxLength.MaxElements = zeroIfNegative(*s.MaxLength)
+			if s.MaxLength() != nil {
+				byteWithMaxLength.MaxElements = zeroIfNegative(*s.MaxLength())
 			} else {
 				byteWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 			}
@@ -163,12 +158,12 @@ func SchemaDeclType(s *spec.Schema, isResourceRoot bool) *apiservercel.DeclType 
 		}
 
 		strWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("string", cel.StringType, types.String(""), apiservercel.MinStringSize)
-		if s.MaxLength != nil {
+		if s.MaxLength() != nil {
 			// multiply the user-provided max length by 4 in the case of an otherwise-untyped string
 			// we do this because the OpenAPIv3 spec indicates that maxLength is specified in runes/code points,
 			// but we need to reason about length for things like request size, so we use bytes in this code (and an individual
 			// unicode code point can be up to 4 bytes long)
-			strWithMaxLength.MaxElements = zeroIfNegative(*s.MaxLength) * 4
+			strWithMaxLength.MaxElements = zeroIfNegative(*s.MaxLength()) * 4
 		} else {
 			strWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 		}
@@ -227,11 +222,11 @@ func WithTypeAndObjectMeta(s *spec.Schema) *spec.Schema {
 // estimateMaxStringLengthPerRequest estimates the maximum string length (in characters)
 // of a string compatible with the format requirements in the provided schema.
 // must only be called on schemas of type "string" or x-kubernetes-int-or-string: true
-func estimateMaxStringLengthPerRequest(s *spec.Schema) int64 {
-	if isXIntOrString(s) {
+func estimateMaxStringLengthPerRequest(s Schema) int64 {
+	if s.IsXIntOrString() {
 		return maxRequestSizeBytes - 2
 	}
-	switch s.Format {
+	switch s.Format() {
 	case "duration":
 		return apiservercel.MaxDurationSizeJSON
 	case "date":

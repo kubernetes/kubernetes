@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package common
 
 import (
 	"fmt"
 	"strings"
-
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // MapList provides a "lookup by key" operation for lists (arrays) with x-kubernetes-list-type=map.
@@ -60,7 +58,7 @@ func (ks *singleKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interf
 
 // multiKeyStrategy computes a composite key of all key values.
 type multiKeyStrategy struct {
-	sts *spec.Schema
+	sts Schema
 }
 
 // CompositeKeyFor returns a composite key computed from the values of all
@@ -69,7 +67,7 @@ func (ks *multiKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interfa
 	const keyDelimiter = "\x00" // 0 byte should never appear in the composite key except as delimiter
 
 	var delimited strings.Builder
-	for _, key := range getXListMapKeys(ks.sts) {
+	for _, key := range ks.sts.XListMapKeys() {
 		v, ok := obj[key]
 		if !ok {
 			return nil, false
@@ -99,7 +97,7 @@ func (emptyMapList) Get(interface{}) interface{} {
 }
 
 type mapListImpl struct {
-	sts *spec.Schema
+	sts Schema
 	ks  keyStrategy
 	// keyedItems contains all lazily keyed map items
 	keyedItems map[interface{}]interface{}
@@ -148,8 +146,8 @@ func (a *mapListImpl) Get(obj interface{}) interface{} {
 	return nil
 }
 
-func makeKeyStrategy(sts *spec.Schema) keyStrategy {
-	listMapKeys := getXListMapKeys(sts)
+func makeKeyStrategy(sts Schema) keyStrategy {
+	listMapKeys := sts.XListMapKeys()
 	if len(listMapKeys) == 1 {
 		key := listMapKeys[0]
 		return &singleKeyStrategy{
@@ -165,8 +163,8 @@ func makeKeyStrategy(sts *spec.Schema) keyStrategy {
 // MakeMapList returns a queryable interface over the provided x-kubernetes-list-type=map
 // keyedItems. If the provided schema is _not_ an array with x-kubernetes-list-type=map, returns an
 // empty mapList.
-func MakeMapList(sts *spec.Schema, items []interface{}) (rv MapList) {
-	if !sts.Type.Contains("array") || getXListType(sts) != "map" || len(getXListMapKeys(sts)) == 0 {
+func MakeMapList(sts Schema, items []interface{}) (rv MapList) {
+	if sts.Type() != "array" || sts.XListType() != "map" || len(sts.XListMapKeys()) == 0 || len(items) == 0 {
 		return emptyMapList{}
 	}
 	ks := makeKeyStrategy(sts)
