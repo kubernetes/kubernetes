@@ -152,7 +152,7 @@ only this superuser group is authorized.
 
    ``` shell
    openssl req -out client.csr -new -newkey rsa:4096 -nodes -keyout client.key -subj "/CN=development/O=system:masters"
-   openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
+   openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out client.crt
    ```
 
 3. As curl requires client certificates in p12 format with password, do the conversion:
