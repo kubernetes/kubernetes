@@ -10817,7 +10817,7 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 				},
 			},
 			featureEnabled:  false,
-			wantFieldErrors: nil,
+			wantFieldErrors: []*field.Error{field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared")},
 		},
 		{
 			name: "create a Pod with nodeName and schedulingGates, feature enabled",
