@@ -31,16 +31,16 @@ import (
 	configv1beta3 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
-func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
+func loadConfigFromFile(logger klog.Logger, file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return loadConfig(data)
+	return loadConfig(logger, data)
 }
 
-func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
+func loadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfiguration, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
 	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
@@ -54,9 +54,9 @@ func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
 		cfgObj.TypeMeta.APIVersion = gvk.GroupVersion().String()
 		switch cfgObj.TypeMeta.APIVersion {
 		case configv1beta2.SchemeGroupVersion.String():
-			klog.InfoS("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.28")
+			logger.Info("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.28")
 		case configv1beta3.SchemeGroupVersion.String():
-			klog.InfoS("KubeSchedulerConfiguration v1beta3 is deprecated in v1.26, will be removed in v1.29")
+			logger.Info("KubeSchedulerConfiguration v1beta3 is deprecated in v1.26, will be removed in v1.29")
 		}
 		return cfgObj, nil
 	}
@@ -89,9 +89,9 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 }
 
 // LogOrWriteConfig logs the completed component config and writes it into the given file name as YAML, if either is enabled
-func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
-	klogV := klog.V(2)
-	if !klogV.Enabled() && len(fileName) == 0 {
+func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
+	loggerV := logger.V(2)
+	if !loggerV.Enabled() && len(fileName) == 0 {
 		return nil
 	}
 	cfg.Profiles = completedProfiles
@@ -101,8 +101,8 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		return err
 	}
 
-	if klogV.Enabled() {
-		klogV.InfoS("Using component config", "config", buf.String())
+	if loggerV.Enabled() {
+		loggerV.Info("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
@@ -114,7 +114,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		if _, err := io.Copy(configFile, buf); err != nil {
 			return err
 		}
-		klog.InfoS("Wrote configuration", "file", fileName)
+		logger.Info("Wrote configuration", "file", fileName)
 		os.Exit(0)
 	}
 	return nil

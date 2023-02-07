@@ -34,6 +34,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2/ktesting"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kube-scheduler/config/v1beta3"
@@ -1662,7 +1663,8 @@ profiles:
 				}
 			}
 			// create the config
-			config, err := tc.options.Config()
+			_, ctx := ktesting.NewTestContext(t)
+			config, err := tc.options.Config(ctx)
 
 			// handle errors
 			if err != nil {
