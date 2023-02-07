@@ -13,7 +13,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a
-	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
+	k8s.io/utils v0.0.0-20230202215443-34013725500c
 )
 
 require (

@@ -515,7 +515,8 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		args = append(formatOptions, args...)
 
 		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
-		output, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
+
+		output, err := mounter.format(fstype, args)
 		if err != nil {
 			// Do not log sensitiveOptions only options
 			sensitiveOptionsLog := sanitizedOptionsForLogging(options, sensitiveOptions)
@@ -548,6 +549,29 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	}
 
 	return nil
+}
+
+func (mounter *SafeFormatAndMount) format(fstype string, args []string) ([]byte, error) {
+	if mounter.formatSem != nil {
+		done := make(chan struct{})
+		defer close(done)
+
+		mounter.formatSem <- struct{}{}
+
+		go func() {
+			defer func() { <-mounter.formatSem }()
+
+			timeout := time.NewTimer(mounter.formatTimeout)
+			defer timeout.Stop()
+
+			select {
+			case <-done:
+			case <-timeout.C:
+			}
+		}()
+	}
+
+	return mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
 }
 
 func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
