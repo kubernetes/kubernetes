@@ -47,7 +47,7 @@ func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource, sele
 		dynamicClient:     dc,
 		mapper:            m,
 		resources:         r,
-		//labelSelector:     selector,
+		labelSelector:     selector,
 	}
 }
 
