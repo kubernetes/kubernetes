@@ -71,7 +71,7 @@ type ScaleFlags struct {
 	PrintFlags      *genericclioptions.PrintFlags
 	RecordFlags     *genericclioptions.RecordFlags
 	Replicas        int
-	resourceVersion string
+	ResourceVersion string
 	Selector        string
 	Timeout         time.Duration
 
