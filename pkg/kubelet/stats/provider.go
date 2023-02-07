@@ -85,7 +85,6 @@ type Provider struct {
 	podManager   kubepod.Manager
 	runtimeCache kubecontainer.RuntimeCache
 	containerStatsProvider
-	rlimitStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
@@ -96,10 +95,6 @@ type containerStatsProvider interface {
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
 	ImageFsDevice(ctx context.Context) (string, error)
-}
-
-type rlimitStatsProvider interface {
-	RlimitStats() (*statsapi.RlimitStats, error)
 }
 
 // RlimitStats returns base information about process count
