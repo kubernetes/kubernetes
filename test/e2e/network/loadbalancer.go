@@ -110,9 +110,8 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 	}
 	for i := range nodes.Items {
 		node := nodes.Items[i]
-		_, isMaster := node.Labels["node-role.kubernetes.io/master"]
-		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
-		if !isMaster && !isControlPlane {
+		_, isWorker := node.Labels["node-role.kubernetes.io/worker"]
+		if isWorker {
 			return &node, nil
 		}
 	}
