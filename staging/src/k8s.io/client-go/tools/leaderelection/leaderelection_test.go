@@ -73,8 +73,9 @@ type Reactor struct {
 }
 
 func testTryAcquireOrRenew(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+	past := clock.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
 		name           string
@@ -308,7 +309,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
 				observedTime:      test.observedTime,
-				clock:             clock.RealClock{},
+				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				if test.retryAfter != 0 {
@@ -409,8 +410,9 @@ func GetRawRecordOrDie(t *testing.T, objectType string, ler rl.LeaderElectionRec
 }
 
 func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+	past := clock.Now().Add(-1000 * time.Hour)
 	primaryType, secondaryType := multiLockType(t, objectType)
 	tests := []struct {
 		name              string
@@ -867,7 +869,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				observedRecord:    test.observedRecord,
 				observedRawRecord: test.observedRawRecord,
 				observedTime:      test.observedTime,
-				clock:             clock.RealClock{},
+				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)

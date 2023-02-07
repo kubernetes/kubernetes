@@ -295,7 +295,7 @@ func (le *LeaderElector) release() bool {
 	if !le.IsLeader() {
 		return true
 	}
-	now := metav1.Now()
+	now := metav1.NewTime(le.clock.Now())
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		LeaderTransitions:    le.observedRecord.LeaderTransitions,
 		LeaseDurationSeconds: 1,
@@ -315,7 +315,7 @@ func (le *LeaderElector) release() bool {
 // else it tries to renew the lease if it has already been acquired. Returns true
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
-	now := metav1.Now()
+	now := metav1.NewTime(le.clock.Now())
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),
