@@ -26,7 +26,7 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var node = &corev1.Node{
+var testNode = &corev1.Node{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "node-XXX",
 	},
@@ -125,7 +125,7 @@ func TestGeneralProfile(t *testing.T) {
 				},
 			},
 			containerName: "dbg",
-			target:        node,
+			target:        testNode,
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: corev1.PodSpec{
@@ -261,7 +261,7 @@ func TestBaselineProfile(t *testing.T) {
 				},
 			},
 			containerName: "dbg",
-			target:        node,
+			target:        testNode,
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: corev1.PodSpec{
@@ -392,7 +392,7 @@ func TestRestrictedProfile(t *testing.T) {
 				},
 			},
 			containerName: "dbg",
-			target:        node,
+			target:        testNode,
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: corev1.PodSpec{

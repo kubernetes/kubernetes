@@ -54,13 +54,13 @@ type debugStyle int
 
 const (
 	// debug by ephemeral container
-	styleEphemeral debugStyle = iota
+	ephemeral debugStyle = iota
 	// debug by pod copy
-	stylePodCopy
+	podCopy
 	// debug node
-	styleNode
+	node
 	// unsupported debug methodology
-	styleUnsupported
+	unsupported
 )
 
 func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
@@ -68,14 +68,14 @@ func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	case *corev1.Pod:
 		if asserted, ok := target.(*corev1.Pod); ok {
 			if pod != asserted { // comparing addresses
-				return stylePodCopy, nil
+				return podCopy, nil
 			}
 		}
-		return styleEphemeral, nil
+		return ephemeral, nil
 	case *corev1.Node:
-		return styleNode, nil
+		return node, nil
 	}
-	return styleUnsupported, fmt.Errorf("objects of type %T are not supported", target)
+	return unsupported, fmt.Errorf("objects of type %T are not supported", target)
 }
 
 func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
@@ -85,17 +85,17 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 	}
 
 	switch style {
-	case styleNode:
+	case node:
 		MountRootPartition(pod, containerName)
 		ClearSecurityContext(pod, containerName, Containers)
 		UseHostNamespaces(pod)
 
-	case stylePodCopy:
+	case podCopy:
 		RemoveLabelsAndProbes(pod)
 		AllowProcessTracing(pod, containerName, Containers)
 		ShareProcessNamespace(pod)
 
-	case styleEphemeral:
+	case ephemeral:
 		AllowProcessTracing(pod, containerName, EphemeralContainers)
 	}
 
@@ -111,11 +111,11 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	ClearSecurityContext(pod, containerName, Containers|EphemeralContainers)
 
 	switch style {
-	case stylePodCopy:
+	case podCopy:
 		RemoveLabelsAndProbes(pod)
 		ShareProcessNamespace(pod)
 
-	case styleEphemeral, styleNode:
+	case ephemeral, node:
 		// no additional modifications needed
 	}
 
@@ -132,13 +132,13 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	DropCapabilities(pod, containerName, Containers|EphemeralContainers)
 
 	switch style {
-	case styleNode:
+	case node:
 		ClearSecurityContext(pod, containerName, Containers)
 
-	case stylePodCopy:
+	case podCopy:
 		ShareProcessNamespace(pod)
 
-	case styleEphemeral:
+	case ephemeral:
 		// no additional modifications needed
 	}
 
