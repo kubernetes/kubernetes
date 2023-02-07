@@ -18,8 +18,10 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 
@@ -38,6 +40,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -59,7 +62,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
+	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -153,12 +156,36 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
+
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
+	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	if err != nil {
+		return err
+	}
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
+
+	if !dryRun {
+		// call `cp` instead of `rename` here since the kubelet config file and back up directory (/etc/kubernetes/tmp/)
+		// might on the filesystem with different mount points in the test environment, such as kinder.
+		// This will lead to a failure to move the file from the source to dest since `rename` normally doesn't work
+		// across different mount points on most Unix system.
+		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		output, err := kubeadmutil.CopyDir(src, dest)
+		if err != nil {
+			return errors.Wrapf(err, "error backing up the kubelet config file, output: %q", output)
+		}
+	} else {
+		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+	}
+
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
@@ -166,7 +193,10 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	if dryRun { // Print what contents would be written
-		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+		}
 	}
 	return errorsutil.NewAggregate(errs)
 }
