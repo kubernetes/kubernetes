@@ -584,12 +584,14 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(logger klog.Logger, remo
 }
 
 func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, n *node) {
-	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
+	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) ||
+		(n.isDeletingDependents() == false && beingDeleted(newAccessor) && hasOrphanFinalizer(newAccessor)) {
 		logger.V(5).Info("add item to attemptToOrphan", "item", n.identity)
 		gb.attemptToOrphan.Add(n)
 		return
 	}
-	if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
+	if startsWaitingForDependentsDeleted(oldObj, newAccessor) ||
+		(n.isDeletingDependents() == false && beingDeleted(newAccessor) && hasDeleteDependentsFinalizer(newAccessor)) {
 		logger.V(2).Info("add item to attemptToDelete, because it's waiting for its dependents to be deleted", "item", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 		n.markDeletingDependents()
