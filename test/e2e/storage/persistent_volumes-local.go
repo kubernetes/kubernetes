@@ -959,7 +959,7 @@ func createLocalPVCsPVs(ctx context.Context, config *localTestConfig, volumes []
 			for _, volume := range volumes {
 				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(ctx, volume.pvc.Name, metav1.GetOptions{})
 				if err != nil {
-					return false, fmt.Errorf("failed to get PVC %s/%s: %v", volume.pvc.Namespace, volume.pvc.Name, err)
+					return false, fmt.Errorf("failed to get PVC %s/%s: %w", volume.pvc.Namespace, volume.pvc.Name, err)
 				}
 				if pvc.Status.Phase != v1.ClaimPending {
 					return true, nil

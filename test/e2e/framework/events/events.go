@@ -42,7 +42,7 @@ func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) 
 	return func(ctx context.Context) (bool, error) {
 		events, err := c.CoreV1().Events(namespace).List(ctx, options)
 		if err != nil {
-			return false, fmt.Errorf("got error while getting events: %v", err)
+			return false, fmt.Errorf("got error while getting events: %w", err)
 		}
 		for _, event := range events.Items {
 			if strings.Contains(event.Message, msg) {

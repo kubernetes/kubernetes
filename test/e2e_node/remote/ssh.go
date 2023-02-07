@@ -121,7 +121,7 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
 		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
-		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
+		return string(output), fmt.Errorf("command [%s %s] failed with error: %w", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil
 }

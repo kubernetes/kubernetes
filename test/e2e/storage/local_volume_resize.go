@@ -143,7 +143,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 		var err error
 		pvToUpdate, err = c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("error fetching pv %s: %v", pvName, err)
+			return false, fmt.Errorf("error fetching pv %s: %w", pvName, err)
 		}
 		pvToUpdate.Spec.Capacity[v1.ResourceStorage] = size
 		pvToUpdate, err = c.CoreV1().PersistentVolumes().Update(ctx, pvToUpdate, metav1.UpdateOptions{})

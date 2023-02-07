@@ -1001,7 +1001,7 @@ func CreateCustomSubresourceInstance(ctx context.Context, namespace, name string
 	}
 	createdObjectMeta, err := meta.Accessor(instance)
 	if err != nil {
-		return nil, fmt.Errorf("Error while creating object meta: %v", err)
+		return nil, fmt.Errorf("Error while creating object meta: %w", err)
 	}
 	if len(createdObjectMeta.GetUID()) == 0 {
 		return nil, fmt.Errorf("Missing UUID: %v", instance)

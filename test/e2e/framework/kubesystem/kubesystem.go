@@ -41,7 +41,7 @@ func RestartControllerManager(ctx context.Context) error {
 	result, err := e2essh.SSH(ctx, cmd, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart controller-manager: %v", err)
+		return fmt.Errorf("couldn't restart controller-manager: %w", err)
 	}
 	return nil
 }

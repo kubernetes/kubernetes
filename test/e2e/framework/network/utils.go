@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -889,7 +888,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0)))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := e2epod.WaitForPodToDisappear(ctx, config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
+	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, wait.ForeverTestTimeout)
 	if err != nil {
 		framework.Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
@@ -1027,7 +1026,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ret.Status = HTTPError
-		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)
+		ret.Error = fmt.Errorf("error reading HTTP body: %w", err)
 		framework.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
@@ -1192,7 +1191,7 @@ func WaitForService(ctx context.Context, c clientset.Interface, namespace, name 
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+		return fmt.Errorf("error waiting for service %s/%s %s: %w", namespace, name, stateMsg[exist], err)
 	}
 	return nil
 }

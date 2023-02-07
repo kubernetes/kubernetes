@@ -34,6 +34,9 @@ type GetFunc[T any] func(ctx context.Context) (T, error)
 // APIGetFunc is a get functions as used in client-go.
 type APIGetFunc[T any] func(ctx context.Context, name string, getOptions metav1.GetOptions) (T, error)
 
+// APIListFunc is a list functions as used in client-go.
+type APIListFunc[T any] func(ctx context.Context, listOptions metav1.ListOptions) (T, error)
+
 // GetObject takes a get function like clientset.CoreV1().Pods(ns).Get
 // and the parameters for it and returns a function that executes that get
 // operation in a [gomega.Eventually] or [gomega.Consistently].
@@ -44,6 +47,17 @@ type APIGetFunc[T any] func(ctx context.Context, name string, getOptions metav1.
 func GetObject[T any](get APIGetFunc[T], name string, getOptions metav1.GetOptions) GetFunc[T] {
 	return HandleRetry(func(ctx context.Context) (T, error) {
 		return get(ctx, name, getOptions)
+	})
+}
+
+// ListObjects takes a list function like clientset.CoreV1().Pods(ns).List
+// and the parameters for it and returns a function that executes that list
+// operation in a [gomega.Eventually] or [gomega.Consistently].
+//
+// Delays and retries are handled by [HandleRetry].
+func ListObjects[T any](list APIListFunc[T], listOptions metav1.ListOptions) GetFunc[T] {
+	return HandleRetry(func(ctx context.Context) (T, error) {
+		return list(ctx, listOptions)
 	})
 }
 

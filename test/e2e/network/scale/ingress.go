@@ -120,7 +120,7 @@ func (f *IngressScaleFramework) PrepareScaleTest(ctx context.Context) error {
 		Cloud:  f.CloudConfig,
 	}
 	if err := f.GCEController.Init(ctx); err != nil {
-		return fmt.Errorf("failed to initialize GCE controller: %v", err)
+		return fmt.Errorf("failed to initialize GCE controller: %w", err)
 	}
 
 	f.ScaleTestSvcs = []*v1.Service{}
@@ -137,7 +137,7 @@ func (f *IngressScaleFramework) CleanupScaleTest(ctx context.Context) []error {
 	for _, ing := range f.ScaleTestIngs {
 		if ing != nil {
 			if err := f.Clientset.NetworkingV1().Ingresses(ing.Namespace).Delete(ctx, ing.Name, metav1.DeleteOptions{}); err != nil {
-				errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
+				errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %w", ing.Namespace, ing.Name, err))
 			}
 		}
 	}
@@ -145,14 +145,14 @@ func (f *IngressScaleFramework) CleanupScaleTest(ctx context.Context) []error {
 	for _, svc := range f.ScaleTestSvcs {
 		if svc != nil {
 			if err := f.Clientset.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{}); err != nil {
-				errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
+				errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %w", svc.Namespace, svc.Name, err))
 			}
 		}
 	}
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
 		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(ctx, f.ScaleTestDeploy.Name, metav1.DeleteOptions{}); err != nil {
-			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %w", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 
@@ -172,7 +172,7 @@ func (f *IngressScaleFramework) RunScaleTest(ctx context.Context) []error {
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
 	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(ctx, testDeploy, metav1.CreateOptions{})
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to create deployment %s: %v", testDeploy.Name, err))
+		errs = append(errs, fmt.Errorf("failed to create deployment %s: %w", testDeploy.Name, err))
 		return errs
 	}
 	f.ScaleTestDeploy = testDeploy
@@ -180,7 +180,7 @@ func (f *IngressScaleFramework) RunScaleTest(ctx context.Context) []error {
 	if f.EnableTLS {
 		f.Logger.Infof("Ensuring TLS secret %s...", scaleTestSecretName)
 		if err := f.Jig.PrepareTLSSecret(ctx, f.Namespace, scaleTestSecretName, scaleTestHostname); err != nil {
-			errs = append(errs, fmt.Errorf("failed to prepare TLS secret %s: %v", scaleTestSecretName, err))
+			errs = append(errs, fmt.Errorf("failed to prepare TLS secret %s: %w", scaleTestSecretName, err))
 			return errs
 		}
 	}
