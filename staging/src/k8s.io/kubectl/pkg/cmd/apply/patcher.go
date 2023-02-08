@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/openapi"
-
 )
 
 const (
@@ -139,7 +138,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 			}
 		} else {
 			if !runtime.IsNotRegisteredError(err) {
-				return nil, nil, return nil, nil, fmt.Errorf("getting instance of versioned object for %v:, err: %w", p.Mapping.GroupVersionKind, err)
+				return nil, nil, fmt.Errorf("getting instance of versioned object for %v:, err: %w", p.Mapping.GroupVersionKind, err)
 			}
 
 			patchType = types.MergePatchType
