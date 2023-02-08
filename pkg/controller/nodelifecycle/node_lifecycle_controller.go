@@ -643,9 +643,8 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 			}
 			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
 			if result {
-				//count the evictionsNumber
+				// Count the number of evictions.
 				zone := nodetopology.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
 				evictionsTotal.WithLabelValues(zone).Inc()
 			}
 
@@ -1222,7 +1221,6 @@ func (nc *Controller) addPodEvictorForNewZone(logger klog.Logger, node *v1.Node)
 				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		// Init the metric for the new zone.
 		logger.Info("Initializing eviction metric for zone", "zone", zone)
-		evictionsNumber.WithLabelValues(zone).Add(0)
 		evictionsTotal.WithLabelValues(zone).Add(0)
 	}
 }
