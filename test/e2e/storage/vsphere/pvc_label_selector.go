@@ -110,7 +110,6 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 
 func testSetupVSpherePVClabelselector(c clientset.Interface, nodeInfo *NodeInfo, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pvSsd *v1.PersistentVolume, pvcSsd *v1.PersistentVolumeClaim, pvcVvol *v1.PersistentVolumeClaim, err error) {
 	ginkgo.By("creating vmdk")
-	volumePath = ""
 	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return
