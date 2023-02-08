@@ -2246,7 +2246,6 @@ function start-kube-controller-manager {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# (TODO/cloud-provider-gcp): Figure out how to inject
 # Starts cloud controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -2309,8 +2308,8 @@ function start-cloud-controller-manager {
       echo "None of the given feature gates (${FEATURE_GATES}) were found to be safe to pass to the CCM"
     fi
   fi
-  if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=("--controllers=${RUN_CONTROLLERS}")
+  if [[ -n "${RUN_CCM_CONTROLLERS:-}" ]]; then
+    params+=("--controllers=${RUN_CCM_CONTROLLERS}")
   fi
 
   echo "Converting manifest for cloud provider controller-manager"
@@ -3572,7 +3571,6 @@ function main() {
       log-wrap 'StartKonnectivityServer' start-konnectivity-server
     fi
     log-wrap 'StartKubeControllerManager' start-kube-controller-manager
-    # (TODO/cloud-provider-gcp): Figure out how to inject
     if [[ "${CLOUD_PROVIDER_FLAG:-gce}" == "external" ]]; then
       log-wrap 'StartCloudControllerManager' start-cloud-controller-manager
     fi
