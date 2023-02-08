@@ -186,3 +186,48 @@ func maxContainerRestarts(pod *corev1.Pod) int {
 	}
 	return maxRestarts
 }
+
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// ContainerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+type ContainerVisitor func(container *corev1.Container, containerType ContainerType) (shouldContinue bool)
+
+// VisitContainers invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
+// visiting is short-circuited. VisitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainers(pod *corev1.Pod, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask&InitContainers != 0 {
+		for i := range pod.Spec.InitContainers {
+			if !visitor(&pod.Spec.InitContainers[i], InitContainers) {
+				return false
+			}
+		}
+	}
+	if mask&Containers != 0 {
+		for i := range pod.Spec.Containers {
+			if !visitor(&pod.Spec.Containers[i], Containers) {
+				return false
+			}
+		}
+	}
+	if mask&EphemeralContainers != 0 {
+		for i := range pod.Spec.EphemeralContainers {
+			if !visitor((*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+				return false
+			}
+		}
+	}
+	return true
+}

@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/utils/pointer"
 )
 
@@ -87,16 +88,16 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 	switch style {
 	case node:
 		MountRootPartition(pod, containerName)
-		ClearSecurityContext(pod, containerName, Containers)
+		ClearSecurityContext(pod, containerName, podutils.Containers)
 		UseHostNamespaces(pod)
 
 	case podCopy:
 		RemoveLabelsAndProbes(pod)
-		AllowProcessTracing(pod, containerName, Containers)
+		AllowProcessTracing(pod, containerName, podutils.Containers)
 		ShareProcessNamespace(pod)
 
 	case ephemeral:
-		AllowProcessTracing(pod, containerName, EphemeralContainers)
+		AllowProcessTracing(pod, containerName, podutils.EphemeralContainers)
 	}
 
 	return nil
@@ -108,7 +109,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		return fmt.Errorf("baseline profile: %s", err)
 	}
 
-	ClearSecurityContext(pod, containerName, Containers|EphemeralContainers)
+	ClearSecurityContext(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
 
 	switch style {
 	case podCopy:
@@ -128,12 +129,12 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		return fmt.Errorf("restricted profile: %s", err)
 	}
 
-	DisallowRoot(pod, containerName, Containers|EphemeralContainers)
-	DropCapabilities(pod, containerName, Containers|EphemeralContainers)
+	DisallowRoot(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
+	DropCapabilities(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
 
 	switch style {
 	case node:
-		ClearSecurityContext(pod, containerName, Containers)
+		ClearSecurityContext(pod, containerName, podutils.Containers)
 
 	case podCopy:
 		ShareProcessNamespace(pod)
@@ -144,16 +145,6 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 
 	return nil
 }
-
-// ContainerType signifies container type
-type ContainerType int
-
-const (
-	// Containers is for normal containers
-	Containers ContainerType = 1 << iota
-	// EphemeralContainers is for ephemeral containers
-	EphemeralContainers
-)
 
 // RemoveLabelsAndProbes removes labels from the pod and remove probes
 // from all containers of the pod.
@@ -174,7 +165,7 @@ func MountRootPartition(p *corev1.Pod, containerName string) {
 			HostPath: &corev1.HostPathVolumeSource{Path: "/"},
 		},
 	})
-	modifyContainer(p, containerName, Containers, func(c *corev1.Container) {
+	modifyContainer(p, containerName, podutils.Containers, func(c *corev1.Container) {
 		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
 			MountPath: "/host",
 			Name:      volumeName,
@@ -197,14 +188,14 @@ func ShareProcessNamespace(p *corev1.Pod) {
 }
 
 // ClearSecurityContext clears the security context for the container.
-func ClearSecurityContext(p *corev1.Pod, containerName string, mask ContainerType) {
+func ClearSecurityContext(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
 		c.SecurityContext = nil
 	})
 }
 
 // DisallowRoot configures the container to run as a non-root user.
-func DisallowRoot(p *corev1.Pod, containerName string, mask ContainerType) {
+func DisallowRoot(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
 		c.SecurityContext = &corev1.SecurityContext{
 			RunAsNonRoot: pointer.BoolPtr(true),
@@ -213,7 +204,7 @@ func DisallowRoot(p *corev1.Pod, containerName string, mask ContainerType) {
 }
 
 // DropCapabilities drops all Capabilities for the container
-func DropCapabilities(p *corev1.Pod, containerName string, mask ContainerType) {
+func DropCapabilities(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{
@@ -234,7 +225,7 @@ func DropCapabilities(p *corev1.Pod, containerName string, mask ContainerType) {
 }
 
 // AllowProcessTracing grants the SYS_PTRACE capability to the container.
-func AllowProcessTracing(p *corev1.Pod, containerName string, mask ContainerType) {
+func AllowProcessTracing(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{
@@ -257,21 +248,12 @@ func AllowProcessTracing(p *corev1.Pod, containerName string, mask ContainerType
 // modifyContainer performs the modifier function m against a container from the
 // the input pod spec which has the name of containerName and the type satisfying
 // the mask.
-func modifyContainer(pod *corev1.Pod, containerName string, mask ContainerType, m func(*corev1.Container)) {
-	if mask&Containers != 0 {
-		for i, c := range pod.Spec.Containers {
-			if c.Name != containerName {
-				continue
-			}
-			m(&pod.Spec.Containers[i])
+func modifyContainer(pod *corev1.Pod, containerName string, mask podutils.ContainerType, m func(*corev1.Container)) {
+	podutils.VisitContainers(pod, mask, func(c *corev1.Container, _ podutils.ContainerType) (shouldContinue bool) {
+		if c.Name != containerName {
+			return true
 		}
-	}
-	if mask&EphemeralContainers != 0 {
-		for i, c := range pod.Spec.EphemeralContainers {
-			if c.Name != containerName {
-				continue
-			}
-			m((*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
-		}
-	}
+		m(c)
+		return false
+	})
 }
