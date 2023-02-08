@@ -214,24 +214,24 @@ type ContainerVisitor func(container *corev1.Container, containerType ContainerT
 // spec in the given pod spec with type set in mask. If visitor returns false,
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
-func VisitContainers(pod *corev1.Pod, mask ContainerType, visitor ContainerVisitor) bool {
+func VisitContainers(podSpec *corev1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
 	if mask&InitContainers != 0 {
-		for i := range pod.Spec.InitContainers {
-			if !visitor(&pod.Spec.InitContainers[i], InitContainers) {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
 				return false
 			}
 		}
 	}
 	if mask&Containers != 0 {
-		for i := range pod.Spec.Containers {
-			if !visitor(&pod.Spec.Containers[i], Containers) {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
 				return false
 			}
 		}
 	}
 	if mask&EphemeralContainers != 0 {
-		for i := range pod.Spec.EphemeralContainers {
-			if !visitor((*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*corev1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
 				return false
 			}
 		}
