@@ -17,6 +17,7 @@ limitations under the License.
 package record
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -452,7 +453,12 @@ func TestWriteEventError(t *testing.T) {
 			},
 		}
 		ev := &v1.Event{}
-		recordToSink(sink, ev, eventCorrelator, 0)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		e := eventBroadcasterImpl{
+			cancelationCtx: ctx,
+		}
+		e.recordToSink(sink, ev, eventCorrelator)
 		if attempts != ent.attemptsWanted {
 			t.Errorf("case %v: wanted %d, got %d attempts", caseName, ent.attemptsWanted, attempts)
 		}
@@ -482,7 +488,12 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	ev := &v1.Event{}
 	ev.ResourceVersion = "updated-resource-version"
 	ev.Count = 2
-	recordToSink(sink, ev, eventCorrelator, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	e := eventBroadcasterImpl{
+		cancelationCtx: ctx,
+	}
+	e.recordToSink(sink, ev, eventCorrelator)
 
 	if createdEvent == nil {
 		t.Error("Event did not get created after patch failed")
@@ -491,6 +502,33 @@ func TestUpdateExpiredEvent(t *testing.T) {
 
 	if createdEvent.ResourceVersion != "" {
 		t.Errorf("Event did not have its resource version cleared, was %s", createdEvent.ResourceVersion)
+	}
+}
+
+func TestCancelEvent(t *testing.T) {
+	clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
+	eventCorrelator := NewEventCorrelator(&clock)
+
+	attempts := 0
+	sink := &testEventSink{
+		OnCreate: func(event *v1.Event) (*v1.Event, error) {
+			attempts++
+			return nil, &errors.UnexpectedObjectError{}
+		},
+	}
+
+	ev := &v1.Event{}
+
+	// Cancel before even calling recordToSink.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	e := eventBroadcasterImpl{
+		cancelationCtx: ctx,
+		sleepDuration:  time.Second,
+	}
+	e.recordToSink(sink, ev, eventCorrelator)
+	if attempts != 1 {
+		t.Errorf("recordToSink should have tried once, then given up immediately. Instead it tried %d times.", attempts)
 	}
 }
 
