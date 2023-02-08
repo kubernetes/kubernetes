@@ -120,7 +120,7 @@ func fetchPath(handler http.Handler, acceptPrefix string, path string, etag stri
 
 // Add all builtin APIServices to the manager and check the output
 func TestBasicResponse(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Items)
@@ -141,7 +141,7 @@ func TestBasicResponse(t *testing.T) {
 
 // Test that protobuf is outputted correctly
 func TestBasicResponseProtobuf(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Items)
@@ -157,8 +157,8 @@ func TestBasicResponseProtobuf(t *testing.T) {
 // e.g.: Multiple services with the same contents should have the same etag.
 func TestEtagConsistent(t *testing.T) {
 	// Create 2 managers, add a bunch of services to each
-	manager1 := discoveryendpoint.NewResourceManager()
-	manager2 := discoveryendpoint.NewResourceManager()
+	manager1 := discoveryendpoint.NewResourceManager("apis")
+	manager2 := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 11)
 	manager1.SetGroups(apis.Items)
@@ -231,7 +231,7 @@ func TestEtagConsistent(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with an incorrect
 // E-Tag, that fresh content is returned.
 func TestEtagNonMatching(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 12)
 	manager.SetGroups(apis.Items)
 
@@ -251,7 +251,7 @@ func TestEtagNonMatching(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with a correct
 // E-Tag, that 304 Not Modified is returned
 func TestEtagMatching(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 12)
 	manager.SetGroups(apis.Items)
 
@@ -273,7 +273,7 @@ func TestEtagMatching(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with an old
 // E-Tag, that fresh content is returned
 func TestEtagOutdated(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 15)
 	manager.SetGroups(apis.Items)
 
@@ -301,7 +301,7 @@ func TestEtagOutdated(t *testing.T) {
 
 // Test that an api service can be added or removed
 func TestAddRemove(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 15)
 	for _, group := range apis.Items {
 		for _, version := range group.Versions {
@@ -331,7 +331,7 @@ func TestAddRemove(t *testing.T) {
 // Show that updating an existing service replaces and does not add the entry
 // and instead replaces it
 func TestUpdateService(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 15)
 	for _, group := range apis.Items {
 		for _, version := range group.Versions {
@@ -368,7 +368,7 @@ func TestUpdateService(t *testing.T) {
 // Show the discovery manager is capable of serving requests to multiple users
 // with unchanging data
 func TestConcurrentRequests(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 	apis := fuzzAPIGroups(1, 3, 15)
 	manager.SetGroups(apis.Items)
 
@@ -410,7 +410,7 @@ func TestConcurrentRequests(t *testing.T) {
 // concurrent writers without tripping up. Good to run with go '-race' detector
 // since there are not many "correctness" checks
 func TestAbuse(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	numReaders := 100
 	numRequestsPerReader := 1000
@@ -505,7 +505,7 @@ func TestAbuse(t *testing.T) {
 }
 
 func TestVersionSortingNoPriority(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
 		Version: "v1alpha1",
@@ -537,7 +537,7 @@ func TestVersionSortingNoPriority(t *testing.T) {
 }
 
 func TestVersionSortingWithPriority(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
 		Version: "v1",
@@ -560,7 +560,7 @@ func TestVersionSortingWithPriority(t *testing.T) {
 
 // if two apiservices declare conflicting priorities for their group priority, take the higher one.
 func TestGroupVersionSortingConflictingPriority(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
 		Version: "v1",
@@ -588,7 +588,7 @@ func TestGroupVersionSortingConflictingPriority(t *testing.T) {
 // Show that the GroupPriorityMinimum is not sticky if a higher group version is removed
 // after a lower one is added
 func TestStatelessGroupPriorityMinimum(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
+	manager := discoveryendpoint.NewResourceManager("apis")
 
 	stableGroup := "stable.example.com"
 	experimentalGroup := "experimental.example.com"
