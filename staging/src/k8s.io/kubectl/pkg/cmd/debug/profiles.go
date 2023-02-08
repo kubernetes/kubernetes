@@ -165,11 +165,15 @@ func MountRootPartition(p *corev1.Pod, containerName string) {
 			HostPath: &corev1.HostPathVolumeSource{Path: "/"},
 		},
 	})
-	modifyContainer(p, containerName, podutils.Containers, func(c *corev1.Container) {
+	podutils.VisitContainers(&p.Spec, podutils.Containers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
 		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
 			MountPath: "/host",
 			Name:      volumeName,
 		})
+		return false
 	})
 }
 
@@ -189,71 +193,74 @@ func ShareProcessNamespace(p *corev1.Pod) {
 
 // ClearSecurityContext clears the security context for the container.
 func ClearSecurityContext(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
-	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
 		c.SecurityContext = nil
+		return false
 	})
 }
 
 // DisallowRoot configures the container to run as a non-root user.
 func DisallowRoot(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
-	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
 		c.SecurityContext = &corev1.SecurityContext{
 			RunAsNonRoot: pointer.BoolPtr(true),
 		}
+		return false
 	})
 }
 
 // DropCapabilities drops all Capabilities for the container
 func DropCapabilities(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
-	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
 			}
-			return
+			return false
 		}
 		if c.SecurityContext.Capabilities == nil {
 			c.SecurityContext.Capabilities = &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			}
-			return
+			return false
 		}
 		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "ALL")
+		return false
 	})
 }
 
 // AllowProcessTracing grants the SYS_PTRACE capability to the container.
 func AllowProcessTracing(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
-	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"SYS_PTRACE"},
 				},
 			}
-			return
+			return false
 		}
 		if c.SecurityContext.Capabilities == nil {
 			c.SecurityContext.Capabilities = &corev1.Capabilities{
 				Drop: []corev1.Capability{"SYS_PTRACE"},
 			}
-			return
+			return false
 		}
 		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "SYS_PTRACE")
-	})
-}
-
-// modifyContainer performs the modifier function m against a container from the
-// the input pod spec which has the name of containerName and the type satisfying
-// the mask.
-func modifyContainer(pod *corev1.Pod, containerName string, mask podutils.ContainerType, m func(*corev1.Container)) {
-	podutils.VisitContainers(pod, mask, func(c *corev1.Container, _ podutils.ContainerType) (shouldContinue bool) {
-		if c.Name != containerName {
-			return true
-		}
-		m(c)
 		return false
 	})
 }
