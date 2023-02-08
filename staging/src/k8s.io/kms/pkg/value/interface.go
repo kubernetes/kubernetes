@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,32 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package encryption
+package value
 
 import "context"
 
-// Store is a simple interface to store and retrieve Transformer. It is expected
-// to be thread-safe.
-type Store interface {
-	// Add adds a transformer to the store with its encrypted key as key.
-	Add([]byte, Transformer)
-	// Get returns a transformer from the store by its encrypted key as key.
-	Get([]byte) (Transformer, bool)
-}
-
-// CreateTransformer enables the creation of a Transformer based on a key.
-type CreateTransformer interface {
-	// Transformer creates a transformer with a given key.
-	Transformer(context.Context, []byte) (Transformer, error)
-	// Key creates a key that should match the expectations of Transformer().
-	Key() ([]byte, error)
-}
-
-/*
-Copied from:
-	- "k8s.io/apiserver/pkg/storage/value"
-	- "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-*/
+// Vendored from kubernetes/staging/src/k8s.io/apiserver/pkg/storage/value/transformer.go
+//  * commit: 59e1a32fc8ed35e328a3971d3a1d640ffc28ff55
+//  * link: https://github.com/kubernetes/kubernetes/blob/59e1a32fc8ed35e328a3971d3a1d640ffc28ff55/staging/src/k8s.io/apiserver/pkg/storage/value/transformer.go
 
 // Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
 // must be able to undo the transformation caused by the other.

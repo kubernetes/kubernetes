@@ -18,180 +18,245 @@ package encryption
 
 import (
 	"context"
-	"errors"
+	"crypto/aes"
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	aestransformer "k8s.io/kms/pkg/encrypt/aes"
+	"k8s.io/kms/pkg/value"
 	"k8s.io/kms/service"
+	"k8s.io/utils/lru"
 )
 
 var (
-	// ErrNoCipher means that there is no remote kms given and therefore the keys in use can't be protected.
-	ErrNoCipher = errors.New("no remote encryption service was specified")
-	// EmptyContext is an empty slice of bytes.
-	EmptyContext = DefaultContext([]byte{})
-	// LocalKEKID is the key used to store the localKEK in the annotations.
-	LocalKEKID = "kmsv2:local-kek"
+	// emptyContext is an empty slice of bytes. This is passed as value.Context to the
+	// GCM transformer. The grpc interface does not provide any additional authenticated data
+	// to use with AEAD.
+	emptyContext = value.DefaultContext([]byte{})
+	// errInvalidKMSAnnotationKeySuffix is returned when the annotation key suffix is not allowed.
+	errInvalidKMSAnnotationKeySuffix = fmt.Errorf("annotation keys are not allowed to use %s", referenceSuffix)
+
+	// these are var instead of const so that we can set them during tests
+	localKEKGenerationPollInterval = 1 * time.Second
+	localKEKGenerationPollTimeout  = 5 * time.Minute
 )
+
+const (
+	referenceSuffix = ".reference.encryption.k8s.io"
+	// referenceKEKAnnotationKey is the key used to store the localKEK in the annotations.
+	referenceKEKAnnotationKey = "encrypted-kek" + referenceSuffix
+	numAnnotations            = 1
+	cacheSize                 = 1_000
+	// keyLength is the length of the local KEK in bytes.
+	// This is the same length used for the DEKs generated in kube-apiserver.
+	keyLength = 32
+)
+
+var _ service.Service = &LocalKEKService{}
 
 // LocalKEKService adds an additional KEK layer to reduce calls to the remote
 // KMS.
-// The KEKs are stored as transformers in the local store. The encrypted
-// form of the KEK is used to pick a transformer from the store. The KEKs should
-// be encrypted by the remote KMS.
-// There is a distinguished KEK (localKEK), that is generated and used by the
-// LocalKEKService to encrypt.
+// The local KEK is generated once and stored in the LocalKEKService. This KEK
+// is used for all encryption operations. For the decrypt operation, if the encrypted
+// local KEK is not found in the cache, the remote KMS is used to decrypt the local KEK.
 type LocalKEKService struct {
-	// remoteKMS is the remote kms that is used to encrypt the local KEKs.
-	remoteKMS service.Service
-	//  remoteKMSID is the ID that helps remoteKMS to decrypt localKEKID.
-	remoteKMSID string
-	// localKEKID is the localKEK in encrypted form.
-	localKEKID []byte
+	// remoteKMS is the remote kms that is used to encrypt and decrypt the local KEKs.
+	remoteKMS  service.Service
+	remoteOnce sync.Once
 
-	// transformers is a store that holds all known transformers.
-	transformers Store
-	// createTransformer creates a new transformer and appropriate keys.
-	createTransformer CreateTransformer
-	// createUID creates a new uid.
-	createUID func() (string, error)
+	// transformers is a thread-safe LRU cache which caches decrypted DEKs indexed by their encrypted form.
+	transformers *lru.Cache
+
+	remoteKMSResponse   *service.EncryptResponse
+	localTransformer    value.Transformer
+	localTransformerErr error
 }
 
-// NewLocalKEKService is being initialized with a key that is encrypted by the
-// remoteService. In the current implementation, the localKEK Service needs to be
+// NewLocalKEKService is being initialized with a remote KMS service.
+// In the current implementation, the localKEK Service needs to be
 // restarted by the caller after security thresholds are met.
-func NewLocalKEKService(
-	ctx context.Context,
-	remoteService service.Service,
-	store Store,
-	createTransformer CreateTransformer,
-	createUID func() (string, error), // TODO add sensible defaults, use functional options
-) (*LocalKEKService, error) {
-	if remoteService == nil {
-		klog.V(2).InfoS("can't create LocalKEKService without remoteService")
-		return nil, ErrNoCipher
-	}
-
-	key, err := createTransformer.Key()
-	if err != nil {
-		klog.V(2).InfoS("create key", "err", err)
-		return nil, err
-	}
-
-	transformer, err := createTransformer.Transformer(ctx, key)
-	if err != nil {
-		klog.V(2).InfoS("create new cipher", "err", err)
-		return nil, err
-	}
-
-	uid, err := createUID()
-	if err != nil {
-		klog.V(2).InfoS("create new uid", "err", err)
-		return nil, err
-	}
-
-	encRes, err := remoteService.Encrypt(ctx, uid, key)
-	if err != nil {
-		klog.V(2).InfoS("encrypt with remote", "err", err)
-		return nil, err
-	}
-
-	store.Add(encRes.Ciphertext, transformer)
-
+// TODO(aramase): handle rotation of local KEKs
+//   - when the keyID in Status() no longer matches the keyID used during encryption
+//   - when the local KEK has been used for a certain number of times
+func NewLocalKEKService(remoteService service.Service) *LocalKEKService {
 	return &LocalKEKService{
-		remoteKMSID: encRes.KeyID,
-		remoteKMS:   remoteService,
-		localKEKID:  encRes.Ciphertext,
-
-		transformers:      store,
-		createTransformer: createTransformer,
-		createUID:         createUID,
-	}, nil
+		remoteKMS:    remoteService,
+		transformers: lru.New(cacheSize),
+	}
 }
 
-// getTransformer returns the transformer for the given keyID. If the keyID is
-// not known, the key gets decrypted by the remoteKMS.
-func (m *LocalKEKService) getTransformer(ctx context.Context, encKey []byte, uid, keyID string) (Transformer, error) {
-	transformer, ok := m.transformers.Get(encKey)
-	if ok {
-		return transformer, nil
-	}
+func (m *LocalKEKService) getTransformerForEncryption(uid string) (value.Transformer, *service.EncryptResponse, error) {
+	// Check if we have a local KEK
+	//	- If exists, use the local KEK for encryption and return
+	//  - Not exists, generate local KEK, encrypt with remote KEK,
+	//	store it in cache encrypt the data and return. This can be
+	// 	expensive but only 1 in N calls will incur this additional latency,
+	// 	N being number of times local KEK is reused)
+	m.remoteOnce.Do(func() {
+		m.localTransformerErr = wait.PollImmediateWithContext(context.Background(), localKEKGenerationPollInterval, localKEKGenerationPollTimeout,
+			func(ctx context.Context) (done bool, err error) {
+				key, err := generateKey(keyLength)
+				if err != nil {
+					return false, fmt.Errorf("failed to generate local KEK: %w", err)
+				}
+				block, err := aes.NewCipher(key)
+				if err != nil {
+					return false, fmt.Errorf("failed to create cipher block: %w", err)
+				}
+				transformer := aestransformer.NewGCMTransformer(block)
 
-	// Decrypt the unknown key with remote KMS. Plainkey must be treated with secrecy.
-	plainKey, err := m.remoteKMS.Decrypt(ctx, uid, &service.DecryptRequest{
-		Ciphertext: encKey,
-		KeyID:      keyID,
+				resp, err := m.remoteKMS.Encrypt(ctx, uid, key)
+				if err != nil {
+					klog.ErrorS(err, "failed to encrypt local KEK with remote KMS", "uid", uid)
+					return false, nil
+				}
+				if err = validateRemoteKMSResponse(resp); err != nil {
+					return false, fmt.Errorf("response annotations failed validation: %w", err)
+				}
+				m.remoteKMSResponse = copyResponseAndAddLocalKEKAnnotation(resp)
+				m.localTransformer = transformer
+				m.transformers.Add(base64.StdEncoding.EncodeToString(resp.Ciphertext), transformer)
+				return true, nil
+			})
 	})
-	if err != nil {
-		klog.V(2).InfoS("decrypt key with remote key", "id", uid, "err", err)
+	return m.localTransformer, m.remoteKMSResponse, m.localTransformerErr
+}
 
-		return nil, err
+func copyResponseAndAddLocalKEKAnnotation(resp *service.EncryptResponse) *service.EncryptResponse {
+	annotations := make(map[string][]byte, len(resp.Annotations)+numAnnotations)
+	for s, bytes := range resp.Annotations {
+		s := s
+		bytes := bytes
+		annotations[s] = bytes
 	}
+	annotations[referenceKEKAnnotationKey] = resp.Ciphertext
 
-	t, err := m.createTransformer.Transformer(ctx, plainKey)
-	if err != nil {
-		klog.V(2).InfoS("create transformer", "id", uid, "err", err)
-		return nil, err
+	return &service.EncryptResponse{
+		// Ciphertext is not set on purpose - it is different per Encrypt call
+		KeyID:       resp.KeyID,
+		Annotations: annotations,
 	}
-
-	// Overwrite the plain key with 0s.
-	copy(plainKey, make([]byte, len(plainKey)))
-
-	m.transformers.Add(encKey, t)
-
-	return t, nil
 }
 
 // Encrypt encrypts the plaintext with the localKEK.
 func (m *LocalKEKService) Encrypt(ctx context.Context, uid string, pt []byte) (*service.EncryptResponse, error) {
-	// It could happen that the localKEK is not available, if the store is an expiring cache.
-	transformer, err := m.getTransformer(ctx, m.localKEKID, uid, m.remoteKMSID)
+	transformer, resp, err := m.getTransformerForEncryption(uid)
 	if err != nil {
-		klog.V(2).InfoS("encrypt plaintext", "id", uid, "err", err)
+		klog.V(2).InfoS("encrypt plaintext", "uid", uid, "err", err)
 		return nil, err
 	}
 
-	ct, err := transformer.TransformToStorage(ctx, pt, EmptyContext)
+	ct, err := transformer.TransformToStorage(ctx, pt, emptyContext)
 	if err != nil {
-		klog.V(2).InfoS("encrypt plaintext", "id", uid, "err", err)
+		klog.V(2).InfoS("encrypt plaintext", "uid", uid, "err", err)
 		return nil, err
 	}
 
 	return &service.EncryptResponse{
-		Ciphertext: ct,
-		KeyID:      m.remoteKMSID,
-		Annotations: map[string][]byte{
-			LocalKEKID: m.localKEKID,
-		},
+		Ciphertext:  ct,
+		KeyID:       resp.KeyID, // TODO what about rotation ??
+		Annotations: resp.Annotations,
 	}, nil
+}
+
+func (m *LocalKEKService) getTransformerForDecryption(ctx context.Context, uid string, req *service.DecryptRequest) (value.Transformer, error) {
+	encKEK := req.Annotations[referenceKEKAnnotationKey]
+
+	if _transformer, found := m.transformers.Get(base64.StdEncoding.EncodeToString(encKEK)); found {
+		return _transformer.(value.Transformer), nil
+	}
+
+	key, err := m.remoteKMS.Decrypt(ctx, uid, &service.DecryptRequest{
+		Ciphertext:  encKEK,
+		KeyID:       req.KeyID,
+		Annotations: annotationsWithoutReferenceKeys(req.Annotations),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	transformer := aestransformer.NewGCMTransformer(block)
+
+	// Overwrite the plain key with 0s.
+	copy(key, make([]byte, len(key)))
+
+	m.transformers.Add(encKEK, transformer)
+
+	return transformer, nil
 }
 
 // Decrypt attempts to decrypt the ciphertext with the localKEK, a KEK from the
 // store, or the remote KMS.
 func (m *LocalKEKService) Decrypt(ctx context.Context, uid string, req *service.DecryptRequest) ([]byte, error) {
-	encKEK, ok := req.Annotations[LocalKEKID]
-	if !ok {
-		// If there is no local KEK ID in the annotations, we must delegate to remote KMS.
-		pt, err := m.remoteKMS.Decrypt(ctx, uid, req)
-		if err != nil {
-			klog.V(2).InfoS("decrypt key with remote key", "id", uid, "err", err)
-
-			return nil, err
-		}
-
-		return pt, nil
+	if _, ok := req.Annotations[referenceKEKAnnotationKey]; !ok {
+		return nil, fmt.Errorf("unable to find local KEK for request with uid %q", uid)
 	}
 
-	transformer, err := m.getTransformer(ctx, encKEK, uid, req.KeyID)
+	transformer, err := m.getTransformerForDecryption(ctx, uid, req)
 	if err != nil {
-		klog.V(2).InfoS("decrypt ciphertext", "id", uid, "err", err)
-		return nil, err
+		klog.V(2).InfoS("decrypt ciphertext", "uid", uid, "err", err)
+		return nil, fmt.Errorf("failed to get transformer for decryption: %w", err)
 	}
 
-	pt, _, err := transformer.TransformFromStorage(ctx, req.Ciphertext, EmptyContext)
+	pt, _, err := transformer.TransformFromStorage(ctx, req.Ciphertext, emptyContext)
 	if err != nil {
-		klog.V(2).InfoS("decrypt ciphertext with pulled key", "id", uid, "err", err)
+		klog.V(2).InfoS("decrypt ciphertext with pulled key", "uid", uid, "err", err)
 		return nil, err
 	}
 
 	return pt, nil
+}
+
+// Status returns the status of the remote KMS.
+func (m *LocalKEKService) Status(ctx context.Context) (*service.StatusResponse, error) {
+	// TODO(aramase): the response from the remote KMS is funneled through without any validation/action.
+	// This needs to handle the case when remote KEK has changed. The local KEK needs to be rotated and
+	// re-encrypted with the new remote KEK.
+	return m.remoteKMS.Status(ctx)
+}
+
+func annotationsWithoutReferenceKeys(annotations map[string][]byte) map[string][]byte {
+	if len(annotations) <= numAnnotations {
+		return nil
+	}
+
+	m := make(map[string][]byte, len(annotations)-numAnnotations)
+	for k, v := range annotations {
+		k, v := k, v
+		if strings.HasSuffix(k, referenceSuffix) {
+			continue
+		}
+		m[k] = v
+	}
+	return m
+}
+
+func validateRemoteKMSResponse(resp *service.EncryptResponse) error {
+	// validate annotations don't contain the reference implementation annotations
+	for k := range resp.Annotations {
+		if strings.HasSuffix(k, referenceSuffix) {
+			return errInvalidKMSAnnotationKeySuffix
+		}
+	}
+	return nil
+}
+
+// generateKey generates a random key using system randomness.
+func generateKey(length int) (key []byte, err error) {
+	key = make([]byte, length)
+	if _, err = rand.Read(key); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
