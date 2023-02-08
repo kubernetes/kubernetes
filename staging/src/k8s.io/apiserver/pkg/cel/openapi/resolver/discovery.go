@@ -57,7 +57,7 @@ func (r *ClientDiscoveryResolver) ResolveSchema(gvk schema.GroupVersionKind) (*s
 	if err != nil {
 		return nil, err
 	}
-	err = populateRefs(func(ref string) (*spec.Schema, bool) {
+	s, err = populateRefs(func(ref string) (*spec.Schema, bool) {
 		s, ok := resp.Components.Schemas[strings.TrimPrefix(ref, refPrefix)]
 		return s, ok
 	}, s)
@@ -65,55 +65,6 @@ func (r *ClientDiscoveryResolver) ResolveSchema(gvk schema.GroupVersionKind) (*s
 		return nil, err
 	}
 	return s, nil
-}
-
-func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), schema *spec.Schema) error {
-	ref, isRef := refOf(schema)
-	if isRef {
-		// replace the whole schema with the referred one.
-		resolved, ok := schemaOf(ref)
-		if !ok {
-			return fmt.Errorf("internal error: cannot resolve Ref %q: %w", ref, ErrSchemaNotFound)
-		}
-		*schema = *resolved
-	}
-	// schema is an object, populate its properties and additionalProperties
-	for name, prop := range schema.Properties {
-		err := populateRefs(schemaOf, &prop)
-		if err != nil {
-			return err
-		}
-		schema.Properties[name] = prop
-	}
-	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
-		err := populateRefs(schemaOf, schema.AdditionalProperties.Schema)
-		if err != nil {
-			return err
-		}
-	}
-	// schema is a list, populate its items
-	if schema.Items != nil && schema.Items.Schema != nil {
-		err := populateRefs(schemaOf, schema.Items.Schema)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func refOf(schema *spec.Schema) (string, bool) {
-	if schema.Ref.GetURL() != nil {
-		return schema.Ref.String(), true
-	}
-	// A Ref may be wrapped in allOf to preserve its description
-	// see https://github.com/kubernetes/kubernetes/issues/106387
-	// For kube-openapi, allOf is only used for wrapping a Ref.
-	for _, allOf := range schema.AllOf {
-		if ref, isRef := refOf(&allOf); isRef {
-			return ref, isRef
-		}
-	}
-	return "", false
 }
 
 func resolveType(resp *schemaResponse, gvk schema.GroupVersionKind) (*spec.Schema, error) {

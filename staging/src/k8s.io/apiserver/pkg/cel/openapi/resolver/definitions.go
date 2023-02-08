@@ -17,7 +17,6 @@ limitations under the License.
 package resolver
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,8 +46,9 @@ func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.
 	for name, def := range defs {
 		_, e := namer.GetDefinitionName(name)
 		gvks := extensionsToGVKs(e)
+		s := def.Schema // map value not addressable, make copy
 		for _, gvk := range gvks {
-			gvkToSchema[gvk] = &def.Schema
+			gvkToSchema[gvk] = &s
 		}
 	}
 	return &DefinitionsSchemaResolver{
@@ -62,45 +62,19 @@ func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (
 	if !ok {
 		return nil, fmt.Errorf("cannot resolve %v: %w", gvk, ErrSchemaNotFound)
 	}
-	result, err := deepCopy(s)
-	if err != nil {
-		return nil, fmt.Errorf("cannot deep copy schema for %v: %v", gvk, err)
-	}
-	err = populateRefs(func(ref string) (*spec.Schema, bool) {
+	s, err := populateRefs(func(ref string) (*spec.Schema, bool) {
 		// find the schema by the ref string, and return a deep copy
 		def, ok := d.defs[ref]
 		if !ok {
 			return nil, false
 		}
-		s, err := deepCopy(&def.Schema)
-		if err != nil {
-			return nil, false
-		}
-		return s, true
-	}, result)
+		s := def.Schema
+		return &s, true
+	}, s)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
-}
-
-// deepCopy generates a deep copy of the given schema with JSON marshalling and
-// unmarshalling.
-// The schema is expected to be "shallow", with all its field being Refs instead
-// of nested schemas.
-// If the schema contains cyclic reference, for example, a properties is itself
-// it will return an error. This resolver does not support such condition.
-func deepCopy(s *spec.Schema) (*spec.Schema, error) {
-	b, err := json.Marshal(s)
-	if err != nil {
-		return nil, err
-	}
-	result := new(spec.Schema)
-	err = json.Unmarshal(b, result)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return s, nil
 }
 
 func extensionsToGVKs(extensions spec.Extensions) []schema.GroupVersionKind {
