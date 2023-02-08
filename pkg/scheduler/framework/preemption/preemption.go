@@ -124,6 +124,7 @@ type Interface interface {
 	SelectVictimsOnNode(ctx context.Context, state *framework.CycleState,
 		pod *v1.Pod, nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status)
 	// DeleteVictim deletes the given victim pod from API server for preemption.
+	// Evaluator uses this function to delete the victim pod instead of calling the Pod delete API directly so that the preemption plugin can implement a hook on victim deletion.
 	DeleteVictim(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error
 }
 
