@@ -775,12 +775,31 @@ kube::golang::build_binaries_for_platform() {
   fi
 
   for test in "${tests[@]:+${tests[@]}}"; do
-    local outfile testpkg
+    local outfile testpkg use_cgo
     outfile=$(kube::golang::outfile_for_binary "${test}" "${platform}")
     testpkg=$(dirname "${test}")
+    use_cgo="${CGO_ENABLED:-0}"
 
     mkdir -p "$(dirname "${outfile}")"
-    go test -c \
+
+    # TODO(saschagrunert): try to remove once go1.20.x got released, watch
+    # out for the release notes which may fix relocation issues like:
+    #
+    # /tmp.k8s/go-link-865684912/go.o: in function `k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/service/ec2.(*ModifyCapacityReservationInput).GoString':
+    # go.go:(.text+0x207ca88): relocation truncated to fit: R_ARM_CALL against `runtime.duffcopy'
+    # go.go:(.text+0x207ca94): relocation truncated to fit: R_ARM_CALL against `runtime.duffcopy'
+    #
+    # Upstream issue: https://github.com/golang/go/issues/58425
+    #
+    # Ref:
+    # - https://github.com/kubernetes/kubernetes/issues/115605
+    # - https://github.com/kubernetes/kubernetes/issues/115675
+    if [[ "${test}" == k8s.io/kubernetes/test/e2e_node/e2e_node.test && "${platform}" == linux/arm ]]; then
+      kube::log::info "    disabling CGO for binary: ${test}"
+      use_cgo=0
+    fi
+
+    CGO_ENABLED="$use_cgo" go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags="${gogcflags}" \
       -asmflags="${goasmflags}" \
