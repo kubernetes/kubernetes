@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission"
 	authorizationrestrictusers "k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers"
 	quotaclusterresourceoverride "k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/clusterresourceoverride"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managednode"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managementcpusoverride"
 	quotarunonceduration "k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/runonceduration"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/customresourcevalidationregistration"
@@ -30,6 +31,7 @@ func RegisterOpenshiftKubeAdmissionPlugins(plugins *admission.Plugins) {
 	imagepolicy.Register(plugins)
 	ingressadmission.Register(plugins)
 	managementcpusoverride.Register(plugins)
+	managednode.Register(plugins)
 	projectnodeenv.Register(plugins)
 	quotaclusterresourceoverride.Register(plugins)
 	quotaclusterresourcequota.Register(plugins)
@@ -71,6 +73,7 @@ var (
 		"route.openshift.io/IngressAdmission",
 		hostassignment.PluginName,          // "route.openshift.io/RouteHostAssignment"
 		csiinlinevolumesecurity.PluginName, // "storage.openshift.io/CSIInlineVolumeSecurity"
+		managednode.PluginName,             // "autoscaling.openshift.io/ManagedNode"
 	}
 
 	// openshiftAdmissionPluginsForKubeAfterResourceQuota are the plugins to add after ResourceQuota plugin

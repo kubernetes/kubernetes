@@ -96,7 +96,6 @@ func TestAdmit(t *testing.T) {
 			pod:                testPod("500m", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
-			infra:              testClusterSNOInfra(),
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
 		},
 		{
@@ -165,25 +164,8 @@ func TestAdmit(t *testing.T) {
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
-			infra:              testClusterSNOInfra(),
 			expectedError:      fmt.Errorf(`failed to get workload annotation effect: the workload annotation value map["test":"test"] does not have "effect" key`),
-		},
-		{
-			name:               "should return admission error when the infrastructure resource status empty",
-			pod:                testManagedPod("", "250m", "500Mi", "250Mi"),
-			expectedCpuRequest: resource.MustParse("250m"),
-			namespace:          testManagedNamespace(),
-			nodes:              []*corev1.Node{testNodeWithManagementResource()},
-			infra:              testClusterInfraWithoutAnyStatusFields(),
-			expectedError:      fmt.Errorf("%s infrastructure resource has empty status", PluginName),
-		},
-		{
-			name:               "should skip the admission when both topology fields empty",
-			pod:                testManagedPod("", "250m", "500Mi", "250Mi"),
-			expectedCpuRequest: resource.MustParse("250m"),
-			namespace:          testManagedNamespace(),
-			nodes:              []*corev1.Node{testNodeWithManagementResource()},
-			infra:              testClusterInfraWithoutTopologyFields(),
+			infra:              testClusterSNOInfra(),
 		},
 		{
 			name:               "should delete CPU requests and update workload CPU annotations for the burstable pod with managed annotation",
@@ -257,22 +239,6 @@ func TestAdmit(t *testing.T) {
 			infra: testClusterSNOInfra(),
 		},
 		{
-			name:               "should not mutate the pod, when it runs under the regular(non SNO) cluster",
-			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
-			expectedCpuRequest: resource.MustParse("250m"),
-			namespace:          testManagedNamespace(),
-			nodes:              []*corev1.Node{},
-			infra: &configv1.Infrastructure{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: infraClusterName,
-				},
-				Status: configv1.InfrastructureStatus{
-					ControlPlaneTopology:   configv1.HighlyAvailableTopologyMode,
-					InfrastructureTopology: configv1.SingleReplicaTopologyMode,
-				},
-			},
-		},
-		{
 			name:               "should not mutate the pod when at least one node does not have management resources",
 			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
@@ -286,8 +252,8 @@ func TestAdmit(t *testing.T) {
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{},
-			expectedError:      fmt.Errorf("the cluster does not have any nodes"),
 			infra:              testClusterSNOInfra(),
+			expectedError:      fmt.Errorf("the cluster does not have any nodes"),
 		},
 	}
 
@@ -704,6 +670,7 @@ func testClusterSNOInfra() *configv1.Infrastructure {
 			APIServerURL:           "test",
 			ControlPlaneTopology:   configv1.SingleReplicaTopologyMode,
 			InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+			CPUPartitioning:        configv1.CPUPartitioningAllNodes,
 		},
 	}
 }
