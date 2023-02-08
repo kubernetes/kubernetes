@@ -4068,7 +4068,7 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
-	// More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
+	// More info: https://git.k8s.io/design-proposals-archive/node/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 	// Status for any ephemeral containers that have run in this pod.
