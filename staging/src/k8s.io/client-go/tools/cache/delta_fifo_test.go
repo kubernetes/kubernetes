@@ -121,6 +121,113 @@ func TestDeltaFIFO_replaceWithDeleteDeltaIn(t *testing.T) {
 	}
 }
 
+
+func TestDeltaFIFOWithKnownObjects_ReplaceMakesDeletionsForObjectsInQueue(t *testing.T) {
+	obj := mkFifoObj("foo", 2)
+	objV2 := mkFifoObj("foo", 3)
+	table := []struct {
+		name           string
+		operations     func(f *DeltaFIFO)
+		expectedDeltas Deltas
+	}{
+		{
+			name: "Added object should be deleted on Replace",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Replaced object should have only a single Delete",
+			operations: func(f *DeltaFIFO) {
+				f.emitDeltaTypeReplaced = true
+				f.Add(obj)
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Replaced, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Deleted object should have only a single Delete",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Delete(obj)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, obj},
+			},
+		},
+		{
+			name: "Synced objects should have a single delete",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Sync, obj},
+				{Sync, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Added objects should have a single delete on multiple Replaces",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{}, "0")
+				f.Replace([]interface{}{}, "1")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Added and deleted and added object should be deleted",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Delete(obj)
+				f.Add(objV2)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, obj},
+				{Added, objV2},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: objV2}},
+			},
+		},
+	}
+	for _, tt := range table {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+				KeyFunction: testFifoObjectKeyFunc,
+				KnownObjects: literalListerGetter(func() []testFifoObject {
+					return []testFifoObject{}
+				}),
+			})
+			tt.operations(f)
+			actualDeltas := Pop(f)
+			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltas) {
+				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltas)
+			}
+		})
+	}
+}
+
 func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 
