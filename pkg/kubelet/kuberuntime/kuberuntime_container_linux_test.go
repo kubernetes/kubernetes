@@ -21,6 +21,8 @@ package kuberuntime
 
 import (
 	"context"
+	"math"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -359,9 +361,14 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			},
 		},
 	}
+	pageSize := int64(os.Getpagesize())
 	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
-	pod1MemoryHigh := float64(podRequestMemory.Value()) + (float64(pod1LimitMemory.Value())-float64(podRequestMemory.Value()))*m.memoryThrottlingFactor
-	pod2MemoryHigh := float64(podRequestMemory.Value()) + (float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*m.memoryThrottlingFactor
+	pod1MemoryHigh := int64(math.Floor(
+		float64(podRequestMemory.Value())+
+			(float64(pod1LimitMemory.Value())-float64(podRequestMemory.Value()))*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+	pod2MemoryHigh := int64(math.Floor(
+		float64(podRequestMemory.Value())+
+			(float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
 
 	type expectedResult struct {
 		containerConfig *runtimeapi.LinuxContainerConfig
