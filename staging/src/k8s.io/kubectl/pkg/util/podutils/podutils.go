@@ -203,6 +203,9 @@ const (
 	EphemeralContainers
 )
 
+// AllContainers specifies that all containers be visited.
+const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+
 // ContainerVisitor is called with each container spec, and returns true
 // if visiting should continue.
 type ContainerVisitor func(container *corev1.Container, containerType ContainerType) (shouldContinue bool)
