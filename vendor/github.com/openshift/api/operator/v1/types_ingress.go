@@ -280,18 +280,18 @@ type HTTPCompressionPolicy struct {
 //
 // The format should follow the Content-Type definition in RFC 1341:
 // Content-Type := type "/" subtype *[";" parameter]
-// - The type in Content-Type can be one of:
-//   application, audio, image, message, multipart, text, video, or a custom
-//   type preceded by "X-" and followed by a token as defined below.
-// - The token is a string of at least one character, and not containing white
-//   space, control characters, or any of the characters in the tspecials set.
-// - The tspecials set contains the characters ()<>@,;:\"/[]?.=
-// - The subtype in Content-Type is also a token.
-// - The optional parameter/s following the subtype are defined as:
-//   token "=" (token / quoted-string)
-// - The quoted-string, as defined in RFC 822, is surrounded by double quotes
-//   and can contain white space plus any character EXCEPT \, ", and CR.
-//   It can also contain any single ASCII character as long as it is escaped by \.
+//   - The type in Content-Type can be one of:
+//     application, audio, image, message, multipart, text, video, or a custom
+//     type preceded by "X-" and followed by a token as defined below.
+//   - The token is a string of at least one character, and not containing white
+//     space, control characters, or any of the characters in the tspecials set.
+//   - The tspecials set contains the characters ()<>@,;:\"/[]?.=
+//   - The subtype in Content-Type is also a token.
+//   - The optional parameter/s following the subtype are defined as:
+//     token "=" (token / quoted-string)
+//   - The quoted-string, as defined in RFC 822, is surrounded by double quotes
+//     and can contain white space plus any character EXCEPT \, ", and CR.
+//     It can also contain any single ASCII character as long as it is escaped by \.
 //
 // +kubebuilder:validation:Pattern=`^(?i)(x-[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|application|audio|image|message|multipart|text|video)/[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+(; *[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+=([^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|"(\\[\x00-\x7F]|[^\x0D"\\])*"))*$`
 type CompressionMIMEType string
@@ -448,7 +448,7 @@ const (
 // +union
 type ProviderLoadBalancerParameters struct {
 	// type is the underlying infrastructure provider for the load balancer.
-	// Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Nutanix",
+	// Allowed values are "AWS", "Azure", "BareMetal", "GCP", "IBM", "Nutanix",
 	// "OpenStack", and "VSphere".
 	//
 	// +unionDiscriminator
@@ -473,10 +473,19 @@ type ProviderLoadBalancerParameters struct {
 	//
 	// +optional
 	GCP *GCPLoadBalancerParameters `json:"gcp,omitempty"`
+
+	// ibm provides configuration settings that are specific to IBM Cloud
+	// load balancers.
+	//
+	// If empty, defaults will be applied. See specific ibm fields for
+	// details about their defaults.
+	//
+	// +optional
+	IBM *IBMLoadBalancerParameters `json:"ibm,omitempty"`
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the
-// load balancer. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Nutanix",
+// load balancer. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "IBM", "Nutanix",
 // "OpenStack", and "VSphere".
 //
 // +kubebuilder:validation:Enum=AWS;Azure;BareMetal;GCP;Nutanix;OpenStack;VSphere;IBM
@@ -572,6 +581,33 @@ const (
 	GCPGlobalAccess GCPClientAccess = "Global"
 	GCPLocalAccess  GCPClientAccess = "Local"
 )
+
+// IBMLoadBalancerParameters provides configuration settings that are
+// specific to IBM Cloud load balancers.
+type IBMLoadBalancerParameters struct {
+	// protocol specifies whether the load balancer uses PROXY protocol to forward connections to
+	// the IngressController. See "service.kubernetes.io/ibm-load-balancer-cloud-provider-enable-features:
+	// "proxy-protocol"" at https://cloud.ibm.com/docs/containers?topic=containers-vpc-lbaas"
+	//
+	// PROXY protocol can be used with load balancers that support it to
+	// communicate the source addresses of client connections when
+	// forwarding those connections to the IngressController.  Using PROXY
+	// protocol enables the IngressController to report those source
+	// addresses instead of reporting the load balancer's address in HTTP
+	// headers and logs.  Note that enabling PROXY protocol on the
+	// IngressController will cause connections to fail if you are not using
+	// a load balancer that uses PROXY protocol to forward connections to
+	// the IngressController.  See
+	// http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt for
+	// information about PROXY protocol.
+	//
+	// Valid values for protocol are TCP, PROXY and omitted.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default is TCP, without the proxy protocol enabled.
+	//
+	// +optional
+	Protocol IngressControllerProtocol `json:"protocol,omitempty"`
+}
 
 // AWSClassicLoadBalancerParameters holds configuration parameters for an
 // AWS Classic load balancer.

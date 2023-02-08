@@ -392,6 +392,13 @@ spec:
                     - SingleReplica
                     - External
                   type: string
+                cpuPartitioning:
+                  default: None
+                  description: cpuPartitioning expresses if CPU partitioning is a currently enabled feature in the cluster. CPU Partitioning means that this cluster can support partitioning workloads to specific CPU Sets. Valid values are "None" and "AllNodes". When omitted, the default value is "None". The default value of "None" indicates that no nodes will be setup with CPU partitioning. The "AllNodes" value indicates that all nodes have been setup with CPU partitioning, and can then be further configured via the PerformanceProfile API.
+                  enum:
+                    - None
+                    - AllNodes
+                  type: string
                 etcdDiscoveryDomain:
                   description: 'etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery deprecated: as of 4.7, this field is no longer set or honored.  It will be removed in a future release.'
                   type: string
@@ -534,7 +541,36 @@ spec:
                         resourceGroupName:
                           description: resourceGroupName is the Resource Group for new Azure resources created for the cluster.
                           type: string
+                        resourceTags:
+                          description: resourceTags is a list of additional tags to apply to Azure resources created for the cluster. See https://docs.microsoft.com/en-us/rest/api/resources/tags for information on tagging Azure resources. Due to limitations on Automation, Content Delivery Network, DNS Azure resources, a maximum of 15 tags may be applied. OpenShift reserves 5 tags for internal use, allowing 10 tags for user configuration.
+                          items:
+                            description: AzureResourceTag is a tag to apply to Azure resources created for the cluster.
+                            properties:
+                              key:
+                                description: key is the key part of the tag. A tag key can have a maximum of 128 characters and cannot be empty. Key must begin with a letter, end with a letter, number or underscore, and must contain only alphanumeric characters and the following special characters `_ . -`.
+                                maxLength: 128
+                                minLength: 1
+                                pattern: ^[a-zA-Z]([0-9A-Za-z_.-]*[0-9A-Za-z_])?$
+                                type: string
+                              value:
+                                description: 'value is the value part of the tag. A tag value can have a maximum of 256 characters and cannot be empty. Value must contain only alphanumeric characters and the following special characters `_ + , - . / : ; < = > ? @`.'
+                                maxLength: 256
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.=+-@]+$
+                                type: string
+                            required:
+                              - key
+                              - value
+                            type: object
+                          maxItems: 10
+                          type: array
+                          x-kubernetes-validations:
+                            - message: resourceTags are immutable and may only be configured during installation
+                              rule: self.all(x, x in oldSelf) && oldSelf.all(x, x in self)
                       type: object
+                      x-kubernetes-validations:
+                        - message: resourceTags may only be configured during installation
+                          rule: '!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)'
                     baremetal:
                       description: BareMetal contains settings specific to the BareMetal platform.
                       properties:
@@ -558,6 +594,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on BareMetal platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for BareMetal deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string
@@ -637,6 +689,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on Nutanix platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                       type: object
                     openstack:
                       description: OpenStack contains settings specific to the OpenStack infrastructure provider.
@@ -664,6 +732,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on OpenStack platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for OpenStack deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string
@@ -691,6 +775,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on Ovirt platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                         nodeDNSIP:
                           description: 'deprecated: as of 4.6, this field is no longer set or honored.  It will be removed in a future release.'
                           type: string
@@ -774,6 +874,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on VSphere platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for vSphere deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string

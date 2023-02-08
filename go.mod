@@ -55,7 +55,7 @@ require (
 	github.com/onsi/gomega v1.23.0
 	github.com/opencontainers/runc v1.1.4
 	github.com/opencontainers/selinux v1.10.0
-	github.com/openshift/api v0.0.0-20230201213816-61d971884921
+	github.com/openshift/api v0.0.0-20230208193339-068b2ae5534f
 	github.com/openshift/apiserver-library-go v0.0.0-20230120221150-cefee9e0162b
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
 	github.com/openshift/library-go v0.0.0-20230127195720-edf819b079cf

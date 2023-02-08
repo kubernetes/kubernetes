@@ -534,7 +534,36 @@ spec:
                         resourceGroupName:
                           description: resourceGroupName is the Resource Group for new Azure resources created for the cluster.
                           type: string
+                        resourceTags:
+                          description: resourceTags is a list of additional tags to apply to Azure resources created for the cluster. See https://docs.microsoft.com/en-us/rest/api/resources/tags for information on tagging Azure resources. Due to limitations on Automation, Content Delivery Network, DNS Azure resources, a maximum of 15 tags may be applied. OpenShift reserves 5 tags for internal use, allowing 10 tags for user configuration.
+                          items:
+                            description: AzureResourceTag is a tag to apply to Azure resources created for the cluster.
+                            properties:
+                              key:
+                                description: key is the key part of the tag. A tag key can have a maximum of 128 characters and cannot be empty. Key must begin with a letter, end with a letter, number or underscore, and must contain only alphanumeric characters and the following special characters `_ . -`.
+                                maxLength: 128
+                                minLength: 1
+                                pattern: ^[a-zA-Z]([0-9A-Za-z_.-]*[0-9A-Za-z_])?$
+                                type: string
+                              value:
+                                description: 'value is the value part of the tag. A tag value can have a maximum of 256 characters and cannot be empty. Value must contain only alphanumeric characters and the following special characters `_ + , - . / : ; < = > ? @`.'
+                                maxLength: 256
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.=+-@]+$
+                                type: string
+                            required:
+                              - key
+                              - value
+                            type: object
+                          maxItems: 10
+                          type: array
+                          x-kubernetes-validations:
+                            - message: resourceTags are immutable and may only be configured during installation
+                              rule: self.all(x, x in oldSelf) && oldSelf.all(x, x in self)
                       type: object
+                      x-kubernetes-validations:
+                        - message: resourceTags may only be configured during installation
+                          rule: '!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)'
                     baremetal:
                       description: BareMetal contains settings specific to the BareMetal platform.
                       properties:
