@@ -339,6 +339,6 @@ func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters
 	return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 }
 
-func (pl *DefaultPreemption) DeletePod(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error {
+func (pl *DefaultPreemption) DeleteVictim(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error {
 	return util.DeletePod(ctx, cs, victim)
 }

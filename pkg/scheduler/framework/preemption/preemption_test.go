@@ -82,7 +82,7 @@ func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominate
 	return true, ""
 }
 
-func (pl *FakePostFilterPlugin) DeletePod(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error {
+func (pl *FakePostFilterPlugin) DeleteVictim(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error {
 	return util.DeletePod(ctx, cs, victim)
 }
 

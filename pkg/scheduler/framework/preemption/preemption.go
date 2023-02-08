@@ -123,8 +123,8 @@ type Interface interface {
 	// Note that both `state` and `nodeInfo` are deep copied.
 	SelectVictimsOnNode(ctx context.Context, state *framework.CycleState,
 		pod *v1.Pod, nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status)
-	// DeletePod deletes the given victim pod from API server for preemption.
-	DeletePod(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error
+	// DeleteVictim deletes the given victim pod from API server for preemption.
+	DeleteVictim(ctx context.Context, cs kubernetes.Interface, victim, preemptor *v1.Pod) error
 }
 
 type Evaluator struct {
@@ -375,7 +375,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 					return
 				}
 			}
-			if err := ev.DeletePod(ctx, cs, victim, pod); err != nil {
+			if err := ev.DeleteVictim(ctx, cs, victim, pod); err != nil {
 				klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 				errCh.SendErrorWithCancel(err, cancel)
 				return
