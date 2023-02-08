@@ -652,6 +652,33 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 		}
 	}
 
+	// detect deletions for items in the queue that are not yet present in knownObjects
+	for k, oldItem := range f.items {
+		if keys.Has(k) {
+			continue
+		}
+		_, exists, _ := f.knownObjects.GetByKey(k)
+		if exists {
+			continue
+		}
+		// Delete pre-existing items not in the new list.
+		// This could happen if watch deletion event was missed while
+		// disconnected from apiserver.
+		var deletedObj interface{}
+		if n := oldItem.Newest(); n != nil {
+			deletedObj = n.Object
+
+			// if the previous object is a DeletedFinalStateUnknown, we have to extract the actual Object
+			if d, ok := deletedObj.(DeletedFinalStateUnknown); ok {
+				deletedObj = d.Obj
+			}
+		}
+		queuedDeletions++
+		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
+			return err
+		}
+	}
+
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = keys.Len() + queuedDeletions
