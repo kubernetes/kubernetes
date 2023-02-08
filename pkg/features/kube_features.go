@@ -167,6 +167,7 @@ const (
 	// owner: @humblec, @zhucan
 	// kep: http://kep.k8s.io/3171
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Enables SecretRef field in CSI NodeExpandVolume request.
 	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
@@ -837,7 +838,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.Beta},
 
-	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
+	CSINodeExpandSecret: {Default: true, PreRelease: featuregate.Beta},
 
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
