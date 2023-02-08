@@ -187,6 +187,10 @@ func maxContainerRestarts(pod *corev1.Pod) int {
 	return maxRestarts
 }
 
+// ContainerType and VisitContainers are taken from
+// https://github.com/kubernetes/kubernetes/blob/master/pkg/api/v1/pod/util.go
+// kubectl cannot directly import this due to project goals
+
 // ContainerType signifies container type
 type ContainerType int
 
