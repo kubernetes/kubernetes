@@ -359,6 +359,14 @@ func TestIsInterested(t *testing.T) {
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
 				"memory": "0",
 			}).Obj(),
+			want: false,
+		},
+		{
+			label:    "Managed memory, container memory with Requests",
+			extender: mem,
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "1",
+			}).Obj(),
 			want: true,
 		},
 		{
@@ -367,6 +375,14 @@ func TestIsInterested(t *testing.T) {
 			pod: st.MakePod().Lim(map[v1.ResourceName]string{
 				"memory": "0",
 			}).Obj(),
+			want: false,
+		},
+		{
+			label:    "Managed memory, container memory with Limits",
+			extender: mem,
+			pod: st.MakePod().Lim(map[v1.ResourceName]string{
+				"memory": "1",
+			}).Obj(),
 			want: true,
 		},
 		{
@@ -374,6 +390,14 @@ func TestIsInterested(t *testing.T) {
 			extender: mem,
 			pod: st.MakePod().Container("app").InitReq(map[v1.ResourceName]string{
 				"memory": "0",
+			}).Obj(),
+			want: false,
+		},
+		{
+			label:    "Managed memory, init container memory",
+			extender: mem,
+			pod: st.MakePod().Container("app").InitReq(map[v1.ResourceName]string{
+				"memory": "1",
 			}).Obj(),
 			want: true,
 		},

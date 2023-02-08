@@ -431,12 +431,18 @@ func (h *HTTPExtender) hasManagedResources(containers []v1.Container) bool {
 		container := &containers[i]
 		for resourceName := range container.Resources.Requests {
 			if h.managedResources.Has(string(resourceName)) {
-				return true
+				q := container.Resources.Requests[resourceName]
+				if q.Value() > 0 {
+					return true
+				}
 			}
 		}
 		for resourceName := range container.Resources.Limits {
 			if h.managedResources.Has(string(resourceName)) {
-				return true
+				q := container.Resources.Limits[resourceName]
+				if q.Value() > 0 {
+					return true
+				}
 			}
 		}
 	}
