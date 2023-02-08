@@ -52,9 +52,6 @@
 - endpoint: createCoreV1PersistentVolume
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: createStorageV1CSIDriver
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: createStorageV1CSINode
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
@@ -91,9 +88,6 @@
 - endpoint: deleteStorageV1CollectionVolumeAttachment
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CSIDriver
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: deleteStorageV1CSINode
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
@@ -128,9 +122,6 @@
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: listCoreV1PersistentVolumeClaimForAllNamespaces
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listStorageV1CSIDriver
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: listStorageV1CSINode
@@ -188,9 +179,6 @@
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: readCoreV1PersistentVolumeStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readStorageV1CSIDriver
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: readStorageV1CSINode
