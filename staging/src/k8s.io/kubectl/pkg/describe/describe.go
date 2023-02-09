@@ -35,7 +35,7 @@ import (
 	"github.com/fatih/camelcase"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -210,7 +210,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                     &EndpointSliceDescriber{c},
 		{Group: policyv1beta1.GroupName, Kind: "PodSecurityPolicy"}:               &PodSecurityPolicyDescriber{c},
-		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
+		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:         &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
@@ -3940,15 +3940,15 @@ type HorizontalPodAutoscalerDescriber struct {
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	// autoscaling/v2beta2 is introduced since v1.12 and autoscaling/v1 does not have full backward compatibility
-	// with autoscaling/v2beta2, so describer will try to get and describe hpa v2beta2 object firstly, if it fails,
+	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
+	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2beta2, err := d.client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV2beta2, describerSettings.ChunkSize)
+			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
 		}
-		return describeHorizontalPodAutoscalerV2beta2(hpaV2beta2, events, d)
+		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
 
 	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -3962,7 +3962,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	return "", err
 }
 
-func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
+func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
@@ -3976,7 +3976,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
-			case autoscalingv2beta2.ExternalMetricSourceType:
+			case autoscalingv2.ExternalMetricSourceType:
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
@@ -3992,15 +3992,15 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.Value.String())
 
 				}
-			case autoscalingv2beta2.PodsMetricSourceType:
+			case autoscalingv2.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
 					current = hpa.Status.CurrentMetrics[i].Pods.Current.AverageValue.String()
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
-			case autoscalingv2beta2.ObjectMetricSourceType:
+			case autoscalingv2.ObjectMetricSourceType:
 				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
-				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+				if metric.Object.Target.Type == autoscalingv2.AverageValueMetricType {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
 						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
@@ -4013,7 +4013,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-			case autoscalingv2beta2.ResourceMetricSourceType:
+			case autoscalingv2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4033,7 +4033,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
-			case autoscalingv2beta2.ContainerResourceMetricSourceType:
+			case autoscalingv2.ContainerResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
 				if metric.ContainerResource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4089,7 +4089,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 	})
 }
 
-func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2beta2.HPAScalingRules) {
+func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2.HPAScalingRules) {
 	if rules != nil {
 		w.Write(LEVEL_1, "%s:\n", direction)
 		if rules.StabilizationWindowSeconds != nil {
@@ -4099,7 +4099,7 @@ func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscaling
 			if rules.SelectPolicy != nil {
 				w.Write(LEVEL_2, "Select Policy: %s\n", *rules.SelectPolicy)
 			} else {
-				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2beta2.MaxPolicySelect)
+				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2.MaxChangePolicySelect)
 			}
 			w.Write(LEVEL_2, "Policies:\n")
 			for _, p := range rules.Policies {
