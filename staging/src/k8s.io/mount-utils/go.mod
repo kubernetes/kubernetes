@@ -8,7 +8,7 @@ require (
 	github.com/moby/sys/mountinfo v0.6.2
 	github.com/stretchr/testify v1.8.1
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/utils v0.0.0-20230202215443-34013725500c
+	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 )
 
 require (
