@@ -39,7 +39,7 @@ const (
 )
 
 const (
-	// NOTE: when you add a new profile string, remember to add to to the
+	// NOTE: when you add a new profile string, remember to add it to the
 	// --profile flag's help text
 
 	// ProfileLegacy represents the legacy debugging profile which is backwards-compatible with 1.23 behavior.
