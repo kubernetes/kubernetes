@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
 	"k8s.io/klog/v2"
 	kmsapi "k8s.io/kms/apis/v2alpha1"
@@ -46,7 +47,7 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Duration) (kmsservice.Service, error) {
+func NewGRPCService(ctx context.Context, endpoint, providerName string, callTimeout time.Duration) (kmsservice.Service, error) {
 	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
 	addr, err := util.ParseEndpoint(endpoint)
@@ -70,7 +71,9 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 					klog.V(4).Infof("Successfully dialed Unix socket %v", addr)
 				}
 				return c, err
-			}))
+			}),
+		grpc.WithChainUnaryInterceptor(recordMetricsInterceptor(providerName)),
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
@@ -137,4 +140,14 @@ func (g *gRPCService) Status(ctx context.Context) (*kmsservice.StatusResponse, e
 		return nil, err
 	}
 	return &kmsservice.StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
+}
+
+func recordMetricsInterceptor(providerName string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		start := time.Now()
+		respErr := invoker(ctx, method, req, reply, cc, opts...)
+		elapsed := time.Since(start)
+		metrics.RecordKMSOperationLatency(providerName, method, elapsed, respErr)
+		return respErr
+	}
 }
