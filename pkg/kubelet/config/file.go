@@ -114,8 +114,15 @@ func (s *sourceFile) run() {
 	s.startWatch()
 }
 
+// Apply default values and validate the pod.
 func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.nodeName)
+	base := filepath.Base(source)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	if pod.Name == name && ext == ".yaml" {
+		return applyDefaults(pod, source, true, s.nodeName)
+	}
+	return fmt.Errorf("%v%v: invalid filename, please make sure it is the same as your pod name (%v)", name, ext, pod.Name)
 }
 
 func (s *sourceFile) listConfig() error {
@@ -159,7 +166,7 @@ func (s *sourceFile) listConfig() error {
 // prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
 func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
-	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
+	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*[.yaml$]"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
