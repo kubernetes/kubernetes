@@ -38,6 +38,43 @@ const (
 	unsupported
 )
 
+const (
+	// NOTE: when you add a new profile string, remember to add to to the
+	// --profile flag's help text
+
+	// ProfileLegacy represents the legacy debugging profile which is backwards-compatible with 1.23 behavior.
+	ProfileLegacy = "legacy"
+	// ProfileGeneral contains a reasonable set of defaults tailored for each debugging journey.
+	ProfileGeneral = "general"
+	// ProfileBaseline is identical to "general" but eliminates privileges that are disallowed under
+	// the baseline security profile, such as host namespaces, host volume, mounts and SYS_PTRACE.
+	ProfileBaseline = "baseline"
+	// ProfileRestricted is identical to "baseline" but adds configuration that's required
+	// under the restricted security profile, such as requiring a non-root user and dropping all capabilities.
+	ProfileRestricted = "restricted"
+)
+
+type ProfileApplier interface {
+	// Apply applies the profile to the given container in the pod.
+	Apply(pod *corev1.Pod, containerName string, target runtime.Object) error
+}
+
+// NewProfileApplier returns a new Options for the given profile name.
+func NewProfileApplier(profile string) (ProfileApplier, error) {
+	switch profile {
+	case ProfileLegacy:
+		return &legacyProfile{}, nil
+	case ProfileGeneral:
+		return &generalProfile{}, nil
+	case ProfileBaseline:
+		return &baselineProfile{}, nil
+	case ProfileRestricted:
+		return &restrictedProfile{}, nil
+	}
+
+	return nil, fmt.Errorf("unknown profile: %s", profile)
+}
+
 type legacyProfile struct {
 }
 
