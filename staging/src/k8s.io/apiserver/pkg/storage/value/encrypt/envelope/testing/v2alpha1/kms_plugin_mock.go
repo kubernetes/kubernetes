@@ -126,7 +126,7 @@ func (s *Base64Plugin) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on the unix socket, error: %v", err)
 	}
-	klog.Infof("Listening on %s", s.socketPath)
+	klog.InfoS("Starting KMS Plugin", "socketPath", s.socketPath)
 
 	go s.grpcServer.Serve(s.listener)
 	return nil
@@ -157,7 +157,7 @@ func (s *Base64Plugin) ExitFailedState() {
 
 // Update keyID for the plugin.
 func (s *Base64Plugin) UpdateKeyID() {
-	klog.Infof("updating keyID")
+	klog.Info("updating keyID")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keyID = "2"
@@ -165,7 +165,7 @@ func (s *Base64Plugin) UpdateKeyID() {
 
 // Status returns the status of the kms-plugin.
 func (s *Base64Plugin) Status(ctx context.Context, request *kmsapi.StatusRequest) (*kmsapi.StatusResponse, error) {
-	klog.Infof("Received request for Status: %v", request)
+	klog.V(3).InfoS("Received request for Status", "request", request)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -178,7 +178,7 @@ func (s *Base64Plugin) Status(ctx context.Context, request *kmsapi.StatusRequest
 
 // Decrypt performs base64 decoding of the payload of kms.DecryptRequest.
 func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
-	klog.V(3).Infof("Received Decrypt Request for DEK: %s", string(request.Ciphertext))
+	klog.V(3).InfoS("Received Decrypt Request", "ciphertext", string(request.Ciphertext))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -200,7 +200,7 @@ func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 
 // Encrypt performs base64 encoding of the payload of kms.EncryptRequest.
 func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
-	klog.V(3).Infof("Received Encrypt Request for DEK: %x", request.Plaintext)
+	klog.V(3).InfoS("Received Encrypt Request", "plaintext", string(request.Plaintext))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastEncryptRequest = request
