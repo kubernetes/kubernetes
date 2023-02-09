@@ -2016,6 +2016,21 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			wantNodes:          sets.NewString("node2", "node3"),
 			wantEvaluatedNodes: pointer.Int32(3),
 		},
+		{
+			name: "test prescore plugin returning skip",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
+					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
+					&st.FakeScorePlugin{FakeScore: 100},
+				), "PreScore", "Score"),
+			},
+			nodes:     []string{"node1", "node2"},
+			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
+			wantNodes: sets.NewString("node1", "node2"),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -2523,12 +2538,10 @@ func Test_prioritizeNodes(t *testing.T) {
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
 				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterPluginAsExtensions(st.FakePreScoreAndScorePlugin{}.Name(), func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
-					return st.FakePreScoreAndScorePlugin{
-						FakePreScorePlugin: &st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
-						FakeScorePlugin:    &st.FakeScorePlugin{FakeScore: 100},
-					}, nil
-				}, "PreScore", "Score"),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
+					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
+					&st.FakeScorePlugin{FakeScore: 100},
+				), "PreScore", "Score"),
 			},
 			extenders: nil,
 			want: []framework.NodePluginScores{
@@ -2560,6 +2573,24 @@ func Test_prioritizeNodes(t *testing.T) {
 					},
 					TotalScore: 200,
 				},
+			},
+		},
+		{
+			name:  "all score plugins are skipped",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
+					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
+					&st.FakeScorePlugin{FakeScore: 100},
+				), "PreScore", "Score"),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{Name: "node1", Scores: []framework.PluginScore{}},
+				{Name: "node2", Scores: []framework.PluginScore{}},
 			},
 		},
 	}

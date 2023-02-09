@@ -301,11 +301,22 @@ func NewFakeScorePlugin(name string, status *framework.Status, score int64) fram
 }
 
 type FakePreScoreAndScorePlugin struct {
+	name string
 	*FakePreScorePlugin
 	*FakeScorePlugin
 }
 
 // Name returns name of the plugin.
 func (pl FakePreScoreAndScorePlugin) Name() string {
-	return "FakePreScoreAndScorePlugin"
+	return pl.name
+}
+
+func NewFakePreScoreAndScorePlugin(name string, preScore *FakePreScorePlugin, score *FakeScorePlugin) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreScoreAndScorePlugin{
+			name:               name,
+			FakePreScorePlugin: preScore,
+			FakeScorePlugin:    score,
+		}, nil
+	}
 }
