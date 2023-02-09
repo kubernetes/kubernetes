@@ -35,6 +35,7 @@ type resourceAllocationScorer struct {
 	useRequested bool
 	scorer       func(requested, allocable []int64) int64
 	resources    []config.ResourceSpec
+	podRequest   map[v1.ResourceName]int64
 }
 
 // score will use `scorer` function to calculate the score.
@@ -84,7 +85,11 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 		requested = nodeInfo.Requested
 	}
 
-	podRequest := r.calculatePodResourceRequest(pod, resource)
+	podRequest, ok := r.podRequest[resource]
+	if !ok {
+		podRequest = r.calculatePodResourceRequest(pod, resource)
+	}
+
 	// If it's an extended resource, and the pod doesn't request it. We return (0, 0)
 	// as an implication to bypass scoring on this resource.
 	if podRequest == 0 && schedutil.IsScalarResourceName(resource) {

@@ -378,6 +378,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.PodTopologySpread},
 									{Name: names.TaintToleration},
 									{Name: names.NodeAffinity},
+									{Name: names.NodeResourcesFit},
 								},
 							},
 							Score: v1beta2.PluginSet{

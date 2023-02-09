@@ -129,6 +129,10 @@ func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
@@ -321,6 +325,10 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
@@ -544,6 +552,10 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)

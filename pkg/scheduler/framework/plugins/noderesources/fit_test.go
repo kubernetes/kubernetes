@@ -768,6 +768,10 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
@@ -885,6 +889,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
+
 				_, status := p.Score(context.Background(), state, requestedPod, nodes[0].Name)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)

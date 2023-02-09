@@ -35,6 +35,7 @@ import (
 var _ framework.PreFilterPlugin = &Fit{}
 var _ framework.FilterPlugin = &Fit{}
 var _ framework.EnqueueExtensions = &Fit{}
+var _ framework.PreScorePlugin = &Fit{}
 var _ framework.ScorePlugin = &Fit{}
 
 const (
@@ -44,6 +45,9 @@ const (
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
+
+	// preScoreStateKey is the key in CycleState to NodeResourcesFit pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
@@ -95,6 +99,45 @@ type preFilterState struct {
 // Clone the prefilter state.
 func (s *preFilterState) Clone() framework.StateData {
 	return s
+}
+
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
+	podRequest map[v1.ResourceName]int64
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *preScoreState) Clone() framework.StateData {
+	return s
+}
+
+func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	if len(nodes) == 0 {
+		return nil
+	}
+	state := &preScoreState{
+		podRequest: make(map[v1.ResourceName]int64),
+	}
+	for _, resource := range f.resources {
+		podRequest := f.calculatePodResourceRequest(pod, v1.ResourceName(resource.Name))
+		state.podRequest[v1.ResourceName(resource.Name)] = podRequest
+	}
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err)
+	}
+
+	s, ok := c.(*preScoreState)
+	if !ok {
+		return nil, fmt.Errorf("invalid PreScore state, got type %T", c)
+	}
+	return s, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -337,6 +380,9 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 	if err != nil {
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
+
+	s, _ := getPreScoreState(state)
+	f.podRequest = s.podRequest
 
 	return f.score(pod, nodeInfo)
 }

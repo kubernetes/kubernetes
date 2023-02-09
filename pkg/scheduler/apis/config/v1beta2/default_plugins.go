@@ -76,6 +76,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.PodTopologySpread},
 				{Name: names.TaintToleration},
 				{Name: names.NodeAffinity},
+				{Name: names.NodeResourcesFit},
 			},
 		},
 		Score: v1beta2.PluginSet{

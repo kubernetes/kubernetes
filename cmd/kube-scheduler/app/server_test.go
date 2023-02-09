@@ -402,6 +402,7 @@ leaderElection:
 						{Name: "NodePorts"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
 					}
@@ -431,6 +432,7 @@ leaderElection:
 						{Name: "NodePorts"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
 					}
