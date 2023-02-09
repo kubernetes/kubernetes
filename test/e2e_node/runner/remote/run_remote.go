@@ -919,7 +919,7 @@ func ignitionInjectGCEPublicKey(path string, content string) string {
 		return content
 	}
 
-	klog.Infof("Injecting SSH public key into ignition")
+	klog.Info("Injecting SSH public key into ignition")
 
 	const publicKeyEnv = "GCE_SSH_PUBLIC_KEY_FILE"
 	sshPublicKeyFile := os.Getenv(publicKeyEnv)
