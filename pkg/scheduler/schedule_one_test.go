@@ -2017,14 +2017,14 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			wantEvaluatedNodes: pointer.Int32(3),
 		},
 		{
-			name: "test prescore plugin returning skip",
+			name: "test all prescore plugins return skip",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
 					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
-					&st.FakeScorePlugin{FakeScore: 100},
+					&st.FakeScorePlugin{Status: framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore")},
 				), "PreScore", "Score"),
 			},
 			nodes:     []string{"node1", "node2"},
@@ -2530,7 +2530,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			},
 		},
 		{
-			name:  "plugin with skip in preScore shouldn't continue to score pod",
+			name:  "plugin which returned skip in preScore shouldn't be executed in the score phase",
 			pod:   &v1.Pod{},
 			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
 			pluginRegistrations: []st.RegisterPluginFunc{
@@ -2540,7 +2540,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
 					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
-					&st.FakeScorePlugin{FakeScore: 100},
+					&st.FakeScorePlugin{Status: framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore")},
 				), "PreScore", "Score"),
 			},
 			extenders: nil,
@@ -2584,7 +2584,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin",
 					&st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
-					&st.FakeScorePlugin{FakeScore: 100},
+					&st.FakeScorePlugin{Status: framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore")},
 				), "PreScore", "Score"),
 			},
 			extenders: nil,
