@@ -2514,6 +2514,54 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "plugin with skip in preScore shouldn't continue to score pod",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions(st.FakePreScoreAndScorePlugin{}.Name(), func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+					return st.FakePreScoreAndScorePlugin{
+						FakePreScorePlugin: &st.FakePreScorePlugin{Status: framework.NewStatus(framework.Skip, "fake skip")},
+						FakeScorePlugin:    &st.FakeScorePlugin{FakeScore: 100},
+					}, nil
+				}, "PreScore", "Score"),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 110,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 200,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -2537,7 +2585,6 @@ func Test_prioritizeNodes(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
 			var extenders []framework.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
