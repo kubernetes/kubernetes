@@ -275,20 +275,12 @@ func allowProcessTracing(p *corev1.Pod, containerName string, mask podutils.Cont
 			return true
 		}
 		if c.SecurityContext == nil {
-			c.SecurityContext = &corev1.SecurityContext{
-				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"SYS_PTRACE"},
-				},
-			}
-			return false
+			c.SecurityContext = &corev1.SecurityContext{}
 		}
 		if c.SecurityContext.Capabilities == nil {
-			c.SecurityContext.Capabilities = &corev1.Capabilities{
-				Drop: []corev1.Capability{"SYS_PTRACE"},
-			}
-			return false
+			c.SecurityContext.Capabilities = &corev1.Capabilities{}
 		}
-		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "SYS_PTRACE")
+		c.SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
 		return false
 	})
 }

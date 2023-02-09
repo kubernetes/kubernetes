@@ -83,7 +83,15 @@ func TestGeneralProfile(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
-						{Name: "dbg", Image: "dbgimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -106,7 +114,7 @@ func TestGeneralProfile(t *testing.T) {
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"SYS_PTRACE"},
+									Add: []corev1.Capability{"NET_ADMIN", "SYS_PTRACE"},
 								},
 							},
 						},
