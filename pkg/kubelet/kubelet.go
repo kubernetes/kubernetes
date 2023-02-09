@@ -1641,10 +1641,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // This operation writes all events that are dispatched in order to provide
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not write an event if this operation returns an error.
-func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
-	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
-	// Currently, using that context causes test failures.
-	ctx, otelSpan := kl.tracer.Start(context.TODO(), "syncPod", trace.WithAttributes(
+func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
+	ctx, otelSpan := kl.tracer.Start(ctx, "syncPod", trace.WithAttributes(
 		attribute.String("k8s.pod.uid", string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),
 		attribute.String("k8s.pod.name", pod.Name),
@@ -1739,13 +1737,15 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		var syncErr error
 		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err := kl.killPod(ctx, pod, p, nil); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
-			syncErr = fmt.Errorf("error killing pod: %v", err)
-			utilruntime.HandleError(syncErr)
+			if !wait.Interrupted(err) {
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
+				syncErr = fmt.Errorf("error killing pod: %w", err)
+				utilruntime.HandleError(syncErr)
+			}
 		} else {
 			// There was no error killing the pod, but the pod cannot be run.
 			// Return an error to signal that the sync loop should back off.
-			syncErr = fmt.Errorf("pod cannot be run: %s", runnable.Message)
+			syncErr = fmt.Errorf("pod cannot be run: %v", runnable.Message)
 		}
 		return false, syncErr
 	}
@@ -1791,6 +1791,9 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		if !pcm.Exists(pod) && !firstSync {
 			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 			if err := kl.killPod(ctx, pod, p, nil); err == nil {
+				if wait.Interrupted(err) {
+					return false, err
+				}
 				podKilled = true
 			} else {
 				klog.ErrorS(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
@@ -1854,15 +1857,13 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		return false, err
 	}
 
-	// Volume manager will not mount volumes for terminating pods
-	// TODO: once context cancellation is added this check can be removed
-	if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
-		// Wait for volumes to attach/mount
-		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+	// Wait for volumes to attach/mount
+	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
+		if !wait.Interrupted(err) {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
 			klog.ErrorS(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
-			return false, err
 		}
+		return false, err
 	}
 
 	// Fetch the pull secrets for the pod
@@ -1881,8 +1882,13 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		}
 	}
 
+	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
+	// Currently, using that context causes test failures. To remove this todoCtx, any wait.Interrupted
+	// errors need to be filtered from result and bypass the reasonCache - cancelling the context for
+	// SyncPod is a known and deliberate error, not a generic error.
+	todoCtx := context.TODO()
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(todoCtx, pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
@@ -2056,7 +2062,7 @@ func (kl *Kubelet) SyncTerminatingRuntimePod(_ context.Context, runningPod *kube
 // This typically occurs when a pod is force deleted from configuration (local disk or API) and the
 // kubelet restarts in the middle of the action.
 func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
-	_, otelSpan := kl.tracer.Start(context.Background(), "syncTerminatedPod", trace.WithAttributes(
+	ctx, otelSpan := kl.tracer.Start(ctx, "syncTerminatedPod", trace.WithAttributes(
 		attribute.String("k8s.pod.uid", string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),
 		attribute.String("k8s.pod.name", pod.Name),
@@ -2074,7 +2080,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// volumes are unmounted after the pod worker reports ShouldPodRuntimeBeRemoved (which is satisfied
 	// before syncTerminatedPod is invoked)
-	if err := kl.volumeManager.WaitForUnmount(pod); err != nil {
+	if err := kl.volumeManager.WaitForUnmount(ctx, pod); err != nil {
 		return err
 	}
 	klog.V(4).InfoS("Pod termination unmounted volumes", "pod", klog.KObj(pod), "podUID", pod.UID)
