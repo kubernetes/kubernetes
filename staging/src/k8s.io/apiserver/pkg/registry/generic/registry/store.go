@@ -1143,6 +1143,11 @@ func (e *Store) DeleteReturnsDeletedObject() bool {
 	return e.ReturnDeletedObject
 }
 
+// deleteCollectionPageSize is the size of the page used when
+// listing objects from storage during DeleteCollection calls.
+// It's a variable to make allow overwriting in tests.
+var deleteCollectionPageSize = int64(10000)
+
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
@@ -1155,27 +1160,11 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 		listOptions = listOptions.DeepCopy()
 	}
 
-	listObj, err := e.List(ctx, listOptions)
-	if err != nil {
-		return nil, err
-	}
-	items, err := meta.ExtractList(listObj)
-	if err != nil {
-		return nil, err
-	}
-	if len(items) == 0 {
-		// Nothing to delete, return now
-		return listObj, nil
-	}
-	// Spawn a number of goroutines, so that we can issue requests to storage
-	// in parallel to speed up deletion.
-	// It is proportional to the number of items to delete, up to
-	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
-	// workers to delete 10 items).
+	itemsLock := sync.RWMutex{}
+	var items []runtime.Object
+
+	// TODO(wojtek-t): Decide if we don't want to start workers more opportunistically.
 	workersNumber := e.DeleteCollectionWorkers
-	if workersNumber > len(items) {
-		workersNumber = len(items)
-	}
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
@@ -1194,7 +1183,9 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 			defer wg.Done()
 
 			for index := range toProcess {
+				itemsLock.RLock()
 				accessor, err := meta.Accessor(items[index])
+				itemsLock.RUnlock()
 				if err != nil {
 					errs <- err
 					return
@@ -1220,20 +1211,86 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 		close(workersExited)
 	}()
 
-	func() {
+	hasLimit := listOptions.Limit > 0
+	if listOptions.Limit == 0 {
+		listOptions.Limit = deleteCollectionPageSize
+	}
+
+	// Paginate the list request and throw all items into workers.
+	listObj, err := func() (runtime.Object, error) {
 		defer close(toProcess)
 
-		for i := 0; i < len(items); i++ {
+		processedItems := 0
+		var originalList runtime.Object
+		for {
 			select {
-			case toProcess <- i:
-			case <-workersExited:
-				klog.V(4).InfoS("workers already exited, and there are some items waiting to be processed", "finished", i, "total", len(items))
-				return
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
 			}
+
+			listObj, err := e.List(ctx, listOptions)
+			if err != nil {
+				return nil, err
+			}
+
+			newItems, err := meta.ExtractList(listObj)
+			if err != nil {
+				return nil, err
+			}
+			itemsLock.Lock()
+			items = append(items, newItems...)
+			itemsLock.Unlock()
+
+			for i := 0; i < len(newItems); i++ {
+				select {
+				case toProcess <- processedItems + i:
+				case <-workersExited:
+					klog.V(4).InfoS("workers already exited, and there are some items waiting to be processed", "queued/finished", i, "total", processedItems+len(newItems))
+					// Try to propagate an error from the workers if possible.
+					select {
+					case err := <-errs:
+						return nil, err
+					default:
+						return nil, fmt.Errorf("all DeleteCollection workers exited")
+					}
+				}
+			}
+			processedItems += len(newItems)
+
+			// If the original request was setting the limit, finish after running it.
+			if hasLimit {
+				return listObj, nil
+			}
+
+			if originalList == nil {
+				originalList = listObj
+				meta.SetList(originalList, nil)
+			}
+
+			// If there are no more items, return the list.
+			m, err := meta.ListAccessor(listObj)
+			if err != nil {
+				return nil, err
+			}
+			if len(m.GetContinue()) == 0 {
+				itemsLock.Lock()
+				meta.SetList(originalList, items)
+				itemsLock.Unlock()
+				return originalList, nil
+			}
+
+			// Set up the next loop.
+			listOptions.Continue = m.GetContinue()
+			listOptions.ResourceVersion = ""
+			listOptions.ResourceVersionMatch = ""
 		}
 	}()
+	if err != nil {
+		return nil, err
+	}
 
-	// Wait for all workers to exist.
+	// Wait for all workers to exit.
 	<-workersExited
 
 	select {
