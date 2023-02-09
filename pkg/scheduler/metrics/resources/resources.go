@@ -57,7 +57,7 @@ var podResourceDesc = resourceMetricsDescriptors{
 			"Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.",
 			[]string{"namespace", "pod", "node", "scheduler", "priority", "resource", "unit"},
 			nil,
-			metrics.ALPHA,
+			metrics.STABLE,
 			""),
 	},
 	limits: resourceLifecycleDescriptors{
@@ -65,7 +65,7 @@ var podResourceDesc = resourceMetricsDescriptors{
 			"Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.",
 			[]string{"namespace", "pod", "node", "scheduler", "priority", "resource", "unit"},
 			nil,
-			metrics.ALPHA,
+			metrics.STABLE,
 			""),
 	},
 }
