@@ -25,6 +25,19 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+type debugStyle int
+
+const (
+	// debug by ephemeral container
+	ephemeral debugStyle = iota
+	// debug by pod copy
+	podCopy
+	// debug node
+	node
+	// unsupported debug methodology
+	unsupported
+)
+
 type legacyProfile struct {
 }
 
@@ -50,19 +63,6 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
 	}
 }
-
-type debugStyle int
-
-const (
-	// debug by ephemeral container
-	ephemeral debugStyle = iota
-	// debug by pod copy
-	podCopy
-	// debug node
-	node
-	// unsupported debug methodology
-	unsupported
-)
 
 func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	switch target.(type) {
