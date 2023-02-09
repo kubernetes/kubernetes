@@ -935,12 +935,13 @@ func ignitionInjectGCEPublicKey(path string, content string) string {
 	}
 
 	const sshPublicKeyFileContentMarker = "GCE_SSH_PUBLIC_KEY_FILE_CONTENT"
-	return strings.Replace(
-		content,
-		sshPublicKeyFileContentMarker,
-		base64.StdEncoding.EncodeToString(sshPublicKey),
-		1,
+	key := base64.StdEncoding.EncodeToString(sshPublicKey)
+	base64Marker := base64.StdEncoding.EncodeToString([]byte(sshPublicKeyFileContentMarker))
+	replacer := strings.NewReplacer(
+		sshPublicKeyFileContentMarker, key,
+		base64Marker, key,
 	)
+	return replacer.Replace(content)
 }
 
 func imageToInstanceName(imageConfig *internalGCEImage) string {
