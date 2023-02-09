@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"testing"
 )
 
@@ -27,7 +28,7 @@ func Test_newReady(t *testing.T) {
 	// create 10 goroutines waiting for ready
 	for i := 0; i < 10; i++ {
 		go func() {
-			errCh <- ready.wait()
+			errCh <- ready.wait(context.Background())
 		}()
 	}
 	ready.set(true)
@@ -45,7 +46,7 @@ func Test_newReadyStop(t *testing.T) {
 	// create 10 goroutines waiting for ready and stop
 	for i := 0; i < 10; i++ {
 		go func() {
-			errCh <- ready.wait()
+			errCh <- ready.wait(context.Background())
 		}()
 	}
 	ready.stop()
@@ -76,7 +77,7 @@ func Test_newReadyCheck(t *testing.T) {
 	if ready.check() {
 		t.Errorf("unexpected ready state %v", ready.check())
 	}
-	err := ready.wait()
+	err := ready.wait(context.Background())
 	if err == nil {
 		t.Errorf("expected error waiting on a stopped state")
 	}

@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -353,7 +354,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -392,7 +393,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -426,7 +427,7 @@ func TestGetCacheBypass(t *testing.T) {
 	result := &example.Pod{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -480,6 +481,34 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 }
 
+func TestWatchNotHangingOnStartupFailure(t *testing.T) {
+	// Configure cacher so that it can't initialize, because of
+	// constantly failing lists to the underlying storage.
+	dummyErr := fmt.Errorf("dummy")
+	backingStorage := &dummyStorage{err: dummyErr}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel the watch after some time to check if it will properly
+	// terminate instead of hanging forever.
+	go func() {
+		defer cancel()
+		cacher.clock.Sleep(5 * time.Second)
+	}()
+
+	// Watch hangs waiting on watchcache being initialized.
+	// Ensure that it terminates when its context is cancelled
+	// (e.g. the request is terminated for whatever reason).
+	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0"})
+	if err == nil || err.Error() != apierrors.NewServiceUnavailable(context.Canceled.Error()).Error() {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+}
+
 func TestWatcherNotGoingBackInTime(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -489,7 +518,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -618,7 +647,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -658,7 +687,7 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 	}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -763,7 +792,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -861,7 +890,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -961,7 +990,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	cacher.bookmarkWatchers.bookmarkFrequency = time.Second
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -1031,7 +1060,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1109,7 +1138,7 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1187,7 +1216,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1267,7 +1296,7 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1378,7 +1407,7 @@ func TestCachingDeleteEvents(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1460,7 +1489,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1556,7 +1585,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	// Ensure there is enough budget for slow processing since

@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
@@ -44,10 +45,34 @@ func newReady() *ready {
 }
 
 // wait blocks until it is Ready or Stopped, it returns an error if is Stopped.
-func (r *ready) wait() error {
+func (r *ready) wait(ctx context.Context) error {
 	r.c.L.Lock()
 	defer r.c.L.Unlock()
+
+	if r.state == Pending {
+		// We're still waiting for initialization.
+		// Ensure that context is honored in case it is cancelled
+		// before initialization happens.
+		// However avoid spanning additional goroutine in a healthy case.
+		// To prevent that this goroutine will be leaked if the context
+		// is never cancelled, force cancel it on exit from the function.
+		waitCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		go func() {
+			<-waitCtx.Done()
+
+			r.c.L.Lock()
+			defer r.c.L.Unlock()
+			r.c.Broadcast()
+		}()
+	}
 	for r.state == Pending {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		r.c.Wait()
 	}
 	switch r.state {
@@ -62,8 +87,6 @@ func (r *ready) wait() error {
 
 // check returns true only if it is Ready.
 func (r *ready) check() bool {
-	// TODO: Make check() function more sophisticated, in particular
-	// allow it to behave as "waitWithTimeout".
 	rwMutex := r.c.L.(*sync.RWMutex)
 	rwMutex.RLock()
 	defer rwMutex.RUnlock()
