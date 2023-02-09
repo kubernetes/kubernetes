@@ -89,8 +89,9 @@ func TestCreateHealthcheck(t *testing.T) {
 		{
 			name: "timeouts if response time higher than default timeout",
 			cfg: storagebackend.Config{
-				Type:      storagebackend.StorageTypeETCD3,
-				Transport: storagebackend.TransportConfig{},
+				Type:               storagebackend.StorageTypeETCD3,
+				Transport:          storagebackend.TransportConfig{},
+				HealthcheckTimeout: 2 * time.Second,
 			},
 			responseTime: 3 * time.Second,
 			want:         context.DeadlineExceeded,
