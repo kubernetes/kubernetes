@@ -43,8 +43,8 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 		// do nothing to the copied pod
 		return nil
 	case *corev1.Node:
-		MountRootPartition(pod, containerName)
-		UseHostNamespaces(pod)
+		mountRootPartition(pod, containerName)
+		useHostNamespaces(pod)
 		return nil
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
@@ -87,17 +87,17 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 
 	switch style {
 	case node:
-		MountRootPartition(pod, containerName)
-		ClearSecurityContext(pod, containerName, podutils.Containers)
-		UseHostNamespaces(pod)
+		mountRootPartition(pod, containerName)
+		clearSecurityContext(pod, containerName, podutils.Containers)
+		useHostNamespaces(pod)
 
 	case podCopy:
-		RemoveLabelsAndProbes(pod)
-		AllowProcessTracing(pod, containerName, podutils.Containers)
-		ShareProcessNamespace(pod)
+		removeLabelsAndProbes(pod)
+		allowProcessTracing(pod, containerName, podutils.Containers)
+		shareProcessNamespace(pod)
 
 	case ephemeral:
-		AllowProcessTracing(pod, containerName, podutils.EphemeralContainers)
+		allowProcessTracing(pod, containerName, podutils.EphemeralContainers)
 	}
 
 	return nil
@@ -109,12 +109,12 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		return fmt.Errorf("baseline profile: %s", err)
 	}
 
-	ClearSecurityContext(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
+	clearSecurityContext(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
 
 	switch style {
 	case podCopy:
-		RemoveLabelsAndProbes(pod)
-		ShareProcessNamespace(pod)
+		removeLabelsAndProbes(pod)
+		shareProcessNamespace(pod)
 
 	case ephemeral, node:
 		// no additional modifications needed
@@ -129,15 +129,15 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		return fmt.Errorf("restricted profile: %s", err)
 	}
 
-	DisallowRoot(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
-	DropCapabilities(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
+	disallowRoot(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
+	dropCapabilities(pod, containerName, podutils.Containers|podutils.EphemeralContainers)
 
 	switch style {
 	case node:
-		ClearSecurityContext(pod, containerName, podutils.Containers)
+		clearSecurityContext(pod, containerName, podutils.Containers)
 
 	case podCopy:
-		ShareProcessNamespace(pod)
+		shareProcessNamespace(pod)
 
 	case ephemeral:
 		// no additional modifications needed
@@ -146,9 +146,9 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	return nil
 }
 
-// RemoveLabelsAndProbes removes labels from the pod and remove probes
+// removeLabelsAndProbes removes labels from the pod and remove probes
 // from all containers of the pod.
-func RemoveLabelsAndProbes(p *corev1.Pod) {
+func removeLabelsAndProbes(p *corev1.Pod) {
 	p.Labels = nil
 	for i := range p.Spec.Containers {
 		p.Spec.Containers[i].LivenessProbe = nil
@@ -156,8 +156,8 @@ func RemoveLabelsAndProbes(p *corev1.Pod) {
 	}
 }
 
-// MountRootPartition mounts the host's root path at "/host" in the container.
-func MountRootPartition(p *corev1.Pod, containerName string) {
+// mountRootPartition mounts the host's root path at "/host" in the container.
+func mountRootPartition(p *corev1.Pod, containerName string) {
 	const volumeName = "host-root"
 	p.Spec.Volumes = append(p.Spec.Volumes, corev1.Volume{
 		Name: volumeName,
@@ -177,22 +177,22 @@ func MountRootPartition(p *corev1.Pod, containerName string) {
 	})
 }
 
-// UseHostNamespaces configures the pod to use the host's network, PID, and IPC
+// useHostNamespaces configures the pod to use the host's network, PID, and IPC
 // namespaces.
-func UseHostNamespaces(p *corev1.Pod) {
+func useHostNamespaces(p *corev1.Pod) {
 	p.Spec.HostNetwork = true
 	p.Spec.HostPID = true
 	p.Spec.HostIPC = true
 }
 
-// ShareProcessNamespace configures all containers in the pod to share the
+// shareProcessNamespace configures all containers in the pod to share the
 // process namespace.
-func ShareProcessNamespace(p *corev1.Pod) {
+func shareProcessNamespace(p *corev1.Pod) {
 	p.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 }
 
-// ClearSecurityContext clears the security context for the container.
-func ClearSecurityContext(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
+// clearSecurityContext clears the security context for the container.
+func clearSecurityContext(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
@@ -202,8 +202,8 @@ func ClearSecurityContext(p *corev1.Pod, containerName string, mask podutils.Con
 	})
 }
 
-// DisallowRoot configures the container to run as a non-root user.
-func DisallowRoot(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
+// disallowRoot configures the container to run as a non-root user.
+func disallowRoot(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
@@ -215,8 +215,8 @@ func DisallowRoot(p *corev1.Pod, containerName string, mask podutils.ContainerTy
 	})
 }
 
-// DropCapabilities drops all Capabilities for the container
-func DropCapabilities(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
+// dropCapabilities drops all Capabilities for the container
+func dropCapabilities(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
@@ -240,8 +240,8 @@ func DropCapabilities(p *corev1.Pod, containerName string, mask podutils.Contain
 	})
 }
 
-// AllowProcessTracing grants the SYS_PTRACE capability to the container.
-func AllowProcessTracing(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
+// allowProcessTracing grants the SYS_PTRACE capability to the container.
+func allowProcessTracing(p *corev1.Pod, containerName string, mask podutils.ContainerType) {
 	podutils.VisitContainers(&p.Spec, mask, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
