@@ -259,20 +259,11 @@ func dropCapabilities(p *corev1.Pod, containerName string, mask podutils.Contain
 			return true
 		}
 		if c.SecurityContext == nil {
-			c.SecurityContext = &corev1.SecurityContext{
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			}
-			return false
+			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		if c.SecurityContext.Capabilities == nil {
-			c.SecurityContext.Capabilities = &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			}
-			return false
+		c.SecurityContext.Capabilities = &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
 		}
-		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "ALL")
 		return false
 	})
 }
