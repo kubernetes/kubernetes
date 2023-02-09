@@ -414,9 +414,9 @@ func TestKMSv2SingleService(t *testing.T) {
 
 	var kmsv2Calls int
 	origEnvelopeKMSv2ServiceFactory := encryptionconfig.EnvelopeKMSv2ServiceFactory
-	encryptionconfig.EnvelopeKMSv2ServiceFactory = func(ctx context.Context, endpoint string, callTimeout time.Duration) (kmsv2svc.Service, error) {
+	encryptionconfig.EnvelopeKMSv2ServiceFactory = func(ctx context.Context, endpoint, providerName string, callTimeout time.Duration) (kmsv2svc.Service, error) {
 		kmsv2Calls++
-		return origEnvelopeKMSv2ServiceFactory(ctx, endpoint, callTimeout)
+		return origEnvelopeKMSv2ServiceFactory(ctx, endpoint, providerName, callTimeout)
 	}
 	t.Cleanup(func() {
 		encryptionconfig.EnvelopeKMSv2ServiceFactory = origEnvelopeKMSv2ServiceFactory

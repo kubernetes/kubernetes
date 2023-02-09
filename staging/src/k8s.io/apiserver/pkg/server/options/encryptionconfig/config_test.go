@@ -104,7 +104,7 @@ func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelo
 }
 
 // The factory method to create mock envelope kmsv2 service.
-func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration) (kmsservice.Service, error) {
+func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint, providerName string, timeout time.Duration) (kmsservice.Service, error) {
 	return &testKMSv2EnvelopeService{nil}, nil
 }
 
@@ -679,7 +679,7 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 func TestKMSv2PluginHealthzTTL(t *testing.T) {
 	ctx := testContext(t)
 
-	service, _ := newMockEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", 3*time.Second)
+	service, _ := newMockEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", "providerName", 3*time.Second)
 	errService, _ := newMockErrorEnvelopeKMSv2Service("unix:///tmp/testprovider.sock", 3*time.Second)
 
 	testCases := []struct {

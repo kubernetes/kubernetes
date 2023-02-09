@@ -17,9 +17,12 @@ limitations under the License.
 package metrics
 
 import (
+	"errors"
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -67,6 +70,20 @@ var (
 		},
 		[]string{"transformation_type"},
 	)
+
+	KMSOperationsLatencyMetric = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "kms_operations_latency_seconds",
+			Help:           "KMS operation duration with gRPC error code status total.",
+			StabilityLevel: metrics.ALPHA,
+			// Use custom buckets to avoid the default buckets which are too small for KMS operations.
+			// Ranges from 1ms to 2m11s
+			Buckets: metrics.ExponentialBuckets(0.001, 2, 18),
+		},
+		[]string{"provider_name", "method_name", "grpc_status_code"},
+	)
 )
 
 var registerMetricsFunc sync.Once
@@ -75,6 +92,7 @@ func RegisterMetrics() {
 	registerMetricsFunc.Do(func() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
+		legacyregistry.MustRegister(KMSOperationsLatencyMetric)
 	})
 }
 
@@ -103,4 +121,29 @@ func RecordArrival(transformationType string, start time.Time) {
 
 func RecordDekCacheFillPercent(percent float64) {
 	dekCacheFillPercent.Set(percent)
+}
+
+// RecordKMSOperationLatency records the latency of KMS operation.
+func RecordKMSOperationLatency(providerName, methodName string, duration time.Duration, err error) {
+	KMSOperationsLatencyMetric.WithLabelValues(providerName, methodName, getErrorCode(err)).Observe(duration.Seconds())
+}
+
+type gRPCError interface {
+	GRPCStatus() *status.Status
+}
+
+func getErrorCode(err error) string {
+	if err == nil {
+		return codes.OK.String()
+	}
+
+	// handle errors wrapped with fmt.Errorf and similar
+	var s gRPCError
+	if errors.As(err, &s) {
+		return s.GRPCStatus().Code().String()
+	}
+
+	// This is not gRPC error. The operation must have failed before gRPC
+	// method was called, otherwise we would get gRPC error.
+	return "unknown-non-grpc"
 }
