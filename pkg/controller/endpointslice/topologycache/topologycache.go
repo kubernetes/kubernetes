@@ -212,7 +212,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	defer t.lock.Unlock()
 
 	if totalCPU.IsZero() || !sufficientNodeInfo || len(cpuByZone) < 2 {
-		klog.V(2).Infof("Insufficient node info for topology hints (%d zones, %s CPU, %t)", len(cpuByZone), totalCPU.MilliValue(), sufficientNodeInfo)
+		klog.V(2).Infof("Insufficient node info for topology hints (%d zones, %s CPU, %t)", len(cpuByZone), totalCPU.String(), sufficientNodeInfo)
 		t.sufficientNodeInfo = false
 		t.cpuByZone = nil
 		t.cpuRatiosByZone = nil
