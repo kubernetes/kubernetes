@@ -121,6 +121,7 @@ type DebugOptions struct {
 	TargetContainer string
 	TTY             bool
 	Profile         string
+	Applier         ProfileApplier
 
 	attachChanged         bool
 	shareProcessedChanged bool
@@ -129,8 +130,6 @@ type DebugOptions struct {
 
 	genericclioptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
-
-	applier ProfileApplier
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -180,7 +179,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T("Debugging profile."))
+	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", or "restricted".`))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -226,9 +225,13 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if o.WarningPrinter == nil {
 		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 	}
-	o.applier, err = NewProfileApplier(o.Profile)
-	if err != nil {
-		return err
+
+	if o.Applier == nil {
+		applier, err := NewProfileApplier(o.Profile)
+		if err != nil {
+			return err
+		}
+		o.Applier = applier
 	}
 
 	return nil
@@ -536,9 +539,11 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 
 	copied := pod.DeepCopy()
 	copied.Spec.EphemeralContainers = append(copied.Spec.EphemeralContainers, *ec)
-	if err := o.applier.Apply(copied, name, copied); err != nil {
+	if err := o.Applier.Apply(copied, name, copied); err != nil {
 		return nil, nil, err
 	}
+
+	ec = &copied.Spec.EphemeralContainers[len(copied.Spec.EphemeralContainers)-1]
 
 	return copied, ec, nil
 }
@@ -593,7 +598,7 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 		p.Spec.Containers[0].Command = o.Args
 	}
 
-	if err := o.applier.Apply(p, cn, node); err != nil {
+	if err := o.Applier.Apply(p, cn, node); err != nil {
 		return nil, err
 	}
 
@@ -614,7 +619,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly
 	if o.shareProcessedChanged {
-		copied.Spec.ShareProcessNamespace = pointer.BoolPtr(o.ShareProcesses)
+		copied.Spec.ShareProcessNamespace = pointer.Bool(o.ShareProcesses)
 	}
 	if !o.SameNode {
 		copied.Spec.NodeName = ""
@@ -647,13 +652,11 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		if len(name) == 0 {
 			name = o.computeDebugContainerName(copied)
 		}
-		c = &corev1.Container{
+		copied.Spec.Containers = append(copied.Spec.Containers, corev1.Container{
 			Name:                     name,
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		}
-		defer func() {
-			copied.Spec.Containers = append(copied.Spec.Containers, *c)
-		}()
+		})
+		c = &copied.Spec.Containers[len(copied.Spec.Containers)-1]
 	}
 
 	if len(o.Args) > 0 {
@@ -676,7 +679,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
 
-	err := o.applier.Apply(copied, c.Name, pod)
+	err := o.Applier.Apply(copied, c.Name, pod)
 	if err != nil {
 		return nil, "", err
 	}
