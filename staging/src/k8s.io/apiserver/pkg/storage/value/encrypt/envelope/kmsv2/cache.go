@@ -18,8 +18,11 @@ limitations under the License.
 package kmsv2
 
 import (
-	"encoding/base64"
+	"crypto/sha256"
+	"hash"
+	"sync"
 	"time"
+	"unsafe"
 
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -29,18 +32,26 @@ import (
 type simpleCache struct {
 	cache *utilcache.Expiring
 	ttl   time.Duration
+	// hashPool is a per cache pool of hash.Hash (to avoid allocations from building the Hash)
+	// SHA-256 is used to prevent collisions
+	hashPool *sync.Pool
 }
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 	return &simpleCache{
 		cache: utilcache.NewExpiringWithClock(clock),
 		ttl:   ttl,
+		hashPool: &sync.Pool{
+			New: func() interface{} {
+				return sha256.New()
+			},
+		},
 	}
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
 func (c *simpleCache) get(key []byte) value.Transformer {
-	record, ok := c.cache.Get(base64.StdEncoding.EncodeToString(key))
+	record, ok := c.cache.Get(c.keyFunc(key))
 	if !ok {
 		return nil
 	}
@@ -55,5 +66,25 @@ func (c *simpleCache) set(key []byte, transformer value.Transformer) {
 	if transformer == nil {
 		panic("transformer must not be nil")
 	}
-	c.cache.Set(base64.StdEncoding.EncodeToString(key), transformer, c.ttl)
+	c.cache.Set(c.keyFunc(key), transformer, c.ttl)
+}
+
+// keyFunc generates a string key by hashing the inputs.
+// This lowers the memory requirement of the cache.
+func (c *simpleCache) keyFunc(s []byte) string {
+	h := c.hashPool.Get().(hash.Hash)
+	h.Reset()
+
+	if _, err := h.Write(s); err != nil {
+		panic(err) // Write() on hash never fails
+	}
+	key := toString(h.Sum(nil)) // skip base64 encoding to save an allocation
+	c.hashPool.Put(h)
+
+	return key
+}
+
+// toString performs unholy acts to avoid allocations
+func toString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
