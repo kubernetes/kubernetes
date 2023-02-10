@@ -162,18 +162,6 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--no-color")
 fi
 
-if [[ -n "${E2E_REPORT_DIR:-}" ]]; then
-    report_dir="${E2E_REPORT_DIR}"
-else
-    # Some jobs don't use E2E_REPORT_DIR and instead pass --report-dir=<dir>
-    # as parameter.
-    for arg in "${@}"; do
-        # shellcheck disable=SC2001
-        # (style): See if you can use ${variable//search/replace} instead.
-        case "$arg" in -report-dir=*|--report-dir=*) report_dir="$(echo "$arg" | sed -e 's/^[^=]*=//')";; esac
-    done
-fi
-
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
@@ -194,19 +182,6 @@ case "${E2E_TEST_DEBUG_TOOL:-ginkgo}" in
       program+=("--nodes=25")
     fi
     program+=("${ginkgo_args[@]:+${ginkgo_args[@]}}")
-
-    if [[ -n "${report_dir:-}" ]]; then
-        # The JUnit report written by the E2E suite gets truncated to avoid
-        # overwhelming the tools that need to process it. For manual analysis
-        # it is useful to have the full reports in both formats that Ginkgo
-        # supports:
-        # - JUnit for comparison with the truncated report.
-        # - JSON because it is a faithful representation of
-        #   all available information.
-        #
-        # This has to be passed to the CLI, the suite doesn't support --output-dir.
-        program+=("--output-dir=${report_dir}" "--junit-report=ginkgo_report.xml" "--json-report=ginkgo_report.json")
-    fi
     ;;
   delve) program=("dlv" "exec") ;;
   gdb) program=("gdb") ;;
@@ -221,6 +196,11 @@ if [ "${E2E_TEST_DEBUG_TOOL:-ginkgo}" != "ginkgo" ]; then
     suite_args+=("--ginkgo.${arg#--}")
   done
 fi
+
+# Generate full dumps of the test result and progress in <report-dir>/ginkgo/,
+# using the Ginkgo-specific JSON format and JUnit XML. Ignored if --report-dir
+# is not used.
+suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
 # The following invocation is fairly complex. Let's dump it to simplify
 # determining what the final options are. Enabled by default in CI
