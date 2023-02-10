@@ -204,6 +204,19 @@ func (e *EventedPLEG) watchEventsChannel() {
 
 func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeapi.ContainerEventResponse) {
 	for event := range containerEventsResponseCh {
+		// Ignore the event if PodSandboxStatus is nil.
+		// This might happen under some race condition where the podSandbox has
+		// been deleted, and therefore container runtime couldn't find the
+		// podSandbox for the container when generating the event.
+		// It is safe to ignore because
+		// a) a event would have been received for the sandbox deletion,
+		// b) in worst case, a relist will eventually sync the pod status.
+		// TODO(#114371): Figure out a way to handle this case instead of ignoring.
+		if event.PodSandboxStatus == nil || event.PodSandboxStatus.Metadata == nil {
+			klog.ErrorS(nil, "Evented PLEG: received ContainerEventResponse with nil PodSandboxStatus or PodSandboxStatus.Metadata", "containerEventResponse", event)
+			continue
+		}
+
 		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
 		shouldSendPLEGEvent := false
 
