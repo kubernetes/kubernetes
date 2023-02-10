@@ -213,10 +213,10 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 			return lastError.Load()
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		now := time.Now()
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
+		cancel()
 		if err != nil {
 			err = fmt.Errorf("error getting data from etcd: %w", err)
 		}
