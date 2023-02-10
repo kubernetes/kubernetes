@@ -198,6 +198,9 @@ func Test_Run_Positive_Register(t *testing.T) {
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	defer func() {
+		require.NoError(t, p.Stop())
+	}()
 	timestampBeforeRegistration := time.Now()
 	dsw.AddOrUpdatePlugin(socketPath)
 	waitForRegistration(t, socketPath, timestampBeforeRegistration, asw)
