@@ -113,15 +113,6 @@ func RunE2ETests(t *testing.T) {
 	gomega.RegisterFailHandler(framework.Fail)
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	if framework.TestContext.ReportDir != "" {
-		// TODO: we should probably only be trying to create this directory once
-		// rather than once-per-Ginkgo-node.
-		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			klog.Errorf("Failed creating report directory: %v", err)
-		}
-	}
-
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, suiteConfig.ParallelProcess)
 	ginkgo.RunSpecs(t, "Kubernetes e2e suite", suiteConfig, reporterConfig)
