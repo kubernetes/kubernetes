@@ -34,6 +34,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -122,7 +124,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", cases.Title(language.Und, cases.NoLower).String(sc.Service))
 }
 
 // Check validates if the service is enabled and active.

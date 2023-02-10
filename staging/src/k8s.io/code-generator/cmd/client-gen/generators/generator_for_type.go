@@ -22,6 +22,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -120,9 +123,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		}
 		var updatedVerbtemplate string
 		if _, exists := subresourceDefaultVerbTemplates[e.VerbType]; e.IsSubresource() && exists {
-			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(subresourceDefaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
+			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(subresourceDefaultVerbTemplates[e.VerbType], cases.Title(language.Und, cases.NoLower).String(e.VerbType)+"(")
 		} else {
-			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(defaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
+			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(defaultVerbTemplates[e.VerbType], cases.Title(language.Und, cases.NoLower).String(e.VerbType)+"(")
 		}
 		extendedMethod := extendedInterfaceMethod{
 			template: updatedVerbtemplate,
@@ -345,7 +348,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
+	return strings.Replace(template, " "+cases.Title(language.Und, cases.NoLower).String(verbType), " "+name, -1)
 }
 
 func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {

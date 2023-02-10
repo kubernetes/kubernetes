@@ -19,6 +19,7 @@ require (
 	github.com/vmware/govmomi v0.30.0
 	golang.org/x/crypto v0.1.0
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/text v0.6.0
 	google.golang.org/api v0.60.0
 	gopkg.in/gcfg.v1 v1.2.0
 	k8s.io/api v0.0.0
@@ -79,7 +80,6 @@ require (
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/term v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect

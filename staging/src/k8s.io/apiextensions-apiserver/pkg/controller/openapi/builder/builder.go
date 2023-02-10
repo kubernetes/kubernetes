@@ -22,6 +22,9 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/emicklei/go-restful/v3"
 
 	v1 "k8s.io/api/autoscaling/v1"
@@ -317,7 +320,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		To(func(req *restful.Request, res *restful.Response) {}).
 		Doc(b.descriptionFor(path, operationVerb)).
 		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
+		Operation(operationVerb+namespaced+b.kind+cases.Title(language.Und, cases.NoLower).String(subresource(path))).
 		Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
 			Group:   b.group,
 			Version: b.version,

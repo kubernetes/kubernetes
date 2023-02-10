@@ -32,6 +32,9 @@ import (
 	"time"
 	"unicode"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/fatih/camelcase"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -366,7 +369,7 @@ func smartLabelFor(field string) string {
 		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
-			part = strings.Title(part)
+			part = cases.Title(language.Und, cases.NoLower).String(part)
 		}
 		result = append(result, part)
 	}
