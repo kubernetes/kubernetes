@@ -4,13 +4,13 @@ metadata:
   name: capabilities_baseline1
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
       capabilities: {}
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
