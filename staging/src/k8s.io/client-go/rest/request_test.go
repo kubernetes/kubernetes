@@ -269,6 +269,26 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	}
 }
 
+func TestRequestVersionedParamsWithInvalidScheme(t *testing.T) {
+	parameterCodec := runtime.NewParameterCodec(runtime.NewScheme())
+	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}})
+	r.VersionedParams(&v1.PodExecOptions{Stdin: false, Stdout: true},
+		parameterCodec)
+
+	if r.Error() == nil {
+		t.Errorf("should have recorded an error: %#v", r.params)
+	}
+}
+
+func TestRequestError(t *testing.T) {
+	// Invalid body, see TestRequestBody()
+	r := (&Request{}).Body([]string{"test"})
+
+	if r.Error() != r.err {
+		t.Errorf("getter should be identical to reference: %#v %#v", r.Error(), r.err)
+	}
+}
+
 func TestRequestURI(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
 	r.Prefix("other")

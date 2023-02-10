@@ -481,7 +481,13 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// URL returns the current working URL.
+// Error returns any error encountered constructing the request, if any.
+func (r *Request) Error() error {
+	return r.err
+}
+
+// URL returns the current working URL. Check the result of Error() to ensure
+// that the returned URL is valid.
 func (r *Request) URL() *url.URL {
 	p := r.pathPrefix
 	if r.namespaceSet && len(r.namespace) > 0 {
