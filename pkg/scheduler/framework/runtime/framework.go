@@ -948,24 +948,26 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
-	// Run Score method for each node in parallel.
-	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-		for _, pl := range plugins {
-			nodeName := nodes[index].Name
-			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
-			if !status.IsSuccess() {
-				err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-				errCh.SendErrorWithCancel(err, cancel)
-				return
+	if len(plugins) > 0 {
+		// Run Score method for each node in parallel.
+		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+			for _, pl := range plugins {
+				nodeName := nodes[index].Name
+				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
+				if !status.IsSuccess() {
+					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+					errCh.SendErrorWithCancel(err, cancel)
+					return
+				}
+				pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
+					Name:  nodeName,
+					Score: s,
+				}
 			}
-			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
-				Name:  nodeName,
-				Score: s,
-			}
+		}, score)
+		if err := errCh.ReceiveError(); err != nil {
+			return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 		}
-	}, score)
-	if err := errCh.ReceiveError(); err != nil {
-		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
