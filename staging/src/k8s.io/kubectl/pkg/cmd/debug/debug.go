@@ -77,6 +77,10 @@ var (
 		# Create an interactive debugging session in pod mypod and immediately attach to it.
 		kubectl debug mypod -it --image=busybox
 
+		# Create an interactive debugging session for the pod in the file pod.yaml and immediately attach to it.
+		# (requires the EphemeralContainers feature to be enabled in the cluster)
+		kubectl debug -f pod.yaml -it --image=busybox
+
 		# Create a debug container named debugger using a custom automated debugging image.
 		kubectl debug --image=myproj/debug-tools -c debugger mypod
 
@@ -123,6 +127,7 @@ type DebugOptions struct {
 	Profile         string
 	Applier         ProfileApplier
 
+	explicitNamespace     bool
 	attachChanged         bool
 	shareProcessedChanged bool
 
@@ -130,6 +135,8 @@ type DebugOptions struct {
 
 	genericclioptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
+
+	resource.FilenameOptions
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -160,6 +167,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	}
 
 	addDebugFlags(cmd, o)
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "identifying the resource to debug")
 	return cmd
 }
 
@@ -212,7 +220,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	// Namespace
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.explicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -272,8 +280,8 @@ func (o *DebugOptions) Validate() error {
 	}
 
 	// Name
-	if len(o.TargetNames) == 0 {
-		return fmt.Errorf("NAME is required for debug")
+	if len(o.TargetNames) == 0 && len(o.FilenameOptions.Filenames) == 0 {
+		return fmt.Errorf("NAME or filename is required for debug")
 	}
 
 	// Pull Policy
@@ -327,6 +335,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	r := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		FilenameParam(o.explicitNamespace, &o.FilenameOptions).
 		NamespaceParam(o.Namespace).DefaultNamespace().ResourceNames("pods", o.TargetNames...).
 		Do()
 	if err := r.Err(); err != nil {
@@ -691,18 +700,15 @@ func (o *DebugOptions) computeDebugContainerName(pod *corev1.Pod) string {
 	if len(o.Container) > 0 {
 		return o.Container
 	}
-	name := o.Container
-	if len(name) == 0 {
-		cn, containerByName := "", containerNameToRef(pod)
-		for len(cn) == 0 || (containerByName[cn] != nil) {
-			cn = fmt.Sprintf("debugger-%s", nameSuffixFunc(5))
-		}
-		if !o.Quiet {
-			fmt.Fprintf(o.Out, "Defaulting debug container name to %s.\n", cn)
-		}
-		name = cn
+
+	cn, containerByName := "", containerNameToRef(pod)
+	for len(cn) == 0 || (containerByName[cn] != nil) {
+		cn = fmt.Sprintf("debugger-%s", nameSuffixFunc(5))
 	}
-	return name
+	if !o.Quiet {
+		fmt.Fprintf(o.Out, "Defaulting debug container name to %s.\n", cn)
+	}
+	return cn
 }
 
 func containerNameToRef(pod *corev1.Pod) map[string]*corev1.Container {

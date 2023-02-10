@@ -1665,7 +1665,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreFields(DebugOptions{},
-				"attachChanged", "shareProcessedChanged", "podClient", "WarningPrinter", "Applier")); diff != "" {
+				"attachChanged", "shareProcessedChanged", "podClient", "WarningPrinter", "Applier", "explicitNamespace")); diff != "" {
 				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
