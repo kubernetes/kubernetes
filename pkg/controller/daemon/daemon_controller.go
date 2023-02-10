@@ -608,9 +608,9 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if err != nil {
 		return
 	}
-	klog.V(4).Infof("Pod %s deleted.", pod.Name)
 	dsc.expectations.DeletionObserved(dsKey)
 	dsc.enqueueDaemonSet(ds)
+	klog.V(4).Infof("Pod %s deleted.", pod.Name)
 }
 
 func (dsc *DaemonSetsController) addNode(obj interface{}) {
