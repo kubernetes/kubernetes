@@ -78,6 +78,9 @@ spec:
         command: ["/bin/sh", "-c", "sleep infinity"]
 EOF
 
+    # Make sure deployment is successfully applied
+    kube::test::wait_object_assert deployments "{{range.items}}{{${id_field:?}}}{{end}}" 'dtest'
+
     set +o errexit
     # wait timeout error because condition is invalid
     start_sec=$(date +"%s")
