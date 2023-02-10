@@ -25,7 +25,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -52,7 +51,7 @@ type HTTPExtender struct {
 	ignorable        bool
 }
 
-func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
+func makeClient(config *schedulerapi.Extender) (*http.Client, error) {
 	var cfg restclient.Config
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig.Insecure = config.TLSConfig.Insecure
@@ -70,35 +69,23 @@ func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
 			cfg.Insecure = true
 		}
 	}
-	tlsConfig, err := restclient.TLSConfigFor(&cfg)
-	if err != nil {
-		return nil, err
-	}
-	if tlsConfig != nil {
-		return utilnet.SetTransportDefaults(&http.Transport{
-			TLSClientConfig: tlsConfig,
-		}), nil
-	}
-	return utilnet.SetTransportDefaults(&http.Transport{}), nil
+	cfg.Timeout = config.HTTPTimeout.Duration
+	return restclient.HTTPClientFor(&cfg)
 }
 
 // NewHTTPExtender creates an HTTPExtender object.
 func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) {
 	if config.HTTPTimeout.Duration.Nanoseconds() == 0 {
-		config.HTTPTimeout.Duration = time.Duration(DefaultExtenderTimeout)
+		config.HTTPTimeout.Duration = DefaultExtenderTimeout
 	}
 
-	transport, err := makeTransport(config)
+	client, err := makeClient(config)
 	if err != nil {
 		return nil, err
 	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   config.HTTPTimeout.Duration,
-	}
 	managedResources := sets.NewString()
 	for _, r := range config.ManagedResources {
-		managedResources.Insert(string(r.Name))
+		managedResources.Insert(r.Name)
 	}
 	return &HTTPExtender{
 		extenderURL:      config.URLPrefix,
