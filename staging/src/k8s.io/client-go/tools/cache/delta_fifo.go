@@ -613,6 +613,11 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			var deletedObj interface{}
 			if n := oldItem.Newest(); n != nil {
 				deletedObj = n.Object
+
+				// if the previous object is a DeletedFinalStateUnknown, we have to extract the actual Object
+				if d, ok := deletedObj.(DeletedFinalStateUnknown); ok {
+					deletedObj = d.Obj
+				}
 			}
 			queuedDeletions++
 			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
