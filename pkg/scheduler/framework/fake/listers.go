@@ -257,12 +257,16 @@ func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework
 var _ storagelisters.CSINodeLister = CSINodeLister{}
 
 // CSINodeLister declares a storagev1.CSINode type for testing.
-type CSINodeLister storagev1.CSINode
+type CSINodeLister []storagev1.CSINode
 
 // Get returns a fake CSINode object.
 func (n CSINodeLister) Get(name string) (*storagev1.CSINode, error) {
-	csiNode := storagev1.CSINode(n)
-	return &csiNode, nil
+	for _, cn := range n {
+		if cn.Name == name {
+			return &cn, nil
+		}
+	}
+	return nil, fmt.Errorf("csiNode %q not found", name)
 }
 
 // List lists all CSINodes in the indexer.
