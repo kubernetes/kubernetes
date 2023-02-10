@@ -266,6 +266,23 @@ type GenericAPIServer struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
+	// is the maximum duration the apiserver will wait for all active
+	// watch request(s) to drain.
+	// Once this grace period elapses, the apiserver will no longer
+	// wait for any active watch request(s) in flight to drain, it will
+	// proceed to the next step in the graceful server shutdown process.
+	// If set to a positive value, the apiserver will keep track of the
+	// number of active watch request(s) in flight and during shutdown
+	// it will wait, at most, for the specified duration and allow these
+	// active watch requests to drain with some rate limiting in effect.
+	// The default is zero, which implies the apiserver will not keep
+	// track of active watch request(s) in flight and will not wait
+	// for them to drain, this maintains backward compatibility.
+	// This grace period is orthogonal to other grace periods, and
+	// it is not overridden by any other grace period.
+	ShutdownWatchTerminationGracePeriod time.Duration
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -617,10 +634,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		defer close(activeWatchesDrainedCh)
 
 		<-notAcceptingNewRequestCh.Signaled()
+		if s.ShutdownWatchTerminationGracePeriod <= time.Duration(0) {
+			klog.V(1).InfoS("[graceful-termination] not going to wait for active watch request(s) to drain")
+			return
+		}
 
 		// Wait for all active watches to finish
-		// TODO(tkashem): make the grace period configurable
-		grace := 10 * time.Second
+		grace := s.ShutdownWatchTerminationGracePeriod
 		activeBefore, activeAfter, err := s.WatchRequestWaitGroup.Wait(func(count int) (utilwaitgroup.RateLimiter, context.Context, context.CancelFunc) {
 			qps := float64(count) / grace.Seconds()
 			// TODO: we don't want the QPS (max requests drained per second) to

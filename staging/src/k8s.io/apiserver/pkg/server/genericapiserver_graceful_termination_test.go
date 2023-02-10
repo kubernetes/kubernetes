@@ -1011,6 +1011,8 @@ func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *G
 	config, _ := setUp(t)
 	config.ShutdownDelayDuration = 100 * time.Millisecond
 	config.ShutdownSendRetryAfter = keepListening
+	// we enable watch draining, any positive value will do that
+	config.ShutdownWatchTerminationGracePeriod = 2 * time.Second
 	config.AuditPolicyRuleEvaluator = fAudit
 	config.AuditBackend = fAudit
 
