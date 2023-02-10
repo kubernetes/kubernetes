@@ -105,8 +105,28 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 
 	// perform the main update function and get the status
 	currentStatus, err = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
-	if err != nil {
+	if err != nil && currentStatus == nil {
+		return currentRevision, updateRevision, nil, err
+	}
+
+	// make sure to update the latest status even if there is an error with non-nil currentStatus
+	statusErr := ssc.updateStatefulSetStatus(ctx, set, currentStatus)
+	if statusErr == nil {
+		klog.V(4).InfoS("Updated status", "statefulSet", klog.KObj(set),
+			"replicas", currentStatus.Replicas,
+			"readyReplicas", currentStatus.ReadyReplicas,
+			"currentReplicas", currentStatus.CurrentReplicas,
+			"updatedReplicas", currentStatus.UpdatedReplicas)
+	}
+
+	switch {
+	case err != nil && statusErr != nil:
+		klog.ErrorS(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
 		return currentRevision, updateRevision, currentStatus, err
+	case err != nil:
+		return currentRevision, updateRevision, currentStatus, err
+	case statusErr != nil:
+		return currentRevision, updateRevision, currentStatus, statusErr
 	}
 
 	klog.V(4).InfoS("StatefulSet revisions", "statefulSet", klog.KObj(set),
@@ -263,7 +283,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	currentRevision *apps.ControllerRevision,
 	updateRevision *apps.ControllerRevision,
 	collisionCount int32,
-	pods []*v1.Pod) (statefulSetStatus *apps.StatefulSetStatus, updateErr error) {
+	pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
 	// get the current and update revisions of the set.
 	currentSet, err := ApplyRevision(set, currentRevision)
 	if err != nil {
@@ -324,23 +344,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
-
-	// make sure to update the latest status even if there is an error later
-	defer func() {
-		// update the set's status
-		statusErr := ssc.updateStatefulSetStatus(ctx, set, &status)
-		if statusErr == nil {
-			klog.V(4).InfoS("Updated status", "statefulSet", klog.KObj(set),
-				"replicas", status.Replicas,
-				"readyReplicas", status.ReadyReplicas,
-				"currentReplicas", status.CurrentReplicas,
-				"updatedReplicas", status.UpdatedReplicas)
-		} else if updateErr == nil {
-			updateErr = statusErr
-		} else {
-			klog.V(4).InfoS("Could not update status", "statefulSet", klog.KObj(set), "err", statusErr)
-		}
-	}()
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
 	for ord := 0; ord < replicaCount; ord++ {
@@ -647,7 +650,7 @@ func updateStatefulSetAfterInvariantEstablished(
 				replicas[target].Name)
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
 				if !errors.IsNotFound(err) {
-					return nil, err
+					return &status, err
 				}
 			}
 			deletedPods++
