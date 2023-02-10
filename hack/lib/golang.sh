@@ -774,15 +774,26 @@ kube::golang::build_binaries_for_platform() {
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
+  # Workaround for https://github.com/kubernetes/kubernetes/issues/115675
+  local testgogcflags="${gogcflags}"
+  local testgoexperiment="${GOEXPERIMENT:-}"
+  if [[ "$(go version)" == *"go1.20"* && "${platform}" == "linux/arm" ]]; then
+    # work around https://github.com/golang/go/issues/58339 until fixed in go1.20.x
+    testgogcflags="${testgogcflags} -d=inlstaticinit=0"
+    # work around https://github.com/golang/go/issues/58425
+    testgoexperiment="nounified,${testgoexperiment}"
+    kube::log::info "Building test binaries with GOEXPERIMENT=${testgoexperiment} GCFLAGS=${testgogcflags} ASMFLAGS=${goasmflags} LDFLAGS=${goldflags}"
+  fi
+
   for test in "${tests[@]:+${tests[@]}}"; do
     local outfile testpkg
     outfile=$(kube::golang::outfile_for_binary "${test}" "${platform}")
     testpkg=$(dirname "${test}")
 
     mkdir -p "$(dirname "${outfile}")"
-    go test -c \
+    GOEXPERIMENT="${testgoexperiment}" go test -c \
       ${goflags:+"${goflags[@]}"} \
-      -gcflags="${gogcflags}" \
+      -gcflags="${testgogcflags}" \
       -asmflags="${goasmflags}" \
       -ldflags="${goldflags}" \
       -tags="${gotags:-}" \
