@@ -213,7 +213,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 
 	// An error might not be fatal.
 	if err != nil && notReady >= 0 && notReady <= allowedNotReadyPods {
-		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+		framework.Logf("Number of not-ready pods (%d) is above the allowed threshold (%d).", notReady, allowedNotReadyPods)
 		return nil
 	}
 	return err
