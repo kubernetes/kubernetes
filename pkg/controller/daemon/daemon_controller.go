@@ -610,6 +610,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	}
 	dsc.expectations.DeletionObserved(dsKey)
 	dsc.enqueueDaemonSet(ds)
+	
 	klog.V(4).Infof("Pod %s deleted.", pod.Name)
 }
 
