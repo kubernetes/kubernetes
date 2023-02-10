@@ -157,7 +157,6 @@ func (s *Base64Plugin) ExitFailedState() {
 
 // Update keyID for the plugin.
 func (s *Base64Plugin) UpdateKeyID() {
-	klog.Info("updating keyID")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keyID = "2"
