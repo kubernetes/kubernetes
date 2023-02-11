@@ -49,6 +49,20 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 			expectedFieldsPath: []string{"field2", "field3"},
 		},
 		{
+			name:       "field with dots 1",
+			inResource: `service.field2['field\.with\.dots']`,
+
+			expectedGVR:        schema.GroupVersionResource{Resource: "services", Version: "v1"},
+			expectedFieldsPath: []string{"field2", "field.with.dots"},
+		},
+		{
+			name:       "field with dots 2",
+			inResource: `service.field2.field\.with\.dots`,
+
+			expectedGVR:        schema.GroupVersionResource{Resource: "services", Version: "v1"},
+			expectedFieldsPath: []string{"field2", "field.with.dots"},
+		},
+		{
 			name:       "trailing period with incorrect fieldsPath",
 			inResource: "node.field2.field3.",
 
