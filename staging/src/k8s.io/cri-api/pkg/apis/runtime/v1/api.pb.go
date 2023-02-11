@@ -77,7 +77,7 @@ func (Protocol) EnumDescriptor() ([]byte, []int) {
 type MountPropagation int32
 
 const (
-	// No mount propagation ("private" in Linux terminology).
+	// No mount propagation ("rprivate" in Linux terminology).
 	MountPropagation_PROPAGATION_PRIVATE MountPropagation = 0
 	// Mounts get propagated from the host to the container ("rslave" in Linux).
 	MountPropagation_PROPAGATION_HOST_TO_CONTAINER MountPropagation = 1
