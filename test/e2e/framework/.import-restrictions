@@ -1,6 +1,9 @@
 rules:
-  # prevent any k8s.io/kubernetes/pkg imports outside of this package
-  # Packages are used in the test
+  # The core E2E framework is meant to be a normal Kubernetes client,
+  # which means that it shouldn't depend on internal
+  # code. But we are not there yet, so some exceptions
+  # have to be allowed. Over time the list of allowed
+  # packages should get shorter, not longer.
   - selectorRegexp: k8s[.]io/kubernetes/pkg/
     allowedPrefixes:
       - k8s.io/kubernetes/pkg/api/v1/pod
@@ -16,8 +19,3 @@ rules:
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator
       - k8s.io/kubernetes/pkg/util/slice
       - k8s.io/kubernetes/pkg/volume/util
-  # prevent any k8s.io/kubernetes/test/ imports outside of this package
-  # Everything under k8s.io/kubernetes/test/ may be used.
-  - selectorRegexp: k8s[.]io/kubernetes/test/
-    allowedPrefixes:
-      - ""
