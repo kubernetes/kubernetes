@@ -31,6 +31,7 @@ import (
 
 var (
 	cleanAssumedPeriod = 1 * time.Second
+	nodeNotFound       = "No node info with given name found in the cache"
 )
 
 // New returns a Cache implementation.
@@ -124,7 +125,7 @@ func newNodeInfoListItem(ni *framework.NodeInfo) *nodeInfoListItem {
 func (cache *cacheImpl) moveNodeInfoToHead(name string) {
 	ni, ok := cache.nodes[name]
 	if !ok {
-		klog.ErrorS(nil, "No node info with given name found in the cache", "node", klog.KRef("", name))
+		klog.ErrorS(nil, nodeNotFound, "node", klog.KRef("", name))
 		return
 	}
 	// if the node info list item is already at the head, we are done.
@@ -152,7 +153,7 @@ func (cache *cacheImpl) moveNodeInfoToHead(name string) {
 func (cache *cacheImpl) removeNodeInfoFromList(name string) {
 	ni, ok := cache.nodes[name]
 	if !ok {
-		klog.ErrorS(nil, "No node info with given name found in the cache", "node", klog.KRef("", name))
+		klog.ErrorS(nil, nodeNotFound, "node", klog.KRef("", name))
 		return
 	}
 
@@ -193,28 +194,73 @@ func (cache *cacheImpl) Dump() *Dump {
 // The snapshot only includes Nodes that are not deleted at the time this function is called.
 // nodeInfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
 // This function tracks generation number of NodeInfo and updates only the
-// entries of an existing snapshot that have changed after the snapshot was taken.
+// entries of an existing snapshot that have been changed after the snapshot was taken.
 func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
+	var (
+		// NodeInfoList, HavePodsWithAffinityNodeInfoList and HavePodsWithRequiredAntiAffinityNodeInfoList
+		// must be re-created if a node was added or removed from the cache.
+		updateAllLists bool
+		// HavePodsWithAffinityNodeInfoList must be re-created if a node changed its
+		// status from having pods with affinity to NOT having pods with affinity or the other
+		// way around.
+		updateNodesHavePodsWithAffinity bool
+		// HavePodsWithRequiredAntiAffinityNodeInfoList must be re-created if a node changed its
+		// status from having pods with required anti-affinity to NOT having pods with required
+		// anti-affinity or the other way around.
+		updateNodesHavePodsWithRequiredAntiAffinity bool
+		// usedPVCSet must be re-created whenever the head node generation is greater than
+		// last snapshot generation.
+		updateUsedPVCSet bool
+	)
+
+	setUpdateFlags := func(nodeName string, nodeInfo *framework.NodeInfo) {
+		existing, ok := nodeSnapshot.nodeInfoMap[nodeName]
+		if !ok {
+			nodeSnapshot.nodeInfoMap[nodeName] = &framework.NodeInfo{}
+			updateAllLists = true
+		}
+
+		if updateAllLists {
+			return
+		}
+
+		// We track nodes that have pods with anti-affinity, here we check if this node changed its
+		// status from having pods with anti-affinity to NOT having pods with anti-affinity or the other
+		// way around.
+		if !updateNodesHavePodsWithRequiredAntiAffinity &&
+			(len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(nodeInfo.PodsWithRequiredAntiAffinity) > 0) {
+			// podsWithAffinity includes podsWithRequiredAntiAffinity, so `updateNodesHavePodsWithAffinity` here
+			// should also be true.
+			updateNodesHavePodsWithRequiredAntiAffinity = true
+			updateNodesHavePodsWithAffinity = true
+		}
+
+		// We track nodes that have pods with affinity, here we check if this node changed its
+		// status from having pods with affinity to NOT having pods with affinity or the other
+		// way around.
+		if !updateNodesHavePodsWithAffinity &&
+			(len(existing.PodsWithAffinity) > 0) != (len(nodeInfo.PodsWithAffinity) > 0) {
+			updateNodesHavePodsWithAffinity = true
+		}
+
+		if !updateUsedPVCSet {
+			if len(existing.PVCRefCounts) != len(nodeInfo.PVCRefCounts) {
+				updateUsedPVCSet = true
+			} else {
+				for pvcKey := range nodeInfo.PVCRefCounts {
+					if _, found := existing.PVCRefCounts[pvcKey]; !found {
+						updateUsedPVCSet = true
+					}
+				}
+			}
+		}
+	}
+
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
-
-	// NodeInfoList and HavePodsWithAffinityNodeInfoList must be re-created if a node was added
-	// or removed from the cache.
-	updateAllLists := false
-	// HavePodsWithAffinityNodeInfoList must be re-created if a node changed its
-	// status from having pods with affinity to NOT having pods with affinity or the other
-	// way around.
-	updateNodesHavePodsWithAffinity := false
-	// HavePodsWithRequiredAntiAffinityNodeInfoList must be re-created if a node changed its
-	// status from having pods with required anti-affinity to NOT having pods with required
-	// anti-affinity or the other way around.
-	updateNodesHavePodsWithRequiredAntiAffinity := false
-	// usedPVCSet must be re-created whenever the head node generation is greater than
-	// last snapshot generation.
-	updateUsedPVCSet := false
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
@@ -223,38 +269,13 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
+
 		if np := node.info.Node(); np != nil {
-			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
-			if !ok {
-				updateAllLists = true
-				existing = &framework.NodeInfo{}
-				nodeSnapshot.nodeInfoMap[np.Name] = existing
-			}
+			setUpdateFlags(np.Name, node.info)
 			clone := node.info.Clone()
-			// We track nodes that have pods with affinity, here we check if this node changed its
-			// status from having pods with affinity to NOT having pods with affinity or the other
-			// way around.
-			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
-				updateNodesHavePodsWithAffinity = true
-			}
-			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
-				updateNodesHavePodsWithRequiredAntiAffinity = true
-			}
-			if !updateUsedPVCSet {
-				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
-					updateUsedPVCSet = true
-				} else {
-					for pvcKey := range clone.PVCRefCounts {
-						if _, found := existing.PVCRefCounts[pvcKey]; !found {
-							updateUsedPVCSet = true
-							break
-						}
-					}
-				}
-			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
-			*existing = *clone
+			*nodeSnapshot.nodeInfoMap[np.Name] = *clone
 		}
 	}
 	// Update the snapshot generation with the latest NodeInfo generation.
@@ -270,8 +291,17 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 		updateAllLists = true
 	}
 
-	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateUsedPVCSet {
-		cache.updateNodeInfoSnapshotList(nodeSnapshot, updateAllLists)
+	if updateAllLists {
+		cache.updateNodeInfoSnapshotList(nodeSnapshot)
+	} else {
+		if updateNodesHavePodsWithAffinity {
+			cache.updatePodsWithAffinityAndRequiredAntiAffinityNodeInfoList(nodeSnapshot)
+		} else if updateNodesHavePodsWithRequiredAntiAffinity {
+			cache.updatePodsWithRequiredAntiAffinityNodeInfoList(nodeSnapshot)
+		}
+		if updateUsedPVCSet {
+			cache.updateUsedPVCSet(nodeSnapshot)
+		}
 	}
 
 	if len(nodeSnapshot.nodeInfoList) != cache.nodeTree.numNodes {
@@ -283,42 +313,28 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 		klog.ErrorS(nil, errMsg)
 		// We will try to recover by re-creating the lists for the next scheduling cycle, but still return an
 		// error to surface the problem, the error will likely cause a failure to the current scheduling cycle.
-		cache.updateNodeInfoSnapshotList(nodeSnapshot, true)
+		cache.updateNodeInfoSnapshotList(nodeSnapshot)
 		return fmt.Errorf(errMsg)
 	}
 
 	return nil
 }
 
-func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll bool) {
+func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot) {
+	// Take a snapshot of the nodes order in the tree
+	snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.usedPVCSet = sets.NewString()
-	if updateAll {
-		// Take a snapshot of the nodes order in the tree
-		snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-		nodesList, err := cache.nodeTree.list()
-		if err != nil {
-			klog.ErrorS(err, "Error occurred while retrieving the list of names of the nodes from node tree")
-		}
-		for _, nodeName := range nodesList {
-			if nodeInfo := snapshot.nodeInfoMap[nodeName]; nodeInfo != nil {
-				snapshot.nodeInfoList = append(snapshot.nodeInfoList, nodeInfo)
-				if len(nodeInfo.PodsWithAffinity) > 0 {
-					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
-				}
-				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
-					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
-				}
-				for key := range nodeInfo.PVCRefCounts {
-					snapshot.usedPVCSet.Insert(key)
-				}
-			} else {
-				klog.ErrorS(nil, "Node exists in nodeTree but not in NodeInfoMap, this should not happen", "node", klog.KRef("", nodeName))
-			}
-		}
-	} else {
-		for _, nodeInfo := range snapshot.nodeInfoList {
+
+	nodesList, err := cache.nodeTree.list()
+	if err != nil {
+		klog.ErrorS(err, "Error occurred while retrieving the list of names of the nodes from node tree")
+	}
+
+	for _, nodeName := range nodesList {
+		if nodeInfo := snapshot.nodeInfoMap[nodeName]; nodeInfo != nil {
+			snapshot.nodeInfoList = append(snapshot.nodeInfoList, nodeInfo)
 			if len(nodeInfo.PodsWithAffinity) > 0 {
 				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 			}
@@ -328,6 +344,39 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll
 			for key := range nodeInfo.PVCRefCounts {
 				snapshot.usedPVCSet.Insert(key)
 			}
+		} else {
+			klog.ErrorS(nil, "Node exists in nodeTree but not in NodeInfoMap, this should not happen", "node", klog.KRef("", nodeName))
+		}
+	}
+}
+
+func (cache *cacheImpl) updateUsedPVCSet(snapshot *Snapshot) {
+	snapshot.usedPVCSet = sets.NewString()
+	for _, nodeInfo := range snapshot.nodeInfoList {
+		for key := range nodeInfo.PVCRefCounts {
+			snapshot.usedPVCSet.Insert(key)
+		}
+	}
+}
+
+func (cache *cacheImpl) updatePodsWithAffinityAndRequiredAntiAffinityNodeInfoList(snapshot *Snapshot) {
+	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	for _, nodeInfo := range snapshot.nodeInfoList {
+		if len(nodeInfo.PodsWithAffinity) > 0 {
+			snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
+		}
+		if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+			snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+		}
+	}
+}
+
+func (cache *cacheImpl) updatePodsWithRequiredAntiAffinityNodeInfoList(snapshot *Snapshot) {
+	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	for _, nodeInfo := range snapshot.nodeInfoList {
+		if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+			snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 		}
 	}
 }

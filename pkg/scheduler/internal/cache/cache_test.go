@@ -1335,6 +1335,14 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		podsWithAffinity = append(podsWithAffinity, pod)
 	}
 
+	// Add a couple of pods with anti-affinity, on the first and seconds nodes.
+	var podsWithRequiredAntiAffinity []*v1.Pod
+	for i := 0; i < 2; i++ {
+		pod := st.MakePod().Name(fmt.Sprintf("p-anti-affinity-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-anti-affinity-%v", i)).
+			PodAntiAffinityExists("foo", "bar", st.PodAntiAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i)).Obj()
+		podsWithRequiredAntiAffinity = append(podsWithRequiredAntiAffinity, pod)
+	}
+
 	// Add a few of pods with PVC
 	var podsWithPVC []*v1.Pod
 	for i := 0; i < 8; i++ {
@@ -1374,6 +1382,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	addPodWithAffinity := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.AddPod(podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	addPodWithRequiredAntiAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AddPod(podsWithRequiredAntiAffinity[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1423,11 +1438,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                         string
-		operations                   []operation
-		expected                     []*v1.Node
-		expectedHavePodsWithAffinity int
-		expectedUsedPVCSet           sets.String
+		name                                     string
+		initialOperations                        []operation
+		operations                               []operation
+		expected                                 []*v1.Node
+		expectedHavePodsWithAffinity             int
+		expectedHavePodsWithRequiredAntiAffinity int
+		expectedUsedPVCSet                       sets.String
 	}{
 		{
 			name:               "Empty cache",
@@ -1555,35 +1572,97 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
-			name: "Add Pods with affinity",
-			operations: []operation{
-				addNode(0), addPodWithAffinity(0), updateSnapshot(), addNode(1),
+			name: "Add a single Pod with affinity",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
 			},
-			expected:                     []*v1.Node{nodes[1], nodes[0]},
+			operations: []operation{
+				addPodWithAffinity(0), updateSnapshot(),
+			},
+			expected:                     []*v1.Node{nodes[0], nodes[1]},
 			expectedHavePodsWithAffinity: 1,
 			expectedUsedPVCSet:           sets.NewString(),
 		},
 		{
-			name: "Add Pods with PVC",
-			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1),
+			name: "Add a single Pod with required anti-affinity",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[0]},
+			operations: []operation{
+				addPodWithRequiredAntiAffinity(0), updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[0], nodes[1]},
+			expectedHavePodsWithAffinity:             1,
+			expectedHavePodsWithRequiredAntiAffinity: 1,
+			expectedUsedPVCSet:                       sets.NewString(),
+		},
+		{
+			name: "Add a single Pod with PVC",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
+			operations: []operation{
+				addPodWithPVC(0), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0], nodes[1]},
 			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0"),
 		},
 		{
-			name: "Add multiple nodes with pods with affinity",
+			name: "Add multi pods with affinity",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
 			operations: []operation{
-				addNode(0), addPodWithAffinity(0), updateSnapshot(), addNode(1), addPodWithAffinity(1), updateSnapshot(),
+				addPodWithAffinity(0), updateSnapshot(), addPodWithAffinity(1), updateSnapshot(),
 			},
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 2,
 			expectedUsedPVCSet:           sets.NewString(),
 		},
 		{
-			name: "Add multiple nodes with pods with PVC",
+			name: "Add multi pods with required anti-affinity",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
 			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1), addPodWithPVC(1), updateSnapshot(),
+				addPodWithRequiredAntiAffinity(0), updateSnapshot(), addPodWithRequiredAntiAffinity(1), updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[1], nodes[0]},
+			expectedHavePodsWithAffinity:             2,
+			expectedHavePodsWithRequiredAntiAffinity: 2,
+			expectedUsedPVCSet:                       sets.NewString(),
+		},
+		{
+			name: "Add multi pods with affinity and required anti-affinity",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
+			operations: []operation{
+				addPodWithAffinity(1), addPodWithRequiredAntiAffinity(0), updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[0], nodes[1]},
+			expectedHavePodsWithAffinity:             2,
+			expectedHavePodsWithRequiredAntiAffinity: 1,
+			expectedUsedPVCSet:                       sets.NewString(),
+		},
+		{
+			name: "Add multi pods with PVC",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
+			operations: []operation{
+				addPodWithPVC(0), updateSnapshot(), addPodWithPVC(1), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0", "test-ns/test-pvc1"),
+		},
+		{
+			name: "Add multi pods with PVC, should only check once when updateUsedPVCSet is true",
+			initialOperations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+			},
+			operations: []operation{
+				addPodWithPVC(0), addPodWithPVC(1), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[1], nodes[0]},
 			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0", "test-ns/test-pvc1"),
@@ -1615,8 +1694,10 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		},
 		{
 			name: "Add and Remove multiple pods with PVC with same ref count length different content",
-			operations: []operation{
+			initialOperations: []operation{
 				addNode(0), addNode(1), addPodWithPVC(0), addPodWithPVC(1), updateSnapshot(),
+			},
+			operations: []operation{
 				removePodWithPVC(0), removePodWithPVC(1), addPodWithPVC(2), addPodWithPVC(3), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[1], nodes[0]},
@@ -1633,12 +1714,30 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected:           []*v1.Node{nodes[0], nodes[1]},
 			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc1", "test-ns/test-pvc2"),
 		},
+		{
+			name:              "Add nodes with pods with affinity, required anti-affinity, pvcs",
+			initialOperations: []operation{},
+			operations: []operation{
+				addNode(0), addNode(1),
+				addPodWithAffinity(1), addPodWithRequiredAntiAffinity(0),
+				addPodWithPVC(0),
+				updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[0], nodes[1]},
+			expectedHavePodsWithAffinity:             2,
+			expectedHavePodsWithRequiredAntiAffinity: 1,
+			expectedUsedPVCSet:                       sets.NewString("test-ns/test-pvc0"),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache = newCache(time.Second, time.Second, nil)
 			snapshot = NewEmptySnapshot()
+
+			for _, op := range test.initialOperations {
+				op(t)
+			}
 
 			for _, op := range test.operations {
 				op(t)
@@ -1655,6 +1754,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				}
 				i++
 			}
+
 			// Make sure we visited all the cached nodes in the above for loop.
 			if i != len(cache.nodes) {
 				t.Errorf("Not all the nodes were visited by following the NodeInfo linked list. Expected to see %v nodes, saw %v.", len(cache.nodes), i)
@@ -1663,6 +1763,11 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			// Check number of nodes with pods with affinity
 			if len(snapshot.havePodsWithAffinityNodeInfoList) != test.expectedHavePodsWithAffinity {
 				t.Errorf("unexpected number of HavePodsWithAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithAffinity, len(snapshot.havePodsWithAffinityNodeInfoList))
+			}
+
+			// Check number of nodes with pods with anti-affinity
+			if len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList) != test.expectedHavePodsWithRequiredAntiAffinity {
+				t.Errorf("unexpected number of HavePodsWithRequiredAntiAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithRequiredAntiAffinity, len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList))
 			}
 
 			// Compare content of the used PVC set
@@ -1777,7 +1882,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 	}
 
 	updateSnapshot := func(t *testing.T) {
-		cache.updateNodeInfoSnapshotList(snapshot, true)
+		cache.updateNodeInfoSnapshotList(snapshot)
 		if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 			t.Error(err)
 		}
@@ -1873,7 +1978,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			test.operations(t)
 
 			// Always update the snapshot at the end of operations and compare it.
-			cache.updateNodeInfoSnapshotList(snapshot, true)
+			cache.updateNodeInfoSnapshotList(snapshot)
 			if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 				t.Error(err)
 			}
