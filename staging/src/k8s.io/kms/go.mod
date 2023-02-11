@@ -9,6 +9,7 @@ require (
 	google.golang.org/grpc v1.51.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.80.1
+	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 )
 
 require (
@@ -19,7 +20,6 @@ require (
 	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 )
 
 replace (
