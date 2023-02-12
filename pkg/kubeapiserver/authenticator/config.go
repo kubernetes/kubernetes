@@ -17,6 +17,7 @@ limitations under the License.
 package authenticator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -155,13 +156,21 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
 		// TODO(enj): wire up the Notifier and ControllerRunner bits when OIDC supports CA reload
-		var oidcCAContent oidc.CAContentProvider
+		var oidcCAContent interface {
+			oidc.CAContentProvider
+			Run(ctx context.Context, workers int)
+		}
 		if len(config.OIDCCAFile) != 0 {
 			var oidcCAErr error
 			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
 			if oidcCAErr != nil {
 				return nil, nil, oidcCAErr
 			}
+			// avoid leaking the work queue go routine by immediately shutting it down
+			// the CA bundle contents have already been loaded and verified at this point
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			oidcCAContent.Run(ctx, 1)
 		}
 
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
