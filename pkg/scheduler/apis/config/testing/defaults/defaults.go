@@ -76,6 +76,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodeResourcesFit},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{
@@ -242,6 +243,7 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 			{Name: names.NodeResourcesFit},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{
@@ -420,6 +422,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesFit},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{

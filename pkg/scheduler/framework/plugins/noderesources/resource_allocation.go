@@ -35,13 +35,13 @@ type resourceAllocationScorer struct {
 	useRequested bool
 	scorer       func(requested, allocable []int64) int64
 	resources    []config.ResourceSpec
-	podRequest   map[v1.ResourceName]int64
 }
 
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+	nodeInfo *framework.NodeInfo,
+	podRequest map[v1.ResourceName]int64) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
@@ -54,7 +54,7 @@ func (r *resourceAllocationScorer) score(
 	requested := make([]int64, len(r.resources))
 	allocatable := make([]int64, len(r.resources))
 	for i := range r.resources {
-		alloc, req := r.calculateResourceAllocatableRequest(nodeInfo, pod, v1.ResourceName(r.resources[i].Name))
+		alloc, req := r.calculateResourceAllocatableRequest(nodeInfo, v1.ResourceName(r.resources[i].Name), podRequest)
 		// Only fill the extended resource entry when it's non-zero.
 		if alloc == 0 {
 			continue
@@ -79,16 +79,13 @@ func (r *resourceAllocationScorer) score(
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
 // Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
-func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
+func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, resource v1.ResourceName, podResourceRequest map[v1.ResourceName]int64) (int64, int64) {
 	requested := nodeInfo.NonZeroRequested
 	if r.useRequested {
 		requested = nodeInfo.Requested
 	}
 
-	podRequest, ok := r.podRequest[resource]
-	if !ok {
-		podRequest = r.calculatePodResourceRequest(pod, resource)
-	}
+	podRequest := podResourceRequest[resource]
 
 	// If it's an extended resource, and the pod doesn't request it. We return (0, 0)
 	// as an implication to bypass scoring on this resource.
@@ -138,4 +135,13 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 	}
 
 	return podRequest
+}
+
+func (r *resourceAllocationScorer) calculatePodResourceRequestMap(pod *v1.Pod, resources []config.ResourceSpec) map[v1.ResourceName]int64 {
+	podRequestMap := make(map[v1.ResourceName]int64)
+	for _, resource := range resources {
+		podRequest := r.calculatePodResourceRequest(pod, v1.ResourceName(resource.Name))
+		podRequestMap[v1.ResourceName(resource.Name)] = podRequest
+	}
+	return podRequestMap
 }

@@ -117,12 +117,13 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
-		args         config.NodeResourcesBalancedAllocationArgs
+		pod             *v1.Pod
+		pods            []*v1.Pod
+		nodes           []*v1.Node
+		expectedList    framework.NodeScoreList
+		name            string
+		args            config.NodeResourcesBalancedAllocationArgs
+		disablePreScore bool
 	}{
 		{
 			// Node1 scores (remaining resources) on 0-MaxNodeScore scale
@@ -345,6 +346,28 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				{Name: "nvidia.com/gpu", Weight: 1},
 			}},
 		},
+		{
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Fraction: 6000 / 10000 = 60%
+			// Memory Fraction: 5000 / 20000 = 25%
+			// Node1 std: (0.6 - 0.25) / 2 = 0.175
+			// Node1 Score: (1 - 0.175)*MaxNodeScore = 82
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Fraction: 6000 / 10000 = 60%
+			// Memory Fraction: 10000 / 20000 = 50%
+			// Node2 std: (0.6 - 0.5) / 2 = 0.05
+			// Node2 Score: (1 - 0.05)*MaxNodeScore = 95
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("node1", 10000, 20000, nil), makeNode("node2", 10000, 20000, nil)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 82}, {Name: "node2", Score: 95}},
+			name:         "resources requested, pods scheduled with resources if PreScore not called",
+			pods: []*v1.Pod{
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
+			},
+			args:            config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
+			disablePreScore: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -354,8 +377,15 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			defer cancel()
 			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
 			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{})
+			state := framework.NewCycleState()
 			for i := range test.nodes {
-				hostResult, err := p.(framework.ScorePlugin).Score(ctx, nil, test.pod, test.nodes[i].Name)
+				if !test.disablePreScore {
+					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+					if !status.IsSuccess() {
+						t.Errorf("unexpected error: %v", status)
+					}
+				}
+				hostResult, err := p.(framework.ScorePlugin).Score(ctx, state, test.pod, test.nodes[i].Name)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

@@ -112,16 +112,13 @@ func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
+// PreScore calculate pod resource request and writes cycle state used by Score.
 func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
 	if len(nodes) == 0 {
 		return nil
 	}
 	state := &preScoreState{
-		podRequest: make(map[v1.ResourceName]int64),
-	}
-	for _, resource := range f.resources {
-		podRequest := f.calculatePodResourceRequest(pod, v1.ResourceName(resource.Name))
-		state.podRequest[v1.ResourceName(resource.Name)] = podRequest
+		podRequest: f.calculatePodResourceRequestMap(pod, f.resources),
 	}
 	cycleState.Write(preScoreStateKey, state)
 	return nil
@@ -381,8 +378,12 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	s, _ := getPreScoreState(state)
-	f.podRequest = s.podRequest
+	s, err := getPreScoreState(state)
+	if err != nil {
+		s = &preScoreState{
+			podRequest: f.calculatePodResourceRequestMap(pod, f.resources),
+		}
+	}
 
-	return f.score(pod, nodeInfo)
+	return f.score(pod, nodeInfo, s.podRequest)
 }
