@@ -49,7 +49,7 @@ type Expiring struct {
 	// generation is used as a cheap resource version for cache entries. Cleanups
 	// are scheduled with a key and generation. When the cleanup runs, it first
 	// compares its generation with the current generation of the entry. It
-	// deletes the entry iff the generation matches. This prevents cleanups
+	// deletes the entry if the generation matches. This prevents cleanups
 	// scheduled for earlier versions of an entry from deleting later versions of
 	// an entry when Set() is called multiple times with the same key.
 	//
