@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
-	"k8s.io/component-base/cli/flag"
-	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -42,7 +42,7 @@ const (
 )
 
 // tlsConfig produces the tls.Config to serve with.
-func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, error) {
+func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, dynamiccertificates.ConnContext, error) {
 	tlsConfig := &tls.Config{
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
@@ -72,10 +72,12 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		}
 	}
 
+	var connContext dynamiccertificates.ConnContext
 	if s.ClientCA != nil {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		tlsConfig.ClientAuth = tls.RequestClientCert
+		connContext = dynamiccertificates.WithChainsConnContext
 	}
 
 	if s.ClientCA != nil || s.Cert != nil || len(s.SNICerts) > 0 {
@@ -142,10 +144,14 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		}
 		go dynamicCertificateController.Run(1, stopCh)
 
-		tlsConfig.GetConfigForClient = dynamicCertificateController.GetConfigForClient
+		if s.ClientCA == nil {
+			tlsConfig.GetConfigForClient = dynamicCertificateController.GetConfigForClient
+		} else {
+			tlsConfig.GetConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(dynamicCertificateController.GetConfigForClient, s.ClientCA)
+		}
 	}
 
-	return tlsConfig, nil
+	return tlsConfig, connContext, nil
 }
 
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
@@ -157,7 +163,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
 
-	tlsConfig, err := s.tlsConfig(stopCh)
+	tlsConfig, connContext, err := s.tlsConfig(stopCh)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -170,6 +176,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 
 		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
+		ConnContext:       connContext,
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
