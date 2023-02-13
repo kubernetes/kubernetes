@@ -111,8 +111,7 @@ for more information about scheduling and the kube-scheduler component.`,
 	cliflag.SetUsageAndHelpFunc(cmd, *nfs, cols)
 
 	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
-		// nolint:logcheck // TODO (?): return error instead of logging it here
-		klog.ErrorS(err, "Failed to mark flag filename")
+		klog.Background().Error(err, "Failed to mark flag filename")
 	}
 
 	return cmd
