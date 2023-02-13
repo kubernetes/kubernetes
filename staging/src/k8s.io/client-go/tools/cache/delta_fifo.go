@@ -600,70 +600,10 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 		}
 	}
 
-	if f.knownObjects == nil {
-		// Do deletion detection against our own list.
-		queuedDeletions := 0
-		for k, oldItem := range f.items {
-			if keys.Has(k) {
-				continue
-			}
-			// Delete pre-existing items not in the new list.
-			// This could happen if watch deletion event was missed while
-			// disconnected from apiserver.
-			var deletedObj interface{}
-			if n := oldItem.Newest(); n != nil {
-				deletedObj = n.Object
-
-				// if the previous object is a DeletedFinalStateUnknown, we have to extract the actual Object
-				if d, ok := deletedObj.(DeletedFinalStateUnknown); ok {
-					deletedObj = d.Obj
-				}
-			}
-			queuedDeletions++
-			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
-				return err
-			}
-		}
-
-		if !f.populated {
-			f.populated = true
-			// While there shouldn't be any queued deletions in the initial
-			// population of the queue, it's better to be on the safe side.
-			f.initialPopulationCount = keys.Len() + queuedDeletions
-		}
-
-		return nil
-	}
-
-	// Detect deletions not already in the queue.
-	knownKeys := f.knownObjects.ListKeys()
+	// Do deletion detection against objects in the queue
 	queuedDeletions := 0
-	for _, k := range knownKeys {
-		if keys.Has(k) {
-			continue
-		}
-
-		deletedObj, exists, err := f.knownObjects.GetByKey(k)
-		if err != nil {
-			deletedObj = nil
-			klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
-		} else if !exists {
-			deletedObj = nil
-			klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
-		}
-		queuedDeletions++
-		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
-			return err
-		}
-	}
-
-	// detect deletions for items in the queue that are not yet present in knownObjects
 	for k, oldItem := range f.items {
 		if keys.Has(k) {
-			continue
-		}
-		_, exists, _ := f.knownObjects.GetByKey(k)
-		if exists {
 			continue
 		}
 		// Delete pre-existing items not in the new list.
@@ -681,6 +621,32 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 		queuedDeletions++
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
+		}
+	}
+
+	if f.knownObjects != nil {
+		// Detect deletions for objects not present in the queue, but present in KnownObjects
+		knownKeys := f.knownObjects.ListKeys()
+		for _, k := range knownKeys {
+			if keys.Has(k) {
+				continue
+			}
+			if len(f.items[k]) > 0 {
+				continue
+			}
+
+			deletedObj, exists, err := f.knownObjects.GetByKey(k)
+			if err != nil {
+				deletedObj = nil
+				klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+			} else if !exists {
+				deletedObj = nil
+				klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
+			}
+			queuedDeletions++
+			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
+				return err
+			}
 		}
 	}
 
