@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -56,6 +57,17 @@ const (
 	// keyLength is the length of the local KEK in bytes.
 	// This is the same length used for the DEKs generated in kube-apiserver.
 	keyLength = 32
+	// keyMaxUsage is the maximum number of times an AES GCM key can be used
+	// with a random nonce: 2^32. The local KEK is a transformer that hold an
+	// AES GCM key. It is based on recommendations from
+	// https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf.
+	// It is reduced by one to be comparable with a atomic.Uint32.
+	keyMaxUsage = 1<<32 - 1
+	// keySuggestedUsage is a threshold that triggers the rotation of a new local KEK. It means that half
+	// the number of times a local KEK can be used has been reached.
+	keySuggestedUsage = 1 << 31
+	// keyMaxAge is the maximum age of a local KEK.
+	keyMaxAge = 7 * 24 * time.Hour
 )
 
 var _ service.Service = &LocalKEKService{}
@@ -73,9 +85,15 @@ type LocalKEKService struct {
 	// transformers is a thread-safe LRU cache which caches decrypted DEKs indexed by their encrypted form.
 	transformers *lru.Cache
 
-	remoteKMSResponse   *service.EncryptResponse
+	// localMutex is used to read / write a new localTransformer, localUsage and localExpiry.
+	localMutex sync.RWMutex
+	// localUsage is incremented by the getTransformerForEncryption method and initialized / read by the Run method.
+	localUsage atomic.Uint32
+	// localExpiry should be only read and be written by the Run method.
+	localExpiry         time.Time
 	localTransformer    value.Transformer
 	localTransformerErr error
+	remoteKMSResponse   *service.EncryptResponse
 }
 
 // NewLocalKEKService is being initialized with a remote KMS service.
@@ -91,6 +109,57 @@ func NewLocalKEKService(remoteService service.Service) *LocalKEKService {
 	}
 }
 
+// Run is locking and expected to be run with a goroutine. The method creates a
+// new local KEK  when the following thresholds are met:
+//   - the local KEK is used more often than keySuggestedUsage times or
+//   - the local KEK is older than a localExpiry.
+func (m *LocalKEKService) Run(ctx context.Context) {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
+		if time.Now().After(m.localExpiry) || m.localUsage.Load() > keySuggestedUsage {
+			uid := fmt.Sprintf("%s:%d", referenceKEKAnnotationKey, time.Now().Unix())
+
+			key, err := generateKey(keyLength)
+			if err != nil {
+				klog.ErrorS(err, "failed to generate local KEK", "uid", uid)
+				return
+			}
+
+			block, err := aes.NewCipher(key)
+			if err != nil {
+				klog.ErrorS(err, "failed to create cipher block", "uid", uid)
+				return
+			}
+
+			transformer := aestransformer.NewGCMTransformer(block)
+			resp, err := m.remoteKMS.Encrypt(ctx, uid, key)
+			if err != nil {
+				klog.ErrorS(err, "failed to encrypt local KEK with remote KMS", "uid", uid)
+				return
+			}
+			if err = validateRemoteKMSResponse(resp); err != nil {
+				klog.ErrorS(err, "response annotations failed validation", "uid", uid)
+				return
+			}
+
+			m.localMutex.Lock()
+			m.localExpiry = time.Now().Add(keyMaxAge)
+			m.localUsage = atomic.Uint32{}
+			m.localTransformer = transformer
+			m.remoteKMSResponse = copyResponseAndAddLocalKEKAnnotation(resp)
+			m.localMutex.Unlock()
+
+			m.transformers.Add(base64.StdEncoding.EncodeToString(resp.Ciphertext), transformer)
+		}
+
+		return
+	}, time.Minute)
+}
+
+// getTransformerForEncryption returns the local KEK as localTransformer, the corresponding
+// rmeoteKMSResponse and an potential error.
+// On first use, the localTransformer is initialized and the remoteKMSResponse is set.
+// On every use the localUsage is incremented by one.
+// It is assumed that only one encryption will happen with the returned transformer.
 func (m *LocalKEKService) getTransformerForEncryption(uid string) (value.Transformer, *service.EncryptResponse, error) {
 	// Check if we have a local KEK
 	//	- If exists, use the local KEK for encryption and return
@@ -119,12 +188,22 @@ func (m *LocalKEKService) getTransformerForEncryption(uid string) (value.Transfo
 				if err = validateRemoteKMSResponse(resp); err != nil {
 					return false, fmt.Errorf("response annotations failed validation: %w", err)
 				}
+				m.localExpiry = time.Now().Add(keyMaxAge)
+				m.localUsage = atomic.Uint32{}
 				m.remoteKMSResponse = copyResponseAndAddLocalKEKAnnotation(resp)
 				m.localTransformer = transformer
 				m.transformers.Add(base64.StdEncoding.EncodeToString(resp.Ciphertext), transformer)
 				return true, nil
 			})
 	})
+
+	if counter := m.localUsage.Add(1); counter == keyMaxUsage {
+		return nil, nil, fmt.Errorf("local KEK has reached maximum usage of %d", keyMaxUsage)
+	}
+
+	m.localMutex.RLock()
+	defer m.localMutex.RUnlock()
+
 	return m.localTransformer, m.remoteKMSResponse, m.localTransformerErr
 }
 
