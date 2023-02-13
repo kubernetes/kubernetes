@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type ConnContext func(ctx context.Context, c net.Conn) context.Context
+type ConnContext func(ctx context.Context, conn net.Conn) context.Context
 type GetConfigForClient func(info *tls.ClientHelloInfo) (*tls.Config, error)
 
 // contextKey type is unexported to prevent collisions.
@@ -155,6 +155,8 @@ func WithChainsVerification(ctx context.Context, clientCA CAContentProvider) ([]
 
 	// TODO this is wrong
 	//  the new caBundleContent may be able to verify the TLS details so we should not fail on that case
+	//  so we should either re-verify the connection or
+	//  close it if data.err == nil - the assumption being that nil error means authenticated was successful
 	if !bytes.Equal(data.caBundleContent, clientCA.CurrentCABundleContent()) {
 		return nil, fmt.Errorf("tls verifcation options have changed and the connection must be closed")
 	}
