@@ -42,6 +42,8 @@ var (
 	emptyContext = value.DefaultContext([]byte{})
 	// errInvalidKMSAnnotationKeySuffix is returned when the annotation key suffix is not allowed.
 	errInvalidKMSAnnotationKeySuffix = fmt.Errorf("annotation keys are not allowed to use %s", referenceSuffix)
+	// errPlaintextSize is returned when the plaintext size is bigger than plaintextMaxSize.
+	errPlaintextSize = fmt.Errorf("plaintext size is bigger than %d", plaintextMaxSize)
 
 	// these are var instead of const so that we can set them during tests
 	localKEKGenerationPollInterval = 1 * time.Second
@@ -66,7 +68,10 @@ const (
 	// keySuggestedUsage is a threshold that triggers the rotation of a new local KEK. It means that half
 	// the number of times a local KEK can be used has been reached.
 	keySuggestedUsage = 1 << 31
-	// keyMaxAge is the maximum age of a local KEK.
+	// plaintextMaxSize is the maximum size in bytes of the plaintext that
+	// can be encrypted with AES GCM, which is being used by the localTransformer.
+	plaintextMaxSize = 1<<36 - 256
+	// keyMaxAge is the maximum age of a local KEK. It is not a cryptographic necessity.
 	keyMaxAge = 7 * 24 * time.Hour
 )
 
@@ -225,6 +230,10 @@ func copyResponseAndAddLocalKEKAnnotation(resp *service.EncryptResponse) *servic
 
 // Encrypt encrypts the plaintext with the localKEK.
 func (m *LocalKEKService) Encrypt(ctx context.Context, uid string, pt []byte) (*service.EncryptResponse, error) {
+	if len(pt) > plaintextMaxSize {
+		return nil, errPlaintextSize
+	}
+
 	transformer, resp, err := m.getTransformerForEncryption(uid)
 	if err != nil {
 		klog.V(2).InfoS("encrypt plaintext", "uid", uid, "err", err)
