@@ -123,6 +123,7 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCAUnion CA
 
 				verifyChains, err := state.PeerCertificates[0].Verify(optsCopy)
 
+				// TODO record cert expiration timestamp so we know when to start failing authentication due to expiration
 				out[clientCA.Name()] = chainData{
 					caBundleContent: caBundle,
 					chains:          verifyChains,
