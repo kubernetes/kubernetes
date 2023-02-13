@@ -1741,6 +1741,9 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 
 	nodeNames := e2edaemonset.SchedulableNodes(ctx, cs, ds)
 	e2eskipper.SkipUnlessAtLeast(len(nodeNames), 2, "load-balancer rolling update test requires at least 2 schedulable nodes for the DaemonSet")
+	if len(nodeNames) > 25 {
+		e2eskipper.Skipf("load-balancer rolling update test skipped for large environments with more than 25 nodes")
+	}
 
 	ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", name))
 	ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
