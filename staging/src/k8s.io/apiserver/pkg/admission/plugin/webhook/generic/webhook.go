@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1"
@@ -36,6 +35,7 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 // Webhook is an abstract admission plugin with all the infrastructure to define Admit or Validate on-top.
@@ -43,6 +43,10 @@ type Webhook struct {
 	*admission.Handler
 
 	sourceFactory sourceFactory
+
+	// Provided to the policy's Compile function as an injected dependency to
+	// assist with compiling its expressions to CEL
+	celValidatorCompiler CELValidatorCompiler
 
 	hookSource       Source
 	clientManager    *webhookutil.ClientManager
@@ -86,12 +90,13 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	cm.SetServiceResolver(webhookutil.NewDefaultServiceResolver())
 
 	return &Webhook{
-		Handler:          handler,
-		sourceFactory:    sourceFactory,
-		clientManager:    &cm,
-		namespaceMatcher: &namespace.Matcher{},
-		objectMatcher:    &object.Matcher{},
-		dispatcher:       dispatcherFactory(&cm),
+		Handler:              handler,
+		sourceFactory:        sourceFactory,
+		clientManager:        &cm,
+		namespaceMatcher:     &namespace.Matcher{},
+		objectMatcher:        &object.Matcher{},
+		dispatcher:           dispatcherFactory(&cm),
+		celValidatorCompiler: CELValidatorCompiler{},
 	}, nil
 }
 
@@ -151,6 +156,27 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 	matches, matchObjErr := a.objectMatcher.MatchObjectSelector(h, attr)
 	if !matches && matchObjErr == nil {
 		return nil, nil
+	}
+
+	//TODO: How expensive is compile? This is a very high traffic path. ValidatingAdmissionPolicy has a controller run a loop refreshing and compiling
+	validator := a.celValidatorCompiler.Compile(h)
+	versionedAttr, err := NewVersionedAttributes(attr, attr.GetKind(), o)
+	if err != nil {
+		//TODO: if error do we just continue? This currently forces no call to webhook
+		klog.Errorf("ivelichkovich failed to convert object version: %w", err)
+		return nil, nil
+	}
+	decisions, err := validator.Validate(*versionedAttr)
+	if err != nil {
+		//TODO: if error do we just continue? This currently moves to calling webhook
+		klog.Error("ivelichkovich error in webhook cel validation")
+	}
+
+	for _, decision := range decisions {
+		klog.Error("ivelichkovich decision action is %v", decision.Action)
+		if decision.Action == ActionDeny {
+			return nil, nil
+		}
 	}
 
 	var invocation *WebhookInvocation

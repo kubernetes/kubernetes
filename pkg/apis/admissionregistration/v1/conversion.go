@@ -41,3 +41,11 @@ func Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(i
 func Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
 	return autoConvert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in, out, s)
 }
+
+//func Convert_v1_MutatingWebhook_To_admissionregistration_MutatingWebhook(in *v1.MutatingWebhook, out *admissionregistration.MutatingWebhook, s conversion.Scope) error {
+//	return autoConvert_v1_MutatingWebhook_To_admissionregistration_MutatingWebhook(in, out, s)
+//}
+//
+//func Convert_v1_ValidatingWebhook_To_admissionregistration_ValidatingWebhook(in *v1.ValidatingWebhook, out *admissionregistration.ValidatingWebhook, s conversion.Scope) error {
+//	return autoConvert_v1_ValidatingWebhook_To_admissionregistration_ValidatingWebhook(in, out, s)
+//}

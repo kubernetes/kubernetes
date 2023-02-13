@@ -97,11 +97,11 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	}()
 	var versionedAttr *generic.VersionedAttributes
 	for i, hook := range hooks {
-		attrForCheck := attr
-		if versionedAttr != nil {
-			attrForCheck = versionedAttr
-		}
-		invocation, statusErr := a.plugin.ShouldCallHook(hook, attrForCheck, o)
+		//attrForCheck := attr
+		//if versionedAttr != nil {
+		//	attrForCheck = versionedAttr
+		//}
+		invocation, statusErr := a.plugin.ShouldCallHook(hook, versionedAttr, o)
 		if statusErr != nil {
 			return statusErr
 		}

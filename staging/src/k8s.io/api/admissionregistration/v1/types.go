@@ -307,6 +307,12 @@ type ValidatingWebhook struct {
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+
+	// MatchConditions contain CEL expressions which is used to apply the validation.
+	// A minimum of one validation is required for a policy definition.
+	// +listType=atomic
+	// Required.
+	MatchConditions []MatchCondition `json:"matchConditions" protobuf:"bytes,11,rep,name=matchConditions"`
 }
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
@@ -454,6 +460,12 @@ type MutatingWebhook struct {
 	// Defaults to "Never".
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
+
+	// MatchConditions contain CEL expressions which is used to apply the validation.
+	// A minimum of one validation is required for a policy definition.
+	// +listType=atomic
+	// Required.
+	MatchConditions []MatchCondition `json:"matchConditions" protobuf:"bytes,12,rep,name=matchConditions"`
 }
 
 // ReinvocationPolicyType specifies what type of policy the admission hook uses.
@@ -562,4 +574,26 @@ type ServiceReference struct {
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
+}
+
+// MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.
+type MatchCondition struct {
+	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// as well as providing an identifier for logging purposes. A good name should be descriptive of
+	// the associated expression.
+	// Name must be a valid RFC 1123 DNS subdomain, and unique in a set of MatchConditions.
+	// Required.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// NOTE: Placeholder documentation, to be replaced by https://github.com/kubernetes/website/issues/39089.
+	//
+	// Expression represents the expression which will be evaluated by CEL.
+	// ref: https://github.com/google/cel-spec
+	// CEL expressions have access to the contents of the AdmissionRequest, organized into CEL variables:
+	//
+	// 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// 'oldObject' - The existing object. The value is null for CREATE requests.
+	// 'request' - Attributes of the admission request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	//
+	// Required.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=expression"`
 }

@@ -1,0 +1,23 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: "test"
+webhooks:
+  - name: "pod-policy.example.com"
+    rules:
+      - apiGroups:   [""]
+        apiVersions: ["v1"]
+        operations:  ["CREATE"]
+        resources:   ["pods"]
+        scope: "Namespaced"
+    clientConfig:
+      service:
+        namespace: "example-namespace"
+        name: "example-service"
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM5akNDQWQ2Z0F3SUJBZ0lKQUkxUm5sdkxtcUVxTUEwR0NTcUdTSWIzRFFFQkJRVUFNQ1V4SXpBaEJnTlYKQkFNTUduZGxZbWh2YjJzdGMyVnlkbVZ5TG1SbFptRjFiSFF1YzNaak1CNFhEVEl5TVRFeE5ESXhOVGt4TmxvWApEVEl5TVRJeE5ESXhOVGt4Tmxvd0pURWpNQ0VHQTFVRUF3d2FkMlZpYUc5dmF5MXpaWEoyWlhJdVpHVm1ZWFZzCmRDNXpkbU13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRRFlqMXhkS2JpdHFpczcKSmUrZlkyRFQzcFpKeWdhUllQbytyV0hsYXBzL001Z1VCR3NLejR3NG5seG1QYnU0UHM2S00ydG5XaG1wRlRXYQoyWDljL1ZlbWZKMU5oVDFuSWU4L1lNblJ1bjI3cFp1M3hTUUl3bWRrNnJLTEc0S2xnY2lRa2tDV0Z0cEl4RmY5Cm9WcGR0MFNBNGhOV3pJREpleUtDZDE3NXBGdUlHMm9udnFsMWRuMGxqR1o2UjlzMFpLUG1PTUlTTENMeEN3NjAKbUVwMlpzVG5mWHNBdWx6WHBDS001bnY3aXRBcUpvQXNHUmRVajBpNGI4UFQwWHUvY09RdkZYdnJISzdQUFZmYQpCV2V0SUZsdS9MT1hoc3cxRm1BemcvaCtyaHlSQjRmdjJxR0IrdC9RL1RmUGxQSEZVMCtnR0R5OFUrTGZGU1g4CkhTc2E2akoxQWdNQkFBR2pLVEFuTUNVR0ExVWRFUVFlTUJ5Q0duZGxZbWh2YjJzdGMyVnlkbVZ5TG1SbFptRjEKYkhRdWMzWmpNQTBHQ1NxR1NJYjNEUUVCQlFVQUE0SUJBUUMwNjBJZW5URy83bHlvaDFsZjFiQ083U28vNDhSWAprRVNxTEw5UHQ2YWh2ZXp1d21Nam9DanNYQlBqaGFWQkkzQ0xJb1pnUGlpQTFuZkFHNFFYN3EwcWl4eWgrSXozCkZKRWQvcG1ocDJ6WnBsNXF1d1BtSnZ5Y0xFaUFvZ3RQZ1J5d3B0K29FZTJ0OVJ6RVpVTkU3U2o1UndGMU1HNncKaWVLWFFNN1A0S0t2dmkxZDFyNzVOTXh2djZUc0hUS1RvTlVrWDdtNFVyb0I4SXR3VDVLZENrWUN3RCt4TlBpZgorUTAwOE5CaXZSdFdmMGZuUVpsM0pyNlJ0Mk13d3QzazdQQUYwbDEyRjJxd1ZiZlJyWHdqYUhUWjg2QXgwd2NLCnRIZ29oS0JwUzBQZGo4cURTM0hQdm4vTHpvRTd0REhLc2I0UW9WM2pWVHBKOCtod3M0M2Z5WDlGCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+    matchConditions:
+      - name: 'exclude-pods'
+        expression: '!(kubernetes.AdmissionRequest.resource.resource == "pods")'
