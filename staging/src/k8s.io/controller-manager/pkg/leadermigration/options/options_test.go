@@ -107,13 +107,13 @@ apiVersion: controllermanager.config.k8s.io/v1
 kind: LeaderMigrationConfiguration
 leaderName: test-leader-migration
 controllerLeaders:
-  - name: route
+  - name: route-controller
     component: "*"
-  - name: service
+  - name: service-controller
     component: "*"
-  - name: cloud-node-lifecycle
+  - name: cloud-node-lifecycle-controller
     component: "*"
-  - name: nodeipam
+  - name: node-ipam-controller
     component: "*"
 `,
 			expectErr: false,
@@ -122,19 +122,19 @@ controllerLeaders:
 				ResourceLock: "leases",
 				ControllerLeaders: []config.ControllerLeaderConfiguration{
 					{
-						Name:      "route",
+						Name:      "route-controller",
 						Component: "*",
 					},
 					{
-						Name:      "service",
+						Name:      "service-controller",
 						Component: "*",
 					},
 					{
-						Name:      "cloud-node-lifecycle",
+						Name:      "cloud-node-lifecycle-controller",
 						Component: "*",
 					},
 					{
-						Name:      "nodeipam",
+						Name:      "node-ipam-controller",
 						Component: "*",
 					},
 				},
@@ -148,13 +148,13 @@ apiVersion: controllermanager.config.k8s.io/v1
 kind: LeaderMigrationConfiguration
 leaderName: test-leader-migration
 controllerLeaders:
-  - name: route
+  - name: route-controller
     component: "cloud-controller-manager"
-  - name: service
+  - name: service-controller
     component: "cloud-controller-manager"
-  - name: cloud-node-lifecycle
+  - name: cloud-node-lifecycle-controller
     component: "cloud-controller-manager"
-  - name: nodeipam
+  - name: node-ipam-controller
     component: "kube-controller-manager"
 `,
 			expectErr: false,
@@ -163,19 +163,19 @@ controllerLeaders:
 				ResourceLock: "leases",
 				ControllerLeaders: []config.ControllerLeaderConfiguration{
 					{
-						Name:      "route",
+						Name:      "route-controller",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "service",
+						Name:      "service-controller",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "cloud-node-lifecycle",
+						Name:      "cloud-node-lifecycle-controller",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "nodeipam",
+						Name:      "node-ipam-controller",
 						Component: "kube-controller-manager",
 					},
 				},
