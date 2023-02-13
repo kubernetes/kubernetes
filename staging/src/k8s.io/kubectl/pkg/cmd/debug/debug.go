@@ -152,7 +152,7 @@ func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
 }
 
 // NewCmdDebug returns a cobra command that runs kubectl debug.
-func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDebug(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewDebugOptions(streams)
 
 	cmd := &cobra.Command{
@@ -162,9 +162,9 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Long:                  debugLong,
 		Example:               debugExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, cmd))
+			cmdutil.CheckErr(o.Run(restClientGetter, cmd))
 		},
 	}
 
@@ -194,7 +194,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
-func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	var err error
 
 	o.PullPolicy = corev1.PullPolicy(cmdutil.GetFlagString(cmd, "image-pull-policy"))
@@ -223,7 +223,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	// Namespace
-	o.Namespace, o.explicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.explicitNamespace, err = restClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		o.Applier = applier
 	}
 
-	clientConfig, err := f.ToRESTConfig()
+	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.podClient = client.CoreV1()
 
-	o.Builder = f.NewBuilder()
+	o.Builder = resource.NewBuilder(restClientGetter)
 
 	return nil
 }
@@ -341,7 +341,7 @@ func (o *DebugOptions) Validate() error {
 }
 
 // Run executes a kubectl debug.
-func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command) error {
 	ctx := context.Background()
 
 	r := o.Builder.
@@ -388,14 +388,14 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 				Attach: &attach.DefaultRemoteAttach{},
 			}
-			config, err := f.ToRESTConfig()
+			config, err := restClientGetter.ToRESTConfig()
 			if err != nil {
 				return err
 			}
 			opts.Config = config
 			opts.AttachFunc = attach.DefaultAttachFunc
 
-			if err := o.handleAttachPod(ctx, f, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
+			if err := o.handleAttachPod(ctx, restClientGetter, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
 				return err
 			}
 		}
@@ -794,7 +794,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 	return result, err
 }
 
-func (o *DebugOptions) handleAttachPod(ctx context.Context, f cmdutil.Factory, ns, podName, containerName string, opts *attach.AttachOptions) error {
+func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, ns, podName, containerName string, opts *attach.AttachOptions) error {
 	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
 	if err != nil {
 		return err
@@ -815,12 +815,12 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, f cmdutil.Factory, n
 	}
 	if status.State.Terminated != nil {
 		klog.V(1).Info("Ephemeral container terminated, falling back to logs")
-		return logOpts(f, pod, opts)
+		return logOpts(restClientGetter, pod, opts)
 	}
 
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", podName, err)
-		return logOpts(f, pod, opts)
+		return logOpts(restClientGetter, pod, opts)
 	}
 	return nil
 }
