@@ -320,7 +320,8 @@ type QueueSortPlugin interface {
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
 // move unschedulable Pods in internal scheduling queues. Plugins
-// that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface.
+// that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface
+// or EnqueueExtensionsWithHints.
 type EnqueueExtensions interface {
 	// EventsToRegister returns a series of possible events that may cause a Pod
 	// failed by this plugin schedulable.
@@ -329,6 +330,29 @@ type EnqueueExtensions interface {
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
 	EventsToRegister() []ClusterEvent
+}
+
+// EnqueueExtensionsWithHints is an optional interface that plugins can implement to efficiently
+// move unschedulable Pods in internal scheduling queues. Plugins
+// that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface
+// or EnqueueExtensions.
+type EnqueueExtensionsWithHints interface {
+	// EventsToRegister returns a series of possible events that may cause a Pod
+	// failed by this plugin schedulable.
+	// The events will be registered when instantiating the internal scheduling queue,
+	// and leveraged to build event handlers dynamically.
+	// Optionally, each event may have a SchedulingHintFn which helps identify
+	// whether a specific event affects scheduling of a pod.
+	//
+	// Note: the returned list needs to be static (not depend on configuration parameters);
+	// otherwise it would lead to undefined behavior.
+	//
+	// Note: although the SchedulingHintFn gets registered together with a certain
+	// ActionType through this API, at runtime it might also get called for other
+	// actions. This is done to minimize overhead in the event handlers.
+	//
+	// Note: it is an error to register more than one SchedulingHintFn per resource.
+	EventsToRegisterWithHints() ClusterEvents
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying

@@ -599,16 +599,15 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
 
-					m := make(map[framework.ClusterEvent]sets.Set[string])
+					var m framework.ClusterEventMap
 					// - All plugins registered for events[0], which is NodeAdd.
 					// - 1/2 of plugins registered for events[1]
 					// - 1/3 of plugins registered for events[2]
 					// - ...
 					for j := 0; j < len(events); j++ {
-						m[events[j]] = sets.New[string]()
 						for k := 0; k < len(plugins); k++ {
 							if (k+1)%(j+1) == 0 {
-								m[events[j]].Insert(plugins[k])
+								m.RegisterClusterEvent(plugins[k], events[j])
 							}
 						}
 					}
@@ -658,9 +657,8 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.Set[string]{
-		{Resource: framework.Node, ActionType: framework.Add}: sets.New("fooPlugin"),
-	}
+	var m framework.ClusterEventMap
+	m.RegisterClusterEvent("fooPlugin", framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
@@ -720,7 +718,8 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	labelPod := st.MakePod().Name("lbp").Namespace(affinityPod.Namespace).Label("service", "securityscan").Node("node1").Obj()
 
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.Set[string]{AssignedPodAdd: sets.New("fakePlugin")}
+	var m framework.ClusterEventMap
+	m.RegisterClusterEvent("fakePlugin", AssignedPodAdd)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
@@ -1261,9 +1260,8 @@ func TestHighPriorityBackoff(t *testing.T) {
 // activeQ after one minutes if it is in unschedulablePods.
 func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.Set[string]{
-		NodeAdd: sets.New("fakePlugin"),
-	}
+	var m framework.ClusterEventMap
+	m.RegisterClusterEvent("fakePlugin", NodeAdd)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
@@ -2047,15 +2045,15 @@ func TestPodMatchesEvent(t *testing.T) {
 		name            string
 		podInfo         *framework.QueuedPodInfo
 		event           framework.ClusterEvent
-		clusterEventMap map[framework.ClusterEvent]sets.Set[string]
+		clusterEventMap framework.ClusterEventMap
 		want            bool
 	}{
 		{
 			name:    "event not registered",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj()),
 			event:   EmptyEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent: sets.New("foo"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent: framework.MakeClusterEventPlugins("foo"),
 			},
 			want: false,
 		},
@@ -2063,8 +2061,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin matches but event does not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   AssignedPodAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent: sets.New("foo", "bar"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent: framework.MakeClusterEventPlugins("foo", "bar"),
 			},
 			want: false,
 		},
@@ -2072,8 +2070,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "wildcard event wins regardless of event matching",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   WildCardEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent: sets.New("foo"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent: framework.MakeClusterEventPlugins("foo"),
 			},
 			want: true,
 		},
@@ -2081,8 +2079,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin and event both match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent: sets.New("foo", "bar"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent: framework.MakeClusterEventPlugins("foo", "bar"),
 			},
 			want: true,
 		},
@@ -2090,9 +2088,9 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin registers fine-grained event",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent:    sets.New("foo"),
-				NodeTaintChange: sets.New("bar"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent:    framework.MakeClusterEventPlugins("foo"),
+				NodeTaintChange: framework.MakeClusterEventPlugins("bar"),
 			},
 			want: true,
 		},
@@ -2100,8 +2098,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "if pod failed by multiple plugins, a single match gets a final match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo", "bar"),
 			event:   NodeAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				NodeAllEvent: sets.New("bar"),
+			clusterEventMap: framework.ClusterEventMap{
+				NodeAllEvent: framework.MakeClusterEventPlugins("bar"),
 			},
 			want: true,
 		},
@@ -2109,8 +2107,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent and plugin name matches",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				WildCardEvent: sets.New("foo"),
+			clusterEventMap: framework.ClusterEventMap{
+				WildCardEvent: framework.MakeClusterEventPlugins("foo"),
 			},
 			want: true,
 		},
@@ -2118,8 +2116,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent but plugin name not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
-				WildCardEvent: sets.New("bar"),
+			clusterEventMap: framework.ClusterEventMap{
+				WildCardEvent: framework.MakeClusterEventPlugins("bar"),
 			},
 			want: false,
 		},
@@ -2147,6 +2145,10 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 		podInfos = append(podInfos, pInfo)
 	}
 
+	maybeSchedulable := map[bool]framework.SchedulingHint{
+		false: framework.PodNotAffected,
+		true:  framework.PodMaybeSchedulable,
+	}
 	tests := []struct {
 		name            string
 		preEnqueueCheck PreEnqueueCheck
@@ -2161,22 +2163,22 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 		{
 			name:            "move Pods with priority greater than 2",
 			podInfos:        podInfos,
-			preEnqueueCheck: func(pod *v1.Pod) bool { return *pod.Spec.Priority >= 2 },
+			preEnqueueCheck: func(pod *v1.Pod) framework.SchedulingHint { return maybeSchedulable[*pod.Spec.Priority >= 2] },
 			want:            []string{"p2", "p3", "p4"},
 		},
 		{
 			name:     "move Pods with even priority and greater than 2",
 			podInfos: podInfos,
-			preEnqueueCheck: func(pod *v1.Pod) bool {
-				return *pod.Spec.Priority%2 == 0 && *pod.Spec.Priority >= 2
+			preEnqueueCheck: func(pod *v1.Pod) framework.SchedulingHint {
+				return maybeSchedulable[*pod.Spec.Priority%2 == 0 && *pod.Spec.Priority >= 2]
 			},
 			want: []string{"p2", "p4"},
 		},
 		{
 			name:     "move Pods with even and negative priority",
 			podInfos: podInfos,
-			preEnqueueCheck: func(pod *v1.Pod) bool {
-				return *pod.Spec.Priority%2 == 0 && *pod.Spec.Priority < 0
+			preEnqueueCheck: func(pod *v1.Pod) framework.SchedulingHint {
+				return maybeSchedulable[*pod.Spec.Priority%2 == 0 && *pod.Spec.Priority < 0]
 			},
 		},
 	}

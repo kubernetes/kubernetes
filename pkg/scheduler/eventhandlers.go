@@ -252,7 +252,7 @@ func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
-	gvkMap map[framework.GVK]framework.ActionType,
+	clusterEventMap framework.ClusterEventMap,
 ) {
 	// scheduled pod cache
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
@@ -317,44 +317,108 @@ func addAllEventHandlers(
 		},
 	)
 
-	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string) cache.ResourceEventHandlerFuncs {
+	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string, plugins framework.ClusterEventPlugins) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
+		hintFns := schedulingHints(plugins)
 		if at&framework.Add != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Add, Label: fmt.Sprintf("%vAdd", shortGVK)}
-			funcs.AddFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if len(hintFns) > 0 {
+				funcs.AddFunc = func(obj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.SchedulingHint {
+						return combineHints(nil, obj, pod, hintFns, plugins)
+					})
+				}
+			} else {
+				funcs.AddFunc = func(_ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		if at&framework.Update != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Update, Label: fmt.Sprintf("%vUpdate", shortGVK)}
-			funcs.UpdateFunc = func(_, _ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if len(hintFns) > 0 {
+				funcs.UpdateFunc = func(oldObj, newObj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.SchedulingHint {
+						return combineHints(oldObj, newObj, pod, hintFns, plugins)
+					})
+				}
+			} else {
+				funcs.UpdateFunc = func(_, _ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		if at&framework.Delete != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Delete, Label: fmt.Sprintf("%vDelete", shortGVK)}
-			funcs.DeleteFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if len(hintFns) > 0 {
+				funcs.DeleteFunc = func(obj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.SchedulingHint {
+						return combineHints(obj, nil, pod, hintFns, plugins)
+					})
+				}
+			} else {
+				funcs.DeleteFunc = func(_ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		return funcs
 	}
 
-	for gvk, at := range gvkMap {
+	// One plugin might have registered for "Add" of a certain GVK while
+	// another might have registered for "Delete" of that same GVK. Here
+	// we condense the cluster event map into one entry per GVK. This
+	// has the effect that SchedulingHintFns may get called for
+	// actions that they weren't registered for.
+	//
+	// MoveAllToActiveOrBackoffQueue will get called for events that
+	// might be relevant. PriorityQueue.podMatchesEvent then uses the
+	// original ClusterEventMap to check the actual actions that
+	// the plugins registered for.
+	gvkMap := make(map[framework.GVK]struct {
+		at      framework.ActionType
+		plugins framework.ClusterEventPlugins
+	})
+	for event, plugins := range clusterEventMap {
+		gvk := event.Resource
+		at := event.ActionType
+		entry := gvkMap[gvk]
+		entry.at |= at
+		for name, schedulingHintFn := range plugins {
+			if existingSchedulingHintFn, ok := entry.plugins[name]; ok {
+				if schedulingHintFn == nil {
+					// This is okay. Just don't overwrite the existing entry...
+					continue
+				}
+				if existingSchedulingHintFn != nil {
+					panic(fmt.Sprintf("Plugin %q incorrectly registered multiple SchedulingHintFn callbacks for the same GVK %q. This is not supported.", name, gvk))
+				}
+			}
+			if entry.plugins == nil {
+				entry.plugins = make(framework.ClusterEventPlugins)
+			}
+			entry.plugins[name] = schedulingHintFn
+		}
+		gvkMap[gvk] = entry
+	}
+
+	for gvk, entry := range gvkMap {
+		at := entry.at
+		plugins := entry.plugins
 		switch gvk {
 		case framework.Node, framework.Pod:
 			// Do nothing.
 		case framework.CSINode:
 			informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSINode, "CSINode"),
+				buildEvtResHandler(at, framework.CSINode, "CSINode", plugins),
 			)
 		case framework.CSIDriver:
 			informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver"),
+				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver", plugins),
 			)
 		case framework.CSIStorageCapacity:
 			informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity"),
+				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity", plugins),
 			)
 		case framework.PersistentVolume:
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
@@ -371,23 +435,23 @@ func addAllEventHandlers(
 			// parties, then scheduler will add pod back to unschedulable queue. We
 			// need to move pods to active queue on PV update for this scenario.
 			informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.PersistentVolume, "Pv"),
+				buildEvtResHandler(at, framework.PersistentVolume, "Pv", plugins),
 			)
 		case framework.PersistentVolumeClaim:
 			// MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc"),
+				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc", plugins),
 			)
 		case framework.PodSchedulingContext:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				_, _ = informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
+					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext", plugins),
 				)
 			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				_, _ = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
+					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim", plugins),
 				)
 			}
 		case framework.StorageClass:
@@ -428,10 +492,42 @@ func addAllEventHandlers(
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
 			dynInformer.AddEventHandler(
-				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
+				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource), plugins),
 			)
 		}
 	}
+}
+
+func schedulingHints(events framework.ClusterEventPlugins) []framework.SchedulingHintFn {
+	var hintFunctions []framework.SchedulingHintFn
+	for _, schedulingHintFn := range events {
+		if schedulingHintFn != nil {
+			hintFunctions = append(hintFunctions, schedulingHintFn)
+		}
+	}
+	return hintFunctions
+}
+
+func combineHints(oldObj, newObj interface{}, pod *v1.Pod, hintFns []framework.SchedulingHintFn, plugins framework.ClusterEventPlugins) framework.SchedulingHint {
+	// For some results like PodNotAffected, all plugins must agree. To
+	// determine that, each hint function gets called and the results are
+	// counted. There is only one case where we can bail out early: if a
+	// plugin returns PodImmediatelySchedulable, then the others either
+	// agree, don't know or don't care so we can return
+	// PodImmediatelySchedulable.
+	notAffected := 0
+	for _, schedulingHintFn := range hintFns {
+		switch schedulingHintFn(oldObj, newObj, pod) {
+		case framework.PodImmediatelySchedulable:
+			return framework.PodImmediatelySchedulable
+		case framework.PodNotAffected:
+			notAffected++
+		}
+	}
+	if notAffected == len(plugins) {
+		return framework.PodNotAffected
+	}
+	return framework.PodMaybeSchedulable
 }
 
 func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
@@ -485,15 +581,18 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	// Note: the following checks doesn't take preemption into considerations, in very rare
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
-	return func(pod *v1.Pod) bool {
+	return func(pod *v1.Pod) framework.SchedulingHint {
 		admissionResults := AdmissionCheck(pod, nodeInfo, false)
 		if len(admissionResults) != 0 {
-			return false
+			return framework.PodNotAffected
 		}
 		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoSchedule
 		})
-		return !isUntolerated
+		if isUntolerated {
+			return framework.PodNotAffected
+		}
+		return framework.PodMaybeSchedulable
 	}
 }
 

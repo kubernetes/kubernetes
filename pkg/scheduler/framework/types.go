@@ -87,9 +87,97 @@ type ClusterEvent struct {
 	Label      string
 }
 
+// SchedulingHintFn gets called for each cluster event and for each pod that might
+// get scheduled again because of it. The return value determines if and how
+// scheduling of the pod continues.
+//
+// For updates, both objects are passed. For deletes, only oldObj is set.
+// For adds, only newObj is set.
+type SchedulingHintFn func(oldObj, newObj interface{}, pod *v1.Pod) SchedulingHint
+
+type SchedulingHint int
+
+const (
+	// PodNotAffected implies that a cluster event has no impact on
+	// scheduling of a pod.
+	PodNotAffected = SchedulingHint(iota)
+
+	// PodMaybeSchedulable implies that it was impossible to determine
+	// whether the cluster event has an impact. An error might have
+	// occurred or there wasn't enough information.
+	PodMaybeSchedulable
+
+	// PodImmediatelySchedulable is returned when it is certain that the
+	// cluster event is related to the pod and made it schedulabele.
+	PodImmediatelySchedulable
+)
+
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
+}
+
+// ClusterEventMap maps a ClusterEvent to the names of all plugins that have
+// registered for that event. Each plugin may provide provide a
+// SchedulingHintFn for that event.
+type ClusterEventMap map[ClusterEvent]ClusterEventPlugins
+
+// ClusterEventPlugins maps the name of a plugin to its SchedulingHintFn.
+// The function may be nil.
+type ClusterEventPlugins map[string]SchedulingHintFn
+
+// ClusterEvents maps events to the optional hint function for that each event.
+type ClusterEvents map[ClusterEvent]SchedulingHintFn
+
+// RegisterClusterEvents registers the events that a plugin is interested in.
+// May be called for a nil ClusterEventMap. The map gets created as needed.
+func (m *ClusterEventMap) RegisterClusterEvents(name string, eventList []ClusterEvent) {
+	for _, event := range eventList {
+		m.RegisterClusterEvent(name, event)
+	}
+}
+
+// RegisterClusterEventsWithHints registers the events that a plugin is interested in.
+// Optionally, the plugin may provide a SchedulingHintFn for each event.
+// May be called for a nil ClusterEventMap. The map gets created as needed.
+func (m *ClusterEventMap) RegisterClusterEventsWithHints(name string, eventMap ClusterEvents) {
+	for event, schedulingHintFn := range eventMap {
+		m.RegisterClusterEventWithHint(name, event, schedulingHintFn)
+	}
+}
+
+// RegisterClusterEvent registers one event that a plugin is interested in.
+// May be called for a nil ClusterEventMap. The map gets created as needed.
+func (m *ClusterEventMap) RegisterClusterEvent(name string, event ClusterEvent) {
+	m.RegisterClusterEventWithHint(name, event, nil)
+}
+
+// RegisterClusterEventWithHint registers one event that a plugin is interested in.
+// Optionally, the plugin may provide a SchedulingHintFn for that event.
+// May be called for a nil ClusterEventMap. The map gets created as needed.
+func (m *ClusterEventMap) RegisterClusterEventWithHint(name string, event ClusterEvent, schedulingHintFn SchedulingHintFn) {
+	if *m == nil {
+		*m = make(ClusterEventMap)
+	}
+	plugins := (*m)[event]
+	if plugins == nil {
+		plugins = make(ClusterEventPlugins)
+	}
+	plugins[name] = schedulingHintFn
+	(*m)[event] = plugins
+}
+
+// MakeClusterEventPlugins is a helper function for constructing a
+// ClusterEventPlugins instance from a list of plugin names.
+func MakeClusterEventPlugins(names ...string) ClusterEventPlugins {
+	if len(names) == 0 {
+		return nil
+	}
+	events := make(ClusterEventPlugins)
+	for _, name := range names {
+		events[name] = nil
+	}
+	return events
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to

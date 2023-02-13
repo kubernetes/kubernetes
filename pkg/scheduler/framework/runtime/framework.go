@@ -132,7 +132,7 @@ type frameworkOptions struct {
 	podNominator           framework.PodNominator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
-	clusterEventMap        map[framework.ClusterEvent]sets.Set[string]
+	clusterEventMap        *framework.ClusterEventMap
 	parallelizer           parallelize.Parallelizer
 }
 
@@ -216,7 +216,7 @@ func WithCaptureProfile(c CaptureProfile) Option {
 }
 
 // WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.Set[string]) Option {
+func WithClusterEventMap(m *framework.ClusterEventMap) Option {
 	return func(o *frameworkOptions) {
 		o.clusterEventMap = m
 	}
@@ -233,7 +233,7 @@ func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
-		clusterEventMap: make(map[framework.ClusterEvent]sets.Set[string]),
+		clusterEventMap: new(framework.ClusterEventMap),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
 }
@@ -530,33 +530,39 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 	return nil
 }
 
-func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.Set[string]) {
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins *framework.ClusterEventMap) {
 	ext, ok := p.(framework.EnqueueExtensions)
-	if !ok {
-		// If interface EnqueueExtensions is not implemented, register the default events
+	extWithHints, okWithHints := p.(framework.EnqueueExtensionsWithHints)
+	if !ok && !okWithHints {
+		// If neither EnqueueExtensions nor EnqueueExtensionsWithHints are implemented, register the default events
 		// to the plugin. This is to ensure backward compatibility.
-		registerClusterEvents(p.Name(), eventToPlugins, allClusterEvents)
+		eventToPlugins.RegisterClusterEvents(p.Name(), allClusterEvents)
 		return
 	}
 
-	events := ext.EventsToRegister()
-	// It's rare that a plugin implements EnqueueExtensions but returns nil.
-	// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
-	// cannot be moved by any regular cluster event.
-	if len(events) == 0 {
-		klog.InfoS("Plugin's EventsToRegister() returned nil", "plugin", p.Name())
-		return
-	}
-	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
-	registerClusterEvents(p.Name(), eventToPlugins, events)
-}
-
-func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.Set[string], evts []framework.ClusterEvent) {
-	for _, evt := range evts {
-		if eventToPlugins[evt] == nil {
-			eventToPlugins[evt] = sets.New(name)
+	if ok {
+		events := ext.EventsToRegister()
+		// It's rare that a plugin implements EnqueueExtensions but returns nil.
+		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+		// cannot be moved by any regular cluster event.
+		if len(events) == 0 {
+			klog.InfoS("Plugin's EventsToRegister() returned nil", "plugin", p.Name())
 		} else {
-			eventToPlugins[evt].Insert(name)
+			// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
+			eventToPlugins.RegisterClusterEvents(p.Name(), events)
+		}
+	}
+
+	if okWithHints {
+		events := extWithHints.EventsToRegisterWithHints()
+		// It's rare that a plugin implements EnqueueExtensionsWithHints but returns nil.
+		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+		// cannot be moved by any regular cluster event.
+		if len(events) == 0 {
+			klog.InfoS("Plugin's EventsToRegisterWithHints() returned nil", "plugin", p.Name())
+		} else {
+			// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
+			eventToPlugins.RegisterClusterEventsWithHints(p.Name(), events)
 		}
 	}
 }

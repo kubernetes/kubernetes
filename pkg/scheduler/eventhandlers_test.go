@@ -258,7 +258,7 @@ func TestPreCheckForNode(t *testing.T) {
 		name               string
 		nodeFn             func() *v1.Node
 		existingPods, pods []*v1.Pod
-		want               []bool
+		want               []framework.SchedulingHint
 	}{
 		{
 			name: "regular node, pods with a single constraint",
@@ -279,7 +279,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p8").HostPort(8080).Obj(),
 				st.MakePod().Name("p9").HostPort(80).Obj(),
 			},
-			want: []bool{true, false, false, true, false, true, false, true, false},
+			want: []framework.SchedulingHint{framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected},
 		},
 		{
 			name: "tainted node, pods with a single constraint",
@@ -297,7 +297,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p3").Toleration("bar").Obj(),
 				st.MakePod().Name("p4").Toleration("bar").Toleration("foo").Obj(),
 			},
-			want: []bool{false, true, false, true},
+			want: []framework.SchedulingHint{framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodMaybeSchedulable},
 		},
 		{
 			name: "regular node, pods with multiple constraints",
@@ -314,7 +314,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
 				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
 			},
-			want: []bool{false, false, true, false, false},
+			want: []framework.SchedulingHint{framework.PodNotAffected, framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodNotAffected},
 		},
 		{
 			name: "tainted node, pods with multiple constraints",
@@ -332,7 +332,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p3").Req(cpu16).Toleration("foo").Obj(),
 				st.MakePod().Name("p3").Req(cpu16).Toleration("bar").Obj(),
 			},
-			want: []bool{false, true, false, false},
+			want: []framework.SchedulingHint{framework.PodNotAffected, framework.PodMaybeSchedulable, framework.PodNotAffected, framework.PodNotAffected},
 		},
 	}
 
@@ -342,7 +342,7 @@ func TestPreCheckForNode(t *testing.T) {
 			nodeInfo.SetNode(tt.nodeFn())
 			preCheckFn := preCheckForNode(nodeInfo)
 
-			var got []bool
+			var got []framework.SchedulingHint
 			for _, pod := range tt.pods {
 				got = append(got, preCheckFn(pod))
 			}
@@ -443,7 +443,14 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 
-			addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap)
+			var clusterEvents framework.ClusterEventMap
+			for gvk, actionType := range tt.gvkMap {
+				clusterEvents.RegisterClusterEvent(tt.name, framework.ClusterEvent{
+					Resource:   gvk,
+					ActionType: actionType,
+				})
+			}
+			addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, clusterEvents)
 
 			informerFactory.Start(testSched.StopEverything)
 			dynInformerFactory.Start(testSched.StopEverything)

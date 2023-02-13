@@ -287,8 +287,11 @@ func (sched *Scheduler) handleBindingCycleError(
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 		// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
 		if status.IsUnschedulable() {
-			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
-				return assumedPod.UID != pod.UID
+			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) framework.SchedulingHint {
+				if assumedPod.UID == pod.UID {
+					return framework.PodNotAffected
+				}
+				return framework.PodMaybeSchedulable
 			})
 		} else {
 			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
