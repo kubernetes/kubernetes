@@ -19,14 +19,15 @@ package headerrequest
 import (
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilcert "k8s.io/client-go/util/cert"
 )
 
@@ -106,13 +107,13 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	return ret, nil
 }
 
-func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string, groupHeaders []string, extraHeaderPrefixes []string, verifyChainFn x509request.VerifyChainFunc) (authenticator.Request, error) {
+func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string, groupHeaders []string, extraHeaderPrefixes []string) (authenticator.Request, error) {
 	if len(clientCA) == 0 {
 		return nil, fmt.Errorf("missing clientCA file")
 	}
 
 	// Wrap with an x509 verifier
-	caData, err := ioutil.ReadFile(clientCA)
+	caData, err := os.ReadFile(clientCA)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %v", clientCA, err)
 	}
@@ -141,7 +142,6 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 
 	return NewDynamicVerifyOptionsSecure(
 		x509request.StaticVerifierFn(opts),
-		verifyChainFn,
 		StaticStringSlice(proxyClientNames),
 		StaticStringSlice(trimmedNameHeaders),
 		StaticStringSlice(trimmedGroupHeaders),
@@ -149,10 +149,10 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	), nil
 }
 
-func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, verifyChainFn x509request.VerifyChainFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+func NewDynamicVerifyOptionsSecure(ca dynamiccertificates.CAContentProvider, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
 	headerAuthenticator := NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes)
 
-	return x509request.NewDynamicCAVerifier(verifyOptionFn, verifyChainFn, headerAuthenticator, proxyClientNames)
+	return x509request.NewDynamicCAVerifier(ca, headerAuthenticator, proxyClientNames)
 }
 
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {

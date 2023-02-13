@@ -17,7 +17,6 @@ limitations under the License.
 package x509
 
 import (
-	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -106,32 +106,22 @@ func certificateIdentifier(c *x509.Certificate) string {
 	)
 }
 
-// VerifyOptionFunc is function which provides a shallow copy of the VerifyOptions to the authenticator.  This allows
-// for cases where the options (particularly the CAs) can change.  If the bool is false, then the returned VerifyOptions
-// are ignored and the authenticator will express "no opinion".  This allows a clear signal for cases where a CertPool
-// is eventually expected, but not currently present.
-type VerifyOptionFunc func() (x509.VerifyOptions, bool)
-
-// TODO doc
-type VerifyChainFunc func(ctx context.Context, opts x509.VerifyOptions) ([][]*x509.Certificate, error)
-
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
-	verifyOptionFn VerifyOptionFunc
-	verifyChainFn  VerifyChainFunc
-	user           UserConversion
+	ca   dynamiccertificates.CAContentProvider
+	user UserConversion
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptions, and converts valid certificate chains into user.Info using the provided UserConversion
-func New(opts x509.VerifyOptions, verifyChainFn VerifyChainFunc, user UserConversion) *Authenticator {
-	return NewDynamic(StaticVerifierFn(opts), verifyChainFn, user)
+func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
+	return NewDynamic(StaticVerifierFn(opts), user)
 }
 
 // NewDynamic returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
-func NewDynamic(verifyOptionsFn VerifyOptionFunc, verifyChainFn VerifyChainFunc, user UserConversion) *Authenticator {
-	return &Authenticator{verifyOptionFn: verifyOptionsFn, verifyChainFn: verifyChainFn, user: user}
+func NewDynamic(ca dynamiccertificates.CAContentProvider, user UserConversion) *Authenticator {
+	return &Authenticator{ca: ca, user: user}
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
@@ -140,16 +130,15 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		return nil, false, nil
 	}
 
-	optsCopy, ok := a.verifyOptionFn()
 	// if there are intentionally no verify options, then we cannot authenticate this request
-	if !ok {
+	if len(a.ca.CurrentCABundleContent()) == 0 {
 		return nil, false, nil
 	}
 
 	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
 	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 
-	chains, err := a.verifyChainFn(req.Context(), optsCopy)
+	chains, err := dynamiccertificates.WithChainsVerification(req.Context(), a.ca)
 	if err != nil {
 		return nil, false, fmt.Errorf(
 			"verifying certificate %s failed: %w",
@@ -160,14 +149,14 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 	var errlist []error
 	for _, chain := range chains {
-		user, ok, err := a.user.User(chain)
+		resp, ok, err := a.user.User(chain)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
 		}
 
 		if ok {
-			return user, ok, err
+			return resp, ok, err
 		}
 	}
 	return nil, false, utilerrors.NewAggregate(errlist)
@@ -175,9 +164,8 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 // Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 type Verifier struct {
-	verifyOptionFn VerifyOptionFunc
-	verifyChainFn  VerifyChainFunc
-	auth           authenticator.Request
+	ca   dynamiccertificates.CAContentProvider
+	auth authenticator.Request
 
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
@@ -185,13 +173,13 @@ type Verifier struct {
 }
 
 // NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-func NewVerifier(opts x509.VerifyOptions, verifyChainFn VerifyChainFunc, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
-	return NewDynamicCAVerifier(StaticVerifierFn(opts), verifyChainFn, auth, StaticStringSlice(allowedCommonNames.List()))
+func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
+	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, StaticStringSlice(allowedCommonNames.List()))
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, verifyChainFn VerifyChainFunc, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
-	return &Verifier{verifyOptionFn: verifyOptionsFn, verifyChainFn: verifyChainFn, auth: auth, allowedCommonNames: allowedCommonNames}
+func NewDynamicCAVerifier(ca dynamiccertificates.CAContentProvider, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
+	return &Verifier{ca: ca, auth: auth, allowedCommonNames: allowedCommonNames}
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
@@ -200,13 +188,12 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 		return nil, false, nil
 	}
 
-	optsCopy, ok := a.verifyOptionFn()
 	// if there are intentionally no verify options, then we cannot authenticate this request
-	if !ok {
+	if len(a.ca.CurrentCABundleContent()) == 0 {
 		return nil, false, nil
 	}
 
-	if _, err := a.verifyChainFn(req.Context(), optsCopy); err != nil {
+	if _, err := dynamiccertificates.WithChainsVerification(req.Context(), a.ca); err != nil {
 		return nil, false, err
 	}
 
