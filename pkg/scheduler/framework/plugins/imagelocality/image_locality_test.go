@@ -90,6 +90,31 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	test30_init300 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+		},
+		InitContainers: []v1.Container{
+			{Image: "gcr.io/300"},
+		},
+	}
+
+	test30300_init300 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+			{
+				Image: "gcr.io/300",
+			},
+		},
+		InitContainers: []v1.Container{
+			{Image: "gcr.io/300"},
+		},
+	}
+
 	node403002000 := v1.NodeStatus{
 		Images: []v1.ContainerImage{
 			{
@@ -316,7 +341,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Pod: gcr.io/30 gcr.io/40
 
 			// Node1
-			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB gcr.io/40:latest 40MB
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
 			// Score: 100 * (30M + 40M * 1/2 - 23M) / (1000M * 2 - 23M) = 1
 
 			// Node2
@@ -326,6 +351,36 @@ func TestImageLocalityPriority(t *testing.T) {
 			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
+		},
+		{
+			// Pod: gcr.io/30  InitContainers: gcr.io/300
+
+			// Node1
+			// Image: gcr.io/40:latest 40MB, gcr.io/300:latest 300MB, gcr.io/2000:latest 2000MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M * 2 - 23M) = 6
+
+			// Node2
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
+			// Score: 100 * (30M * 1/2  - 23M) / (1000M * 2 - 23M) = 0
+			pod:          &v1.Pod{Spec: test30_init300},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			name:         "include InitContainers: two images spread on two nodes, prefer the larger image one",
+		},
+		{
+			// Pod: gcr.io/30  gcr.io/300 InitContainers: gcr.io/300
+
+			// Node1
+			// Image: gcr.io/40:latest 40MB, gcr.io/300:latest 300MB, gcr.io/2000:latest 2000MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M * 2 - 23M) = 6
+
+			// Node2
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
+			// Score: 100 * (30M * 1/2  - 23M) / (1000M * 2 - 23M) = 0
+			pod:          &v1.Pod{Spec: test30300_init300},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			name:         "include InitContainers ignores duplicate image: two images spread on two nodes, prefer the larger image one",
 		},
 	}
 

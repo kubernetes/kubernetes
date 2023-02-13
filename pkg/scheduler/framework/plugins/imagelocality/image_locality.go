@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -63,7 +64,8 @@ func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState,
 	}
 	totalNumNodes := len(nodeInfos)
 
-	score := calculatePriority(sumImageScores(nodeInfo, pod.Spec.Containers, totalNumNodes), len(pod.Spec.Containers))
+	imageScores, totalNumImages := sumImageScores(nodeInfo, pod, totalNumNodes)
+	score := calculatePriority(imageScores, totalNumImages)
 
 	return score, nil
 }
@@ -80,28 +82,42 @@ func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 
 // calculatePriority returns the priority of a node. Given the sumScores of requested images on the node, the node's
 // priority is obtained by scaling the maximum priority value with a ratio proportional to the sumScores.
-func calculatePriority(sumScores int64, numContainers int) int64 {
-	maxThreshold := maxContainerThreshold * int64(numContainers)
+func calculatePriority(sumScores, numContainers int64) int64 {
+	maxThreshold := maxContainerThreshold * numContainers
 	if sumScores < minThreshold {
 		sumScores = minThreshold
 	} else if sumScores > maxThreshold {
 		sumScores = maxThreshold
 	}
 
-	return int64(framework.MaxNodeScore) * (sumScores - minThreshold) / (maxThreshold - minThreshold)
+	return framework.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
-// the final score. Note that the init containers are not considered for it's rare for users to deploy huge init containers.
-func sumImageScores(nodeInfo *framework.NodeInfo, containers []v1.Container, totalNumNodes int) int64 {
+// the final score. Note that the init containers are also considered and duplicate images are removed when counting the requested images.
+func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int) (int64, int64) {
 	var sum int64
-	for _, container := range containers {
+	scoredImages := sets.New[string]()
+	for _, container := range pod.Spec.InitContainers {
+		if scoredImages.Has(container.Image) {
+			continue
+		}
 		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
+		scoredImages.Insert(container.Image)
 	}
-	return sum
+	for _, container := range pod.Spec.Containers {
+		if scoredImages.Has(container.Image) {
+			continue
+		}
+		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+			sum += scaledImageScore(state, totalNumNodes)
+		}
+		scoredImages.Insert(container.Image)
+	}
+	return sum, int64(scoredImages.Len())
 }
 
 // scaledImageScore returns an adaptively scaled score for the given state of an image.
