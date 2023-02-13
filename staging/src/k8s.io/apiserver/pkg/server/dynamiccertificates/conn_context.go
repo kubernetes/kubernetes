@@ -119,8 +119,9 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCAUnion CA
 				verifyChains, err := state.PeerCertificates[0].Verify(optsCopy)
 
 				out[clientCA.Name()] = chainData{
-					chains: verifyChains,
-					err:    err,
+					caBundleContent: caBundle,
+					chains:          verifyChains,
+					err:             err,
 				}
 			}
 
