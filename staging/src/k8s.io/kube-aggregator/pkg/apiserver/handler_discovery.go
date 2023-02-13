@@ -89,30 +89,21 @@ type discoveryManager struct {
 }
 
 // Version of Service/Spec with relevant fields for use as a cache key
+// For apiservices that serve the new discovery mechanism this is not optimally efficient because the same
+// service discovery document is retrieved multiple times when multiple apiservices use the same service.
+// However, when the old discovery method is used, each apiservice needs to get a different discovery URL.
 type serviceKey struct {
-	Namespace string
-	Name      string
-	Port      int32
+	apiServiceName string
 }
 
 // Human-readable String representation used for logs
 func (s serviceKey) String() string {
-	return fmt.Sprintf("%v/%v:%v", s.Namespace, s.Name, s.Port)
+	return fmt.Sprintf("%v", s.apiServiceName)
 }
 
-func newServiceKey(service apiregistrationv1.ServiceReference) serviceKey {
-	// Docs say. Defaults to 443 for compatibility reasons.
-	// BETA: Should this be a shared constant to avoid drifting with the
-	// implementation?
-	port := int32(443)
-	if service.Port != nil {
-		port = *service.Port
-	}
-
+func newServiceKey(apiServiceName string) serviceKey {
 	return serviceKey{
-		Name:      service.Name,
-		Namespace: service.Namespace,
-		Port:      port,
+		apiServiceName: apiServiceName,
 	}
 }
 
@@ -454,7 +445,7 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 		versionPriority: int(apiService.Spec.VersionPriority),
 		handler:         handler,
 		lastMarkedDirty: time.Now(),
-		service:         newServiceKey(*apiService.Spec.Service),
+		service:         newServiceKey(apiService.Name),
 	})
 	dm.dirtyAPIServiceQueue.Add(apiService.Name)
 }
