@@ -99,9 +99,14 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCAUnion CA
 
 				// avoid any TOCTOU issues
 				caBundle := clientCA.CurrentCABundleContent()
+
+				// if there are intentionally no CA bundle contents, then we cannot authenticate
+				if len(caBundle) == 0 {
+					continue
+				}
+
 				opts, err := newCABundleAndVerifier(clientCA.Name(), caBundle) // TODO cache this or combine opts+bundle into one method
 				if err != nil {
-					// if there are intentionally no verify options, then we cannot authenticate using this bundle
 					klog.ErrorS(err, "invalid bundle prevented TLS verification", "name", clientCA.Name())
 					continue // the CA bundle contents are always supposed to be valid so this should not happen in practice
 				}
