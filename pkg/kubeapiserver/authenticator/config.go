@@ -105,6 +105,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	if config.RequestHeaderConfig != nil {
 		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
 			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
+			dynamiccertificates.WithChainsVerification,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
@@ -115,7 +116,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
-		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
+		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, dynamiccertificates.WithChainsVerification, x509.CommonNameUserConversion)
 		authenticators = append(authenticators, certAuth)
 	}
 

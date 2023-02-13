@@ -106,7 +106,7 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	return ret, nil
 }
 
-func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string, groupHeaders []string, extraHeaderPrefixes []string) (authenticator.Request, error) {
+func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string, groupHeaders []string, extraHeaderPrefixes []string, verifyChainFn x509request.VerifyChainFunc) (authenticator.Request, error) {
 	if len(clientCA) == 0 {
 		return nil, fmt.Errorf("missing clientCA file")
 	}
@@ -141,6 +141,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 
 	return NewDynamicVerifyOptionsSecure(
 		x509request.StaticVerifierFn(opts),
+		verifyChainFn,
 		StaticStringSlice(proxyClientNames),
 		StaticStringSlice(trimmedNameHeaders),
 		StaticStringSlice(trimmedGroupHeaders),
@@ -148,10 +149,10 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	), nil
 }
 
-func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, verifyChainFn x509request.VerifyChainFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
 	headerAuthenticator := NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes)
 
-	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
+	return x509request.NewDynamicCAVerifier(verifyOptionFn, verifyChainFn, headerAuthenticator, proxyClientNames)
 }
 
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
