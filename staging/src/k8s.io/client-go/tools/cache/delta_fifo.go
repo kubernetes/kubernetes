@@ -571,12 +571,11 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // using the Sync or Replace DeltaType and then (2) it does some deletions.
 // In particular: for every pre-existing key K that is not the key of
 // an object in `list` there is the effect of
-// `Delete(DeletedFinalStateUnknown{K, O})` where O is current object
-// of K.  If `f.knownObjects == nil` then the pre-existing keys are
-// those in `f.items` and the current object of K is the `.Newest()`
-// of the Deltas associated with K.  Otherwise the pre-existing keys
-// are those listed by `f.knownObjects` and the current object of K is
-// what `f.knownObjects.GetByKey(K)` returns.
+// `Delete(DeletedFinalStateUnknown{K, O})` where O is the latest known
+// object of K. The pre-existing keys are those in the union set of the keys in
+// `f.items` and `f.knownObjects` (if not nil). The last known object for key K is
+// the one present in the last delta in `f.items`. If there is no delta for K
+// in `f.items`, it is the object in `f.knownObjects`
 func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
