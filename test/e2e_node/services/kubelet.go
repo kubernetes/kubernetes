@@ -41,6 +41,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/remote"
+
+	systemdutil "github.com/coreos/go-systemd/v22/util"
 )
 
 // TODO(random-liu): Replace this with standard kubelet launcher.
@@ -122,6 +124,11 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 		//                   uses of e2e_node switch to providing one (or move to
 		//                   kubetest2 and pick up the default).
 		kc.CgroupRoot = "/"
+		if systemdutil.IsRunningSystemd() {
+			kc.CgroupDriver = "systemd"
+		} else {
+			kc.CgroupDriver = "cgroupfs"
+		}
 		kc.VolumeStatsAggPeriod = metav1.Duration{Duration: 10 * time.Second}
 		kc.SerializeImagePulls = false
 		kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second}
