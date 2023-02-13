@@ -24,10 +24,11 @@ import (
 // https://github.com/docker/docker/commit/4352da7803d182a6013a5238ce20a7c749db979a
 func TestParseImageName(t *testing.T) {
 	testCases := []struct {
-		Input  string
-		Repo   string
-		Tag    string
-		Digest string
+		Input       string
+		Repo        string
+		Tag         string
+		Digest      string
+		expectError bool
 	}{
 		{Input: "root", Repo: "docker.io/library/root", Tag: "latest"},
 		{Input: "root:tag", Repo: "docker.io/library/root", Tag: "tag"},
@@ -38,10 +39,13 @@ func TestParseImageName(t *testing.T) {
 		{Input: "url:5000/repo", Repo: "url:5000/repo", Tag: "latest"},
 		{Input: "url:5000/repo:tag", Repo: "url:5000/repo", Tag: "tag"},
 		{Input: "url:5000/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "url:5000/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "ROOT", expectError: true},
 	}
 	for _, testCase := range testCases {
 		repo, tag, digest, err := ParseImageName(testCase.Input)
-		if err != nil {
+		if testCase.expectError && err != nil {
+
+		} else if err != nil {
 			t.Errorf("ParseImageName(%s) failed: %v", testCase.Input, err)
 		} else if repo != testCase.Repo || tag != testCase.Tag || digest != testCase.Digest {
 			t.Errorf("Expected repo: %q, tag: %q and digest: %q, got %q, %q and %q", testCase.Repo, testCase.Tag, testCase.Digest,

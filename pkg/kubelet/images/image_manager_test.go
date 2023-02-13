@@ -159,6 +159,36 @@ func pullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, ErrImagePull},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff},
 			}},
+		{containerImage: "FAILED_IMAGE",
+			testName:   "invalid image name, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string{}, ErrInvalidImageName},
+			}},
+		{containerImage: "http://url",
+			testName:   "invalid image name with http, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string{}, ErrInvalidImageName},
+			}},
+		{containerImage: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+			testName:   "invalid image name with sha256, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string{}, ErrInvalidImageName},
+			}},
 	}
 }
 
@@ -168,7 +198,7 @@ func (m *mockPodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID)
 
 func (m *mockPodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
 
-func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
+func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -179,7 +209,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int
 	fakeClock = testingclock.NewFakeClock(time.Now())
 	backOff.Clock = fakeClock
 
-	fakeRuntime = &ctest.FakeRuntime{}
+	fakeRuntime = &ctest.FakeRuntime{T: t}
 	fakeRecorder := &record.FakeRecorder{}
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
@@ -203,12 +233,12 @@ func TestParallelPuller(t *testing.T) {
 
 	useSerializedEnv := false
 	for _, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
 			for _, expected := range c.expected {
-				fakeRuntime.CalledFunctions = nil
+				fakeRuntime.CalledFunctions = []string{}
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
@@ -231,12 +261,12 @@ func TestSerializedPuller(t *testing.T) {
 
 	useSerializedEnv := true
 	for _, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
 			for _, expected := range c.expected {
-				fakeRuntime.CalledFunctions = nil
+				fakeRuntime.CalledFunctions = []string{}
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
@@ -253,6 +283,7 @@ func TestApplyDefaultImageTag(t *testing.T) {
 		Output   string
 	}{
 		{testName: "root", Input: "root", Output: "root:latest"},
+		{testName: "root:latest", Input: "root:latest", Output: "root:latest"},
 		{testName: "root:tag", Input: "root:tag", Output: "root:tag"},
 		{testName: "root@sha", Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 	} {
@@ -289,7 +320,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		}}
 
 	useSerializedEnv := true
-	puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
+	puller, fakeClock, fakeRuntime, container := pullerTestEnv(t, c, useSerializedEnv, nil)
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.ImageList = []Image{}
 	fakeClock.Step(time.Second)
@@ -339,7 +370,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	maxParallelImagePulls := 5
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container := pullerTestEnv(*testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container := pullerTestEnv(t, *testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t

@@ -9906,6 +9906,40 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
+		"all capitals for image": {
+			expectedError: "spec.containers[0].image",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: core.PodSpec{
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+					Containers:    []core.Container{{Name: "ctr", Image: "ALLCAPITALS", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+		"http present in image": {
+			expectedError: "spec.containers[0].image",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: core.PodSpec{
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+					Containers:    []core.Container{{Name: "ctr", Image: "https://busybox", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+		"hexadecimal name in image": {
+			expectedError: "spec.containers[0].image",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: core.PodSpec{
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+					Containers:    []core.Container{{Name: "ctr", Image: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+
 		"bad namespace": {
 			expectedError: "metadata.namespace",
 			spec: core.Pod{

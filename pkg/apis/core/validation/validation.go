@@ -30,6 +30,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -53,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	netutils "k8s.io/utils/net"
 )
 
@@ -3192,6 +3194,17 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 		allErrs = append(allErrs, field.Required(path.Child("image"), ""))
 	}
 
+	// Adding API validation for images.
+	if len(ctr.Image) > 0 {
+		// Whitespace in image name seems to be a valid case for our tests but docker says it isn't.
+		// We will ignore the check if we detect padded whitespace for now.
+		if len(ctr.Image) == len(strings.TrimSpace(ctr.Image)) {
+			_, _, _, err := parsers.ParseImageName(ctr.Image)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(path.Child("image"), ctr.Image, err.Error()))
+			}
+		}
+	}
 	switch ctr.TerminationMessagePolicy {
 	case core.TerminationMessageReadFile, core.TerminationMessageFallbackToLogsOnError:
 	case "":
