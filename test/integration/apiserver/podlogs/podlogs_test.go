@@ -240,7 +240,13 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 			nil,
 		),
 	)
-	fakeKubeletServer.TLS = &tls.Config{ClientAuth: tls.RequestClientCert}
+	fakeKubeletServer.Config.ConnContext = dynamiccertificates.WithChainsConnContext
+	tlsConfig := &tls.Config{ClientAuth: tls.RequestClientCert}
+	tlsConfig.GetConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(
+		func(_ *tls.ClientHelloInfo) (*tls.Config, error) { return fakeKubeletServer.TLS, nil },
+		dynamicCAContentFromFile,
+	)
+	fakeKubeletServer.TLS = tlsConfig
 	fakeKubeletServer.StartTLS()
 	t.Cleanup(fakeKubeletServer.Close)
 

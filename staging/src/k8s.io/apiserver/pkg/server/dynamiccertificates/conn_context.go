@@ -99,7 +99,7 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCAUnion CA
 
 				// avoid any TOCTOU issues
 				caBundle := clientCA.CurrentCABundleContent()
-				opts, err := newCABundleAndVerifier(clientCA.Name(), caBundle)
+				opts, err := newCABundleAndVerifier(clientCA.Name(), caBundle) // TODO cache this or combine opts+bundle into one method
 				if err != nil {
 					// if there are intentionally no verify options, then we cannot authenticate using this bundle
 					klog.ErrorS(err, "invalid bundle prevented TLS verification", "name", clientCA.Name())
@@ -165,13 +165,12 @@ func WithChainsVerification(ctx context.Context, clientCA CAContentProvider) ([]
 func splitUnion(clientCA CAContentProvider) unionCAContent {
 	caContents, ok := clientCA.(unionCAContent)
 	if !ok {
-		return unionCAContent{caContents}
+		return unionCAContent{clientCA}
 	}
 	var out unionCAContent
 	for _, ca := range caContents {
 		ca := ca
-		split := splitUnion(ca)
-		out = append(out, split...)
+		out = append(out, splitUnion(ca)...)
 	}
 	return out
 }
