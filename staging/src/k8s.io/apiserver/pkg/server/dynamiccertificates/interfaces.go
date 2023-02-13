@@ -38,12 +38,14 @@ type CAContentProvider interface {
 	Notifier
 
 	// Name is just an identifier.
+	// It must be unique across all provider instances and must not change for a given provider instance.
 	Name() string
 	// CurrentCABundleContent provides ca bundle byte content. Errors can be
 	// contained to the controllers initializing the value. By the time you get
 	// here, you should always be returning a value that won't fail.
 	CurrentCABundleContent() []byte
 	// VerifyOptions provides VerifyOptions for authenticators.
+	// TODO delete this method, it is not meaningful anymore
 	VerifyOptions() (x509.VerifyOptions, bool)
 }
 

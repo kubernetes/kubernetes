@@ -17,12 +17,15 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"net"
 	"sync/atomic"
+
+	"k8s.io/klog/v2"
 )
 
 type ConnContext func(ctx context.Context, c net.Conn) context.Context
@@ -58,18 +61,23 @@ func getChains(ctx context.Context) (*atomic.Pointer[chains], error) {
 	return chainsPtr, nil
 }
 
-type chains struct {
-	opts   x509.VerifyOptions
-	chains [][]*x509.Certificate
-	err    error
+type chains map[string]chainData // TODO maybe use CAContentProvider as the map key?
+
+type chainData struct {
+	caBundleContent []byte
+	chains          [][]*x509.Certificate
+	err             error
 }
 
-func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCA CAContentProvider) GetConfigForClient {
+func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCAUnion CAContentProvider) GetConfigForClient {
 	return func(info *tls.ClientHelloInfo) (*tls.Config, error) {
 		tlsConfig, err := getConfig(info)
 		if err != nil {
 			return nil, err
 		}
+
+		// TODO verify no overlapping names or something like that
+		clientCAs := splitUnion(clientCAUnion)
 
 		tlsConfig = tlsConfig.Clone()
 
@@ -85,34 +93,49 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCA CAConte
 				return nil // either this is the call before peer certs are known or no certs provided
 			}
 
-			// Use intermediates, if provided
-			optsCopy, ok := clientCA.VerifyOptions()
-			// if there are intentionally no verify options, then we cannot authenticate this request
-			if !ok {
-				return nil
-			}
-			if optsCopy.Intermediates == nil && len(state.PeerCertificates) > 1 {
-				optsCopy.Intermediates = x509.NewCertPool()
-				for _, intermediate := range state.PeerCertificates[1:] {
-					optsCopy.Intermediates.AddCert(intermediate)
+			out := make(chains)
+			for _, clientCA := range clientCAs {
+				clientCA := clientCA
+
+				// avoid any TOCTOU issues
+				caBundle := clientCA.CurrentCABundleContent()
+				opts, err := newCABundleAndVerifier(clientCA.Name(), caBundle)
+				if err != nil {
+					// if there are intentionally no verify options, then we cannot authenticate using this bundle
+					klog.ErrorS(err, "invalid bundle prevented TLS verification", "name", clientCA.Name())
+					continue // the CA bundle contents are always supposed to be valid so this should not happen in practice
+				}
+
+				optsCopy := opts.verifyOptions
+
+				// Use intermediates, if provided
+				if optsCopy.Intermediates == nil && len(state.PeerCertificates) > 1 {
+					optsCopy.Intermediates = x509.NewCertPool()
+					for _, intermediate := range state.PeerCertificates[1:] {
+						optsCopy.Intermediates.AddCert(intermediate)
+					}
+				}
+
+				verifyChains, err := state.PeerCertificates[0].Verify(optsCopy)
+
+				out[clientCA.Name()] = chainData{
+					chains: verifyChains,
+					err:    err,
 				}
 			}
 
-			verifyChains, err := state.PeerCertificates[0].Verify(optsCopy)
+			if len(out) == 0 {
+				return nil
+			}
 
-			return setChainsOnce(info.Context(),
-				&chains{
-					opts:   optsCopy,
-					chains: verifyChains,
-					err:    err,
-				})
+			return setChainsOnce(info.Context(), &out)
 		}
 
 		return tlsConfig, nil
 	}
 }
 
-func WithChainsVerification(ctx context.Context, opts x509.VerifyOptions) ([][]*x509.Certificate, error) {
+func WithChainsVerification(ctx context.Context, clientCA CAContentProvider) ([][]*x509.Certificate, error) {
 	chainsPtr, err := getChains(ctx)
 	if err != nil {
 		return nil, err
@@ -122,19 +145,33 @@ func WithChainsVerification(ctx context.Context, opts x509.VerifyOptions) ([][]*
 	if chainsLoad == nil {
 		return nil, fmt.Errorf("tls verification was not performed on this connection")
 	}
+	chainsLoaded := *chainsLoad
 
-	// TODO this wrong - the new opts may this be able to verify the TLS details so we should not fail on that case
-	if !equalOpts(chainsLoad.opts, opts) {
+	data, ok := chainsLoaded[clientCA.Name()]
+	if !ok {
+		return nil, fmt.Errorf("tls verification was not performed on this connection for %q", clientCA.Name())
+	}
+
+	// TODO this is wrong
+	//  the new caBundleContent may be able to verify the TLS details so we should not fail on that case
+	if !bytes.Equal(data.caBundleContent, clientCA.CurrentCABundleContent()) {
 		return nil, fmt.Errorf("tls verifcation options have changed and the connection must be closed")
 	}
 
-	if chainsLoad.err != nil {
-		return nil, err
-	}
-
-	return chainsLoad.chains, nil
+	return data.chains, data.err
 }
 
-func equalOpts(a, b x509.VerifyOptions) bool {
-	// TODO comparison, figure out how to handle intermediates being calculated?
+// TODO this is a hack, we should be given all of the CAs as distinct input so we know how to bucket them
+func splitUnion(clientCA CAContentProvider) unionCAContent {
+	caContents, ok := clientCA.(unionCAContent)
+	if !ok {
+		return unionCAContent{caContents}
+	}
+	var out unionCAContent
+	for _, ca := range caContents {
+		ca := ca
+		split := splitUnion(ca)
+		out = append(out, split...)
+	}
+	return out
 }
