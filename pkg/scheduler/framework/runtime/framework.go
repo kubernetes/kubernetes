@@ -887,7 +887,9 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 }
 
 // RunPreScorePlugins runs the set of configured pre-score plugins. If any
-// of these plugins returns any status other than "Success", the given pod is rejected.
+// of these plugins returns any status other than Success/Skip, the given pod is rejected.
+// When it returns Skip status, other fields in status are just ignored,
+// and coupled Score plugin will be skipped in this scheduling cycle.
 func (f *frameworkImpl) RunPreScorePlugins(
 	ctx context.Context,
 	state *framework.CycleState,
@@ -898,13 +900,18 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	skipPlugins := sets.New[string]()
 	for _, pl := range f.preScorePlugins {
 		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
+		if status.IsSkip() {
+			skipPlugins.Insert(pl.Name())
+			continue
+		}
 		if !status.IsSuccess() {
 			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError()))
 		}
 	}
-
+	state.SkipScorePlugins = skipPlugins
 	return nil
 }
 
@@ -928,37 +935,45 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	allNodePluginScores := make([]framework.NodePluginScores, len(nodes))
-	pluginToNodeScores := make(map[string]framework.NodeScoreList, len(f.scorePlugins))
+	numPlugins := len(f.scorePlugins) - state.SkipScorePlugins.Len()
+	plugins := make([]framework.ScorePlugin, 0, numPlugins)
+	pluginToNodeScores := make(map[string]framework.NodeScoreList, numPlugins)
 	for _, pl := range f.scorePlugins {
+		if state.SkipScorePlugins.Has(pl.Name()) {
+			continue
+		}
+		plugins = append(plugins, pl)
 		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
-	// Run Score method for each node in parallel.
-	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-		for _, pl := range f.scorePlugins {
-			nodeName := nodes[index].Name
-			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
-			if !status.IsSuccess() {
-				err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-				errCh.SendErrorWithCancel(err, cancel)
-				return
+	if len(plugins) > 0 {
+		// Run Score method for each node in parallel.
+		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+			for _, pl := range plugins {
+				nodeName := nodes[index].Name
+				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
+				if !status.IsSuccess() {
+					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+					errCh.SendErrorWithCancel(err, cancel)
+					return
+				}
+				pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
+					Name:  nodeName,
+					Score: s,
+				}
 			}
-			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
-				Name:  nodeName,
-				Score: s,
-			}
+		}, score)
+		if err := errCh.ReceiveError(); err != nil {
+			return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 		}
-	}, score)
-	if err := errCh.ReceiveError(); err != nil {
-		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
-	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
-		pl := f.scorePlugins[index]
+	f.Parallelizer().Until(ctx, len(plugins), func(index int) {
+		pl := plugins[index]
 		if pl.ScoreExtensions() == nil {
 			return
 		}
@@ -979,10 +994,10 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
 		nodePluginScores := framework.NodePluginScores{
 			Name:   nodes[index].Name,
-			Scores: make([]framework.PluginScore, len(f.scorePlugins)),
+			Scores: make([]framework.PluginScore, len(plugins)),
 		}
 
-		for i, pl := range f.scorePlugins {
+		for i, pl := range plugins {
 			weight := f.scorePluginWeight[pl.Name()]
 			nodeScoreList := pluginToNodeScores[pl.Name()]
 			score := nodeScoreList[index].Score

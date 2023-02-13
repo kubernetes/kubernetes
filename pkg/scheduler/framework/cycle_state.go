@@ -52,6 +52,8 @@ type CycleState struct {
 	recordPluginMetrics bool
 	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
 	SkipFilterPlugins sets.Set[string]
+	// SkipScorePlugins are plugins that will be skipped in the Score extension point.
+	SkipScorePlugins sets.Set[string]
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -88,6 +90,7 @@ func (c *CycleState) Clone() *CycleState {
 	})
 	copy.recordPluginMetrics = c.recordPluginMetrics
 	copy.SkipFilterPlugins = c.SkipFilterPlugins
+	copy.SkipScorePlugins = c.SkipScorePlugins
 
 	return copy
 }
