@@ -26,7 +26,6 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -112,12 +111,6 @@ type Authenticator struct {
 	user UserConversion
 }
 
-// New returns a request.Authenticator that verifies client certificates using the provided
-// VerifyOptions, and converts valid certificate chains into user.Info using the provided UserConversion
-func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
-	return NewDynamic(StaticVerifierFn(opts), user)
-}
-
 // NewDynamic returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
 func NewDynamic(ca dynamiccertificates.CAContentProvider, user UserConversion) *Authenticator {
@@ -170,11 +163,6 @@ type Verifier struct {
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
 	allowedCommonNames StringSliceProvider
-}
-
-// NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
-	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, StaticStringSlice(allowedCommonNames.List()))
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
