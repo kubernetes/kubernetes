@@ -34,25 +34,32 @@ type contextKey int
 const chainsKey contextKey = iota
 
 func WithChainsConnContext(ctx context.Context, _ net.Conn) context.Context {
-	// TODO may also track conn to allow the server to close it?
+	// TODO may also track conn to allow the server to close it when the cert if expired but otherwise valid?
 	c := &atomic.Pointer[chains]{} // safe for concurrent access
 	return context.WithValue(ctx, chainsKey, c)
 }
 
-func setChains(ctx context.Context, c *chains) error {
-	cc, _ := ctx.Value(chainsKey).(*atomic.Pointer[chains])
-	if cc == nil {
-		return fmt.Errorf("chains not wired to server context")
+func setChainsOnce(ctx context.Context, c *chains) error {
+	chainsPtr, err := getChains(ctx)
+	if err != nil {
+		return err
 	}
-	if !cc.CompareAndSwap(nil, c) {
+	if !chainsPtr.CompareAndSwap(nil, c) {
 		return fmt.Errorf("chains set more than once")
 	}
 	return nil
 }
 
+func getChains(ctx context.Context) (*atomic.Pointer[chains], error) {
+	chainsPtr, _ := ctx.Value(chainsKey).(*atomic.Pointer[chains])
+	if chainsPtr == nil {
+		return nil, fmt.Errorf("chains not wired to server context")
+	}
+	return chainsPtr, nil
+}
+
 type chains struct {
 	opts   x509.VerifyOptions
-	ok     bool
 	chains [][]*x509.Certificate
 	err    error
 }
@@ -93,10 +100,9 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCA CAConte
 
 			verifyChains, err := state.PeerCertificates[0].Verify(optsCopy)
 
-			return setChains(info.Context(),
+			return setChainsOnce(info.Context(),
 				&chains{
 					opts:   optsCopy,
-					ok:     true,
 					chains: verifyChains,
 					err:    err,
 				})
@@ -104,4 +110,31 @@ func WithChainsGetConfigForClient(getConfig GetConfigForClient, clientCA CAConte
 
 		return tlsConfig, nil
 	}
+}
+
+func WithChainsVerification(ctx context.Context, opts x509.VerifyOptions) ([][]*x509.Certificate, error) {
+	chainsPtr, err := getChains(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	chainsLoad := chainsPtr.Load()
+	if chainsLoad == nil {
+		return nil, fmt.Errorf("tls verification was not performed on this connection")
+	}
+
+	// TODO this wrong - the new opts may this be able to verify the TLS details so we should not fail on that case
+	if !equalOpts(chainsLoad.opts, opts) {
+		return nil, fmt.Errorf("tls verifcation options have changed and the connection must be closed")
+	}
+
+	if chainsLoad.err != nil {
+		return nil, err
+	}
+
+	return chainsLoad.chains, nil
+}
+
+func equalOpts(a, b x509.VerifyOptions) bool {
+	// TODO comparison, figure out how to handle intermediates being calculated?
 }
