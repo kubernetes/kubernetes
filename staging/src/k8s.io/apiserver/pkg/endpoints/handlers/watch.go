@@ -209,8 +209,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	var unknown runtime.Unknown
-	internalEvent := &metav1.InternalEvent{}
-	outEvent := &metav1.WatchEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
@@ -228,6 +226,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	watchEvent := &metav1.WatchEvent{}
+	var outEvent runtime.Object
+	var newOutEvent func() (runtime.Object, error)
 	for {
 		select {
 		case <-done:
@@ -241,26 +242,36 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
-			obj := s.Fixup(event.Object)
-			if err := embeddedEncodeFn(obj, buf); err != nil {
-				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
-				return
+			// Returns an external representation of a watch event that will be then serialized
+			// and sent to the watch client.
+			newOutEvent = func() (runtime.Object, error) {
+				obj := s.Fixup(event.Object)
+				if err := embeddedEncodeFn(obj, buf); err != nil {
+					// unexpected error
+					return nil, fmt.Errorf("unable to encode watch object %T: %v", obj, err)
+				}
+
+				// ContentType is not required here because we are defaulting to the serializer
+				// type
+				unknown.Raw = buf.Bytes()
+				event.Object = &unknown
+
+				metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
+
+				if err := metav1.Convert_watch_Event_To_v1_WatchEvent(&event, watchEvent, nil); err != nil {
+					return nil, fmt.Errorf("unable to convert watch object: %v", err)
+				}
+				return watchEvent, nil
 			}
-
-			// ContentType is not required here because we are defaulting to the serializer
-			// type
-			unknown.Raw = buf.Bytes()
-			event.Object = &unknown
-			metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
-
-			*outEvent = metav1.WatchEvent{}
-
-			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
-			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
-			// and we get the benefit of using conversion functions which already have to stay in sync
-			*internalEvent = metav1.InternalEvent(event)
-			err := metav1.Convert_v1_InternalEvent_To_v1_WatchEvent(internalEvent, outEvent, nil)
+			var err error
+			if obj, ok := event.Object.(runtime.CacheableObject); ok {
+				outEvent, err = obj.GetCachedEvent(
+					s.EmbeddedEncoder.Identifier(),
+					newOutEvent,
+				)
+			} else {
+				outEvent, err = newOutEvent()
+			}
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.

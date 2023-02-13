@@ -328,6 +328,7 @@ type Object interface {
 // CacheableObject allows an object to cache its different serializations
 // to avoid performing the same serialization multiple times.
 type CacheableObject interface {
+	Object
 	// CacheEncode writes an object to a stream. The <encode> function will
 	// be used in case of cache miss. The <encode> function takes ownership
 	// of the object.
@@ -344,6 +345,10 @@ type CacheableObject interface {
 	// to be passed to <encode> function in CacheEncode method.
 	// If CacheableObject is a wrapper, the copy of wrapped object should be returned.
 	GetObject() Object
+	// GetCachedEvent returns a cached watch event containing the encoded object.
+	// If the cache doesn't contain a particular encoding of an event, it executes
+	// the <eventProducer> method and stores it afterwards.
+	GetCachedEvent(id Identifier, eventProducer func() (Object, error)) (CacheableObject, error)
 }
 
 // Unstructured objects store values as map[string]interface{}, with only values that can be serialized

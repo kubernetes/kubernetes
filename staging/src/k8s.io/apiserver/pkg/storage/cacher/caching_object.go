@@ -81,6 +81,11 @@ type cachingObject struct {
 	// The value stored in atomic.Value is of type serializationsCache.
 	// The atomic.Value type is used to allow fast-path.
 	serializations atomic.Value
+
+	cachedEventsLock sync.RWMutex
+
+	// cachedEvents is a cache containing object's encodings into watch events.
+	cachedEvents map[runtime.Identifier]*cachingObject
 }
 
 // newCachingObject performs a deep copy of the given object and wraps it
@@ -159,6 +164,29 @@ func (o *cachingObject) GetObject() runtime.Object {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.DeepCopyObject().(metaRuntimeInterface)
+}
+
+// GetCachedEvent implements runtime.CacheableObject interface.
+// It returns a watch event containing the already encoded object.
+func (o *cachingObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+	o.cachedEventsLock.Lock()
+	defer o.cachedEventsLock.Unlock()
+
+	if obj, ok := o.cachedEvents[id]; ok {
+		return obj, nil
+	}
+
+	event, err := eventProducer()
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := newCachingObject(event)
+	if err != nil {
+		return nil, err
+	}
+	o.cachedEvents[id] = obj
+	return obj, nil
 }
 
 // GetObjectKind implements runtime.Object interface.

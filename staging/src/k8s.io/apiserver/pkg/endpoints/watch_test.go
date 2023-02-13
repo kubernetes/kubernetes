@@ -1024,6 +1024,10 @@ func (f *fakeCachingObject) GetObject() runtime.Object {
 	return f.obj
 }
 
+func (f *fakeCachingObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+	return f, nil
+}
+
 func (f *fakeCachingObject) GetObjectKind() schema.ObjectKind {
 	return f.obj.GetObjectKind()
 }

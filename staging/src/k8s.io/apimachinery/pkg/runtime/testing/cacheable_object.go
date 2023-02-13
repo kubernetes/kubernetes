@@ -127,6 +127,10 @@ func (m *MockCacheableObject) GetObject() runtime.Object {
 	return &noncacheableTestObject{gvk: gvk}
 }
 
+func (m *MockCacheableObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+	return m, nil
+}
+
 func (m *MockCacheableObject) interceptedCalls() []runtime.Identifier {
 	return m.intercepted
 }
