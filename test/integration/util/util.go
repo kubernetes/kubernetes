@@ -682,6 +682,16 @@ func CreatePV(cs clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVo
 	return cs.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 }
 
+// DeletePVC deletes the given PVC in the given namespace.
+func DeletePVC(cs clientset.Interface, pvcName string, nsName string) error {
+	return cs.CoreV1().PersistentVolumeClaims(nsName).Delete(context.TODO(), pvcName, *metav1.NewDeleteOptions(0))
+}
+
+// DeletePV deletes the given PV in the given namespace.
+func DeletePV(cs clientset.Interface, pvName string) error {
+	return cs.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, *metav1.NewDeleteOptions(0))
+}
+
 // RunPausePod creates a pod with "Pause" image and the given config and waits
 // until it is scheduled. It returns its pointer and error status.
 func RunPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
