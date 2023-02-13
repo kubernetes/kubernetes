@@ -382,12 +382,12 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				if !test.disablePreScore {
 					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 					if !status.IsSuccess() {
-						t.Errorf("unexpected error: %v", status)
+						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}
 				}
-				hostResult, err := p.(framework.ScorePlugin).Score(ctx, state, test.pod, test.nodes[i].Name)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
+				hostResult, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, test.nodes[i].Name)
+				if !status.IsSuccess() {
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				if !reflect.DeepEqual(test.expectedList[i].Score, hostResult) {
 					t.Errorf("got score %v for host %v, expected %v", hostResult, test.nodes[i].Name, test.expectedList[i].Score)
