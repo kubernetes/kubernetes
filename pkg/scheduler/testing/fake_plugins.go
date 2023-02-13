@@ -246,77 +246,37 @@ func NewFakePermitPlugin(status *framework.Status, timeout time.Duration) framew
 	}
 }
 
-// FakePreScorePlugin is a test preScore plugin.
-type FakePreScorePlugin struct {
-	Status *framework.Status
-	name   string
-}
-
-func (pl FakePreScorePlugin) Name() string {
-	return pl.name
-}
-
-func (pl FakePreScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
-	return pl.Status
-}
-
-// NewFakePreScorePlugin initializes a FakePreScorePlugin and returns it.
-func NewFakePreScorePlugin(name string, status *framework.Status) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &FakePreScorePlugin{
-			Status: status,
-			name:   name,
-		}, nil
-	}
-}
-
-// FakeScorePlugin is a test score plugin.
-type FakeScorePlugin struct {
-	name      string
-	FakeScore int64
-	Status    *framework.Status
-}
-
-func (pl FakeScorePlugin) Name() string {
-	return pl.name
-}
-
-func (pl FakeScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
-	return pl.FakeScore, pl.Status
-}
-
-func (pl FakeScorePlugin) ScoreExtensions() framework.ScoreExtensions {
-	return nil
-}
-
-// NewFakeScorePlugin initializes a FakeScorePlugin and returns it.
-func NewFakeScorePlugin(name string, status *framework.Status, score int64) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &FakeScorePlugin{
-			name:      name,
-			Status:    status,
-			FakeScore: score,
-		}, nil
-	}
-}
-
 type FakePreScoreAndScorePlugin struct {
-	name string
-	*FakePreScorePlugin
-	*FakeScorePlugin
+	name           string
+	score          int64
+	preScoreStatus *framework.Status
+	scoreStatus    *framework.Status
 }
 
 // Name returns name of the plugin.
-func (pl FakePreScoreAndScorePlugin) Name() string {
+func (pl *FakePreScoreAndScorePlugin) Name() string {
 	return pl.name
 }
 
-func NewFakePreScoreAndScorePlugin(name string, preScore *FakePreScorePlugin, score *FakeScorePlugin) frameworkruntime.PluginFactory {
+func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+	return pl.score, pl.scoreStatus
+}
+
+func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtensions {
+	return nil
+}
+
+func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	return pl.preScoreStatus
+}
+
+func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, scoreStatus *framework.Status) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreScoreAndScorePlugin{
-			name:               name,
-			FakePreScorePlugin: preScore,
-			FakeScorePlugin:    score,
+			name:           name,
+			score:          score,
+			preScoreStatus: preScoreStatus,
+			scoreStatus:    scoreStatus,
 		}, nil
 	}
 }

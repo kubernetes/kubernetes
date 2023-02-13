@@ -935,8 +935,9 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	allNodePluginScores := make([]framework.NodePluginScores, len(nodes))
-	plugins := make([]framework.ScorePlugin, 0, len(f.scorePlugins)-state.SkipScorePlugins.Len())
-	pluginToNodeScores := make(map[string]framework.NodeScoreList, len(f.scorePlugins)-state.SkipScorePlugins.Len())
+	numPlugins := len(f.scorePlugins) - state.SkipScorePlugins.Len()
+	plugins := make([]framework.ScorePlugin, 0, numPlugins)
+	pluginToNodeScores := make(map[string]framework.NodeScoreList, numPlugins)
 	for _, pl := range f.scorePlugins {
 		if state.SkipScorePlugins.Has(pl.Name()) {
 			continue
