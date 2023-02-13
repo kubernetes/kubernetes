@@ -1649,7 +1649,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				},
 			}
 			cmd.SetArgs(strings.Split(tc.args, " "))
-			addDebugFlags(cmd, opts)
+			opts.AddFlags(cmd)
 
 			cmdError := cmd.Execute()
 
