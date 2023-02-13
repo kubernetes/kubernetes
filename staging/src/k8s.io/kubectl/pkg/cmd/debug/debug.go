@@ -40,6 +40,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -133,6 +134,7 @@ type DebugOptions struct {
 
 	podClient corev1client.CoreV1Interface
 
+	Builder *resource.Builder
 	genericclioptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 
@@ -243,6 +245,20 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		o.Applier = applier
 	}
 
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	o.podClient = client.CoreV1()
+
+	o.Builder = f.NewBuilder()
+
 	return nil
 }
 
@@ -328,13 +344,7 @@ func (o *DebugOptions) Validate() error {
 func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	ctx := context.Background()
 
-	clientset, err := f.KubernetesClientSet()
-	if err != nil {
-		return fmt.Errorf("internal error getting clientset: %v", err)
-	}
-	o.podClient = clientset.CoreV1()
-
-	r := f.NewBuilder().
+	r := o.Builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		FilenameParam(o.explicitNamespace, &o.FilenameOptions).
 		NamespaceParam(o.Namespace).DefaultNamespace().ResourceNames("pods", o.TargetNames...).
@@ -343,7 +353,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			// TODO(verb): configurable early return
 			return err
