@@ -103,7 +103,7 @@ func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSch
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfiguration) {
-	logger := klog.TODO() // called by generated code that doesn't pass a logger
+	logger := klog.TODO() // called by generated code that doesn't pass a logger. See #115724
 	if obj.Parallelism == nil {
 		obj.Parallelism = pointer.Int32(16)
 	}
