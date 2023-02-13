@@ -130,7 +130,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		return nil, false, nil
 	}
 
-	// if there are intentionally no verify options, then we cannot authenticate this request
+	// if there are intentionally no CA bundle contents, then we cannot authenticate this request
 	if len(a.ca.CurrentCABundleContent()) == 0 {
 		return nil, false, nil
 	}
@@ -188,7 +188,7 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 		return nil, false, nil
 	}
 
-	// if there are intentionally no verify options, then we cannot authenticate this request
+	// if there are intentionally no CA bundle contents, then we cannot authenticate this request
 	if len(a.ca.CurrentCABundleContent()) == 0 {
 		return nil, false, nil
 	}
