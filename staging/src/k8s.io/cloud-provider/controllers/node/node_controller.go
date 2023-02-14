@@ -45,7 +45,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -756,9 +755,9 @@ func getNodeProvidedIP(node *v1.Node) (net.IP, error) {
 		return nil, nil
 	}
 
-	nodeIP := netutils.ParseIPSloppy(providedIP)
-	if nodeIP == nil {
-		return nil, fmt.Errorf("failed to parse node IP %q for node %q", providedIP, node.Name)
+	nodeIP, err := nodeutil.ParseNodeIPAnnotation(providedIP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse node IP %q for node %q: %v", providedIP, node.Name, err)
 	}
 
 	return nodeIP, nil
