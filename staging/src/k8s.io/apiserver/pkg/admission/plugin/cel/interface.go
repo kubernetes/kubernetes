@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package cel
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 // Validator defines the func used to validate an object against the validator's rules.
 // It expects the inbound object to already have been converted to the version expected
 // by the underlying CEL code (which is indicated by the match criteria of a policy definition).
 type Validator interface {
-	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
+	Validate(versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
 }
 
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
@@ -45,7 +45,5 @@ type ValidatorCompiler interface {
 	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
 
 	// Compile is used for the cel expression compilation
-	Compile(
-		policy *v1alpha1.ValidatingAdmissionPolicy,
-	) Validator
+	Compile(failPolicy *v1.FailurePolicyType, paramKind *v1alpha1.ParamKind, validations []v1alpha1.Validation) Validator
 }

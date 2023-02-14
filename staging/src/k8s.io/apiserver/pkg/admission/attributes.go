@@ -28,6 +28,31 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+// VersionedAttributes is a wrapper around the original admission attributes, adding versioned
+// variants of the object and old object.
+type VersionedAttributes struct {
+	// Attributes holds the original admission attributes
+	Attributes
+	// VersionedOldObject holds Attributes.OldObject (if non-nil), converted to VersionedKind.
+	// It must never be mutated.
+	VersionedOldObject runtime.Object
+	// VersionedObject holds Attributes.Object (if non-nil), converted to VersionedKind.
+	// If mutated, Dirty must be set to true by the mutator.
+	VersionedObject runtime.Object
+	// VersionedKind holds the fully qualified kind
+	VersionedKind schema.GroupVersionKind
+	// Dirty indicates VersionedObject has been modified since being converted from Attributes.Object
+	Dirty bool
+}
+
+// GetObject overrides the Attributes.GetObject()
+func (v *VersionedAttributes) GetObject() runtime.Object {
+	if v.VersionedObject != nil {
+		return v.VersionedObject
+	}
+	return v.Attributes.GetObject()
+}
+
 type attributesRecord struct {
 	kind        schema.GroupVersionKind
 	namespace   string

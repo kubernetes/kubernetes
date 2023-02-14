@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package cel
 
 import (
 	"net/http"
@@ -47,7 +47,7 @@ type PolicyDecision struct {
 	Elapsed    time.Duration
 }
 
-type policyDecisionWithMetadata struct {
+type PolicyDecisionWithMetadata struct {
 	PolicyDecision
 	Definition *v1alpha1.ValidatingAdmissionPolicy
 	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding

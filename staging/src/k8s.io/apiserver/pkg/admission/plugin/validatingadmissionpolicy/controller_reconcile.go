@@ -19,6 +19,8 @@ package validatingadmissionpolicy
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"sync"
 	"time"
 
@@ -48,7 +50,7 @@ type policyController struct {
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	ValidatorCompiler
+	cel.ValidatorCompiler
 
 	// Lock which protects:
 	//  - cachedPolicies
@@ -85,7 +87,7 @@ func newPolicyController(
 	restMapper meta.RESTMapper,
 	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	validatorCompiler ValidatorCompiler,
+	validatorCompiler cel.ValidatorCompiler,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
 	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
 ) *policyController {
@@ -424,7 +426,11 @@ func (c *policyController) latestPolicyData() []policyData {
 		for bindingNN := range c.definitionsToBindings[definitionNN] {
 			bindingInfo := c.bindingInfos[bindingNN]
 			if bindingInfo.validator == nil && definitionInfo.configurationError == nil {
-				bindingInfo.validator = c.ValidatorCompiler.Compile(definitionInfo.lastReconciledValue)
+				bindingInfo.validator = c.ValidatorCompiler.Compile(
+					v1alphaFailPolicyTov1FailPolicy(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
+					definitionInfo.lastReconciledValue.Spec.ParamKind,
+					definitionInfo.lastReconciledValue.Spec.Validations,
+				)
 			}
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
@@ -445,6 +451,21 @@ func (c *policyController) latestPolicyData() []policyData {
 
 	c.cachedPolicies = res
 	return res
+}
+
+func v1alphaFailPolicyTov1FailPolicy(failPolicy *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+	ignore := v1.Ignore
+	fail := v1.Fail
+	if failPolicy == nil {
+		return nil
+	}
+	if *failPolicy == v1alpha1.Ignore {
+		return &ignore
+	}
+	if *failPolicy == v1alpha1.Fail {
+		return &fail
+	}
+	return nil
 }
 
 func getNamespaceName(namespace, name string) namespacedName {

@@ -67,6 +67,9 @@ type WebhookAccessor interface {
 	// GetAdmissionReviewVersions gets the webhook AdmissionReviewVersions field.
 	GetAdmissionReviewVersions() []string
 
+	// GetMatchConditions gets the webhook MatchConditions field.
+	GetMatchConditions() []v1.MatchCondition
+
 	// GetMutatingWebhook if the accessor contains a MutatingWebhook, returns it and true, else returns false.
 	GetMutatingWebhook() (*v1.MutatingWebhook, bool)
 	// GetValidatingWebhook if the accessor contains a ValidatingWebhook, returns it and true, else returns false.
@@ -163,6 +166,10 @@ func (m *mutatingWebhookAccessor) GetTimeoutSeconds() *int32 {
 
 func (m *mutatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return m.AdmissionReviewVersions
+}
+
+func (m *mutatingWebhookAccessor) GetMatchConditions() []v1.MatchCondition {
+	return m.MatchConditions
 }
 
 func (m *mutatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, bool) {
@@ -263,6 +270,10 @@ func (v *validatingWebhookAccessor) GetTimeoutSeconds() *int32 {
 
 func (v *validatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return v.AdmissionReviewVersions
+}
+
+func (v *validatingWebhookAccessor) GetMatchConditions() []v1.MatchCondition {
+	return v.MatchConditions
 }
 
 func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, bool) {

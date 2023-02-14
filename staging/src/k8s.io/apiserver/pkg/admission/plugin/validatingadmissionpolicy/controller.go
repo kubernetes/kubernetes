@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -87,7 +88,7 @@ type definitionInfo struct {
 
 type bindingInfo struct {
 	// Compiled CEL expression turned into an validator
-	validator Validator
+	validator cel.Validator
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
@@ -118,7 +119,7 @@ func NewAdmissionController(
 			restMapper,
 			client,
 			dynamicClient,
-			&CELValidatorCompiler{
+			&cel.CELValidatorCompiler{
 				Matcher: matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client),
 			},
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
@@ -167,7 +168,7 @@ func (c *celAdmissionController) Validate(
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
-	var deniedDecisions []policyDecisionWithMetadata
+	var deniedDecisions []cel.PolicyDecisionWithMetadata
 
 	addConfigError := func(err error, definition *v1alpha1.ValidatingAdmissionPolicy, binding *v1alpha1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
@@ -190,18 +191,18 @@ func (c *celAdmissionController) Validate(
 			} else {
 				message = fmt.Errorf("failed to configure binding: %w", err).Error()
 			}
-			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-				PolicyDecision: PolicyDecision{
-					Action:  ActionDeny,
+			deniedDecisions = append(deniedDecisions, cel.PolicyDecisionWithMetadata{
+				PolicyDecision: cel.PolicyDecision{
+					Action:  cel.ActionDeny,
 					Message: message,
 				},
 				Definition: definition,
 				Binding:    binding,
 			})
 		default:
-			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-				PolicyDecision: PolicyDecision{
-					Action:  ActionDeny,
+			deniedDecisions = append(deniedDecisions, cel.PolicyDecisionWithMetadata{
+				PolicyDecision: cel.PolicyDecision{
+					Action:  cel.ActionDeny,
 					Message: fmt.Errorf("unrecognized failure policy: '%v'", policy).Error(),
 				},
 				Definition: definition,
@@ -248,7 +249,7 @@ func (c *celAdmissionController) Validate(
 			// is scoped outside of the param loop so we only convert once. We defer
 			// conversion so that it is only performed when we know a policy matches,
 			// saving the cost of converting non-matching requests.
-			var versionedAttr *whgeneric.VersionedAttributes
+			var versionedAttr *admission.VersionedAttributes
 
 			// If definition has paramKind, paramRef is required in binding.
 			// If definition has no paramKind, paramRef set in binding will be ignored.
@@ -320,12 +321,12 @@ func (c *celAdmissionController) Validate(
 
 			for _, decision := range decisions {
 				switch decision.Action {
-				case ActionAdmit:
-					if decision.Evaluation == EvalError {
+				case cel.ActionAdmit:
+					if decision.Evaluation == cel.EvalError {
 						celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 					}
-				case ActionDeny:
-					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+				case cel.ActionDeny:
+					deniedDecisions = append(deniedDecisions, cel.PolicyDecisionWithMetadata{
 						Definition:     definition,
 						Binding:        binding,
 						PolicyDecision: decision,
@@ -354,7 +355,7 @@ func (c *celAdmissionController) Validate(
 			reason = metav1.StatusReasonInvalid
 		}
 		err.ErrStatus.Reason = reason
-		err.ErrStatus.Code = ReasonToCode(reason)
+		err.ErrStatus.Code = cel.ReasonToCode(reason)
 		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Message: message})
 		return err
 	}

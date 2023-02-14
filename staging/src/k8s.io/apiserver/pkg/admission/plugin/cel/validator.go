@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package cel
 
 import (
 	"fmt"
+	v1 "k8s.io/api/admissionregistration/v1"
 	"reflect"
 	"strings"
 	"time"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 var _ ValidatorCompiler = &CELValidatorCompiler{}
@@ -114,25 +114,30 @@ func (a *validationActivation) Parent() interpreter.Activation {
 }
 
 // Compile compiles the cel expression defined in ValidatingAdmissionPolicy
-func (c *CELValidatorCompiler) Compile(p *v1alpha1.ValidatingAdmissionPolicy) Validator {
-	if len(p.Spec.Validations) == 0 {
+func (c *CELValidatorCompiler) Compile(failPolicy *v1.FailurePolicyType, paramKind *v1alpha1.ParamKind, validations []v1alpha1.Validation) Validator {
+	if len(validations) == 0 {
 		return nil
 	}
 	hasParam := false
-	if p.Spec.ParamKind != nil {
+	if paramKind != nil {
 		hasParam = true
 	}
-	compilationResults := make([]CompilationResult, len(p.Spec.Validations))
-	for i, validation := range p.Spec.Validations {
+	compilationResults := make([]CompilationResult, len(validations))
+	for i, validation := range validations {
 		compilationResults[i] = CompileValidatingPolicyExpression(validation.Expression, hasParam)
 	}
-	return &CELValidator{policy: p, compilationResults: compilationResults}
+	return &CELValidator{
+		failPolicy:         failPolicy,
+		compilationResults: compilationResults,
+		validations:        validations,
+	}
 }
 
 // CELValidator implements the Validator interface
 type CELValidator struct {
-	policy             *v1alpha1.ValidatingAdmissionPolicy
+	failPolicy         *v1.FailurePolicyType
 	compilationResults []CompilationResult
+	validations        []v1alpha1.Validation
 }
 
 func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
@@ -157,8 +162,8 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	return v.Object, nil
 }
 
-func policyDecisionActionForError(f v1alpha1.FailurePolicyType) PolicyDecisionAction {
-	if f == v1alpha1.Ignore {
+func policyDecisionActionForError(f v1.FailurePolicyType) PolicyDecisionAction {
+	if f == v1.Ignore {
 		return ActionAdmit
 	}
 	return ActionDeny
@@ -168,7 +173,7 @@ func policyDecisionActionForError(f v1alpha1.FailurePolicyType) PolicyDecisionAc
 // An error will be returned if failed to convert the object/oldObject/params/request to unstructured.
 // Each PolicyDecision will have a decision and a message.
 // policyDecision.message will be empty if the decision is allowed and no error met.
-func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
+func (v *CELValidator) Validate(versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	decisions := make([]PolicyDecision, len(v.compilationResults))
 	var err error
@@ -198,17 +203,16 @@ func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, vers
 		request:   requestVal.Object,
 	}
 
-	var f v1alpha1.FailurePolicyType
-	if v.policy.Spec.FailurePolicy == nil {
-		f = v1alpha1.Fail
+	var f v1.FailurePolicyType
+	if v.failPolicy == nil {
+		f = v1.Fail
 	} else {
-		f = *v.policy.Spec.FailurePolicy
+		f = *v.failPolicy
 	}
 
 	for i, compilationResult := range v.compilationResults {
-		validation := v.policy.Spec.Validations[i]
-
 		var policyDecision = &decisions[i]
+		validation := v.validations[i]
 
 		if compilationResult.Error != nil {
 			policyDecision.Action = policyDecisionActionForError(f)
@@ -229,7 +233,7 @@ func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, vers
 		if err != nil {
 			policyDecision.Action = policyDecisionActionForError(f)
 			policyDecision.Evaluation = EvalError
-			policyDecision.Message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
+			policyDecision.Message = fmt.Sprintf("expression '%v' resulted in error: %v", validation.Expression, err)
 		} else if evalResult != celtypes.True {
 			policyDecision.Action = ActionDeny
 			if validation.Reason == nil {
