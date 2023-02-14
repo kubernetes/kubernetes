@@ -33,16 +33,14 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -72,10 +71,11 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	tracing "k8s.io/component-base/tracing"
+	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -107,6 +107,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )
@@ -1078,6 +1079,14 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		tlsOptions.Config.ClientCAs = clientCAs
 		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
 		tlsOptions.Config.ClientAuth = tls.RequestClientCert
+		tlsOptions.ConnContext = dynamiccertificates.WithChainsConnContext
+
+		tlsOptions.Config.GetConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(
+			func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
+				return tlsOptions.Config, nil
+			},
+			caContentProvider,
+		)
 	}
 
 	return tlsOptions, nil

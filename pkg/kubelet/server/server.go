@@ -40,10 +40,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
-	"k8s.io/utils/clock"
-	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -67,6 +64,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -79,11 +77,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/clock"
+	netutils "k8s.io/utils/net"
 )
 
 func init() {
@@ -113,9 +114,10 @@ type Server struct {
 
 // TLSOptions holds the TLS options.
 type TLSOptions struct {
-	Config   *tls.Config
-	CertFile string
-	KeyFile  string
+	Config      *tls.Config
+	CertFile    string
+	KeyFile     string
+	ConnContext dynamiccertificates.ConnContext
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -171,6 +173,7 @@ func ListenAndServeKubeletServer(
 
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
+		s.ConnContext = tlsOptions.ConnContext
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
