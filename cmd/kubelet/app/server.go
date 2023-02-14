@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -616,11 +617,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if kubeDeps.Auth == nil {
-		auth, runAuthenticatorCAReload, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+		auth, caContentProvider, runAuthenticatorCAReload, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}
 		kubeDeps.Auth = auth
+		kubeDeps.TLSOptions.CAContentProvider = caContentProvider
 		runAuthenticatorCAReload(ctx.Done())
 	}
 
@@ -1081,12 +1083,19 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		tlsOptions.Config.ClientAuth = tls.RequestClientCert
 		tlsOptions.ConnContext = dynamiccertificates.WithChainsConnContext
 
-		tlsOptions.Config.GetConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(
-			func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
-				return tlsOptions.Config, nil
-			},
-			caContentProvider,
-		)
+		var getConfigForClient dynamiccertificates.GetConfigForClient
+		var getConfigForClientOnce sync.Once
+		tlsOptions.Config.GetConfigForClient = func(info *tls.ClientHelloInfo) (*tls.Config, error) {
+			getConfigForClientOnce.Do(func() {
+				getConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(
+					func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
+						return tlsOptions.Config, nil
+					},
+					tlsOptions.CAContentProvider,
+				)
+			})
+			return getConfigForClient(info)
+		}
 	}
 
 	return tlsOptions, nil

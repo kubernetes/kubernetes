@@ -114,10 +114,11 @@ type Server struct {
 
 // TLSOptions holds the TLS options.
 type TLSOptions struct {
-	Config      *tls.Config
-	CertFile    string
-	KeyFile     string
-	ConnContext dynamiccertificates.ConnContext
+	Config            *tls.Config
+	CertFile          string
+	KeyFile           string
+	ConnContext       dynamiccertificates.ConnContext
+	CAContentProvider dynamiccertificates.CAContentProvider
 }
 
 // containerInterface defines the restful.Container functions used on the root container

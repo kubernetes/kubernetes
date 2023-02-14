@@ -32,14 +32,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
-
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
 // It returns AuthInterface, a run method to start internal controllers (like cert reloading) and error.
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, func(<-chan struct{}), error) {
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, dynamiccertificates.CAContentProvider, func(<-chan struct{}), error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.AuthenticationV1Interface
@@ -50,29 +49,29 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1()
 	}
 
-	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
+	authenticator, caContentProvider, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	attributes := server.NewNodeAuthorizerAttributesGetter(nodeName)
 
 	authorizer, err := BuildAuthz(sarClient, config.Authorization)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return server.NewKubeletAuth(authenticator, attributes, authorizer), runAuthenticatorCAReload, nil
+	return server.NewKubeletAuth(authenticator, attributes, authorizer), caContentProvider, runAuthenticatorCAReload, nil
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
+func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, dynamiccertificates.CAContentProvider, func(<-chan struct{}), error) {
 	var dynamicCAContentFromFile *dynamiccertificates.DynamicFileCAContent
 	var err error
 	if len(authn.X509.ClientCAFile) > 0 {
 		dynamicCAContentFromFile, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", authn.X509.ClientCAFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
@@ -84,7 +83,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 
 	if authn.Webhook.Enabled {
 		if client == nil {
-			return nil, nil, errors.New("no client provided, cannot use webhook authentication")
+			return nil, nil, nil, errors.New("no client provided, cannot use webhook authentication")
 		}
 		authenticatorConfig.WebhookRetryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
 		authenticatorConfig.TokenAccessReviewClient = client
@@ -92,10 +91,10 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 
 	authenticator, _, err := authenticatorConfig.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return authenticator, func(stopCh <-chan struct{}) {
+	return authenticator, dynamicCAContentFromFile, func(stopCh <-chan struct{}) {
 		// generate a context from stopCh. This is to avoid modifying files which are relying on this method
 		// TODO: See if we can pass ctx to the current method
 		ctx, cancel := context.WithCancel(context.Background())
