@@ -43,13 +43,13 @@ import (
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
-	"k8s.io/kubernetes/pkg/util/conntrack"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -222,11 +222,11 @@ type Proxier struct {
 	// current is state after applying all of those.
 	endpointsChanges *proxy.EndpointChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
-
-	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
-	nodeLabels   map[string]string
+	conntrack        conntrack.Interface
+	mu               sync.Mutex // protects the following fields
+	svcPortMap       proxy.ServicePortMap
+	endpointsMap     proxy.EndpointsMap
+	nodeLabels       map[string]string
 	// initialSync is a bool indicating if the proxier is syncing for the first time.
 	// It is set to true when a new proxier is initialized and then set to false on all
 	// future syncs.
@@ -422,6 +422,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
 		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, nil),
+		conntrack:             conntrack.NewConntrack(exec),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
@@ -946,21 +947,6 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
-	// merge stale services gathered from updateEndpointsMap
-	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
-			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			staleServices.Insert(svcInfo.ClusterIP().String())
-			for _, extIP := range svcInfo.ExternalIPStrings() {
-				staleServices.Insert(extIP)
-			}
-			for _, extIP := range svcInfo.LoadBalancerIPStrings() {
-				staleServices.Insert(extIP)
-			}
-		}
-	}
-
 	klog.V(3).InfoS("Syncing ipvs proxier rules")
 
 	proxier.serviceNoLocalEndpointsInternal = sets.New[string]()
@@ -1061,11 +1047,11 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
 			continue
 		}
-		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
-		localPortIPFamily := netutils.IPv4
-		if isIPv6 {
-			localPortIPFamily = netutils.IPv6
-		}
+		//isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
+		//localPortIPFamily := netutils.IPv4
+		//if isIPv6 {
+		//	localPortIPFamily = netutils.IPv6
+		//}
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.
@@ -1310,32 +1296,6 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			var lps []netutils.LocalPort
-			for _, address := range nodeAddresses {
-				lp := netutils.LocalPort{
-					Description: "nodePort for " + svcPortNameString,
-					IP:          address,
-					IPFamily:    localPortIPFamily,
-					Port:        svcInfo.NodePort(),
-					Protocol:    netutils.Protocol(svcInfo.Protocol()),
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					// Empty IP address means all
-					lp.IP = ""
-					lps = append(lps, lp)
-					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
-					break
-				}
-				lps = append(lps, lp)
-			}
-
-			// For ports on node IPs, open the actual port and hold it.
-			for _, lp := range lps {
-				if svcInfo.Protocol() != v1.ProtocolSCTP && lp.Protocol == netutils.UDP {
-					conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
-				}
-			}
-
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
 
@@ -1547,17 +1507,11 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
 	}
 
-	// Finish housekeeping.
-	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.ErrorS(err, "Failed to delete stale service IP connections", "IP", svcIP)
-		}
-	}
-	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
-
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
+
+	// clear conntrack entries
+	proxier.conntrack.CleanUp(proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1822,34 +1776,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 		}
 	}
 
-}
-
-// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
-// risk sending more traffic to it, all of which will be lost (because UDP).
-// This assumes the proxier mutex is held
-func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
-	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
-			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			svcProto := svcInfo.Protocol()
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
-			if err != nil {
-				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
-			}
-			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
-				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "IP", extIP)
-				}
-			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
-				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "IP", lbIP)
-				}
-			}
-		}
-	}
 }
 
 func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool, alreadyBoundAddrs sets.Set[string]) error {

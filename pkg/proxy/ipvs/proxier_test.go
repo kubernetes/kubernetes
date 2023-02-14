@@ -22,6 +22,7 @@ package ipvs
 import (
 	"bytes"
 	"fmt"
+	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"net"
 	"reflect"
 	"sort"
@@ -155,6 +156,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
 		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, ipFamily, nil, nil),
+		conntrack:             conntrack.NewConntrack(fexec),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,

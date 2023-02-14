@@ -18,6 +18,7 @@ package iptables
 
 import (
 	"fmt"
+	fakeexec "k8s.io/utils/exec/testing"
 	"testing"
 	"time"
 
@@ -256,7 +257,7 @@ func TestNumberIptablesRules(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			ipt := iptablestest.NewFake()
-			fp := NewFakeProxier(ipt)
+			fp := NewFakeProxier(ipt, &fakeexec.FakeExec{})
 
 			svcs, eps := generateServiceEndpoints(test.services, test.epPerService, test.epsFunc, test.svcFunc)
 
