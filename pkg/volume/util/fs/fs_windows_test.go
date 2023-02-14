@@ -18,9 +18,7 @@ package fs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,21 +26,21 @@ import (
 
 func TestDiskUsage(t *testing.T) {
 
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
 	defer os.RemoveAll(dir1)
 
-	tmpfile1, err := ioutil.TempFile(dir1, "test")
+	tmpfile1, err := os.CreateTemp(dir1, "test")
 	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	dir2, err := ioutil.TempDir(dir1, "dir_2")
+	dir2, err := os.MkdirTemp(dir1, "dir_2")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	tmpfile2, err := ioutil.TempFile(dir2, "test")
+	tmpfile2, err := os.CreateTemp(dir2, "test")
 	if _, err = tmpfile2.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
@@ -92,49 +90,49 @@ func TestDiskUsage(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestInfo failed: %s", err.Error())
 	}
 	defer os.RemoveAll(dir1)
 
 	// should pass for folder path
-	availablebytes, capacity, usage, inodesTotal, inodesFree, inodeUsage, err := Info(dir1)
+	info, err := Info(dir1)
 	if err != nil {
 		t.Errorf("Info() should not error = %v", err)
 		return
 	}
-	validateInfo(t, availablebytes, capacity, usage, inodesTotal, inodeUsage, inodesFree)
+	validateInfo(t, info)
 
 	// should pass for file
-	tmpfile1, err := ioutil.TempFile(dir1, "test")
+	tmpfile1, err := os.CreateTemp(dir1, "test")
 	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestInfo failed: %s", err.Error())
 	}
-	availablebytes, capacity, usage, inodesTotal, inodesFree, inodeUsage, err = Info(tmpfile1.Name())
-	validateInfo(t, availablebytes, capacity, usage, inodesTotal, inodeUsage, inodesFree)
+	info, err = Info(tmpfile1.Name())
+	validateInfo(t, info)
 }
 
-func validateInfo(t *testing.T, availablebytes int64, capacity int64, usage int64, inodesTotal int64, inodeUsage int64, inodesFree int64) {
+func validateInfo(t *testing.T, info FSInfo) {
 	// All of these should be greater than zero on a real system
-	if availablebytes <= 0 {
-		t.Errorf("Info() availablebytes should be greater than 0, got %v", availablebytes)
+	if info.Available <= 0 {
+		t.Errorf("Info() availablebytes should be greater than 0, got %v", info.Available)
 	}
-	if capacity <= 0 {
-		t.Errorf("Info() capacity should be greater than 0, got %v", capacity)
+	if info.Capacity <= 0 {
+		t.Errorf("Info() capacity should be greater than 0, got %v", info.Capacity)
 	}
-	if usage <= 0 {
-		t.Errorf("Info() got usage should be greater than 0, got %v", usage)
+	if info.Usage <= 0 {
+		t.Errorf("Info() got usage should be greater than 0, got %v", info.Usage)
 	}
 
 	// inodes will always be zero for Windows
-	if inodesTotal != 0 {
-		t.Errorf("Info() inodesTotal = %v, want %v", inodeUsage, 0)
+	if info.Inodes != 0 {
+		t.Errorf("Info() inodesTotal = %v, want %v", info.Inodes, 0)
 	}
-	if inodesFree != 0 {
-		t.Errorf("Info() inodesFree = %v, want %v", inodesFree, 0)
+	if info.InodesFree != 0 {
+		t.Errorf("Info() inodesFree = %v, want %v", info.InodesFree, 0)
 	}
-	if inodeUsage != 0 {
-		t.Errorf("Info() inodeUsage = %v, want %v", inodeUsage, 0)
+	if info.InodesUsed != 0 {
+		t.Errorf("Info() inodeUsage = %v, want %v", info.InodesUsed, 0)
 	}
 }

@@ -61,15 +61,15 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
 func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(md.path)
+	info, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}
-	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
-	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
-	metrics.Used = resource.NewQuantity(usage, resource.BinarySI)
-	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
-	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
-	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+	metrics.Available = resource.NewQuantity(info.Available, resource.BinarySI)
+	metrics.Capacity = resource.NewQuantity(info.Capacity, resource.BinarySI)
+	metrics.Used = resource.NewQuantity(info.Usage, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(info.Inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(info.InodesFree, resource.BinarySI)
+	metrics.InodesUsed = resource.NewQuantity(info.InodesUsed, resource.BinarySI)
 	return nil
 }

@@ -73,13 +73,13 @@ func (md *metricsDu) getDiskUsage(metrics *Metrics) error {
 // getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
 // info
 func (md *metricsDu) getFsInfo(metrics *Metrics) error {
-	available, capacity, _, inodes, inodesFree, _, err := fs.Info(md.path)
+	info, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}
-	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
-	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
-	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
-	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
+	metrics.Available = resource.NewQuantity(info.Available, resource.BinarySI)
+	metrics.Capacity = resource.NewQuantity(info.Capacity, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(info.Inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(info.InodesFree, resource.BinarySI)
 	return nil
 }

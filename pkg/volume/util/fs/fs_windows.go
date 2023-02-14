@@ -33,11 +33,6 @@ var (
 	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 )
 
-type UsageInfo struct {
-	Bytes  int64
-	Inodes int64
-}
-
 // Info returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
