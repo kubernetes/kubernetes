@@ -17,9 +17,13 @@ limitations under the License.
 package debug
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -106,39 +110,101 @@ func dumpAllNodeInfo(ctx context.Context, c clientset.Interface, nodes *v1.NodeL
 // DumpNodeDebugInfo dumps debug information of the given nodes.
 func DumpNodeDebugInfo(ctx context.Context, c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{})) {
 	for _, n := range nodeNames {
-		logFunc("\nLogging node info for node %v", n)
+		logFunc("")
+		logFunc("Logging node info for node %v", n)
 		node, err := c.CoreV1().Nodes().Get(ctx, n, metav1.GetOptions{})
 		if err != nil {
 			logFunc("Error getting node info %v", err)
 		}
-		logFunc("Node Info: %v", node)
-
-		logFunc("\nLogging kubelet events for node %v", n)
+		nodeString, _ := json.Marshal(node)
+		logFunc("Node Info: %s", nodeString)
+		logFunc("")
+		logFunc("Logging kubelet events for node %v", n)
 		for _, e := range getNodeEvents(ctx, c, n) {
 			logFunc("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
-		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
+		logFunc("")
+		logFunc("Logging pods the kubelet thinks is on node %v", n)
 		podList, err := getKubeletPods(ctx, c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
 		}
-		for _, p := range podList.Items {
-			logFunc("%v started at %v (%d+%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
-			for _, c := range p.Status.InitContainerStatuses {
-				logFunc("\tInit container %v ready: %v, restart count %v",
-					c.Name, c.Ready, c.RestartCount)
-			}
-			for _, c := range p.Status.ContainerStatuses {
-				logFunc("\tContainer %v ready: %v, restart count %v",
-					c.Name, c.Ready, c.RestartCount)
-			}
+		for _, line := range formatTabularPods(podList.Items) {
+			logFunc("%s", line)
 		}
 		_, err = e2emetrics.HighLatencyKubeletOperations(ctx, c, 10*time.Second, n, logFunc)
 		framework.ExpectNoError(err)
 		// TODO: Log node resource info
 	}
+}
+
+// formatContainerState summarizes container status into a compact string and a timestamp.
+func formatContainerState(state v1.ContainerState) (string, string) {
+	switch {
+	case state.Running != nil:
+		return "running", state.Running.StartedAt.UTC().Format(time.RFC3339)
+	case state.Terminated != nil:
+		return fmt.Sprintf("terminated:%s", state.Terminated.Reason), state.Terminated.FinishedAt.UTC().Format(time.RFC3339)
+	case state.Waiting != nil:
+		return fmt.Sprintf("waiting:%s", state.Waiting.Reason), ""
+	default:
+		return "<unknown>", ""
+	}
+}
+
+// formatTabularPods creates a table of pods with container statuses interspersed. The output should
+// summarize the state of containers on a node in test output and should help a reader debug what the
+// kubelet thinks is happening on a node at a given point.
+func formatTabularPods(pods []v1.Pod) []string {
+	var lines []string
+
+	// note: newlines are at the beginning of each line
+
+	var pbuf bytes.Buffer
+	pw := tabwriter.NewWriter(&pbuf, 0, 1, 1, ' ', 0)
+	fmt.Fprintf(pw, "POD\tPHASE\tSTART")
+	for _, p := range pods {
+		if p.Status.StartTime != nil {
+			fmt.Fprintf(pw, "\n%s\t%s\t%s", p.Name, p.Status.Phase, p.Status.StartTime.UTC().Format(time.RFC3339))
+		} else {
+			fmt.Fprintf(pw, "\n%s\t%s\t%s", p.Name, p.Status.Phase, "")
+		}
+	}
+	pw.Flush()
+
+	var cbuf bytes.Buffer
+	cw := tabwriter.NewWriter(&cbuf, 0, 1, 1, ' ', 0)
+	fmt.Fprintf(cw, "  \tNAME\tREADY\tRESTARTS\tSTATE\tTIME")
+	for _, p := range pods {
+		for _, c := range p.Status.InitContainerStatuses {
+			state, lastTime := formatContainerState(c.State)
+			fmt.Fprintf(cw, "\n  %s\t%s\t%t\t%d\t%s\t%s", "I", c.Name, c.Ready, c.RestartCount, state, lastTime)
+		}
+		for _, c := range p.Status.ContainerStatuses {
+			state, lastTime := formatContainerState(c.State)
+			fmt.Fprintf(cw, "\n  %s\t%s\t%t\t%d\t%s\t%s", "C", c.Name, c.Ready, c.RestartCount, state, lastTime)
+		}
+		for _, c := range p.Status.EphemeralContainerStatuses {
+			state, lastTime := formatContainerState(c.State)
+			fmt.Fprintf(cw, "\n  %s\t%s\t%t\t%d\t%s\t%s", "E", c.Name, c.Ready, c.RestartCount, state, lastTime)
+		}
+	}
+	cw.Flush()
+
+	podLines := strings.Split(pbuf.String(), "\n")
+	containerLines := strings.Split(cbuf.String(), "\n")
+	lines = append(lines, podLines[:1]...)
+	lines = append(lines, containerLines[:1]...)
+	containerLines = containerLines[1:]
+	for i, podLine := range podLines[1:] {
+		containerLen := len(pods[i].Status.InitContainerStatuses) + len(pods[i].Status.ContainerStatuses) + len(pods[i].Status.EphemeralContainerStatuses)
+		lines = append(lines, podLine)
+		lines = append(lines, containerLines[:containerLen]...)
+		containerLines = containerLines[containerLen:]
+	}
+	return lines
 }
 
 // getKubeletPods retrieves the list of pods on the kubelet.
