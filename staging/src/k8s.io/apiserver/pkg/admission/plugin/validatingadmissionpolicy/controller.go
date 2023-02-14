@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -320,7 +321,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			decisions := bindingInfo.validator.Validate(versionedAttr, param)
+			decisions := bindingInfo.validator.Validate(versionedAttr, param, celconfig.RuntimeCELCostBudget)
 
 			for _, decision := range decisions {
 				switch decision.Action {

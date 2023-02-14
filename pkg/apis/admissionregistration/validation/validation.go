@@ -21,8 +21,6 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
-
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +29,8 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 
@@ -740,7 +740,7 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 			Expression: trimmedExpression,
 			Message:    v.Message,
 			Reason:     v.Reason,
-		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true})
+		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true}, celconfig.PerCallLimit)
 		if result.Error != nil {
 			switch result.Error.Type {
 			case cel.ErrorTypeRequired:

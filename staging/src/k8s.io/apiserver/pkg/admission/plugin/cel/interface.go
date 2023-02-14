@@ -65,7 +65,8 @@ type OptionalVariableDeclarations struct {
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
 type FilterCompiler interface {
 	// Compile is used for the cel expression compilation
-	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations) Filter
+	// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
+	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, perCallLimit uint64) Filter
 }
 
 // OptionalVariableBindings provides expression bindings for optional CEL variables.
@@ -84,7 +85,8 @@ type OptionalVariableBindings struct {
 // by the underlying CEL code (which is indicated by the match criteria of a policy definition).
 type Filter interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed values
-	ForInput(versionedAttr *generic.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings) ([]EvaluationResult, error)
+	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
+	ForInput(versionedAttr *generic.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error

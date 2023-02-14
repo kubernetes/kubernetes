@@ -27,6 +27,7 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -87,7 +88,7 @@ func TestCompile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var c filterCompiler
-			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false})
+			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -144,13 +145,14 @@ func TestFilter(t *testing.T) {
 
 	var nilUnstructured *unstructured.Unstructured
 	cases := []struct {
-		name         string
-		attributes   admission.Attributes
-		params       runtime.Object
-		validations  []ExpressionAccessor
-		results      []EvaluationResult
-		hasParamKind bool
-		authorizer   authorizer.Authorizer
+		name             string
+		attributes       admission.Attributes
+		params           runtime.Object
+		validations      []ExpressionAccessor
+		results          []EvaluationResult
+		hasParamKind     bool
+		authorizer       authorizer.Authorizer
+		testPerCallLimit uint64
 	}{
 		{
 			name: "valid syntax for object",
@@ -616,12 +618,32 @@ func TestFilter(t *testing.T) {
 				APIVersion:      "*",
 			}),
 		},
+		{
+			name: "test perCallLimit exceed",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "object.subsets.size() < params.spec.testSize",
+				},
+			},
+			attributes: newValidAttribute(nil, false),
+			results: []EvaluationResult{
+				{
+					Error: errors.New(fmt.Sprintf("operation cancelled: actual cost limit exceeded")),
+				},
+			},
+			hasParamKind:     true,
+			params:           crdParams,
+			testPerCallLimit: 1,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := filterCompiler{}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil})
+			if tc.testPerCallLimit == 0 {
+				tc.testPerCallLimit = celconfig.PerCallLimit
+			}
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, tc.testPerCallLimit)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -635,7 +657,7 @@ func TestFilter(t *testing.T) {
 			}
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
-			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars)
+			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -647,6 +669,111 @@ func TestFilter(t *testing.T) {
 				if result.Error != nil && !strings.Contains(evalResults[i].Error.Error(), result.Error.Error()) {
 					t.Errorf("Expected result '%v' but got '%v'", result.Error, evalResults[i].Error)
 				}
+			}
+		})
+	}
+}
+
+func TestRuntimeCELCostBudget(t *testing.T) {
+	configMapParams := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Data: map[string]string{
+			"fakeString": "fake",
+		},
+	}
+
+	cases := []struct {
+		name                     string
+		attributes               admission.Attributes
+		params                   runtime.Object
+		validations              []ExpressionAccessor
+		hasParamKind             bool
+		authorizer               authorizer.Authorizer
+		testRuntimeCELCostBudget int64
+		exceedBudget             bool
+	}{
+		{
+			name: "expression exceed RuntimeCELCostBudget at fist expression",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "has(object.subsets) && object.subsets.size() < 2",
+				},
+				&condition{
+					Expression: "has(object.subsets)",
+				},
+			},
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			testRuntimeCELCostBudget: 1,
+			exceedBudget:             true,
+		},
+		{
+			name: "expression exceed RuntimeCELCostBudget at last expression",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "has(object.subsets) && object.subsets.size() < 2",
+				},
+				&condition{
+					Expression: "object.subsets.size() > 2",
+				},
+			},
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			testRuntimeCELCostBudget: 5,
+			exceedBudget:             true,
+		},
+		{
+			name: "test RuntimeCELCostBudge is not exceed",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "oldObject != null",
+				},
+				&condition{
+					Expression: "object.subsets.size() > 2",
+				},
+			},
+			attributes:   newValidAttribute(nil, false),
+			hasParamKind: true,
+			params:       configMapParams,
+			exceedBudget: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := filterCompiler{}
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: false}, celconfig.PerCallLimit)
+			if f == nil {
+				t.Fatalf("unexpected nil validator")
+			}
+			validations := tc.validations
+			CompilationResults := f.(*filter).compilationResults
+			require.Equal(t, len(validations), len(CompilationResults))
+
+			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
+			if err != nil {
+				t.Fatalf("unexpected error on conversion: %v", err)
+			}
+
+			if tc.testRuntimeCELCostBudget == 0 {
+				tc.testRuntimeCELCostBudget = celconfig.RuntimeCELCostBudget
+			}
+			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
+			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
+			if tc.exceedBudget && err == nil {
+				t.Errorf("Expected RuntimeCELCostBudge to be exceeded but got nil")
+			}
+			if tc.exceedBudget && !strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+				t.Errorf("Expected RuntimeCELCostBudge exceeded error but got: %v", err)
+			}
+			if err != nil && !tc.exceedBudget {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.exceedBudget && len(evalResults) != 0 {
+				t.Fatalf("unexpected result returned: %v", evalResults)
 			}
 		})
 	}
