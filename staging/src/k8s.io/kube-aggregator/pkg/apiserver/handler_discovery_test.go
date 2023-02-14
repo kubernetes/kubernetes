@@ -221,6 +221,164 @@ func TestRemoveAPIService(t *testing.T) {
 	}
 }
 
+func TestLegacyFallbackNoCache(t *testing.T) {
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
+
+	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
+		Name: "stable.example.com",
+		PreferredVersion: metav1.GroupVersionForDiscovery{
+			GroupVersion: "stable.example.com/v1",
+			Version:      "v1",
+		},
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: "stable.example.com/v1",
+				Version:      "v1",
+			},
+			{
+				GroupVersion: "stable.example.com/v1beta1",
+				Version:      "v1beta1",
+			},
+			{
+				GroupVersion: "stable.example.com/v1alpha1",
+				Version:      "v1alpha1",
+			},
+		},
+	})
+
+	generateVersionResource := func(version string) metav1.APIResource {
+		return metav1.APIResource{
+			Name:         "foos",
+			SingularName: "foo",
+			Group:        "stable.example.com",
+			Version:      version,
+			Namespaced:   false,
+			Kind:         "Foo",
+			Verbs:        []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"},
+			Categories:   []string{"all"},
+		}
+	}
+
+	resources := map[string]metav1.APIResource{
+		"v1":       generateVersionResource("v1"),
+		"v1beta1":  generateVersionResource("v1beta1"),
+		"v1alpha1": generateVersionResource("v1alpha1"),
+	}
+
+	legacyResourceHandlerV1 := discovery.NewAPIVersionHandler(scheme.Codecs, schema.GroupVersion{
+		Group:   "stable.example.com",
+		Version: "v1",
+	}, discovery.APIResourceListerFunc(func() []metav1.APIResource {
+		return []metav1.APIResource{
+			resources["v1"],
+		}
+	}))
+
+	legacyResourceHandlerV1Beta1 := discovery.NewAPIVersionHandler(scheme.Codecs, schema.GroupVersion{
+		Group:   "stable.example.com",
+		Version: "v1beta1",
+	}, discovery.APIResourceListerFunc(func() []metav1.APIResource {
+		return []metav1.APIResource{
+			resources["v1beta1"],
+		}
+	}))
+
+	legacyResourceHandlerV1Alpha1 := discovery.NewAPIVersionHandler(scheme.Codecs, schema.GroupVersion{
+		Group:   "stable.example.com",
+		Version: "v1alpha1",
+	}, discovery.APIResourceListerFunc(func() []metav1.APIResource {
+		return []metav1.APIResource{
+			resources["v1alpha1"],
+		}
+	}))
+
+	handlerFunc := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/apis/stable.example.com" {
+			legacyGroupHandler.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis/stable.example.com/v1" {
+			// defer to legacy discovery
+			legacyResourceHandlerV1.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis/stable.example.com/v1beta1" {
+			// defer to legacy discovery
+			legacyResourceHandlerV1Beta1.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis/stable.example.com/v1alpha1" {
+			legacyResourceHandlerV1Alpha1.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis" {
+			rootAPIsHandler.ServeHTTP(w, r)
+		} else {
+			// Unknown url
+			t.Fatalf("unexpected request sent to %v", r.URL.Path)
+		}
+	})
+
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, handlerFunc)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1beta1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1beta1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, handlerFunc)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1alpha1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1alpha1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, handlerFunc)
+
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done())
+	require.True(t, waitForEmptyQueue(testCtx.Done(), aggregatedManager))
+
+	// At this point external services have synced. Check if discovery document
+	// includes the legacy resources
+	_, _, doc := fetchPath(aggregatedResourceManager, "")
+
+	aggregatedVersions := []apidiscoveryv2beta1.APIVersionDiscovery{}
+	for _, resource := range resources {
+		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resource})
+		require.NoError(t, err)
+		aggregatedVersions = append(aggregatedVersions, apidiscoveryv2beta1.APIVersionDiscovery{
+			Version:   resource.Version,
+			Resources: converted,
+			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+		})
+	}
+	aggregatedDiscovery := []apidiscoveryv2beta1.APIGroupDiscovery{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resources["v1"].Group,
+		},
+		Versions: aggregatedVersions,
+	}}
+	require.Equal(t, aggregatedDiscovery, doc.Items)
+}
+
 func TestLegacyFallback(t *testing.T) {
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
 	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
