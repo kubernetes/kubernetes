@@ -199,6 +199,21 @@ type QueuedPodInfo struct {
 	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
+
+	// MoveRequestCycle is used by the PriorityQueue. Other queue
+	// implementations can ignore it.
+	//
+	// It caches the sequence number of scheduling cycle when we received a
+	// move request, typically because of a cluster event. When a pod
+	// scheduling attempt fails with "Unschedulable" in or before this
+	// cycle, it is placed in the backoff queue instead of the normal queue
+	// of unschedulable pods. This causes additional delays due to
+	// timeouts, but is necessary because the event that would have moved
+	// them out of the normal queue was already processed and thus the pod
+	// would be stuck in that queue unless some other event activates it.
+	// In the backoff queue it will be considered again without a cluster
+	// event.
+	MoveRequestCycle int64
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.

@@ -107,6 +107,9 @@ type SchedulingQueue interface {
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop() (*framework.QueuedPodInfo, error)
+	// Done must be called pod returned by Pop. This allows the queue to
+	// keep track of which pods are currently being processed.
+	Done(types.UID)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
 	MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck)
@@ -157,6 +160,13 @@ type PriorityQueue struct {
 
 	cond sync.Cond
 
+	// inFlightPods holds the UID of all pods which have been popped out for which Done
+	// hasn't been called yet - in other words, all pods that are currently being
+	// processed. For each of those, it stores PodInfo.MoveRequestCycle (if one was observed)
+	// and the pod object. This is intentionally not a PodInfo pointer because accessing
+	// fields in the PodInfo is tricky and could result in race conditons. The Pod struct
+	// is read-only and represents the state of the pod when scheduling it started.
+	inFlightPods map[types.UID]inFlightPod
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
 	activeQ *heap.Heap
@@ -168,11 +178,6 @@ type PriorityQueue struct {
 	// schedulingCycle represents sequence number of scheduling cycle and is incremented
 	// when a pod is popped.
 	schedulingCycle int64
-	// moveRequestCycle caches the sequence number of scheduling cycle when we
-	// received a move request. Unschedulable pods in and before this scheduling
-	// cycle will be put back to activeQueue if we were trying to schedule them
-	// when we received move request.
-	moveRequestCycle int64
 
 	clusterEventMap framework.ClusterEventMap
 	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
@@ -187,6 +192,11 @@ type PriorityQueue struct {
 	metricsRecorder metrics.MetricAsyncRecorder
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
+}
+
+type inFlightPod struct {
+	pod              *v1.Pod
+	moveRequestCycle int64
 }
 
 type priorityQueueOptions struct {
@@ -314,13 +324,16 @@ func NewPriorityQueue(
 		podInitialBackoffDuration:         options.podInitialBackoffDuration,
 		podMaxBackoffDuration:             options.podMaxBackoffDuration,
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
+		inFlightPods:                      make(map[types.UID]inFlightPod),
 		activeQ:                           heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		moveRequestCycle:                  -1,
 		clusterEventMap:                   options.clusterEventMap,
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
+
+		// QueuedPodInfo.MoveRequestCycle gets initialized with zero, so here we make it one higher.
+		schedulingCycle: 1,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -516,11 +529,26 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	for plugin := range pInfo.UnschedulablePlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
-	if p.moveRequestCycle >= podSchedulingCycle {
+	// While the pod was in flight, a more recent cycle number might have
+	// been recorded for it in p.inFlightPods, so in that case we need to
+	// honor the more recent cycle number.
+	moveRequestCycle := pInfo.MoveRequestCycle
+	inFlightMoveRequestCycle := p.inFlightPods[pInfo.Pod.UID].moveRequestCycle
+	if inFlightMoveRequestCycle > moveRequestCycle {
+		moveRequestCycle = inFlightMoveRequestCycle
+	}
+	if moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
 		}
-		klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQName)
+		if klogV := klog.V(6); klogV.Enabled() {
+			// Log more information about the cycle counters.
+			klog.V(6).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQName,
+				"podMoveRequestCycle", pInfo.MoveRequestCycle, "inFlightMoveRequestCycle", inFlightMoveRequestCycle,
+				"schedulingCycle", podSchedulingCycle)
+		} else {
+			klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQName)
+		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", ScheduleAttemptFailure).Inc()
 	} else {
 		p.unschedulablePods.addOrUpdate(pInfo)
@@ -607,7 +635,15 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
+	// In flight, no move request yet.
+	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{pod: pInfo.Pod}
 	return pInfo, nil
+}
+
+func (p *PriorityQueue) Done(pod types.UID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	delete(p.inFlightPods, pod)
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
@@ -764,7 +800,7 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(event framework.ClusterEve
 			activated = true
 		}
 	}
-	p.moveRequestCycle = p.schedulingCycle
+	p.checkInFlightPods(event, preCheck)
 	if activated {
 		p.cond.Broadcast()
 	}
@@ -792,7 +828,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			activated = true
 		}
 	}
-	p.moveRequestCycle = p.schedulingCycle
+	p.checkInFlightPods(event, nil)
 	if activated {
 		p.cond.Broadcast()
 	}
@@ -822,10 +858,35 @@ func (p *PriorityQueue) movePodToActiveOrBackoffQueue(pInfo *framework.QueuedPod
 			klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQName)
 			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
 			p.unschedulablePods.delete(pod, gated)
+			pInfo.MoveRequestCycle = p.schedulingCycle
 			return true
 		}
 	}
 	return false
+}
+
+func (p *PriorityQueue) checkInFlightPods(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
+	// Besides setting MoveRequestCycle for all pods which got moved in
+	// movePodToActiveOrBackoffQueue, we also need to set it for pods that
+	// are being processed because AddUnschedulableIfNotPresent might get
+	// called for them, and in AddUnschedulableIfNotPresent we need to know
+	// whether events where observed while processing them.
+	for uid, inFlight := range p.inFlightPods {
+		if preCheck != nil &&
+			preCheck(inFlight.pod) == framework.PodNotAffected {
+			continue
+		}
+		// TODO: forcing a pod into backoff because of some event that
+		// doesn't affect it slows down scheduling. Can we detect more
+		// unrelated events even when they don't have a preCheck?
+		// For example, PodSchedulingContextUpdate?
+		if event.Label == "PodSchedulingContextUpdate" {
+			continue
+		}
+		klog.V(6).InfoS("In-flight pod with concurrent event", "pod", klog.KObj(inFlight.pod), "event", event.Label, "schedulingCycle", p.schedulingCycle)
+		inFlight.moveRequestCycle = p.schedulingCycle
+		p.inFlightPods[uid] = inFlight
+	}
 }
 
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
@@ -1148,10 +1209,11 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 	}
 }
 
-// MakeNextPodFunc returns a function to retrieve the next pod from a given
-// scheduling queue
-func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
-	return func() *framework.QueuedPodInfo {
+// MakeNextPodFuncs returns two functions to retrieve the next pod from a given
+// scheduling queue. For each pod info retrieved via it, the done function
+// must be called when no longer processing the pod.
+func MakeNextPodFuncs(queue SchedulingQueue) (next func() *framework.QueuedPodInfo, done func(types.UID)) {
+	next = func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
 		if err == nil {
 			klog.V(4).InfoS("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
@@ -1163,6 +1225,10 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 		klog.ErrorS(err, "Error while retrieving next pod from scheduling queue")
 		return nil
 	}
+	done = func(pod types.UID) {
+		queue.Done(pod)
+	}
+	return
 }
 
 func podInfoKeyFunc(obj interface{}) (string, error) {

@@ -212,8 +212,11 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 		}
 	}
 
-	// move all pods to active queue when we were trying to schedule them
-	q.MoveAllToActiveOrBackoffQueue(TestEvent, nil)
+	// Remember the current cycle. By using it for the fabricated PodQueueInfo below,
+	// this test simulates the situation that a cluster event causes the pod to
+	// be moved while it is being scheduled. Calling MoveAllToActiveOrBackoffQueue
+	// here wouldn't do anything because it only operates on unscheduleable pods,
+	// and the current ones aren't in that state yet.
 	oldCycle := q.SchedulingCycle()
 
 	firstPod, _ := q.Pop()
@@ -234,7 +237,9 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		if err := q.AddUnschedulableIfNotPresent(newQueuedPodInfoForLookup(unschedulablePod), oldCycle); err != nil {
+		pInfo := newQueuedPodInfoForLookup(unschedulablePod)
+		pInfo.MoveRequestCycle = oldCycle
+		if err := q.AddUnschedulableIfNotPresent(pInfo, oldCycle); err != nil {
 			t.Errorf("Failed to call AddUnschedulableIfNotPresent(%v): %v", unschedulablePod.Name, err)
 		}
 	}
@@ -1873,22 +1878,28 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
 	metrics.Register()
-	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
-	for i := 1; i <= 3; i++ {
-		p := &framework.QueuedPodInfo{
-			PodInfo: mustNewTestPodInfo(t,
-				st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
-			Timestamp: timestamp,
+	newPInfos := func(moveRequestCycle int64) []*framework.QueuedPodInfo {
+		var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
+		for i := 1; i <= 3; i++ {
+			p := &framework.QueuedPodInfo{
+				PodInfo: mustNewTestPodInfo(t,
+					st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
+				Timestamp:        timestamp,
+				MoveRequestCycle: moveRequestCycle,
+			}
+			pInfos = append(pInfos, p)
 		}
-		pInfos = append(pInfos, p)
+		return pInfos
 	}
 	tests := []struct {
 		name       string
+		pInfos     []*framework.QueuedPodInfo
 		operations []operation
 		want       string
 	}{
 		{
-			name: "add pods to activeQ",
+			name:   "add pods to activeQ",
+			pInfos: newPInfos(-1),
 			operations: []operation{
 				add,
 			},
@@ -1897,7 +1908,8 @@ func TestIncomingPodsMetrics(t *testing.T) {
 `,
 		},
 		{
-			name: "add pods to unschedulablePods",
+			name:   "add pods to unschedulablePods",
+			pInfos: newPInfos(-1 /* not the same cycle as in addUnschedulablePodBackToUnschedulablePods */),
 			operations: []operation{
 				addUnschedulablePodBackToUnschedulablePods,
 			},
@@ -1906,7 +1918,18 @@ func TestIncomingPodsMetrics(t *testing.T) {
 `,
 		},
 		{
-			name: "add pods to unschedulablePods and then move all to backoffQ",
+			name:   "add pods to backoff",
+			pInfos: newPInfos(0 /* same cycle as in addUnschedulablePodBackToUnschedulablePods */),
+			operations: []operation{
+				addUnschedulablePodBackToUnschedulablePods,
+			},
+			want: `
+             scheduler_queue_incoming_pods_total{event="ScheduleAttemptFailure",queue="backoff"} 3
+`,
+		},
+		{
+			name:   "add pods to unschedulablePods and then move all to backoffQ",
+			pInfos: newPInfos(-1),
 			operations: []operation{
 				addUnschedulablePodBackToUnschedulablePods,
 				moveAllToActiveOrBackoffQ,
@@ -1916,7 +1939,8 @@ func TestIncomingPodsMetrics(t *testing.T) {
 `,
 		},
 		{
-			name: "add pods to unschedulablePods and then move all to activeQ",
+			name:   "add pods to unschedulablePods and then move all to activeQ",
+			pInfos: newPInfos(-1),
 			operations: []operation{
 				addUnschedulablePodBackToUnschedulablePods,
 				moveClockForward,
@@ -1927,7 +1951,8 @@ func TestIncomingPodsMetrics(t *testing.T) {
 `,
 		},
 		{
-			name: "make some pods subject to backoff and add them to backoffQ, then flush backoffQ",
+			name:   "make some pods subject to backoff and add them to backoffQ, then flush backoffQ",
+			pInfos: newPInfos(-1),
 			operations: []operation{
 				addUnschedulablePodBackToBackoffQ,
 				moveClockForward,
@@ -1946,7 +1971,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 			defer cancel()
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			for _, op := range test.operations {
-				for _, pInfo := range pInfos {
+				for _, pInfo := range test.pInfos {
 					op(queue, pInfo)
 				}
 			}

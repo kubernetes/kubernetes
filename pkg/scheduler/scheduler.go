@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -70,6 +71,9 @@ type Scheduler struct {
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
 	NextPod func() *framework.QueuedPodInfo
+
+	// DonePod must be called when the processing of the pod is completed.
+	DonePod func(pod types.UID)
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
@@ -337,11 +341,11 @@ func New(client clientset.Interface,
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: options.percentageOfNodesToScore,
 		Extenders:                extenders,
-		NextPod:                  internalqueue.MakeNextPodFunc(podQueue),
 		StopEverything:           stopEverything,
 		SchedulingQueue:          podQueue,
 		Profiles:                 profiles,
 	}
+	sched.NextPod, sched.DonePod = internalqueue.MakeNextPodFuncs(podQueue)
 	sched.applyDefaultHandlers()
 
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, clusterEventMap)
