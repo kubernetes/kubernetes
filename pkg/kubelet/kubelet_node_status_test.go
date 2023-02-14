@@ -46,8 +46,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/version"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -1212,7 +1214,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 				},
 			}
 
-			nodeLister := testNodeLister{[]*v1.Node{node.DeepCopy()}}
+			nodeLister := testNodeLister(node.DeepCopy())
 			kubelet.nodeLister = nodeLister
 
 			callCount := 0
@@ -1230,7 +1232,11 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 					}
 				}
 				if callCount > tc.beforeNextReady {
-					nodeLister.nodes[0].Status.Conditions[0].Status = v1.ConditionTrue
+					n, err := nodeLister.Get(node.Name)
+					if err != nil {
+						t.Fatalf("unexpected error getting node %s : %v", node.Name, err)
+					}
+					n.Status.Conditions[0].Status = v1.ConditionTrue
 				}
 				if callCount > tc.beforeTimeout {
 					testKubelet.fakeClock.Step(nodeReadyGracePeriod)
@@ -2675,11 +2681,16 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
-
-	var gotNode runtime.Object
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	kubelet.nodeLister = corelisters.NewNodeLister(store)
+	var gotNode *v1.Node
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		createAction := action.(core.CreateAction)
-		gotNode = createAction.GetObject()
+		gotNode = createAction.GetObject().(*v1.Node)
+		err := store.Add(gotNode)
+		if err != nil {
+			t.Errorf("unexpected error adding node %s to the local store :%v", gotNode.Name, err)
+		}
 		return true, gotNode, nil
 	})
 
@@ -2688,14 +2699,10 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	// Make node to be unschedulable.
 	kubelet.registerSchedulable = false
 
-	// Reset kubelet status for each test.
-	kubelet.registrationCompleted = false
-
 	// Register node to apiserver.
 	kubelet.registerWithAPIServer()
 
 	// Check the unschedulable taint.
-	got := gotNode.(*v1.Node)
 	unschedulableTaint := &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
@@ -2703,8 +2710,61 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	require.Equal(t,
 		true,
-		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+		taintutil.TaintExists(gotNode.Spec.Taints, unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
+}
+
+func TestRegisterWithApiServerMultipleTimes(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	kubelet.nodeLister = corelisters.NewNodeLister(store)
+	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		createAction := action.(core.CreateAction)
+		gotNode := createAction.GetObject().(*v1.Node)
+		err := store.Add(gotNode)
+		if err != nil {
+			t.Errorf("unexpected error adding node %v to the local store :%v", gotNode, err)
+		}
+		return true, gotNode, nil
+	})
+
+	addNotImplatedReaction(kubeClient)
+
+	// Register node to apiserver.
+	kubelet.registerWithAPIServer()
+	if node, err := kubelet.nodeLister.Get(string(kubelet.nodeName)); node == nil || err != nil {
+		t.Fatalf("Node %s has not been registered: %v", kubelet.nodeName, err)
+	}
+
+	// Register multiple times should not perform any additional actions
+	numActions := len(kubeClient.Actions())
+	kubelet.registerWithAPIServer()
+	kubelet.registerWithAPIServer()
+	if numActions != len(kubeClient.Actions()) {
+		t.Fatalf("Unexpacted number of actions, got %d expected %d", len(kubeClient.Actions()), numActions)
+	}
+
+	// If anything deletes the registered Node kubelet should register it again
+	node, err := kubelet.nodeLister.Get(string(kubelet.nodeName))
+	if node == nil || err != nil {
+		t.Fatalf("Node %s has not been registered: %v", kubelet.nodeName, err)
+	}
+	err = store.Delete(node)
+	if err != nil {
+		t.Fatalf("unexpected error deleting node %s from store: %v", node.Name, err)
+	}
+	if node, err := kubelet.nodeLister.Get(string(kubelet.nodeName)); node != nil || err == nil {
+		t.Fatalf("Node %s is still present in the sotre: %v", kubelet.nodeName, err)
+	}
+
+	kubelet.registerWithAPIServer()
+	if node, err := kubelet.nodeLister.Get(string(kubelet.nodeName)); node == nil || err != nil {
+		t.Fatalf("Node %s has not been registered: %v", kubelet.nodeName, err)
+	}
 }
 
 func TestNodeStatusHasChanged(t *testing.T) {

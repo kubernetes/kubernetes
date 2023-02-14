@@ -3464,15 +3464,12 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 
-			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
-					Status: v1.NodeStatus{
-						Addresses: tc.nodeAddresses,
-					},
+			kl.nodeLister = testNodeLister(&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+				Status: v1.NodeStatus{
+					Addresses: tc.nodeAddresses,
 				},
-			}}
-
+			})
 			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
 			pod.Spec.HostNetwork = true
 
@@ -3570,14 +3567,13 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			for _, ip := range tc.nodeIPs {
 				kl.nodeIPs = append(kl.nodeIPs, netutils.ParseIPSloppy(ip))
 			}
-			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
-					Status: v1.NodeStatus{
-						Addresses: tc.nodeAddresses,
-					},
+
+			kl.nodeLister = testNodeLister(&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+				Status: v1.NodeStatus{
+					Addresses: tc.nodeAddresses,
 				},
-			}}
+			})
 
 			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
 			pod.Spec.HostNetwork = true

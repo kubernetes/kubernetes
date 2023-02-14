@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,21 +30,17 @@ import (
 func TestPodResourceLimitsDefaulting(t *testing.T) {
 	tk := newTestKubelet(t, true)
 	defer tk.Cleanup()
-	tk.kubelet.nodeLister = &testNodeLister{
-		nodes: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: string(tk.kubelet.nodeName),
-				},
-				Status: v1.NodeStatus{
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("6"),
-						v1.ResourceMemory: resource.MustParse("4Gi"),
-					},
-				},
+	tk.kubelet.nodeLister = testNodeLister(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(tk.kubelet.nodeName),
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("6"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
-	}
+	})
 	cases := []struct {
 		pod      *v1.Pod
 		expected *v1.Pod

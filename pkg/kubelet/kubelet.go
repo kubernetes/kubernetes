@@ -969,8 +969,6 @@ type Kubelet struct {
 	registerWithTaints []v1.Taint
 	// Set to true to have the node register itself as schedulable.
 	registerSchedulable bool
-	// for internal book keeping; access only from within registerWithApiserver
-	registrationCompleted bool
 
 	// dnsConfigurer is used for setting up DNS resolver configuration when launching pods.
 	dnsConfigurer *dns.Configurer

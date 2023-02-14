@@ -38,17 +38,18 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -212,37 +213,34 @@ func newTestKubeletWithImageList(
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeHasSynced = func() bool { return true }
-	kubelet.nodeLister = testNodeLister{
-		nodes: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: string(kubelet.nodeName),
+	kubelet.nodeLister = testNodeLister(
+		&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: string(kubelet.nodeName),
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:    v1.NodeReady,
+						Status:  v1.ConditionTrue,
+						Reason:  "Ready",
+						Message: "Node ready",
+					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:    v1.NodeReady,
-							Status:  v1.ConditionTrue,
-							Reason:  "Ready",
-							Message: "Node ready",
-						},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: testKubeletHostIP,
 					},
-					Addresses: []v1.NodeAddress{
-						{
-							Type:    v1.NodeInternalIP,
-							Address: testKubeletHostIP,
-						},
-					},
-					VolumesAttached: []v1.AttachedVolume{
-						{
-							Name:       "fake/fake-device",
-							DevicePath: "fake/path",
-						},
+				},
+				VolumesAttached: []v1.AttachedVolume{
+					{
+						Name:       "fake/fake-device",
+						DevicePath: "fake/path",
 					},
 				},
 			},
-		},
-	}
+		})
 	kubelet.recorder = fakeRecorder
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
@@ -735,21 +733,12 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	}
 }
 
-type testNodeLister struct {
-	nodes []*v1.Node
-}
-
-func (nl testNodeLister) Get(name string) (*v1.Node, error) {
-	for _, node := range nl.nodes {
-		if node.Name == name {
-			return node, nil
-		}
+func testNodeLister(nodes ...*v1.Node) corelisters.NodeLister {
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, n := range nodes {
+		store.Add(n)
 	}
-	return nil, fmt.Errorf("Node with name: %s does not exist", name)
-}
-
-func (nl testNodeLister) List(_ labels.Selector) (ret []*v1.Node, err error) {
-	return nl.nodes, nil
+	return corelisters.NewNodeLister(store)
 }
 
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
@@ -765,17 +754,14 @@ func TestHandlePortConflicts(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
-	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
-			Status: v1.NodeStatus{
-				Allocatable: v1.ResourceList{
-					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
-				},
+	kl.nodeLister = testNodeLister(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 			},
 		},
-	}}
-
+	})
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -815,16 +801,14 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
-	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
-			Status: v1.NodeStatus{
-				Allocatable: v1.ResourceList{
-					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
-				},
+	kl.nodeLister = testNodeLister(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 			},
 		},
-	}}
+	})
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -867,7 +851,7 @@ func TestHandleNodeSelector(t *testing.T) {
 			},
 		},
 	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeLister = testNodeLister(nodes...)
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -937,7 +921,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 					},
 				},
 			}
-			kl.nodeLister = testNodeLister{nodes: nodes}
+			kl.nodeLister = testNodeLister(nodes...)
 
 			recorder := record.NewFakeRecorder(20)
 			nodeRef := &v1.ObjectReference{
@@ -972,7 +956,7 @@ func TestHandleMemExceeded(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
 			}}},
 	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeLister = testNodeLister(nodes...)
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -1037,7 +1021,7 @@ func TestHandlePluginResources(t *testing.T) {
 				v1.ResourcePods:  allowedPodQuantity,
 			}}},
 	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeLister = testNodeLister(nodes...)
 
 	updatePluginResourcesFunc := func(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
@@ -2396,17 +2380,14 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
-			Status: v1.NodeStatus{
-				Allocatable: v1.ResourceList{
-					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
-				},
+	kl.nodeLister = testNodeLister(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 			},
 		},
-	}}
-
+	})
 	pods := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2570,7 +2551,7 @@ func TestSyncLabels(t *testing.T) {
 
 			test.existingNode.Name = string(kl.nodeName)
 
-			kl.nodeLister = testNodeLister{nodes: []*v1.Node{test.existingNode}}
+			kl.nodeLister = testNodeLister(test.existingNode)
 			go func() { kl.syncNodeStatus() }()
 
 			err := retryWithExponentialBackOff(

@@ -46,11 +46,15 @@ import (
 )
 
 // registerWithAPIServer registers the node with the cluster master. It is safe
-// to call multiple times, but not concurrently (kl.registrationCompleted is
-// not locked).
+// to call multiple times.
 func (kl *Kubelet) registerWithAPIServer() {
-	if kl.registrationCompleted {
-		return
+	// If the informer has not synced try to register to improve the node startup latency
+	// If the informer has synced, check if the node has been already registered in the apiserver
+	if kl.nodeHasSynced() {
+		node, err := kl.nodeLister.Get(string(kl.nodeName))
+		if node != nil && err == nil {
+			return
+		}
 	}
 	step := 100 * time.Millisecond
 
@@ -71,7 +75,6 @@ func (kl *Kubelet) registerWithAPIServer() {
 		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
 			klog.InfoS("Successfully registered node", "node", klog.KObj(node))
-			kl.registrationCompleted = true
 			return
 		}
 	}
