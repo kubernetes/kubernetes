@@ -165,7 +165,8 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 		return nil, nil
 	}
 	for _, decision := range decisions {
-		klog.Error("ivelichkovich decision action is %v", decision.Action)
+		klog.Infof("ivelichkovich decision action is %v", decision.Action)
+		klog.V(5).Infof("Did not call webhook due to match condition %v", decision.Message)
 		if decision.Action == cel.ActionDeny {
 			return nil, nil
 		}
@@ -250,8 +251,16 @@ func (a *Webhook) evaluateCELRules(h webhook.WebhookAccessor, attr admission.Att
 	return decisions, nil
 }
 
+// TODO ivelichkovich: should I use some common object here rather than v1alpha.Validation?
 func matchConditionsToValidations(matchConditions []v1.MatchCondition) []v1alpha1.Validation {
-	return []v1alpha1.Validation{}
+	validations := []v1alpha1.Validation{}
+	for _, matchCondition := range matchConditions {
+		validations = append(validations, v1alpha1.Validation{
+			Expression: matchCondition.Expression,
+			Message:    matchCondition.Name,
+		})
+	}
+	return validations
 }
 
 type attrWithResourceOverride struct {

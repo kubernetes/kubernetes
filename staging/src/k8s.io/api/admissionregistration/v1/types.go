@@ -308,10 +308,12 @@ type ValidatingWebhook struct {
 	// and be subject to the failure policy.
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
-	// MatchConditions contain CEL expressions which is used to apply the validation.
-	// A minimum of one validation is required for a policy definition.
-	// +listType=atomic
-	// Required.
+	// MatchConditions is a list of conditions on the AdmissionRequest ('request') that must be met
+	// for a request to be sent to this webhook. All conditions in the list must evaluate to TRUE for
+	// the request to be matched.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	MatchConditions []MatchCondition `json:"matchConditions" protobuf:"bytes,11,rep,name=matchConditions"`
 }
 
@@ -461,10 +463,12 @@ type MutatingWebhook struct {
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 
-	// MatchConditions contain CEL expressions which is used to apply the validation.
-	// A minimum of one validation is required for a policy definition.
-	// +listType=atomic
-	// Required.
+	// MatchConditions is a list of conditions on the AdmissionRequest ('request') that must be met
+	// for a request to be sent to this webhook. All conditions in the list must evaluate to TRUE for
+	// the request to be matched.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	MatchConditions []MatchCondition `json:"matchConditions" protobuf:"bytes,12,rep,name=matchConditions"`
 }
 

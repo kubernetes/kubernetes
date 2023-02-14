@@ -567,6 +567,10 @@ type ValidatingWebhook struct {
 	// +optional
 	AdmissionReviewVersions []string
 
+	// MatchConditions is a list of conditions on the AdmissionRequest ('request') that must be met
+	// for a request to be sent to this webhook. All conditions in the list must evaluate to TRUE for
+	// the request to be matched.
+	// +optional
 	MatchConditions []MatchCondition
 }
 
@@ -818,7 +822,7 @@ type ServiceReference struct {
 	Port int32
 }
 
-// MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.
+// MatchCondition represents a condition which must be fulfilled for a request to be sent to a webhook.
 type MatchCondition struct {
 	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
 	// as well as providing an identifier for logging purposes. A good name should be descriptive of
