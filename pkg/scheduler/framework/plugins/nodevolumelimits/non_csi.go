@@ -250,7 +250,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	// count unique volumes
 	existingVolumes := make(sets.String)
 	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterVolumes(existingPod.Pod, false /* existing pod */, existingVolumes); err != nil {
+		if err := pl.filterVolumes(existingPod.Pod.Load(), false /* existing pod */, existingVolumes); err != nil {
 			return framework.AsStatus(err)
 		}
 	}

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,26 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+func newPodInfo(pod *v1.Pod) *PodInfo {
+	var pi PodInfo
+	pi.Pod.Store(pod)
+	return &pi
+}
+
+// cmpNodeInfo is similar to reflect.DeepEqual, but in contrast to that it
+// knows how to compare the atomic.Pointer in PodInfo.
+func cmpNodeInfo(t *testing.T, expected, actual *NodeInfo) {
+	t.Helper()
+	if diff := cmp.Diff(expected, actual,
+		// NodeInfo has an unexported node field. We want to compare
+		// it.
+		cmp.AllowUnexported(NodeInfo{}),
+		PodInfoCmp,
+	); diff != "" {
+		t.Errorf("expected (-), got (+):\n%s", diff)
+	}
+}
 
 func TestNewResource(t *testing.T) {
 	tests := []struct {
@@ -281,64 +302,60 @@ func TestNewNodeInfo(t *testing.T) {
 		ImageStates:  map[string]*ImageStateSummary{},
 		PVCRefCounts: map[string]int{},
 		Pods: []*PodInfo{
-			{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "node_info_cache_test",
-						Name:      "test-1",
-						UID:       types.UID("test-1"),
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU:    resource.MustParse("100m"),
-										v1.ResourceMemory: resource.MustParse("500"),
-									},
+			newPodInfo(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-1",
+					UID:       types.UID("test-1"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("500"),
 								},
-								Ports: []v1.ContainerPort{
-									{
-										HostIP:   "127.0.0.1",
-										HostPort: 80,
-										Protocol: "TCP",
-									},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 80,
+									Protocol: "TCP",
 								},
 							},
 						},
-						NodeName: nodeName,
 					},
+					NodeName: nodeName,
 				},
-			},
-			{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "node_info_cache_test",
-						Name:      "test-2",
-						UID:       types.UID("test-2"),
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU:    resource.MustParse("200m"),
-										v1.ResourceMemory: resource.MustParse("1Ki"),
-									},
+			}),
+			newPodInfo(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-2",
+					UID:       types.UID("test-2"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("1Ki"),
 								},
-								Ports: []v1.ContainerPort{
-									{
-										HostIP:   "127.0.0.1",
-										HostPort: 8080,
-										Protocol: "TCP",
-									},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 8080,
+									Protocol: "TCP",
 								},
 							},
 						},
-						NodeName: nodeName,
 					},
+					NodeName: nodeName,
 				},
-			},
+			}),
 		},
 	}
 
@@ -348,9 +365,7 @@ func TestNewNodeInfo(t *testing.T) {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
-	}
+	cmpNodeInfo(t, expected, ni)
 }
 
 func TestNodeInfoClone(t *testing.T) {
@@ -374,64 +389,60 @@ func TestNodeInfoClone(t *testing.T) {
 				ImageStates:  map[string]*ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-1",
-								UID:       types.UID("test-1"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("100m"),
-												v1.ResourceMemory: resource.MustParse("500"),
-											},
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-1",
+							UID:       types.UID("test-1"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("500"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 80,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 80,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
 							},
+							NodeName: nodeName,
 						},
-					},
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-2",
-								UID:       types.UID("test-2"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("200m"),
-												v1.ResourceMemory: resource.MustParse("1Ki"),
-											},
+					}),
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-2",
+							UID:       types.UID("test-2"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("200m"),
+											v1.ResourceMemory: resource.MustParse("1Ki"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 8080,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 8080,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
 							},
+							NodeName: nodeName,
 						},
-					},
+					}),
 				},
 			},
 			expected: &NodeInfo{
@@ -448,64 +459,60 @@ func TestNodeInfoClone(t *testing.T) {
 				ImageStates:  map[string]*ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-1",
-								UID:       types.UID("test-1"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("100m"),
-												v1.ResourceMemory: resource.MustParse("500"),
-											},
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-1",
+							UID:       types.UID("test-1"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("500"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 80,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 80,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
 							},
+							NodeName: nodeName,
 						},
-					},
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-2",
-								UID:       types.UID("test-2"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("200m"),
-												v1.ResourceMemory: resource.MustParse("1Ki"),
-											},
+					}),
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-2",
+							UID:       types.UID("test-2"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("200m"),
+											v1.ResourceMemory: resource.MustParse("1Ki"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 8080,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 8080,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
 							},
+							NodeName: nodeName,
 						},
-					},
+					}),
 				},
 			},
 		},
@@ -517,9 +524,7 @@ func TestNodeInfoClone(t *testing.T) {
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
-			if !reflect.DeepEqual(test.expected, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, ni)
-			}
+			cmpNodeInfo(t, test.expected, ni)
 		})
 	}
 }
@@ -686,139 +691,133 @@ func TestNodeInfoAddPod(t *testing.T) {
 		ImageStates:  map[string]*ImageStateSummary{},
 		PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
 		Pods: []*PodInfo{
-			{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "node_info_cache_test",
-						Name:      "test-1",
-						UID:       types.UID("test-1"),
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU:    resource.MustParse("100m"),
-										v1.ResourceMemory: resource.MustParse("500"),
-									},
+			newPodInfo(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-1",
+					UID:       types.UID("test-1"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("500"),
 								},
-								Ports: []v1.ContainerPort{
-									{
-										HostIP:   "127.0.0.1",
-										HostPort: 80,
-										Protocol: "TCP",
-									},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 80,
+									Protocol: "TCP",
 								},
 							},
 						},
-						NodeName: nodeName,
-						Overhead: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("500m"),
-						},
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "pvc-1",
-									},
+					},
+					NodeName: nodeName,
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("500m"),
+					},
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-1",
 								},
 							},
 						},
 					},
 				},
-			},
-			{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "node_info_cache_test",
-						Name:      "test-2",
-						UID:       types.UID("test-2"),
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU: resource.MustParse("200m"),
-									},
+			}),
+			newPodInfo(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-2",
+					UID:       types.UID("test-2"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("200m"),
 								},
-								Ports: []v1.ContainerPort{
-									{
-										HostIP:   "127.0.0.1",
-										HostPort: 8080,
-										Protocol: "TCP",
-									},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 8080,
+									Protocol: "TCP",
 								},
 							},
 						},
-						NodeName: nodeName,
-						Overhead: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("500m"),
-							v1.ResourceMemory: resource.MustParse("500"),
-						},
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "pvc-1",
-									},
+					},
+					NodeName: nodeName,
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("500"),
+					},
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-1",
 								},
 							},
 						},
 					},
 				},
-			},
-			{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "node_info_cache_test",
-						Name:      "test-3",
-						UID:       types.UID("test-3"),
+			}),
+			newPodInfo(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-3",
+					UID:       types.UID("test-3"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("200m"),
+								},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 8080,
+									Protocol: "TCP",
+								},
+							},
+						},
 					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU: resource.MustParse("200m"),
-									},
-								},
-								Ports: []v1.ContainerPort{
-									{
-										HostIP:   "127.0.0.1",
-										HostPort: 8080,
-										Protocol: "TCP",
-									},
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("500m"),
+									v1.ResourceMemory: resource.MustParse("200Mi"),
 								},
 							},
 						},
-						InitContainers: []v1.Container{
-							{
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceCPU:    resource.MustParse("500m"),
-										v1.ResourceMemory: resource.MustParse("200Mi"),
-									},
-								},
-							},
-						},
-						NodeName: nodeName,
-						Overhead: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("500m"),
-							v1.ResourceMemory: resource.MustParse("500"),
-						},
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "pvc-2",
-									},
+					},
+					NodeName: nodeName,
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("500"),
+					},
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-2",
 								},
 							},
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 
@@ -833,9 +832,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 	}
 
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
-	}
+	cmpNodeInfo(t, expected, ni)
 }
 
 func TestNodeInfoRemovePod(t *testing.T) {
@@ -894,81 +891,77 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				ImageStates:  map[string]*ImageStateSummary{},
 				PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 1},
 				Pods: []*PodInfo{
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-1",
-								UID:       types.UID("test-1"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("100m"),
-												v1.ResourceMemory: resource.MustParse("500"),
-											},
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-1",
+							UID:       types.UID("test-1"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("500"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 80,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 80,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
-								Overhead: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("500m"),
-									v1.ResourceMemory: resource.MustParse("500"),
-								},
-								Volumes: []v1.Volume{
-									{
-										VolumeSource: v1.VolumeSource{
-											PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-												ClaimName: "pvc-1",
-											},
+							},
+							NodeName: nodeName,
+							Overhead: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("500"),
+							},
+							Volumes: []v1.Volume{
+								{
+									VolumeSource: v1.VolumeSource{
+										PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+											ClaimName: "pvc-1",
 										},
 									},
 								},
 							},
 						},
-					},
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-2",
-								UID:       types.UID("test-2"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("200m"),
-												v1.ResourceMemory: resource.MustParse("1Ki"),
-											},
+					}),
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-2",
+							UID:       types.UID("test-2"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("200m"),
+											v1.ResourceMemory: resource.MustParse("1Ki"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 8080,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 8080,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
-								Overhead: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("500m"),
-									v1.ResourceMemory: resource.MustParse("500"),
-								},
+							},
+							NodeName: nodeName,
+							Overhead: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("500"),
 							},
 						},
-					},
+					}),
 				},
 			},
 		},
@@ -1044,39 +1037,37 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				ImageStates:  map[string]*ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
-					{
-						Pod: &v1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: "node_info_cache_test",
-								Name:      "test-2",
-								UID:       types.UID("test-2"),
-							},
-							Spec: v1.PodSpec{
-								Containers: []v1.Container{
-									{
-										Resources: v1.ResourceRequirements{
-											Requests: v1.ResourceList{
-												v1.ResourceCPU:    resource.MustParse("200m"),
-												v1.ResourceMemory: resource.MustParse("1Ki"),
-											},
+					newPodInfo(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "node_info_cache_test",
+							Name:      "test-2",
+							UID:       types.UID("test-2"),
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("200m"),
+											v1.ResourceMemory: resource.MustParse("1Ki"),
 										},
-										Ports: []v1.ContainerPort{
-											{
-												HostIP:   "127.0.0.1",
-												HostPort: 8080,
-												Protocol: "TCP",
-											},
+									},
+									Ports: []v1.ContainerPort{
+										{
+											HostIP:   "127.0.0.1",
+											HostPort: 8080,
+											Protocol: "TCP",
 										},
 									},
 								},
-								NodeName: nodeName,
-								Overhead: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("500m"),
-									v1.ResourceMemory: resource.MustParse("500"),
-								},
+							},
+							NodeName: nodeName,
+							Overhead: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("500"),
 							},
 						},
-					},
+					}),
 				},
 			},
 		},
@@ -1104,9 +1095,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			}
 
 			test.expectedNodeInfo.Generation = ni.Generation
-			if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
-			}
+			cmpNodeInfo(t, test.expectedNodeInfo, ni)
 		})
 	}
 }

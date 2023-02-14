@@ -210,8 +210,9 @@ func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
 	nodeInfo *framework.NodeInfo) (*v1.Pod, error) {
 	for _, p := range nodeInfo.Pods {
-		if string(p.Pod.UID) == metaPod.UID {
-			return p.Pod, nil
+		pod := p.Pod.Load()
+		if string(pod.UID) == metaPod.UID {
+			return pod, nil
 		}
 	}
 	return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",

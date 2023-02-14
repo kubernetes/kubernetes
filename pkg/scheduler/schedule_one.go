@@ -63,10 +63,13 @@ const (
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	podInfo := sched.NextPod()
 	// pod could be nil when schedulerQueue is closed
-	if podInfo == nil || podInfo.Pod == nil {
+	if podInfo == nil {
 		return
 	}
-	pod := podInfo.Pod
+	pod := podInfo.Pod.Load()
+	if pod == nil {
+		return
+	}
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
@@ -126,7 +129,7 @@ func (sched *Scheduler) schedulingCycle(
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
 ) (ScheduleResult, *framework.QueuedPodInfo, *framework.Status) {
-	pod := podInfo.Pod
+	pod := podInfo.Pod.Load()
 	scheduleResult, err := sched.SchedulePod(ctx, fwk, state, pod)
 	if err != nil {
 		if err == ErrNoNodesAvailable {
@@ -171,7 +174,7 @@ func (sched *Scheduler) schedulingCycle(
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPodInfo := podInfo.DeepCopy()
-	assumedPod := assumedPodInfo.Pod
+	assumedPod := assumedPodInfo.Pod.Load()
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
 	err = sched.assume(assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
@@ -232,7 +235,7 @@ func (sched *Scheduler) bindingCycle(
 	start time.Time,
 	podsToActivate *framework.PodsToActivate) *framework.Status {
 
-	assumedPod := assumedPodInfo.Pod
+	assumedPod := assumedPodInfo.Pod.Load()
 
 	// Run "permit" plugins.
 	if status := fwk.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
@@ -277,7 +280,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	scheduleResult ScheduleResult,
 	status *framework.Status) {
 
-	assumedPod := podInfo.Pod
+	assumedPod := podInfo.Pod.Load()
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 	if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
@@ -856,7 +859,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 	}
 
-	pod := podInfo.Pod
+	pod := podInfo.Pod.Load()
 	err := status.AsError()
 	errMsg := status.Message()
 

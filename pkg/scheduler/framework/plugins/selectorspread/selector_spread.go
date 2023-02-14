@@ -224,8 +224,9 @@ func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *fra
 	for _, p := range nodeInfo.Pods {
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
-		if namespace == p.Pod.Namespace && p.Pod.DeletionTimestamp == nil {
-			if selector.Matches(labels.Set(p.Pod.Labels)) {
+		pod := p.Pod.Load()
+		if namespace == pod.Namespace && pod.DeletionTimestamp == nil {
+			if selector.Matches(labels.Set(pod.Labels)) {
 				count++
 			}
 		}

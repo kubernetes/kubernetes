@@ -876,7 +876,8 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
+		piPod := pi.Pod.Load()
+		if corev1.PodPriority(piPod) >= corev1.PodPriority(pod) && piPod.UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {

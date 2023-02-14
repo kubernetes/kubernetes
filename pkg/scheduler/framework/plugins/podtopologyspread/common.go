@@ -148,10 +148,11 @@ func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selec
 	count := 0
 	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).
-		if p.Pod.DeletionTimestamp != nil || p.Pod.Namespace != ns {
+		pod := p.Pod.Load()
+		if pod.DeletionTimestamp != nil || pod.Namespace != ns {
 			continue
 		}
-		if selector.Matches(labels.Set(p.Pod.Labels)) {
+		if selector.Matches(labels.Set(pod.Labels)) {
 			count++
 		}
 	}

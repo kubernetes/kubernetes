@@ -93,14 +93,14 @@ func (pl *InterPodAffinity) processExistingPod(
 	// value as that of <existingPods>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod, nil, existingPodNode, 1)
+	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod.Load(), nil, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 	// decrement <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod, nil, existingPodNode, -1)
+	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod.Load(), nil, existingPodNode, -1)
 
 	// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>

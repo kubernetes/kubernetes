@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -124,11 +126,21 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	}
 }
 
+// PodInfoCmp must be passed to cmp.Diff when comparing PodInfo or something that
+// contains a PodInfo instance.
+var PodInfoCmp = cmp.Transformer("podPointer",
+	//nolint:govet // copylocks: func passes lock by value: sync/atomic.Pointer[k8s.io/api/core/v1.Pod] contains sync/atomic.noCopy
+	// This cannot be avoided at the moment (https://github.com/google/go-cmp/issues/310#issuecomment-1430338479).
+	func(p atomic.Pointer[v1.Pod]) *v1.Pod {
+		return p.Load()
+	},
+)
+
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
 type PodInfo struct {
-	Pod                        *v1.Pod
+	Pod                        atomic.Pointer[v1.Pod]
 	RequiredAffinityTerms      []AffinityTerm
 	RequiredAntiAffinityTerms  []AffinityTerm
 	PreferredAffinityTerms     []WeightedAffinityTerm
@@ -137,22 +149,24 @@ type PodInfo struct {
 
 // DeepCopy returns a deep copy of the PodInfo object.
 func (pi *PodInfo) DeepCopy() *PodInfo {
-	return &PodInfo{
-		Pod:                        pi.Pod.DeepCopy(),
+	copy := &PodInfo{
 		RequiredAffinityTerms:      pi.RequiredAffinityTerms,
 		RequiredAntiAffinityTerms:  pi.RequiredAntiAffinityTerms,
 		PreferredAffinityTerms:     pi.PreferredAffinityTerms,
 		PreferredAntiAffinityTerms: pi.PreferredAntiAffinityTerms,
 	}
+	copy.Pod.Store(pi.Pod.Load().DeepCopy())
+	return copy
 }
 
 // Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
 // has been instantiated and the passed pod is the exact same one as the original pod.
 func (pi *PodInfo) Update(pod *v1.Pod) error {
-	if pod != nil && pi.Pod != nil && pi.Pod.UID == pod.UID {
+	oldPod := pi.Pod.Load()
+	if pod != nil && oldPod != nil && oldPod.UID == pod.UID {
 		// PodInfo includes immutable information, and so it is safe to update the pod in place if it is
 		// the exact same pod
-		pi.Pod = pod
+		pi.Pod.Store(pod)
 		return nil
 	}
 	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
@@ -186,7 +200,7 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
 	}
 
-	pi.Pod = pod
+	pi.Pod.Store(pod)
 	pi.RequiredAffinityTerms = requiredAffinityTerms
 	pi.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
 	pi.PreferredAffinityTerms = weightedAffinityTerms
@@ -596,7 +610,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 func (n *NodeInfo) String() string {
 	podKeys := make([]string, len(n.Pods))
 	for i, p := range n.Pods {
-		podKeys[i] = p.Pod.Name
+		podKeys[i] = p.Pod.Load().Name
 	}
 	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
 		podKeys, n.Requested, n.NonZeroRequested, n.UsedPorts, n.Allocatable)
@@ -606,13 +620,13 @@ func (n *NodeInfo) String() string {
 // Consider using this instead of AddPod if a PodInfo is already computed.
 func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 	n.Pods = append(n.Pods, podInfo)
-	if podWithAffinity(podInfo.Pod) {
+	if podWithAffinity(podInfo.Pod.Load()) {
 		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
 	}
-	if podWithRequiredAntiAffinity(podInfo.Pod) {
+	if podWithRequiredAntiAffinity(podInfo.Pod.Load()) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
-	n.update(podInfo.Pod, 1)
+	n.update(podInfo.Pod.Load(), 1)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -636,9 +650,9 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 
 func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 	for i := range s {
-		k2, err := GetPodKey(s[i].Pod)
+		k2, err := GetPodKey(s[i].Pod.Load())
 		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod.Load()))
 			continue
 		}
 		if k == k2 {
@@ -665,9 +679,9 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	}
 
 	for i := range n.Pods {
-		k2, err := GetPodKey(n.Pods[i].Pod)
+		k2, err := GetPodKey(n.Pods[i].Pod.Load())
 		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod.Load()))
 			continue
 		}
 		if k == k2 {

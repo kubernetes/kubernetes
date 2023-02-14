@@ -32,6 +32,17 @@ import (
 
 const mb int64 = 1024 * 1024
 
+func newPodInfo(pod *v1.Pod) *framework.PodInfo {
+	var pi framework.PodInfo
+	pi.Pod.Store(pod)
+	return &pi
+}
+
+func withPod(podInfo *framework.PodInfo, pod *v1.Pod) *framework.PodInfo {
+	podInfo.Pod.Store(pod)
+	return podInfo
+}
+
 func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
@@ -270,7 +281,7 @@ func TestNewSnapshot(t *testing.T) {
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
 					Pods: []*framework.PodInfo{
-						{Pod: podWithPort},
+						newPodInfo(podWithPort),
 					},
 				},
 			},
@@ -287,17 +298,17 @@ func TestNewSnapshot(t *testing.T) {
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
 					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[0]},
+						newPodInfo(podsWithPVCs[0]),
 					},
 				},
 				{
 					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[1]},
+						newPodInfo(podsWithPVCs[1]),
 					},
 				},
 				{
 					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[2]},
+						newPodInfo(podsWithPVCs[2]),
 					},
 				},
 			},
@@ -321,13 +332,12 @@ func TestNewSnapshot(t *testing.T) {
 				},
 				{
 					Pods: []*framework.PodInfo{
-						{Pod: podWithAnnotations},
+						newPodInfo(podWithAnnotations),
 					},
 				},
 				{
 					Pods: []*framework.PodInfo{
-						{
-							Pod: podsWithAffitiny[0],
+						withPod(&framework.PodInfo{
 							RequiredAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.NewString("ns"),
@@ -337,6 +347,8 @@ func TestNewSnapshot(t *testing.T) {
 								},
 							},
 						},
+							podsWithAffitiny[0],
+						),
 					},
 				},
 			},
@@ -356,8 +368,7 @@ func TestNewSnapshot(t *testing.T) {
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
 					Pods: []*framework.PodInfo{
-						{
-							Pod: podsWithAffitiny[1],
+						withPod(&framework.PodInfo{
 							RequiredAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.NewString("ns"),
@@ -367,8 +378,10 @@ func TestNewSnapshot(t *testing.T) {
 								},
 							},
 						},
-						{
-							Pod: podWithAntiAffitiny,
+							podsWithAffitiny[1],
+						),
+
+						withPod(&framework.PodInfo{
 							RequiredAntiAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.NewString("ns"),
@@ -378,6 +391,8 @@ func TestNewSnapshot(t *testing.T) {
 								},
 							},
 						},
+							podWithAntiAffitiny,
+						),
 					},
 				},
 				{
@@ -407,7 +422,9 @@ func TestNewSnapshot(t *testing.T) {
 					t.Error("node infos should not be nil")
 				}
 				for j := range test.expectedNodesInfos[i].Pods {
-					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.Pods[j]); diff != "" {
+					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.Pods[j],
+						framework.PodInfoCmp,
+					); diff != "" {
 						t.Errorf("Unexpected PodInfo (-want +got):\n%s", diff)
 					}
 				}

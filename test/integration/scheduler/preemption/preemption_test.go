@@ -1487,7 +1487,7 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 		podInfo = f()
 		// Scheduler.Next() may return nil when scheduler is shutting down.
 		if podInfo != nil {
-			podInfo.Pod.Status.NominatedNodeName = "node-1"
+			podInfo.Pod.Load().Status.NominatedNodeName = "node-1"
 		}
 		return podInfo
 	}

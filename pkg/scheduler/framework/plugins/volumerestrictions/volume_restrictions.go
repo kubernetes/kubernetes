@@ -70,7 +70,7 @@ func (s *preFilterState) updateWithPod(podInfo *framework.PodInfo, multiplier in
 
 func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo) int {
 	conflicts := 0
-	for _, volume := range podInfo.Pod.Spec.Volumes {
+	for _, volume := range podInfo.Pod.Load().Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
 		}
@@ -264,7 +264,7 @@ func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 		}
 
 		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(v, ev.Pod) {
+			if isVolumeConflict(v, ev.Pod.Load()) {
 				return false
 			}
 		}

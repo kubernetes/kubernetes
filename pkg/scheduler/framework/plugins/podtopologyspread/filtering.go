@@ -169,7 +169,7 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
+	pl.updateWithPod(s, podInfoToAdd.Pod.Load(), podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 		return framework.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
+	pl.updateWithPod(s, podInfoToRemove.Pod.Load(), podToSchedule, nodeInfo.Node(), -1)
 	return nil
 }
 

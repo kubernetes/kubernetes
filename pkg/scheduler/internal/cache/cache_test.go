@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,15 +41,15 @@ func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.No
 	if (actual == nil) != (expected == nil) {
 		return errors.New("one of the actual or expected is nil and the other is not")
 	}
-	// Ignore generation field.
 	if actual != nil {
-		actual.info.Generation = 0
-	}
-	if expected != nil {
-		expected.Generation = 0
-	}
-	if actual != nil && !reflect.DeepEqual(actual.info, expected) {
-		return fmt.Errorf("got node info %s, want %s", actual.info, expected)
+		if diff := cmp.Diff(expected, actual.info,
+			// Ignore generation field.
+			cmp.AllowUnexported(framework.NodeInfo{}),
+			cmpopts.IgnoreFields(framework.NodeInfo{}, "Generation"),
+			framework.PodInfoCmp,
+		); diff != "" {
+			return fmt.Errorf("expected (-), got (+):\n%s", diff)
+		}
 	}
 	return nil
 }

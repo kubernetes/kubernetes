@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
@@ -92,7 +92,7 @@ func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[s
 	cached := []string{}
 	for _, nodeinfo := range nodeinfos {
 		for _, p := range nodeinfo.Pods {
-			cached = append(cached, string(p.Pod.UID))
+			cached = append(cached, string(p.Pod.Load().UID))
 		}
 	}
 	for _, pod := range waitingPods {

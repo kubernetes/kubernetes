@@ -540,8 +540,9 @@ func getLowerPriorityNominatedPods(pn framework.PodNominator, pod *v1.Pod, nodeN
 	var lowerPriorityPods []*v1.Pod
 	podPriority := corev1helpers.PodPriority(pod)
 	for _, pi := range podInfos {
-		if corev1helpers.PodPriority(pi.Pod) < podPriority {
-			lowerPriorityPods = append(lowerPriorityPods, pi.Pod)
+		pod := pi.Pod.Load()
+		if corev1helpers.PodPriority(pod) < podPriority {
+			lowerPriorityPods = append(lowerPriorityPods, pod)
 		}
 	}
 	return lowerPriorityPods

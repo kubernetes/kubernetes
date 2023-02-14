@@ -117,7 +117,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterAttachableVolumes(existingPod.Pod, csiNode, false /* existing pod */, attachedVolumes); err != nil {
+		if err := pl.filterAttachableVolumes(existingPod.Pod.Load(), csiNode, false /* existing pod */, attachedVolumes); err != nil {
 			return framework.AsStatus(err)
 		}
 	}

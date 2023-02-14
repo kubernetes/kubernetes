@@ -146,7 +146,7 @@ func TestSchedulingGates(t *testing.T) {
 			// Pop the expected pods out. They should be de-queueable.
 			for _, wantPod := range tt.want {
 				podInfo := nextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
+				if got := podInfo.Pod.Load().Name; got != wantPod {
 					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
 				}
 			}
@@ -165,7 +165,7 @@ func TestSchedulingGates(t *testing.T) {
 			// Pop the expected pods out. They should be de-queueable.
 			for _, wantPod := range tt.wantPostGatesRemoval {
 				podInfo := nextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
+				if got := podInfo.Pod.Load().Name; got != wantPod {
 					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
 				}
 			}
@@ -224,14 +224,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	// Pop the three pods out. They should be unschedulable.
 	for i := 0; i < 3; i++ {
 		podInfo := nextPodOrDie(t, testCtx)
-		fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
+		fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Load().Spec.SchedulerName]
 		if !ok {
-			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
+			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Load().Name)
 		}
 		// Schedule the Pod manually.
-		_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+		_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod.Load())
 		if fitError == nil {
-			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
+			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Load().Name)
 		}
 		testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
 	}
@@ -248,7 +248,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	if podInfo.Attempts != 2 {
 		t.Fatalf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
-	if got := podInfo.Pod.Name; got != "pod1" {
+	if got := podInfo.Pod.Load().Name; got != "pod1" {
 		t.Fatalf("Expected pod1 to be popped, but got %v", got)
 	}
 
@@ -258,7 +258,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	// - Regarding Pod3, the NodeTaintChange event is irrelevant with its scheduling failure.
 	podInfo = nextPod(t, testCtx)
 	if podInfo != nil {
-		t.Fatalf("Unexpected pod %v get popped out", podInfo.Pod.Name)
+		t.Fatalf("Unexpected pod %v get popped out", podInfo.Pod.Load().Name)
 	}
 }
 
@@ -399,15 +399,15 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Pop fake-pod out. It should be unschedulable.
 	podInfo := nextPodOrDie(t, testCtx)
-	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
+	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Load().Spec.SchedulerName]
 	if !ok {
-		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
+		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Load().Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod.Load())
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
-		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
+		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Load().Name)
 	}
 	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
 

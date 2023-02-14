@@ -298,7 +298,7 @@ func TestFailureHandler(t *testing.T) {
 				if e != nil {
 					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
 				}
-				got = head.Pod
+				got = head.Pod.Load()
 			} else {
 				got = getPodFromPriorityQueue(queue, testPod)
 			}

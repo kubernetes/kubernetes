@@ -602,11 +602,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				return item.mockResult.result, item.mockResult.err
 			}
 			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
-				gotPod = p.Pod
+				gotPod = p.Pod.Load()
 				gotError = status.AsError()
 
 				msg := truncateMessage(gotError.Error())
-				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+				fwk.EventRecorder().Eventf(gotPod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
 			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -2982,7 +2982,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		errChan <- err
 
 		msg := truncateMessage(err.Error())
-		fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+		fwk.EventRecorder().Eventf(p.Pod.Load(), nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	}
 	return sched, bindingChan, errChan
 }

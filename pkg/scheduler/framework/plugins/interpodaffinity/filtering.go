@@ -76,11 +76,11 @@ func (s *preFilterState) updateWithPod(pInfo *framework.PodInfo, node *v1.Node, 
 		return
 	}
 
-	s.existingAntiAffinityCounts.updateWithAntiAffinityTerms(pInfo.RequiredAntiAffinityTerms, s.podInfo.Pod, s.namespaceLabels, node, multiplier)
-	s.affinityCounts.updateWithAffinityTerms(s.podInfo.RequiredAffinityTerms, pInfo.Pod, node, multiplier)
+	s.existingAntiAffinityCounts.updateWithAntiAffinityTerms(pInfo.RequiredAntiAffinityTerms, s.podInfo.Pod.Load(), s.namespaceLabels, node, multiplier)
+	s.affinityCounts.updateWithAffinityTerms(s.podInfo.RequiredAffinityTerms, pInfo.Pod.Load(), node, multiplier)
 	// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the updated pod's namespace labels, hence passing nil for nsLabels.
-	s.antiAffinityCounts.updateWithAntiAffinityTerms(s.podInfo.RequiredAntiAffinityTerms, pInfo.Pod, nil, node, multiplier)
+	s.antiAffinityCounts.updateWithAntiAffinityTerms(s.podInfo.RequiredAntiAffinityTerms, pInfo.Pod.Load(), nil, node, multiplier)
 }
 
 type topologyPair struct {
@@ -204,10 +204,10 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 		affinity := make(topologyToMatchedTermCount)
 		antiAffinity := make(topologyToMatchedTermCount)
 		for _, existingPod := range nodeInfo.Pods {
-			affinity.updateWithAffinityTerms(podInfo.RequiredAffinityTerms, existingPod.Pod, node, 1)
+			affinity.updateWithAffinityTerms(podInfo.RequiredAffinityTerms, existingPod.Pod.Load(), node, 1)
 			// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 			// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-			antiAffinity.updateWithAntiAffinityTerms(podInfo.RequiredAntiAffinityTerms, existingPod.Pod, nil, node, 1)
+			antiAffinity.updateWithAntiAffinityTerms(podInfo.RequiredAntiAffinityTerms, existingPod.Pod.Load(), nil, node, 1)
 		}
 
 		if len(affinity) > 0 || len(antiAffinity) > 0 {
@@ -358,7 +358,7 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 		// in the cluster matches the namespace and selector of this pod, the pod matches
 		// its own terms, and the node has all the requested topologies, then we allow the pod
 		// to pass the affinity check.
-		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod) {
+		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod.Load()) {
 			return true
 		}
 		return false
