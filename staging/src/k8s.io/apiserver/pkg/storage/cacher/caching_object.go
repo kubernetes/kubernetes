@@ -85,7 +85,7 @@ type cachingObject struct {
 	cachedEventsLock sync.RWMutex
 
 	// cachedEvents is a cache containing object's encodings into watch events.
-	cachedEvents map[runtime.Identifier]*cachingObject
+	cachedEvents map[runtime.Identifier]runtime.Object
 }
 
 // newCachingObject performs a deep copy of the given object and wraps it
@@ -168,7 +168,7 @@ func (o *cachingObject) GetObject() runtime.Object {
 
 // GetCachedEvent implements runtime.CacheableObject interface.
 // It returns a watch event containing the already encoded object.
-func (o *cachingObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+func (o *cachingObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.Object, error) {
 	o.cachedEventsLock.Lock()
 	defer o.cachedEventsLock.Unlock()
 
@@ -181,12 +181,8 @@ func (o *cachingObject) GetCachedEvent(id runtime.Identifier, eventProducer func
 		return nil, err
 	}
 
-	obj, err := newCachingObject(event)
-	if err != nil {
-		return nil, err
-	}
-	o.cachedEvents[id] = obj
-	return obj, nil
+	o.cachedEvents[id] = event
+	return event, nil
 }
 
 // GetObjectKind implements runtime.Object interface.

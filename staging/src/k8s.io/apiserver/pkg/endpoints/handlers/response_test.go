@@ -72,7 +72,7 @@ func (m *mockCacheableObject) GetObject() runtime.Object {
 	return m.obj
 }
 
-func (m *mockCacheableObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+func (m *mockCacheableObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.Object, error) {
 	return m, nil
 }
 

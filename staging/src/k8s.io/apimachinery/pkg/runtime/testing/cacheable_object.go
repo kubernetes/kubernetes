@@ -127,7 +127,7 @@ func (m *MockCacheableObject) GetObject() runtime.Object {
 	return &noncacheableTestObject{gvk: gvk}
 }
 
-func (m *MockCacheableObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.CacheableObject, error) {
+func (m *MockCacheableObject) GetCachedEvent(id runtime.Identifier, eventProducer func() (runtime.Object, error)) (runtime.Object, error) {
 	return m, nil
 }
 

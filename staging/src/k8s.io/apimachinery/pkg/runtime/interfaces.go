@@ -348,7 +348,7 @@ type CacheableObject interface {
 	// GetCachedEvent returns a cached watch event containing the encoded object.
 	// If the cache doesn't contain a particular encoding of an event, it executes
 	// the <eventProducer> method and stores it afterwards.
-	GetCachedEvent(id Identifier, eventProducer func() (Object, error)) (CacheableObject, error)
+	GetCachedEvent(id Identifier, eventProducer func() (Object, error)) (Object, error)
 }
 
 // Unstructured objects store values as map[string]interface{}, with only values that can be serialized
