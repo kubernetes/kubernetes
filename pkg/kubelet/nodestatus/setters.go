@@ -463,12 +463,9 @@ func GoRuntime() Setter {
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now
-	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
-	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
-	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
+	readyFuncs []func() error,
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
-	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 	localStorageCapacityIsolation bool,
 ) Setter {
@@ -484,7 +481,10 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc()}
+		var errs []error
+		for _, f := range readyFuncs {
+			errs = append(errs, f())
+		}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 		if localStorageCapacityIsolation {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)

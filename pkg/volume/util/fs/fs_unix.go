@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
-// Info linux returns filesystem information for the filesystem that path resides upon.
+// Info returns filesystem information for the filesystem that path resides upon.
 func Info(path string) (FSInfo, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
@@ -50,7 +50,8 @@ func Info(path string) (FSInfo, error) {
 		Inodes:     int64(statfs.Files),
 		InodesFree: int64(statfs.Ffree),
 		InodesUsed: int64(statfs.Files) - int64(statfs.Ffree),
-		ReadOnly:   (statfs.Flags & unix.ST_RDONLY) != 0,
+		// the constant name for read-only filesystems differs between linux and the BSDs
+		ReadOnly: isReadOnlyMount(statfs),
 	}
 
 	return info, nil

@@ -1,8 +1,7 @@
-//go:build !linux && !darwin && !windows
-// +build !linux,!darwin,!windows
+//go:build linux
 
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,17 +18,8 @@ limitations under the License.
 
 package fs
 
-import (
-	"fmt"
-)
+import "golang.org/x/sys/unix"
 
-// Info unsupported returns 0 values for available and capacity and an error.
-func Info(path string) (FSInfo, error) {
-	return FSInfo{}, fmt.Errorf("fsinfo not supported for this build")
-}
-
-// DiskUsage gets disk usage of specified path.
-func DiskUsage(path string) (UsageInfo, error) {
-	var usage UsageInfo
-	return usage, fmt.Errorf("directory disk usage not supported for this build.")
+func isReadOnlyMount(statfs *unix.Statfs_t) bool {
+	return (statfs.Flags & unix.ST_RDONLY) != 0
 }

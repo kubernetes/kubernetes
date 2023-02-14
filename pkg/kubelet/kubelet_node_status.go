@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	goruntime "runtime"
 	"sort"
 	"strings"
@@ -37,12 +38,14 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 // registerWithAPIServer registers the node with the cluster master. It is safe
@@ -739,12 +742,19 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	// Volume limits
 	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
 
+	var readyFuncs = []func() error{
+		kl.runtimeState.runtimeErrors,
+		kl.runtimeState.networkErrors,
+		kl.runtimeState.storageErrors,
+		kl.shutdownManager.ShutdownStatus,
+		validateWritableDirectory("root", kl.getRootDir()),
+		validateWritableDirectory("pods", kl.getPodsDir()),
+	}
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors,
-			validateHostFunc, kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
+		nodestatus.ReadyCondition(kl.clock.Now, readyFuncs, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
 		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate
@@ -753,6 +763,33 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		kl.recordNodeSchedulableEvent,
 	)
 	return setters
+}
+
+// validateWritableDirectory is used to ensure that we can write to the directories that we expect to.  During runtime
+// filesystems can be re-mounted as read-only or experience other conditions that prevent writing to them.  This readiness
+// check causes the node to go NotReady in those situations.
+func validateWritableDirectory(label, dirName string) func() error {
+	return func() error {
+		info, err := fs.Info(dirName)
+		if err != nil {
+			return fmt.Errorf("unable to determine filesystem info for %s directory %s, %w", label, dirName, err)
+		}
+		if info.ReadOnly {
+			return fmt.Errorf("%s directory %s is mounted read-only", label, dirName)
+		}
+
+		// Actually writing a file can detect a rare condition with xfs where you have a r/w mounted filesystem,
+		// plenty of free space and inodes reported, but that free space is fragmented enough that there isn't enough
+		// contiguous free space for new inodes to be dynamically allocated. Anything that requires a new inode, such as
+		// creation of a new file returns ENOSPC in that case.
+		f, err := os.CreateTemp(dirName, ".validate-writable-*")
+		if err != nil {
+			return fmt.Errorf("validating writable %s directory %s, %w", label, dirName, err)
+		}
+		f.Close()
+		os.Remove(f.Name())
+		return nil
+	}
 }
 
 // Validate given node IP belongs to the current host

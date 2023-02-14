@@ -102,6 +102,7 @@ func TestInfo(t *testing.T) {
 }
 
 func validateInfo(t *testing.T, info FSInfo) {
+	t.Helper()
 	// All of these should be greater than zero on a real system
 	if info.Available <= 0 {
 		t.Errorf("Info() availablebytes should be greater than 0, got %v", info.Available)

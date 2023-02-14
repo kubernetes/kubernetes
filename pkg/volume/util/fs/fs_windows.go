@@ -35,7 +35,7 @@ var (
 
 // Info returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
+func Info(path string) (FSInfo, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
 
@@ -55,10 +55,18 @@ func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
 		0,
 	)
 	if ret == 0 {
-		return 0, 0, 0, 0, 0, 0, err
+		return FSInfo{}, err
 	}
 
-	return freeBytesAvailable, totalNumberOfBytes, totalNumberOfBytes - freeBytesAvailable, 0, 0, 0, nil
+	return FSInfo{
+		Available:  freeBytesAvailable,
+		Capacity:   totalNumberOfBytes,
+		Usage:      totalNumberOfBytes - freeBytesAvailable,
+		Inodes:     0,
+		InodesFree: 0,
+		InodesUsed: 0,
+		ReadOnly:   false,
+	}, nil
 }
 
 // DiskUsage gets disk usage of specified path.
