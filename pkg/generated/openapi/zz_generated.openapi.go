@@ -58990,6 +58990,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"dynamicNodeResize": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DynamicNodeResize enables dynamic node resize and avoids restarting kubelet to reflect node resource changes. See https://kep.k8s.io/3953 for more details. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},

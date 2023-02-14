@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -179,6 +180,10 @@ func (cm *containerManagerStub) UnprepareDynamicResources(*v1.Pod) error {
 
 func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *containerManagerStub) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

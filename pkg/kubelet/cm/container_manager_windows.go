@@ -268,3 +268,7 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(*v1.Pod) error {
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
+func (cm *containerManagerImpl) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
+}

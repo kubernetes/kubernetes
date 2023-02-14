@@ -916,6 +916,13 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @Karthik-K-N
+	// kep: http://kep.k8s.io/3953
+	// alpha: v1.28
+	//
+	// Enables Dynamic Node Resize
+	DynamicNodeResize featuregate.Feature = "DynamicNodeResize"
 )
 
 func init() {

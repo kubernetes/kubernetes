@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -1135,6 +1136,31 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	metrics.ActivePodCount.WithLabelValues("").Set(float64(len(activeRegularPods)))
 	metrics.ActivePodCount.WithLabelValues("true").Set(float64(len(activeStaticPods)))
 	metrics.MirrorPodCount.Set(float64(len(mirrorPods)))
+
+	if kl.kubeletConfiguration.DynamicNodeResize {
+		// Handle the node dynamic resize
+		machineInfo, err := kl.cadvisor.MachineInfo()
+		if err != nil {
+			klog.ErrorS(err, "Error fetching machine info")
+		} else {
+			cachedMachineInfo, _ := kl.GetCachedMachineInfo()
+
+			if !reflect.DeepEqual(cachedMachineInfo, machineInfo) {
+				kl.setCachedMachineInfo(machineInfo)
+
+				// Resync the resource managers
+				if err := kl.ResyncComponents(machineInfo); err != nil {
+					klog.ErrorS(err, "Error resyncing the kubelet components with machine info")
+				}
+
+				// Rerun pod admission only in case of shrink in cluster resources
+				if machineInfo.NumCores < cachedMachineInfo.NumCores || machineInfo.MemoryCapacity < cachedMachineInfo.MemoryCapacity {
+					klog.InfoS("Observed shrink in nod resources, rerunning pod admission")
+					kl.HandlePodAdditions(activePods)
+				}
+			}
+		}
+	}
 
 	// At this point, the pod worker is aware of which pods are not desired (SyncKnownPods).
 	// We now look through the set of active pods for those that the pod worker is not aware of

@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"strconv"
 	"strings"
 	"time"
@@ -126,6 +127,10 @@ type ContainerManager interface {
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
+
+	// ResyncComponents will resyc the resource managers like cpu, memory and topology managers
+	// with updated machineInfo
+	ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error
 
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider

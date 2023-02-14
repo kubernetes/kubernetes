@@ -482,6 +482,14 @@ type KubeletConfiguration struct {
 	// If not specified the default value is ContainerRuntimeEndpoint
 	// +optional
 	ImageServiceEndpoint string
+
+	// DynamicNodeResize enables dynamic node resize and avoids restarting kubelet to reflect node resource changes.
+	// Defaults to false.
+	// To use this flag, the corresponding DynamicNodeResize feature gate must be enabled.
+	// See https://kep.k8s.io/3953 for more details.
+	// +featureGate=DynamicNodeResize
+	// +optional
+	DynamicNodeResize bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

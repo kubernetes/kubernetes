@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
@@ -74,6 +75,11 @@ func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, contain
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
 	klog.InfoS("RemoveContainer", "containerID", containerID)
+	return nil
+}
+
+func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	klog.InfoS("SyncMachineInfo", "machineInfo", machineInfo)
 	return nil
 }
 

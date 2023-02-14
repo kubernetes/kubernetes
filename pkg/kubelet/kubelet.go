@@ -2915,3 +2915,8 @@ func (kl *Kubelet) PrepareDynamicResources(pod *v1.Pod) error {
 func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(pod)
 }
+
+// ResyncComponents calls the container Manager ResyncComponents API
+func (kl *Kubelet) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
+	return kl.containerManager.ResyncComponents(machineInfo)
+}

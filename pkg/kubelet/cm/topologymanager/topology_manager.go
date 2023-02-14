@@ -66,6 +66,8 @@ type Manager interface {
 	RemoveContainer(containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
+	// Sync will sync the Topology Manager with the latest machine info
+	Sync(machineInfo *cadvisorapi.MachineInfo) error
 }
 
 type manager struct {
@@ -206,6 +208,10 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 
 func (m *manager) RemoveContainer(containerID string) error {
 	return m.scope.RemoveContainer(containerID)
+}
+
+func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {

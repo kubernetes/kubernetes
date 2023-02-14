@@ -90,6 +90,9 @@ type Manager interface {
 
 	// GetMemory returns the memory allocated by a container from NUMA nodes
 	GetMemory(podUID, containerName string) []state.Block
+
+	// Sync will sync the memory Manager with the latest machine info
+	Sync(machineInfo *cadvisorapi.MachineInfo) error
 }
 
 type manager struct {
@@ -455,6 +458,11 @@ func (m *manager) GetAllocatableMemory() []state.Block {
 // GetMemory returns the memory allocated by a container from NUMA nodes
 func (m *manager) GetMemory(podUID, containerName string) []state.Block {
 	return m.state.GetMemoryBlocks(podUID, containerName)
+}
+
+// Sync will reinitialize the memory manager with latest machine info
+func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
 }
 
 func (m *manager) setPodPendingAdmission(pod *v1.Pod) {

@@ -1020,6 +1020,11 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return len(checkpoints) == 0
 }
 
+func (m *ManagerImpl) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	// Handle CPU manager sync here
+	return nil
+}
+
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

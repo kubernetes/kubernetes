@@ -826,6 +826,13 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
+
+	// DynamicNodeResize enables dynamic node resize and avoids restarting kubelet to reflect node resource changes.
+	// See https://kep.k8s.io/3953 for more details.
+	// Default: false
+	// +featureGate=DynamicNodeResize
+	// +optional
+	DynamicNodeResize bool `json:"dynamicNodeResize,omitempty"`
 }
 
 type KubeletAuthorizationMode string

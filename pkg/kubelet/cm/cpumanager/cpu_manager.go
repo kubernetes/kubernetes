@@ -93,6 +93,9 @@ type Manager interface {
 	// GetCPUAffinity returns cpuset which includes cpus from shared pools
 	// as well as exclusively allocated cpus
 	GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
+
+	// Sync will sync the CPU Manager with the latest machine info
+	Sync(machineInfo *cadvisorapi.MachineInfo) error
 }
 
 type manager struct {
@@ -535,6 +538,11 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	// Handle CPU manager sync here
+	return nil
 }
 
 func (m *manager) setPodPendingAdmission(pod *v1.Pod) {

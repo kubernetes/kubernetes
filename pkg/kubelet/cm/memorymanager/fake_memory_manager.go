@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -84,6 +85,10 @@ func (m *fakeManager) GetAllocatableMemory() []state.Block {
 func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
 	klog.InfoS("Get Memory", "podUID", podUID, "containerName", containerName)
 	return []state.Block{}
+}
+
+func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
 }
 
 // NewFakeManager creates empty/fake memory manager

@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -252,4 +253,8 @@ func (cm *FakeContainerManager) UnprepareDynamicResources(*v1.Pod) error {
 
 func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *FakeContainerManager) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
+	return nil
 }

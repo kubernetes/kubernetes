@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -1040,4 +1041,29 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(pod *v1.Pod) error {
 
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return cm.draManager.PodMightNeedToUnprepareResources(UID)
+}
+
+func (cm *containerManagerImpl) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
+
+	// Resync Topology manager
+	if err := cm.topologyManager.Sync(machineInfo); err != nil {
+		return err
+	}
+
+	// Resync Device manager
+	if err := cm.deviceManager.Sync(machineInfo); err != nil {
+		return err
+	}
+
+	// Resync CPU manager
+	if err := cm.cpuManager.Sync(machineInfo); err != nil {
+		return err
+	}
+
+	// Resync Memory manager
+	if err := cm.memoryManager.Sync(machineInfo); err != nil {
+		return err
+	}
+
+	return nil
 }

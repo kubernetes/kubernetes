@@ -270,5 +270,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			fmt.Errorf("invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery"))
 	}
 
+	if kc.DynamicNodeResize && !localFeatureGate.Enabled(features.DynamicNodeResize) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: DynamicNodeResize feature gate is required for DynamicNodeResize"))
+	}
+
 	return utilerrors.NewAggregate(allErrors)
 }
