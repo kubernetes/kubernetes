@@ -1085,11 +1085,27 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 
 		var getConfigForClient dynamiccertificates.GetConfigForClient
 		var getConfigForClientOnce sync.Once
+		loadCert, loadErr := tls.LoadX509KeyPair(kc.TLSCertFile, kc.TLSPrivateKeyFile) // error is check if used
 		tlsOptions.Config.GetConfigForClient = func(info *tls.ClientHelloInfo) (*tls.Config, error) {
 			getConfigForClientOnce.Do(func() {
 				getConfigForClient = dynamiccertificates.WithChainsGetConfigForClient(
+					// copied from http.Server.ListenAndServeTLS
 					func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
-						return tlsOptions.Config, nil
+						tlsConfig := tlsOptions.Config.Clone()
+						if !sets.NewString(tlsConfig.NextProtos...).Has("http/1.1") {
+							tlsConfig.NextProtos = append(tlsConfig.NextProtos, "http/1.1")
+						}
+
+						configHasCert := len(tlsConfig.Certificates) > 0 || tlsConfig.GetCertificate != nil
+						if !configHasCert || kc.TLSCertFile != "" || kc.TLSPrivateKeyFile != "" {
+							var err error
+							tlsConfig.Certificates = make([]tls.Certificate, 1)
+							tlsConfig.Certificates[0], err = loadCert, loadErr
+							if err != nil {
+								return nil, err
+							}
+						}
+						return tlsConfig, nil
 					},
 					tlsOptions.CAContentProvider,
 				)
