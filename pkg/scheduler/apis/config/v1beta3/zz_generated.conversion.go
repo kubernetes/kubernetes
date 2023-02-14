@@ -466,6 +466,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfi
 		out.Profiles = nil
 	}
 	out.Extenders = *(*[]v1beta3.Extender)(unsafe.Pointer(&in.Extenders))
+	// WARNING: in.DelayCacheUntilActive requires manual conversion: does not exist in peer-type
 	return nil
 }
 
