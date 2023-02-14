@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
 	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -46,6 +49,7 @@ type ExampleInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ExampleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error)
+	Apply(ctx context.Context, example *crv1.ExampleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Example, err error)
 	ExampleExpansion
 }
 
@@ -171,6 +175,32 @@ func (c *examples) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied example.
+func (c *examples) Apply(ctx context.Context, example *crv1.ExampleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Example, err error) {
+	if example == nil {
+		return nil, fmt.Errorf("example provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(example)
+	if err != nil {
+		return nil, err
+	}
+	name := example.Name
+	if name == nil {
+		return nil, fmt.Errorf("example.Name must be provided to Apply")
+	}
+	result = &v1.Example{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("examples").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -27,6 +29,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
 )
 
 // FakeFlunders implements FlunderInterface
@@ -133,6 +136,51 @@ func (c *FakeFlunders) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeFlunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Flunder, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, name, pt, data, subresources...), &v1beta1.Flunder{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Flunder), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied flunder.
+func (c *FakeFlunders) Apply(ctx context.Context, flunder *wardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Flunder, err error) {
+	if flunder == nil {
+		return nil, fmt.Errorf("flunder provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(flunder)
+	if err != nil {
+		return nil, err
+	}
+	name := flunder.Name
+	if name == nil {
+		return nil, fmt.Errorf("flunder.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Flunder{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Flunder), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeFlunders) ApplyStatus(ctx context.Context, flunder *wardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Flunder, err error) {
+	if flunder == nil {
+		return nil, fmt.Errorf("flunder provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(flunder)
+	if err != nil {
+		return nil, err
+	}
+	name := flunder.Name
+	if name == nil {
+		return nil, fmt.Errorf("flunder.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.Flunder{})
 
 	if obj == nil {
 		return nil, err
