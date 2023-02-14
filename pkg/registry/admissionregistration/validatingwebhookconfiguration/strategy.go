@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	admissionregistrationutil "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
 )
 
@@ -46,6 +47,8 @@ func (validatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 func (validatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	ic.Generation = 1
+
+	admissionregistrationutil.DropDisabledValidatingWebhookConfigurationFields(ic, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -53,6 +56,7 @@ func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Conte
 	newIC := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	oldIC := old.(*admissionregistration.ValidatingWebhookConfiguration)
 
+	admissionregistrationutil.DropDisabledValidatingWebhookConfigurationFields(newIC, oldIC)
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.

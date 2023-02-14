@@ -236,6 +236,9 @@ func (a *Webhook) evaluateCELRules(h webhook.WebhookAccessor, attr admission.Att
 		nil,
 		matchConditionsToValidations(h.GetMatchConditions()),
 	)
+	if validator == nil {
+		return []cel.PolicyDecision{}, nil
+	}
 	versionedAttr, err := NewVersionedAttributes(attr, attr.GetKind(), o)
 	if err != nil {
 		//TODO ivelichkovich: if error do we just continue? This currently forces no call to webhook
