@@ -1071,7 +1071,7 @@ func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 	return d
 }
 
-func OnRequestDispatched(ctx context.Context, r fq.Request) {
+func OnRequestDispatched(r fq.Request) {
 	req, ok := r.(*request)
 	if !ok {
 		return
@@ -1079,7 +1079,7 @@ func OnRequestDispatched(ctx context.Context, r fq.Request) {
 
 	qs := req.qs
 	if qs != nil {
-		qs.lockAndSyncTime(ctx)
+		qs.lock.Lock()
 		defer qs.lock.Unlock()
 		qs.totRequestsDispatched++
 	}

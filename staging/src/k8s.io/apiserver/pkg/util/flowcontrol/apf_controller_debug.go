@@ -64,11 +64,9 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
-	plNames := make([]string, len(cfgCtlr.priorityLevelStates))
-	i := 0
+	plNames := make([]string, 0, len(cfgCtlr.priorityLevelStates))
 	for plName := range cfgCtlr.priorityLevelStates {
-		plNames[i] = plName
-		i++
+		plNames = append(plNames, plName)
 	}
 	sort.Strings(plNames)
 	for i := range plNames {
