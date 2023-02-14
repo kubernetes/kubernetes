@@ -48,15 +48,7 @@ func NewValidator() Validator {
 	if err := validateHost(); err != nil {
 		return &validator{validateHostErr: err}
 	}
-	appArmorFS, err := getAppArmorFS()
-	if err != nil {
-		return &validator{
-			validateHostErr: fmt.Errorf("error finding AppArmor FS: %v", err),
-		}
-	}
-	return &validator{
-		appArmorFS: appArmorFS,
-	}
+	return nil
 }
 
 type validator struct {
