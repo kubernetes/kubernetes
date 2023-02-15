@@ -1,5 +1,5 @@
-//go:build !linux && !windows && !freebsd
-// +build !linux,!windows,!freebsd
+//go:build freebsd
+// +build freebsd
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -21,15 +21,26 @@ package subpath
 
 import (
 	"errors"
-	"os"
-
+	"fmt"
+	"unsafe"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/nsenter"
 )
 
-type subpath struct{}
+/*
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <stdlib.h>
 
-var errUnsupported = errors.New("util/subpath on this platform is not supported")
+int openat_no_vargs(int fd, const char *path, int flags, uint32_t mode) { return openat(fd, path, flags, mode); }
+*/
+import "C"
+
+const (
+	O_PATH_PORTABLE = C.O_PATH // TODO: rebind with libc directly
+)
+
+var errUnsupported = errors.New("util/subpath on this platform is not fully supported")
 
 // New returns a subpath.Interface for the current system.
 func New(mount.Interface) Interface {
@@ -46,10 +57,27 @@ func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, clea
 	return subPath.Path, nil, errUnsupported
 }
 
-func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
-	return errUnsupported
+// This call is not implemented in golang unix/syscall, we need to bind
+// from FreeBSD libc
+func doOpenat(fd int, path string, flags int, mode uint32) (int, error) {
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+	res := C.openat_no_vargs(C.int(fd), cPath, C.int(flags), C.uint(mode))
+	if res < 0 {
+		return 0, fmt.Errorf("openat failed for path %s", path)
+	}
+	return int(res), nil
 }
 
-func (sp *subpath) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return errUnsupported
+// This call is not implemented in golang unix/syscall, we need to bind
+// from FreeBSD libc
+func doMkdirat(dirfd int, path string, mode uint32) (err error) {
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+	res := C.mkdirat(C.int(dirfd), cPath, C.ushort(mode))
+	if res < 0 {
+		return fmt.Errorf("mkdirat failed for path %s", path)
+	}
+	return nil
+
 }

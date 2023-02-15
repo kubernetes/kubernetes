@@ -1,8 +1,8 @@
-//go:build !linux && !freebsd
-// +build !linux && !freebsd
+//go:build freebsd
+// +build freebsd
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,10 +20,16 @@ limitations under the License.
 package rlimit
 
 import (
-	"errors"
+        "golang.org/x/sys/unix"
+        "math"
+        "fmt"
 )
 
-// SetNumFiles sets the rlimit for the maximum open files.
+// SetNumFiles sets the linux rlimit for the maximum open files.
 func SetNumFiles(maxOpenFiles uint64) error {
-	return errors.New("SetRLimit unsupported in this platform")
+        if maxOpenFiles > math.MaxInt64 {
+                return fmt.Errorf("cannot set RLIMIT_NOFILE to a value upper than INT64_MAX")
+        }
+        return unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{Max: int64(maxOpenFiles), Cur: int64(maxOpenFiles)})
 }
+
