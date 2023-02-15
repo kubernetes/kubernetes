@@ -38,6 +38,9 @@ func TestApplyFeatureGates(t *testing.T) {
 	}{
 		{
 			name: "Feature gates disabled",
+			features: map[featuregate.Feature]bool{
+				features.PodSchedulingReadiness: false,
+			},
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
@@ -127,6 +130,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
 						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 						{Name: names.DefaultBinder},
+						{Name: names.SchedulingGates},
 					},
 				},
 			},

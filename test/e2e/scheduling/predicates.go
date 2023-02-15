@@ -806,7 +806,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		})
 	})
 
-	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling [Feature:PodSchedulingReadiness] [alpha]", func(ctx context.Context) {
+	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling", func(ctx context.Context) {
 		podLabel := "e2e-scheduling-gates"
 		replicas := 3
 		ginkgo.By(fmt.Sprintf("Creating a ReplicaSet with replicas=%v, carrying scheduling gates [foo bar]", replicas))
