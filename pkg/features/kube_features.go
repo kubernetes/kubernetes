@@ -652,7 +652,9 @@ const (
 	QOSReserved featuregate.Feature = "QOSReserved"
 
 	// owner: @chrishenzie
+	// kep: https://kep.k8s.io/2485
 	// alpha: v1.22
+	// beta: v1.27
 	//
 	// Enables usage of the ReadWriteOncePod PersistentVolume access mode.
 	ReadWriteOncePod featuregate.Feature = "ReadWriteOncePod"
@@ -1009,7 +1011,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
-	ReadWriteOncePod: {Default: false, PreRelease: featuregate.Alpha},
+	ReadWriteOncePod: {Default: true, PreRelease: featuregate.Beta},
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
 
