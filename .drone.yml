@@ -1,0 +1,51 @@
+---
+kind: pipeline
+name: default
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: ci
+  pull: default
+  image: rancher/dapper:1.11.2
+  commands:
+  - dapper ci
+  - ls -lR output/bin
+  privileged: true
+  volumes:
+  - name: socket
+    path: /var/run/docker.sock
+  when:
+    event:
+    - pull_request
+    - tag
+
+- name: github_binary_release
+  pull: default
+  image: plugins/github-release
+  settings:
+    checksum:
+    - sha256
+    files:
+    - "output/bin/kubelet*"
+    api_key:
+      from_secret: github_token
+    title: "${DRONE_TAG}"
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+    ref:
+      exclude:
+      - "refs/tags/*rc*"
+      - "refs/tags/*alpha*"    
+
+volumes:
+- name: socket
+  host:
+    path: /var/run/docker.sock
+

@@ -1,0 +1,19 @@
+FROM registry.suse.com/bci/golang:1.19
+
+ARG DAPPER_HOST_ARCH
+ARG DEBIAN_FRONTEND=noninteractive
+ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
+
+RUN zypper install -y -f docker rsync awk
+COPY --from=docker/buildx-bin:0.10.2 /buildx /usr/libexec/docker/cli-plugins/docker-buildx
+
+ENV DAPPER_SOURCE /go/src/github.com/rancher/kubernetes/
+ENV DAPPER_RUN_ARGS --privileged -v /var/lib/docker
+ENV DAPPER_OUTPUT ./output/bin
+ENV DAPPER_DOCKER_SOCKET true
+ENV DAPPER_ENV TAG REPO GOOS CROSS DRONE_TAG
+ENV HOME ${DAPPER_SOURCE}
+WORKDIR ${DAPPER_SOURCE}
+ENTRYPOINT ["./scripts/entry"]
+CMD ["ci"]
+
