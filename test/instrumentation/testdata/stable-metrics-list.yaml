@@ -290,6 +290,7 @@
   - 0.5
   - 1
   - 2.5
+  - 10
 - name: current_inflight_requests
   subsystem: apiserver
   help: Maximal number of currently used inflight request limit of this apiserver
