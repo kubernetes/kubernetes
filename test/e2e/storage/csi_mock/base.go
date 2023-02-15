@@ -880,8 +880,8 @@ func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]strin
 
 // A lot of this code was copied from e2e/framework. It would be nicer
 // if it could be reused - see https://github.com/kubernetes/kubernetes/issues/92754
-func podRunning(ctx context.Context, c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
+func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		pod, err := c.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -896,7 +896,7 @@ func podRunning(ctx context.Context, c clientset.Interface, podName, namespace s
 	}
 }
 
-func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespace string, when time.Time) wait.ConditionFunc {
+func podHasStorage(c clientset.Interface, podName, namespace string, when time.Time) wait.ConditionWithContextFunc {
 	// Check for events of this pod. Copied from test/e2e/common/container_probe.go.
 	expectedEvent := fields.Set{
 		"involvedObject.kind":      "Pod",
@@ -908,7 +908,7 @@ func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespac
 		FieldSelector: expectedEvent,
 	}
 	// copied from test/e2e/framework/events/events.go
-	return func() (bool, error) {
+	return func(ctx context.Context) (bool, error) {
 		// We cannot be sure here whether it has enough storage, only when
 		// it hasn't. In that case we abort waiting with a special error.
 		events, err := c.CoreV1().Events(namespace).List(ctx, options)
@@ -925,10 +925,10 @@ func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespac
 	}
 }
 
-func anyOf(conditions ...wait.ConditionFunc) wait.ConditionFunc {
-	return func() (bool, error) {
+func anyOf(conditions ...wait.ConditionWithContextFunc) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		for _, condition := range conditions {
-			done, err := condition()
+			done, err := condition(ctx)
 			if err != nil {
 				return false, err
 			}

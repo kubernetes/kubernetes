@@ -204,7 +204,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 // assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func assertCleanup(ns string, selectors ...string) {
 	var e error
-	verifyCleanupFunc := func() (bool, error) {
+	verifyCleanupFunc := func(ctx context.Context) (bool, error) {
 		e = nil
 		for _, selector := range selectors {
 			resources := e2ekubectl.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers")

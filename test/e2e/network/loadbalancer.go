@@ -1623,7 +1623,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		for nodeName, nodeIP := range endpointNodeMap {
 			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIP))
 			var body string
-			pollFn := func() (bool, error) {
+			pollFn := func(ctx context.Context) (bool, error) {
 				// we expect connection failure here, but not other errors
 				resp, err := config.GetResponseFromTestContainer(ctx,
 					"http",
@@ -1641,7 +1641,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				}
 				return false, nil
 			}
-			if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.TestTimeout, true, pollFn); pollErr != nil {
+			if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.TestTimeout, true, pollFn); pollErr != nil {
 				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
 					nodeName, healthCheckNodePort, body)
 			}

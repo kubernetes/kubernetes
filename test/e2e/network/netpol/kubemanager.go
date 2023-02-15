@@ -190,7 +190,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	// Instead of re-running the job on connectivity failure, the following conditionFunc when passed to PollImmediate, reruns
 	// the job when the observed value don't match the expected value, so we don't rely on return value of PollImmediate, we
 	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
-	conditionFunc := func() (bool, error) {
+	conditionFunc := func(_ context.Context) (bool, error) {
 		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 		// retry should only occur if expected and observed value don't match.
 		if args.expectConnectivity {

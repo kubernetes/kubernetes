@@ -341,7 +341,7 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 	var current int
 	var expected int
 	framework.Logf("Waiting up to %v for kube-dns to reach expected replicas", timeout)
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		current, err = getDNSReplicas(ctx, c)
 		if err != nil {
 			return false, err
@@ -354,7 +354,7 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 		return true, nil
 	}
 
-	if err = wait.PollUntilContextTimeout(context.Background(), 2*time.Second, timeout, false, condition); err != nil {
+	if err = wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, false, condition); err != nil {
 		return fmt.Errorf("err waiting for DNS replicas to satisfy %v, got %v: %w", expected, current, err)
 	}
 	framework.Logf("kube-dns reaches expected replicas: %v", expected)
@@ -363,7 +363,7 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 
 func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, timeout time.Duration) (configMap *v1.ConfigMap, err error) {
 	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		configMap, err = fetchDNSScalingConfigMap(ctx, c)
 		if err != nil {
 			return false, nil
@@ -371,7 +371,7 @@ func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, time
 		return true, nil
 	}
 
-	if err = wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, false, condition); err != nil {
+	if err = wait.PollUntilContextTimeout(ctx, time.Second, timeout, false, condition); err != nil {
 		return nil, fmt.Errorf("err waiting for DNS autoscaling ConfigMap got re-created: %w", err)
 	}
 	return configMap, nil

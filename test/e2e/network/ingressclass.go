@@ -92,7 +92,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		lastFailure := ""
 
 		// the admission controller may take a few seconds to observe the ingress classes
-		if err := wait.PollWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			lastFailure = ""
 
 			ingress, err := createBasicIngress(ctx, cs, f.Namespace.Name)
@@ -134,7 +134,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		defer cancel()
 
 		// the admission controller may take a few seconds to observe both ingress classes
-		if err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			classes, err := cs.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, nil

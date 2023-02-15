@@ -719,7 +719,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Unable to delete apiservice %s", apiServiceName)
 
 	ginkgo.By("Confirm that the generated APIService has been deleted")
-	err = wait.PollUntilContextTimeout(context.Background(), apiServiceRetryPeriod, apiServiceRetryTimeout, true, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
+	err = wait.PollUntilContextTimeout(context.Background(), apiServiceRetryPeriod, apiServiceRetryTimeout, true, checkApiServiceListQuantity(aggrclient, apiServiceLabelSelector, 0))
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
@@ -765,8 +765,8 @@ func generateFlunderName(base string) string {
 	return fmt.Sprintf("%s-%d", base, id)
 }
 
-func checkApiServiceListQuantity(ctx context.Context, aggrclient *aggregatorclient.Clientset, label string, quantity int) func() (bool, error) {
-	return func() (bool, error) {
+func checkApiServiceListQuantity(aggrclient *aggregatorclient.Clientset, label string, quantity int) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		var err error
 
 		framework.Logf("Requesting list of APIServices to confirm quantity")

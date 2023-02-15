@@ -62,7 +62,7 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 // GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
 func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
 	var body string
-	pollFn := func() (bool, error) {
+	pollFn := func(ctx context.Context) (bool, error) {
 		resp, err := config.GetResponseFromTestContainer(ctx, "http", dialCmd, host, port)
 		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
 			return false, nil
@@ -70,7 +70,7 @@ func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.Net
 		body = resp.Responses[0]
 		return true, nil
 	}
-	if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollFn); pollErr != nil {
+	if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollFn); pollErr != nil {
 		return "", pollErr
 	}
 	return body, nil

@@ -491,8 +491,8 @@ func validateRedirectRequest(client *http.Client, redirectVerb string, urlString
 // validateProxyVerbRequest checks that a http request to a pod
 // or service was valid for any http verb. Requires agnhost image
 // with porter --json-response
-func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb string, msg string) func() (bool, error) {
-	return func() (bool, error) {
+func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb string, msg string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		var err error
 
 		request, err := http.NewRequest(httpVerb, urlString, nil)

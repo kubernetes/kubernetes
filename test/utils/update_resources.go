@@ -36,13 +36,6 @@ const (
 	waitRetryTimeout    = 5 * time.Minute
 )
 
-func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
-	return func() (bool, error) {
-		done, err := condition()
-		return done, err
-	}
-}
-
 func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, name string, size uint, gvr schema.GroupVersionResource) error {
 	scaler := scale.NewScaler(scalesGetter)
 	preconditions := &scale.ScalePrecondition{
@@ -50,7 +43,8 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 		ResourceVersion: "",
 	}
 	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
-	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false))
+	// TODO: ScaleCondition should take a context
+	cond := scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false).WithContext()
 	err := wait.PollUntilContextTimeout(context.Background(), updateRetryInterval, updateRetryTimeout, true, cond)
 	if err == nil {
 		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)

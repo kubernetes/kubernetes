@@ -118,8 +118,8 @@ func testStackdriverMonitoring(ctx context.Context, f *framework.Framework, pods
 	framework.ExpectNoError(err)
 }
 
-func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) func() (bool, error) {
-	return func() (bool, error) {
+func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		counter := 0
 		correctUtilization := false
 		for _, metric := range stackdriverMetrics {

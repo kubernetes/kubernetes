@@ -255,7 +255,7 @@ func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
 	hittedHosts := sets.NewString()
 	count := 0
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(externalIP, int(httpPort), "/hostname", &e2enetwork.HTTPPokeParams{Timeout: 1 * time.Second})
 		if result.Status != e2enetwork.HTTPSuccess {
 			return false, nil

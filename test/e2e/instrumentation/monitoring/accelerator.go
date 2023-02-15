@@ -112,8 +112,8 @@ func testStackdriverAcceleratorMonitoring(ctx context.Context, f *framework.Fram
 	framework.ExpectNoError(err)
 }
 
-func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
-	return func() (bool, error) {
+func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		counter := 0
 		for _, metric := range acceleratorMetrics {
 			metricsMap[metric] = false

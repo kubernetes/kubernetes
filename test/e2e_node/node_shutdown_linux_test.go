@@ -234,7 +234,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					return false, nil
 				})
 
-				// Ignore timeout error since the context will be explicitly cancelled and the watch will never return true
+				// Ignore error since the context will be explicitly cancelled and the watch will never return true
 				if err != nil && !wait.Interrupted(err) {
 					framework.Failf("watch for invalid pod status failed: %v", err.Error())
 				}

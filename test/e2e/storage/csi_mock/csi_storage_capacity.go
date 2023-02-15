@@ -360,17 +360,16 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
 
 				condition := anyOf(
-					podRunning(ctx, f.ClientSet, pod.Name, pod.Namespace),
+					podRunning(f.ClientSet, pod.Name, pod.Namespace),
 					// We only just created the CSIStorageCapacity objects, therefore
 					// we have to ignore all older events, plus the syncDelay as our
 					// safety margin.
-					podHasStorage(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Now().Add(syncDelay)),
+					podHasStorage(f.ClientSet, pod.Name, pod.Namespace, time.Now().Add(syncDelay)),
 				)
 				err = wait.PollUntilContextCancel(ctx, poll, true, condition)
 				if test.expectFailure {
 					switch {
-					case errors.Is(err, context.DeadlineExceeded),
-						errors.Is(err, wait.ErrorInterrupted(errors.New("TODO"))),
+					case wait.Interrupted(err),
 						errors.Is(err, errNotEnoughSpace):
 						// Okay, we expected that.
 					case err == nil:

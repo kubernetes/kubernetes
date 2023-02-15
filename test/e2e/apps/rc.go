@@ -19,7 +19,6 @@ package apps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -786,7 +785,7 @@ func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, condit
 				}
 
 			case <-ctx.Done():
-				return lastEvent, wait.ErrorInterrupted(errors.New("TODO"))
+				return lastEvent, ctx.Err()
 			}
 		}
 	}

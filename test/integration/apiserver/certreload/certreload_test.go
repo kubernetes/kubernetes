@@ -306,9 +306,9 @@ func testClientCA(t *testing.T, recreate bool) {
 	}
 }
 
-func waitForConfigMapCAContent(t *testing.T, kubeClient kubernetes.Interface, key, content string, count int) func() (bool, error) {
-	return func() (bool, error) {
-		clusterAuthInfo, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "extension-apiserver-authentication", metav1.GetOptions{})
+func waitForConfigMapCAContent(t *testing.T, kubeClient kubernetes.Interface, key, content string, count int) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		clusterAuthInfo, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(ctx, "extension-apiserver-authentication", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}

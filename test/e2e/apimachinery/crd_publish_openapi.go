@@ -588,10 +588,10 @@ const waitSuccessThreshold = 10
 // mustSucceedMultipleTimes calls f multiple times on success and only returns true if all calls are successful.
 // This is necessary to avoid flaking tests where one call might hit a good apiserver while in HA other apiservers
 // might be lagging behind. Calling f multiple times reduces the chance exponentially.
-func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error) {
-	return func() (bool, error) {
+func mustSucceedMultipleTimes(n int, f wait.ConditionWithContextFunc) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		for i := 0; i < n; i++ {
-			ok, err := f()
+			ok, err := f(ctx)
 			if err != nil || !ok {
 				return ok, err
 			}
@@ -648,7 +648,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
-	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 60*time.Second, false, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 60*time.Second, false, mustSucceedMultipleTimes(waitSuccessThreshold, func(ctx context.Context) (bool, error) {
 		spec := &spec.Swagger{}
 		req, err := http.NewRequest("GET", url.String(), nil)
 		if err != nil {
