@@ -409,7 +409,7 @@ func (t Tag) SetTypeForKey(key, value string) (Tag, error) {
 	return t, nil
 }
 
-// findKeyAndType returns the start and end position for the type corresponding
+// findTypeForKey returns the start and end position for the type corresponding
 // to key or the point at which to insert the key-value pair if the type
 // wasn't found. The hasExt return value reports whether an -u extension was present.
 // Note: the extensions are typically very small and are likely to contain
