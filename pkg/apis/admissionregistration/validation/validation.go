@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"regexp"
 	"strings"
 
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	plugincel "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -733,7 +734,11 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	if len(trimmedExpression) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), "expression is not specified"))
 	} else {
-		result := plugincel.CompileValidatingPolicyExpression(trimmedExpression, paramKind != nil)
+		result := plugincel.CompileCELExpression(&validatingadmissionpolicy.ValidationCondition{
+			Expression: trimmedExpression,
+			Message:    v.Message,
+			Reason:     v.Reason,
+		}, paramKind != nil)
 		if result.Error != nil {
 			switch result.Error.Type {
 			case cel.ErrorTypeRequired:

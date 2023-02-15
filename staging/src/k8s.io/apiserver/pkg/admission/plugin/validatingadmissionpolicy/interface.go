@@ -18,34 +18,42 @@ package validatingadmissionpolicy
 
 import (
 	"k8s.io/api/admissionregistration/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
-// Validator defines the func used to validate an object against the validator's rules.
-// It expects the inbound object to already have been converted to the version expected
-// by the underlying CEL code (which is indicated by the match criteria of a policy definition).
-type Validator interface {
-	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
+var _ cel.ExpressionAccessor = &ValidationCondition{}
+
+// ValidationCondition contains the inputs needed to compile, evaluate and validate a cel expression
+type ValidationCondition struct {
+	Expression string
+	Message    string
+	Reason     *metav1.StatusReason
 }
 
-// ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
-// function to assist with converting types and values to/from CEL-typed values.
-type ValidatorCompiler interface {
+func (v *ValidationCondition) GetExpression() string {
+	return v.Expression
+}
+
+// Matcher is used for matching ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding to attributes
+type Matcher interface {
 	admission.InitializationValidator
 
-	// Matches says whether this policy definition matches the provided admission
+	// DefinitionMatches says whether this policy definition matches the provided admission
 	// resource request
 	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
 
-	// Matches says whether this policy definition matches the provided admission
+	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
 	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
+}
 
-	// Compile is used for the cel expression compilation
-	Compile(
-		policy *v1alpha1.ValidatingAdmissionPolicy,
-	) Validator
+// Validator is contains logic for converting ValidationEvaluation to PolicyDecisions
+type Validator interface {
+	// Validate is used to take cel evaluations and convert into decisions
+	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) []PolicyDecision
 }

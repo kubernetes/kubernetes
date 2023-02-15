@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package cel
 
 import (
 	"sync"
@@ -160,14 +160,15 @@ func buildRequestType() *apiservercel.DeclType {
 	))
 }
 
-// CompilationResult represents a compiled ValidatingAdmissionPolicy validation expression.
+// CompilationResult represents a compiled validations expression.
 type CompilationResult struct {
-	Program cel.Program
-	Error   *apiservercel.Error
+	Program            cel.Program
+	Error              *apiservercel.Error
+	ExpressionAccessor ExpressionAccessor
 }
 
-// CompileValidatingPolicyExpression returns a compiled vaalidating policy CEL expression.
-func CompileValidatingPolicyExpression(validationExpression string, hasParams bool) CompilationResult {
+// CompileCELExpression returns a compiled CEL expression.
+func CompileCELExpression(expressionAccessor ExpressionAccessor, hasParams bool) CompilationResult {
 	var env *cel.Env
 	envs, err := getEnvs()
 	if err != nil {
@@ -176,6 +177,7 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 				Type:   apiservercel.ErrorTypeInternal,
 				Detail: "compiler initialization failed: " + err.Error(),
 			},
+			ExpressionAccessor: expressionAccessor,
 		}
 	}
 	if hasParams {
@@ -184,13 +186,14 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 		env = envs.noParams
 	}
 
-	ast, issues := env.Compile(validationExpression)
+	ast, issues := env.Compile(expressionAccessor.GetExpression())
 	if issues != nil {
 		return CompilationResult{
 			Error: &apiservercel.Error{
 				Type:   apiservercel.ErrorTypeInvalid,
 				Detail: "compilation failed: " + issues.String(),
 			},
+			ExpressionAccessor: expressionAccessor,
 		}
 	}
 	if ast.OutputType() != cel.BoolType {
@@ -199,6 +202,7 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 				Type:   apiservercel.ErrorTypeInvalid,
 				Detail: "cel expression must evaluate to a bool",
 			},
+			ExpressionAccessor: expressionAccessor,
 		}
 	}
 
@@ -210,6 +214,7 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 				Type:   apiservercel.ErrorTypeInternal,
 				Detail: "unexpected compilation error: " + err.Error(),
 			},
+			ExpressionAccessor: expressionAccessor,
 		}
 	}
 	prog, err := env.Program(ast,
@@ -223,9 +228,11 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 				Type:   apiservercel.ErrorTypeInvalid,
 				Detail: "program instantiation failed: " + err.Error(),
 			},
+			ExpressionAccessor: expressionAccessor,
 		}
 	}
 	return CompilationResult{
-		Program: prog,
+		Program:            prog,
+		ExpressionAccessor: expressionAccessor,
 	}
 }

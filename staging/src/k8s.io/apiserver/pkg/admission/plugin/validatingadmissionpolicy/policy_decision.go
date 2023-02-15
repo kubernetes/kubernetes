@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,6 +38,7 @@ const (
 	EvalDeny  PolicyDecisionEvaluation = "deny"
 )
 
+// PolicyDecision contains the action determined from a cel evaluation along with metadata such as message, reason and duration
 type PolicyDecision struct {
 	Action     PolicyDecisionAction
 	Evaluation PolicyDecisionEvaluation
@@ -47,13 +47,7 @@ type PolicyDecision struct {
 	Elapsed    time.Duration
 }
 
-type policyDecisionWithMetadata struct {
-	PolicyDecision
-	Definition *v1alpha1.ValidatingAdmissionPolicy
-	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding
-}
-
-func ReasonToCode(r metav1.StatusReason) int32 {
+func reasonToCode(r metav1.StatusReason) int32 {
 	switch r {
 	case metav1.StatusReasonForbidden:
 		return http.StatusForbidden

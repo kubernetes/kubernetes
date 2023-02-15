@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -48,7 +50,11 @@ type policyController struct {
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	ValidatorCompiler
+	filterCompiler cel.FilterCompiler
+
+	matcher Matcher
+
+	newValidator
 
 	// Lock which protects:
 	//  - cachedPolicies
@@ -81,21 +87,26 @@ type policyController struct {
 	client kubernetes.Interface
 }
 
+type newValidator func(cel.Filter, *v1.FailurePolicyType) Validator
+
 func newPolicyController(
 	restMapper meta.RESTMapper,
 	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	validatorCompiler ValidatorCompiler,
+	filterCompiler cel.FilterCompiler,
+	matcher Matcher,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
 	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
 ) *policyController {
 	res := &policyController{}
 	*res = policyController{
-		ValidatorCompiler:     validatorCompiler,
+		filterCompiler:        filterCompiler,
 		definitionInfo:        make(map[namespacedName]*definitionInfo),
 		bindingInfos:          make(map[namespacedName]*bindingInfo),
 		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
+		matcher:               matcher,
+		newValidator:          NewValidator,
 		policyDefinitionsController: generic.NewController(
 			policiesInformer,
 			res.reconcilePolicyDefinition,
@@ -424,7 +435,14 @@ func (c *policyController) latestPolicyData() []policyData {
 		for bindingNN := range c.definitionsToBindings[definitionNN] {
 			bindingInfo := c.bindingInfos[bindingNN]
 			if bindingInfo.validator == nil && definitionInfo.configurationError == nil {
-				bindingInfo.validator = c.ValidatorCompiler.Compile(definitionInfo.lastReconciledValue)
+				hasParam := false
+				if definitionInfo.lastReconciledValue.Spec.ParamKind != nil {
+					hasParam = true
+				}
+				bindingInfo.validator = c.newValidator(
+					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), hasParam),
+					convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
+				)
 			}
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
@@ -445,6 +463,33 @@ func (c *policyController) latestPolicyData() []policyData {
 
 	c.cachedPolicies = res
 	return res
+}
+
+func convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(policyType *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+	if policyType == nil {
+		return nil
+	}
+
+	var v1FailPolicy v1.FailurePolicyType
+	if *policyType == v1alpha1.Fail {
+		v1FailPolicy = v1.Fail
+	} else if *policyType == v1alpha1.Ignore {
+		v1FailPolicy = v1.Ignore
+	}
+	return &v1FailPolicy
+}
+
+func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := ValidationCondition{
+			Expression: validation.Expression,
+			Message:    validation.Message,
+			Reason:     validation.Reason,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
 }
 
 func getNamespaceName(namespace, name string) namespacedName {
