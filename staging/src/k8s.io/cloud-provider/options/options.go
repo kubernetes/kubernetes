@@ -38,6 +38,7 @@ import (
 	ccmconfig "k8s.io/cloud-provider/config"
 	ccmconfigscheme "k8s.io/cloud-provider/config/install"
 	ccmconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
+	"k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
@@ -145,8 +146,8 @@ func (o *CloudControllerManagerOptions) Flags(allControllers []string, disabledB
 	fss := cliflag.NamedFlagSets{}
 	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	o.NodeController.AddFlags(fss.FlagSet("node controller"))
-	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	o.NodeController.AddFlags(fss.FlagSet(names.CloudNodeController))
+	o.ServiceController.AddFlags(fss.FlagSet(names.ServiceLBController))
 	if o.Webhook != nil {
 		o.Webhook.AddFlags(fss.FlagSet("webhook"), allWebhooks, disabledByDefaultWebhooks)
 	}

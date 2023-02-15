@@ -38,6 +38,7 @@ import (
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
@@ -228,37 +229,38 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fss := cliflag.NamedFlagSets{}
 	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	s.ServiceController.AddFlags(fss.FlagSet(names.ServiceController))
 
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 
-	s.AttachDetachController.AddFlags(fss.FlagSet("attachdetach controller"))
-	s.CSRSigningController.AddFlags(fss.FlagSet("csrsigning controller"))
-	s.DeploymentController.AddFlags(fss.FlagSet("deployment controller"))
-	s.StatefulSetController.AddFlags(fss.FlagSet("statefulset controller"))
-	s.DaemonSetController.AddFlags(fss.FlagSet("daemonset controller"))
+	s.AttachDetachController.AddFlags(fss.FlagSet(names.PersistentVolumeAttachDetachController))
+	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
+	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
+	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
+	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
-	s.EndpointController.AddFlags(fss.FlagSet("endpoint controller"))
-	s.EndpointSliceController.AddFlags(fss.FlagSet("endpointslice controller"))
-	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet("endpointslicemirroring controller"))
-	s.EphemeralVolumeController.AddFlags(fss.FlagSet("ephemeralvolume controller"))
-	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
-	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
-	s.JobController.AddFlags(fss.FlagSet("job controller"))
-	s.CronJobController.AddFlags(fss.FlagSet("cronjob controller"))
-	s.LegacySATokenCleaner.AddFlags(fss.FlagSet("legacy service account token cleaner"))
-	s.NamespaceController.AddFlags(fss.FlagSet("namespace controller"))
-	s.NodeIPAMController.AddFlags(fss.FlagSet("nodeipam controller"))
-	s.NodeLifecycleController.AddFlags(fss.FlagSet("nodelifecycle controller"))
-	s.PersistentVolumeBinderController.AddFlags(fss.FlagSet("persistentvolume-binder controller"))
-	s.PodGCController.AddFlags(fss.FlagSet("podgc controller"))
-	s.ReplicaSetController.AddFlags(fss.FlagSet("replicaset controller"))
-	s.ReplicationController.AddFlags(fss.FlagSet("replicationcontroller"))
-	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
-	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
-	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
+	s.EndpointController.AddFlags(fss.FlagSet(names.EndpointsController))
+	s.EndpointSliceController.AddFlags(fss.FlagSet(names.EndpointSliceController))
+	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet(names.EndpointSliceMirroringController))
+	s.EphemeralVolumeController.AddFlags(fss.FlagSet(names.EphemeralVolumeController))
+	s.GarbageCollectorController.AddFlags(fss.FlagSet(names.GarbageCollectorController))
+	s.HPAController.AddFlags(fss.FlagSet(names.HorizontalPodAutoscalerController))
+	s.JobController.AddFlags(fss.FlagSet(names.JobController))
+	s.CronJobController.AddFlags(fss.FlagSet(names.CronJobController))
+	s.LegacySATokenCleaner.AddFlags(fss.FlagSet(names.LegacyServiceAccountTokenCleanerController))
+	s.NamespaceController.AddFlags(fss.FlagSet(names.NamespaceController))
+	s.NodeIPAMController.AddFlags(fss.FlagSet(names.NodeIpamController))
+	s.NodeLifecycleController.AddFlags(fss.FlagSet(names.NodeLifecycleController))
+	s.PersistentVolumeBinderController.AddFlags(fss.FlagSet(names.PersistentVolumeBinderController))
+	s.PodGCController.AddFlags(fss.FlagSet(names.PodGarbageCollectorController))
+	s.ReplicaSetController.AddFlags(fss.FlagSet(names.ReplicaSetController))
+	s.ReplicationController.AddFlags(fss.FlagSet(names.ReplicationControllerController))
+	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
+	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
+	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
+
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
 

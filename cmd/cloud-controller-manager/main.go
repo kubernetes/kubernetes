@@ -62,7 +62,7 @@ func main() {
 	nodeIpamController := nodeIPAMController{}
 	nodeIpamController.nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIpamController.nodeIPAMControllerConfiguration
 	fss := cliflag.NamedFlagSets{}
-	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet("nodeipam controller"))
+	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet(kcmnames.NodeIpamController))
 
 	controllerInitializers[kcmnames.NodeIpamController] = app.ControllerInitFuncConstructor{
 		// "node-controller" is the shared identity of all node controllers, including node, node lifecycle, and node ipam.
