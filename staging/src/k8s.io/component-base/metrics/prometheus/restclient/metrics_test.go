@@ -42,9 +42,9 @@ func TestClientGOMetrics(t *testing.T) {
 				metrics.RequestResult.Increment(context.TODO(), "200", "POST", "www.foo.com")
 			},
 			want: `
-			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by status code, verb, and host.
+			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by status code, method, and host.
 			            # TYPE rest_client_requests_total counter
-			            rest_client_requests_total{code="200",host="www.foo.com",verb="POST"} 1
+			            rest_client_requests_total{code="200",host="www.foo.com",method="POST"} 1
 				`,
 		},
 		{
