@@ -28,7 +28,9 @@ const (
 	// CrioSocket is the path to the CRI-O socket.
 	// Please keep this in sync with the one in:
 	// github.com/google/cadvisor/tree/master/container/crio/client.go
-	CrioSocket = "/var/run/crio/crio.sock"
+	CrioSocket           = "/var/run/crio/crio.sock"
+	CriDockerdSocketv123 = "/var/run/dockershim.sock"
+	CriDockerdSocketv124 = "/var/run/cri-dockerd.sock"
 )
 
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
@@ -68,6 +70,12 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 // TODO: cri-o relies on cadvisor as a temporary workaround. The code should
 // be removed. Related issue:
 // https://github.com/kubernetes/kubernetes/issues/51798
+// Related issue for cri-dockerd: https://github.com/Mirantis/cri-dockerd/issues/135
 func UsingLegacyCadvisorStats(runtimeEndpoint string) bool {
-	return runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+	return UsingCriDockerdSocket(runtimeEndpoint) || runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+}
+
+func UsingCriDockerdSocket(runtimeEndpoint string) bool {
+	return runtimeEndpoint == "unix://"+CriDockerdSocketv124 || runtimeEndpoint == CriDockerdSocketv124 ||
+		runtimeEndpoint == CriDockerdSocketv123 || runtimeEndpoint == "unix://"+CriDockerdSocketv123
 }
