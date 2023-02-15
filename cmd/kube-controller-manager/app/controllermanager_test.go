@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	cpnames "k8s.io/cloud-provider/names"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
@@ -67,9 +68,9 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.TokenCleanerController,
 		names.NodeIpamController,
 		names.NodeLifecycleController,
-		names.ServiceController,
-		names.RouteController,
-		names.CloudNodeLifecycleController,
+		cpnames.ServiceLBController,
+		cpnames.NodeRouteController,
+		cpnames.CloudNodeLifecycleController,
 		names.PersistentVolumeBinderController,
 		names.PersistentVolumeAttachDetachController,
 		names.PersistentVolumeExpanderController,

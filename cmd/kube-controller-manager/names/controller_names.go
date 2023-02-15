@@ -16,6 +16,8 @@ limitations under the License.
 
 package names
 
+import cpnames "k8s.io/cloud-provider/names"
+
 // Canonical controller names
 //
 // NAMING CONVENTIONS
@@ -72,9 +74,6 @@ const (
 	TokenCleanerController                       = "token-cleaner-controller"
 	NodeIpamController                           = "node-ipam-controller"
 	NodeLifecycleController                      = "node-lifecycle-controller"
-	ServiceController                            = "service-controller"
-	RouteController                              = "route-controller"
-	CloudNodeLifecycleController                 = "cloud-node-lifecycle-controller"
 	PersistentVolumeBinderController             = "persistentvolume-binder-controller"
 	PersistentVolumeAttachDetachController       = "persistentvolume-attach-detach-controller"
 	PersistentVolumeExpanderController           = "persistentvolume-expander-controller"
@@ -122,9 +121,9 @@ func KCMControllerAliases() map[string]string {
 		"tokencleaner":                         TokenCleanerController,
 		"nodeipam":                             NodeIpamController,
 		"nodelifecycle":                        NodeLifecycleController,
-		"service":                              ServiceController,
-		"route":                                RouteController,
-		"cloud-node-lifecycle":                 CloudNodeLifecycleController,
+		"service":                              cpnames.ServiceLBController,
+		"route":                                cpnames.NodeRouteController,
+		"cloud-node-lifecycle":                 cpnames.CloudNodeLifecycleController,
 		"persistentvolume-binder":              PersistentVolumeBinderController,
 		"attachdetach":                         PersistentVolumeAttachDetachController,
 		"persistentvolume-expander":            PersistentVolumeExpanderController,

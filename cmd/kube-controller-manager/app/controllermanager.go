@@ -51,6 +51,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
+	cpnames "k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -459,9 +460,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	register(names.NodeIpamController, startNodeIpamController)
 	register(names.NodeLifecycleController, startNodeLifecycleController)
 	if loopMode == IncludeCloudLoops {
-		register(names.ServiceController, startServiceController)
-		register(names.RouteController, startRouteController)
-		register(names.CloudNodeLifecycleController, startCloudNodeLifecycleController)
+		register(cpnames.ServiceLBController, startServiceController)
+		register(cpnames.NodeRouteController, startRouteController)
+		register(cpnames.CloudNodeLifecycleController, startCloudNodeLifecycleController)
 		// TODO: persistent volume controllers into the IncludeCloudLoops only set.
 	}
 	register(names.PersistentVolumeBinderController, startPersistentVolumeBinderController)
