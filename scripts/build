@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/version
+
+cd $(dirname $0)/..
+
+OS_ARCH_LINUX="amd64 arm64"
+
+mkdir -p output/bin
+
+for ARCH in ${OS_ARCH_LINUX}; do
+        echo Building kubelet-$ARCH
+        build/run.sh make kubelet KUBE_BUILD_PLATFORMS=linux/$ARCH
+        tar -cvzf output/bin/kubelet-$ARCH.tar.gz _output/dockerized/bin/linux/$ARCH/kubelet
+done
+
+rm -rf _output/
+
+if [ -n "$DRONE_TAG" ]; then
+    TAG=$DRONE_TAG
+fi
+
+echo Built ${TAG}
