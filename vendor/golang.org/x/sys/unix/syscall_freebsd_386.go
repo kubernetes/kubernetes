@@ -60,8 +60,13 @@ func PtraceGetFsBase(pid int, fsbase *int64) (err error) {
 	return ptrace(PT_GETFSBASE, pid, uintptr(unsafe.Pointer(fsbase)), 0)
 }
 
-func PtraceIO(req int, pid int, addr uintptr, out []byte, countin int) (count int, err error) {
-	ioDesc := PtraceIoDesc{Op: int32(req), Offs: uintptr(unsafe.Pointer(addr)), Addr: uintptr(unsafe.Pointer(&out[0])), Len: uint32(countin)}
+func PtraceIO(req int, pid int, offs uintptr, out []byte, countin int) (count int, err error) {
+	ioDesc := PtraceIoDesc{
+		Op:   int32(req),
+		Offs: offs,
+		Addr: uintptr(unsafe.Pointer(&out[0])), // TODO(#58351): this is not safe.
+		Len:  uint32(countin),
+	}
 	err = ptrace(PT_IO, pid, uintptr(unsafe.Pointer(&ioDesc)), 0)
 	return int(ioDesc.Len), err
 }
