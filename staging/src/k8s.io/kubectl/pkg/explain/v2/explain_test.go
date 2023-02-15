@@ -19,44 +19,118 @@ package v2
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
-	"k8s.io/client-go/openapi/openapitest"
 )
 
-var apiGroupsPath = "apis/discovery.k8s.io/v1"
-
-var apiGroupsGVR = schema.GroupVersionResource{
+var apiDiscoveryJSON string = `{"openapi":"3.0.0","info":{"title":"Kubernetes","version":"v1.26.0"},"paths":{"/apis/discovery.k8s.io/":{"get":{"tags":["discovery"],"description":"get information of a group","operationId":"getDiscoveryAPIGroup","responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"}},"application/vnd.kubernetes.protobuf":{"schema":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"}},"application/yaml":{"schema":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"}}}},"401":{"description":"Unauthorized"}}}}},"components":{"schemas":{"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup":{"description":"APIGroup contains the name, the supported versions, and the preferred version of a group.","type":"object","required":["name","versions"],"properties":{"apiVersion":{"description":"APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources","type":"string"},"kind":{"description":"Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds","type":"string"},"name":{"description":"name is the name of the group.","type":"string","default":""},"preferredVersion":{"description":"preferredVersion is the version preferred by the API server, which probably is the storage version.","default":{},"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"}]},"serverAddressByClientCIDRs":{"description":"a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.","type":"array","items":{"default":{},"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR"}]}},"versions":{"description":"versions are the versions supported in this group.","type":"array","items":{"default":{},"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"}]}}},"x-kubernetes-group-version-kind":[{"group":"","kind":"APIGroup","version":"v1"}]},"io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery":{"description":"GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.","type":"object","required":["groupVersion","version"],"properties":{"groupVersion":{"description":"groupVersion specifies the API group and version in the form \"group/version\"","type":"string","default":""},"version":{"description":"version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.","type":"string","default":""}}},"io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR":{"description":"ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.","type":"object","required":["clientCIDR","serverAddress"],"properties":{"clientCIDR":{"description":"The CIDR with which clients can match their IP to figure out the server address that they should use.","type":"string","default":""},"serverAddress":{"description":"Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.","type":"string","default":""}}}},"securitySchemes":{"BearerToken":{"type":"apiKey","description":"Bearer Token authentication","name":"authorization","in":"header"}}}}`
+var apiGroupsGVR schema.GroupVersionResource = schema.GroupVersionResource{
 	Group:    "discovery.k8s.io",
 	Version:  "v1",
 	Resource: "apigroups",
 }
+var apiGroupsDocument map[string]interface{} = func() map[string]interface{} {
+	var doc map[string]interface{}
 
-var openAPIV3SpecDir = "../../../../../../../api/openapi-spec/v3"
+	err := json.Unmarshal([]byte(apiDiscoveryJSON), &doc)
+	if err != nil {
+		panic(err)
+	}
+
+	return doc
+}()
+
+type FakeOpenAPIV3Client struct {
+	// Path:
+	//		ContentType:
+	//			OpenAPIV3 Schema bytes
+	Values      map[string]map[string][]byte
+	FetchCounts map[string]map[string]int
+	lock        sync.Mutex
+}
+
+type FakeGroupVersion struct {
+	Data        map[string][]byte
+	FetchCounts map[string]int
+	Lock        *sync.Mutex
+}
+
+func (f *FakeGroupVersion) Schema(contentType string) ([]byte, error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+
+	if count, ok := f.FetchCounts[contentType]; ok {
+		f.FetchCounts[contentType] = count + 1
+	} else {
+		f.FetchCounts[contentType] = 1
+	}
+
+	data, ok := f.Data[contentType]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return data, nil
+}
+
+func (f *FakeOpenAPIV3Client) Paths() (map[string]openapi.GroupVersion, error) {
+	if f.Values == nil {
+		return nil, errors.New("values is nil")
+	}
+
+	res := map[string]openapi.GroupVersion{}
+	if f.FetchCounts == nil {
+		f.FetchCounts = map[string]map[string]int{}
+	}
+
+	for k, v := range f.Values {
+		counts, ok := f.FetchCounts[k]
+		if !ok {
+			counts = map[string]int{}
+			f.FetchCounts[k] = counts
+		}
+		res[k] = &FakeGroupVersion{Data: v, FetchCounts: counts, Lock: &f.lock}
+	}
+	return res, nil
+}
 
 func TestExplainErrors(t *testing.T) {
 	var buf bytes.Buffer
 
-	// Validate error when "Paths()" returns error.
-	err := PrintModelDescription(nil, &buf, &forceErrorClient{}, apiGroupsGVR, false, "unknown-format")
+	// A client with nil `Values` will return error on returning paths
+	failFetchPaths := &FakeOpenAPIV3Client{}
+
+	err := PrintModelDescription(nil, &buf, failFetchPaths, apiGroupsGVR, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch list of groupVersions")
 
-	// Validate error when GVR is not found in returned paths map.
-	emptyClient := &emptyPathsClient{}
-	err = PrintModelDescription(nil, &buf, emptyClient, schema.GroupVersionResource{
+	// Missing Schema
+	fakeClient := &FakeOpenAPIV3Client{
+		Values: map[string]map[string][]byte{
+			"apis/test1.example.com/v1": {
+				"unknown/content-type": []byte(apiDiscoveryJSON),
+			},
+			"apis/test2.example.com/v1": {
+				runtime.ContentTypeJSON: []byte(`<some invalid json!>`),
+			},
+			"apis/discovery.k8s.io/v1": {
+				runtime.ContentTypeJSON: []byte(apiDiscoveryJSON),
+			},
+		},
+	}
+
+	err = PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test0.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
 	}, false, "unknown-format")
 	require.ErrorContains(t, err, "could not locate schema")
 
-	// Validate error when GroupVersion "Schema()" call returns error.
-	fakeClient := &fakeOpenAPIClient{values: make(map[string]openapi.GroupVersion)}
-	fakeClient.values["apis/test1.example.com/v1"] = &forceErrorGV{}
+	// Missing JSON
 	err = PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test1.example.com",
 		Version:  "v1",
@@ -64,8 +138,6 @@ func TestExplainErrors(t *testing.T) {
 	}, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch openapi schema ")
 
-	// Validate error when returned bytes from GroupVersion "Schema" are invalid.
-	fakeClient.values["apis/test2.example.com/v1"] = &parseErrorGV{}
 	err = PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test2.example.com",
 		Version:  "v1",
@@ -73,9 +145,7 @@ func TestExplainErrors(t *testing.T) {
 	}, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to parse openapi schema")
 
-	// Validate error when render template is not recognized.
-	client := openapitest.NewFileClient(openAPIV3SpecDir)
-	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, "unknown-format")
+	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, "unknown-format")
 	require.ErrorContains(t, err, "unrecognized format: unknown-format")
 }
 
@@ -84,71 +154,31 @@ func TestExplainErrors(t *testing.T) {
 func TestExplainOpenAPIClient(t *testing.T) {
 	var buf bytes.Buffer
 
-	fileClient := openapitest.NewFileClient(openAPIV3SpecDir)
-	paths, err := fileClient.Paths()
-	require.NoError(t, err)
-	gv, found := paths[apiGroupsPath]
-	require.True(t, found)
-	discoveryBytes, err := gv.Schema("application/json")
-	require.NoError(t, err)
-
-	var doc map[string]interface{}
-	err = json.Unmarshal(discoveryBytes, &doc)
-	require.NoError(t, err)
+	fakeClient := &FakeOpenAPIV3Client{
+		Values: map[string]map[string][]byte{
+			"apis/discovery.k8s.io/v1": {
+				runtime.ContentTypeJSON: []byte(apiDiscoveryJSON),
+			},
+		},
+	}
 
 	gen := NewGenerator()
-	err = gen.AddTemplate("Context", "{{ toJson . }}")
+	err := gen.AddTemplate("Context", "{{ toJson . }}")
 	require.NoError(t, err)
 
 	expectedContext := TemplateContext{
-		Document:  doc,
+		Document:  apiGroupsDocument,
 		GVR:       apiGroupsGVR,
 		Recursive: false,
 		FieldPath: nil,
 	}
 
-	err = printModelDescriptionWithGenerator(gen, nil, &buf, fileClient, apiGroupsGVR, false, "Context")
+	err = printModelDescriptionWithGenerator(gen, nil, &buf, fakeClient, apiGroupsGVR, false, "Context")
 	require.NoError(t, err)
 
 	var actualContext TemplateContext
 	err = json.Unmarshal(buf.Bytes(), &actualContext)
 	require.NoError(t, err)
 	require.Equal(t, expectedContext, actualContext)
-}
-
-// forceErrorClient always returns an error for "Paths()".
-type forceErrorClient struct{}
-
-func (f *forceErrorClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return nil, fmt.Errorf("Always fails")
-}
-
-// emptyPathsClient returns an empty map for "Paths()".
-type emptyPathsClient struct{}
-
-func (f *emptyPathsClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return map[string]openapi.GroupVersion{}, nil
-}
-
-// fakeOpenAPIClient returns hard-coded map for "Paths()".
-type fakeOpenAPIClient struct {
-	values map[string]openapi.GroupVersion
-}
-
-func (f *fakeOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return f.values, nil
-}
-
-// forceErrorGV always returns an error for "Schema()".
-type forceErrorGV struct{}
-
-func (f *forceErrorGV) Schema(contentType string) ([]byte, error) {
-	return nil, fmt.Errorf("Always fails")
-}
-
-// parseErrorGV always returns invalid JSON for "Schema()".
-type parseErrorGV struct{}
-
-func (f *parseErrorGV) Schema(contentType string) ([]byte, error) {
-	return []byte(`<some invalid json!>`), nil
+	require.Equal(t, fakeClient.FetchCounts["apis/discovery.k8s.io/v1"][runtime.ContentTypeJSON], 1)
 }
