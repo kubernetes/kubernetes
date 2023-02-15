@@ -17,11 +17,8 @@ limitations under the License.
 package apparmor
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
@@ -30,7 +27,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	utilpath "k8s.io/utils/path"
 )
 
 // Whether AppArmor should be disabled by default.
