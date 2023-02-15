@@ -409,3 +409,15 @@
   stabilityLevel: STABLE
   labels:
   - resource
+- name: load_balancer_sync_total
+  subsystem: service_controller
+  help: A metric counting the amount of times any load balancer has been configured,
+    as an effect of service/node changes on the cluster
+  type: Counter
+  stabilityLevel: BETA
+- name: node_sync_error_total
+  subsystem: service_controller
+  help: A metric counting the amount of times any load balancer has been configured
+    and errored, as an effect of node changes on the cluster
+  type: Counter
+  stabilityLevel: BETA
