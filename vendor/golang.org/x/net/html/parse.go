@@ -184,7 +184,7 @@ func (p *parser) clearStackToContext(s scope) {
 	}
 }
 
-// parseGenericRawTextElements implements the generic raw text element parsing
+// parseGenericRawTextElement implements the generic raw text element parsing
 // algorithm defined in 12.2.6.2.
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-elements-that-contain-only-text
 // TODO: Since both RAWTEXT and RCDATA states are treated as tokenizer's part
