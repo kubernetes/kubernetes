@@ -166,7 +166,7 @@ var args = []string{
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
-	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -457,7 +457,7 @@ func TestApplyTo(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	// flag set to parse the args that are required to start the kube controller manager
-	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -648,7 +648,7 @@ func TestApplyTo(t *testing.T) {
 	sort.Sort(sortedGCIgnoredResources(expected.ComponentConfig.GarbageCollectorController.GCIgnoredResources))
 
 	c := &kubecontrollerconfig.Config{}
-	s.ApplyTo(c)
+	s.ApplyTo(c, []string{""}, []string{""}, nil)
 
 	if !reflect.DeepEqual(expected.ComponentConfig, c.ComponentConfig) {
 		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", cmp.Diff(expected.ComponentConfig, c.ComponentConfig))
@@ -1270,8 +1270,52 @@ func TestValidateControllerManagerOptions(t *testing.T) {
 
 	opts.EndpointSliceController.MaxEndpointsPerSlice = 1001 // max endpoints per slice should be a positive integer <= 1000
 
-	if err := opts.Validate([]string{"*"}, []string{""}); err == nil {
+	if err := opts.Validate([]string{"*"}, []string{""}, nil); err == nil {
 		t.Error("expected error, no error found")
+	}
+}
+
+func TestControllerManagerAliases(t *testing.T) {
+	opts, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Errorf("expected no error, error found %+v", err)
+	}
+	opts.Generic.Controllers = []string{"deployment", "-job", "-cronjob-controller", "podgc", "token-cleaner-controller"}
+	expectedControllers := []string{"deployment-controller", "-job-controller", "-cronjob-controller", "pod-garbage-collector-controller", "token-cleaner-controller"}
+
+	allControllers := []string{
+		"bootstrap-signer-controller",
+		"job-controller",
+		"deployment-controller",
+		"cronjob-controller",
+		"namespace-controller",
+		"pod-garbage-collector-controller",
+		"token-cleaner-controller",
+	}
+	disabledByDefaultControllers := []string{
+		"bootstrap-signer-controller",
+		"token-cleaner-controller",
+	}
+	controllerAliases := map[string]string{
+		"bootstrapsigner": "bootstrap-signer-controller",
+		"job":             "job-controller",
+		"deployment":      "deployment-controller",
+		"cronjob":         "cronjob-controller",
+		"namespace":       "namespace-controller",
+		"podgc":           "pod-garbage-collector-controller",
+		"tokencleaner":    "token-cleaner-controller",
+	}
+
+	if err := opts.Validate(allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
+		t.Errorf("expected no error, error found %v", err)
+	}
+
+	cfg := &kubecontrollerconfig.Config{}
+	if err := opts.ApplyTo(cfg, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
+		t.Errorf("expected no error, error found %v", err)
+	}
+	if !reflect.DeepEqual(cfg.ComponentConfig.Generic.Controllers, expectedControllers) {
+		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.ComponentConfig.Generic.Controllers)
 	}
 }
 

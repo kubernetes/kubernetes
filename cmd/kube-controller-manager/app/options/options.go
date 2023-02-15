@@ -224,9 +224,9 @@ func NewDefaultComponentConfig() (kubectrlmgrconfig.KubeControllerManagerConfigu
 }
 
 // Flags returns flags for a specific KubeController by section name
-func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
+func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
-	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
+	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
 	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
@@ -271,8 +271,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 }
 
 // ApplyTo fills up controller manager config with options.
-func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
-	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
+func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
+	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return err
 	}
 	if err := s.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
@@ -371,10 +371,10 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 }
 
 // Validate is used to validate the options and config before launching the controller manager
-func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
 	var errs []error
 
-	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
 	errs = append(errs, s.KubeCloudShared.Validate()...)
 	errs = append(errs, s.AttachDetachController.Validate()...)
 	errs = append(errs, s.CSRSigningController.Validate()...)
@@ -413,8 +413,8 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 }
 
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
-	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) (*kubecontrollerconfig.Config, error) {
+	if err := s.Validate(allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
 
@@ -446,7 +446,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		EventBroadcaster: eventBroadcaster,
 		EventRecorder:    eventRecorder,
 	}
-	if err := s.ApplyTo(c); err != nil {
+	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
 	s.Metrics.Apply()
