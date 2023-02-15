@@ -416,7 +416,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if status.Code() != test.wantStatusCode {
-					t.Errorf("Score is expected to return success, but didn't, want: %v, got: %v", test.wantStatusCode, status)
+					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status.Code())
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}
