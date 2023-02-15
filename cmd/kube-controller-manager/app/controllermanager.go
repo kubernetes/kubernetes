@@ -462,7 +462,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		register(names.ServiceController, startServiceController)
 		register(names.RouteController, startRouteController)
 		register(names.CloudNodeLifecycleController, startCloudNodeLifecycleController)
-		// TODO: volume controller into the IncludeCloudLoops only set.
+		// TODO: persistent volume controllers into the IncludeCloudLoops only set.
 	}
 	register(names.PersistentVolumeBinderController, startPersistentVolumeBinderController)
 	register(names.PersistentVolumeAttachDetachController, startAttachDetachController)
