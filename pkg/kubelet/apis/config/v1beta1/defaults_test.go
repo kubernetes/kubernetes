@@ -251,6 +251,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.Bool(false),
 				LocalStorageCapacityIsolation:   utilpointer.Bool(false),
+				PodresourcesLimits:              v1beta1.RateLimitConfiguration{MaxFrequency: 0, MaxBurst: 0},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(false),
@@ -349,6 +350,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(0),
 				RegisterNode:                  utilpointer.Bool(false),
 				LocalStorageCapacityIsolation: utilpointer.Bool(false),
+				PodresourcesLimits:            v1beta1.RateLimitConfiguration{MaxFrequency: 0, MaxBurst: 0},
 			},
 		},
 		{
@@ -498,6 +500,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(1),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				PodresourcesLimits:            v1beta1.RateLimitConfiguration{MaxFrequency: 100.0, MaxBurst: 10},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(true),
@@ -644,6 +647,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(1),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				PodresourcesLimits:            v1beta1.RateLimitConfiguration{MaxFrequency: 100.0, MaxBurst: 10},
 			},
 		},
 		{

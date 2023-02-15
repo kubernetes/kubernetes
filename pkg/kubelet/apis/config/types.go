@@ -478,6 +478,11 @@ type KubeletConfiguration struct {
 	// If not specified the default value is ContainerRuntimeEndpoint
 	// +optional
 	ImageServiceEndpoint string
+
+	// PodresourcesLimits specifies the rate limits for the node-local podresources API endpoint
+	// +featureGate=KubeletPodResources
+	// +optional
+	PodresourcesLimits RateLimitConfiguration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -655,4 +660,17 @@ type MemorySwapConfiguration struct {
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string
+}
+
+// RateLimitConfiguration is used for setting the rate limits for the kubelet APIs exposed
+// locally on the node as gRPC over UNIX-domain sockets, like the podresources API
+type RateLimitConfiguration struct {
+	// MaxFrequency  defines the maximum allowed frequency of the calls represented
+	// as number of calls per second, cumulating all the calls.
+	// Omitting the value or setting to zero means no limit.
+	MaxFrequency float64
+	// MaxBurst defines the maximum numbers of calls that may happen at once, within
+	// the boundaries set by frequency.
+	// This value is ignored if the frequuency is unlimited.
+	MaxBurst int32
 }

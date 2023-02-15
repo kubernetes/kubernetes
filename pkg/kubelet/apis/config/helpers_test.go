@@ -251,6 +251,8 @@ var (
 		"OOMScoreAdj",
 		"PodCIDR",
 		"PodPidsLimit",
+		"PodresourcesLimits.MaxFrequency",
+		"PodresourcesLimits.MaxBurst",
 		"PodsPerCore",
 		"Port",
 		"ProtectKernelDefaults",

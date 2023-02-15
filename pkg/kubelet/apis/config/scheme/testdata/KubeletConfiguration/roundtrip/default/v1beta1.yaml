@@ -68,6 +68,7 @@ nodeStatusReportFrequency: 5m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1
+podresourcesLimits: {}
 port: 10250
 registerNode: true
 registryBurst: 10

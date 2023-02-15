@@ -820,6 +820,11 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
+
+	// PodresourcesLimits specifies the rate limits for the node-local podresources API endpoint
+	// +featureGate=KubeletPodResources
+	// +optional
+	PodresourcesLimits RateLimitConfiguration `json:"podresourcesLimits,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -1004,4 +1009,17 @@ type CredentialProvider struct {
 type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// RateLimitConfiguration is used for setting the rate limits for the kubelet APIs exposed
+// locally on the node as gRPC over UNIX-domain sockets, like the podresources API
+type RateLimitConfiguration struct {
+	// MaxFrequency  defines the maximum allowed frequency of the calls represented
+	// as number of calls per second, cumulating all the calls.
+	// Setting the values to zero means no limit.
+	MaxFrequency float64 `json:"maxFrequency,omitempty"`
+	// MaxBurst defines the maximum numbers of calls that may happen at once, within
+	// the boundaries set by frequency.
+	// This value is ignored if the frequuency is unlimited.
+	MaxBurst int32 `json:"maxBurst,omitempty"`
 }
