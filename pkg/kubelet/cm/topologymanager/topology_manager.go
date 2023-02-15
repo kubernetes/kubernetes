@@ -211,10 +211,9 @@ func (m *manager) RemoveContainer(containerID string) error {
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.InfoS("Topology Admit Handler")
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
-	pod := attrs.Pod
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(pod)
+	podAdmitResult := m.scope.Admit(attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	return podAdmitResult
