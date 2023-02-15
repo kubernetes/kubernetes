@@ -138,7 +138,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 		}
 	}
 	if !fieldFoundOnce {
-		return nil, fmt.Errorf("couldn't find any field with path %q in the list of objects", field)
+		fmt.Printf("[kubectl] couldn't find any field with path %q in the list of objects\n", field)
 	}
 
 	sorter := NewRuntimeSort(field, objs)
@@ -407,7 +407,7 @@ func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 	}
 
 	if len(table.Rows) > 0 && !fieldFoundOnce {
-		return nil, fmt.Errorf("couldn't find any field with path %q in the list of objects", field)
+		fmt.Printf("[kubectl] couldn't find any field with path %q in the list of objects\n", field)
 	}
 
 	return &TableSorter{
