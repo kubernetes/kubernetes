@@ -3365,9 +3365,7 @@ func validateSchedulingGates(schedulingGates []core.PodSchedulingGate, fldPath *
 	// There should be no duplicates in the list of scheduling gates.
 	seen := sets.String{}
 	for i, schedulingGate := range schedulingGates {
-		if schedulingGate.Name == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i), "must not be empty"))
-		}
+		allErrs = append(allErrs, ValidateQualifiedName(schedulingGate.Name, fldPath.Index(i))...)
 		if seen.Has(schedulingGate.Name) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), schedulingGate.Name))
 		}
