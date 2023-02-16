@@ -19,10 +19,10 @@ package headerrequest
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -34,6 +34,7 @@ const (
 	defConfigMapNamespace = "kube-system"
 
 	defUsernameHeadersKey     = "user-key"
+	defUIDHeadersKey          = "uid-key"
 	defGroupHeadersKey        = "group-key"
 	defExtraHeaderPrefixesKey = "extra-key"
 	defAllowedClientNamesKey  = "names-key"
@@ -41,6 +42,7 @@ const (
 
 type expectedHeadersHolder struct {
 	usernameHeaders     []string
+	uidHeaders          []string
 	groupHeaders        []string
 	extraHeaderPrefixes []string
 	allowedClientNames  []string
@@ -55,9 +57,10 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 	}{
 		{
 			name: "happy-path: headers values are populated form a config map",
-			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
+			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val"},
+				uidHeaders:          []string{"uid-val"},
 				groupHeaders:        []string{"group-val"},
 				extraHeaderPrefixes: []string{"extra-val"},
 				allowedClientNames:  []string{"names-val"},
@@ -66,7 +69,7 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 		{
 			name: "passing an empty config map doesn't break the controller",
 			cm: func() *corev1.ConfigMap {
-				c := defaultConfigMap(t, nil, nil, nil, nil)
+				c := defaultConfigMap(t, nil, nil, nil, nil, nil)
 				c.Data = map[string]string{}
 				return c
 			}(),
@@ -74,7 +77,7 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 		{
 			name: "an invalid config map produces an error",
 			cm: func() *corev1.ConfigMap {
-				c := defaultConfigMap(t, nil, nil, nil, nil)
+				c := defaultConfigMap(t, nil, nil, nil, nil, nil)
 				c.Data = map[string]string{
 					defUsernameHeadersKey: "incorrect-json-array",
 				}
@@ -119,9 +122,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 	}{
 		{
 			name: "scenario 1: headers values are populated form a config map",
-			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
+			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val"},
+				uidHeaders:          []string{"uid-val"},
 				groupHeaders:        []string{"group-val"},
 				extraHeaderPrefixes: []string{"extra-val"},
 				allowedClientNames:  []string{"names-val"},
@@ -130,7 +134,7 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 		{
 			name: "scenario 2: an invalid config map produces an error but doesn't destroy the state (scenario 1)",
 			cm: func() *corev1.ConfigMap {
-				c := defaultConfigMap(t, nil, nil, nil, nil)
+				c := defaultConfigMap(t, nil, nil, nil, nil, nil)
 				c.Data = map[string]string{
 					defUsernameHeadersKey: "incorrect-json-array",
 				}
@@ -139,6 +143,7 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			expectErr: true,
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val"},
+				uidHeaders:          []string{"uid-val"},
 				groupHeaders:        []string{"group-val"},
 				extraHeaderPrefixes: []string{"extra-val"},
 				allowedClientNames:  []string{"names-val"},
@@ -146,9 +151,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 		},
 		{
 			name: "scenario 3: some headers values have changed (prev set by scenario 1)",
-			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"group-val-scenario-3"}, []string{"extra-val"}, []string{"names-val"}),
+			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val-scenario-3"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val"},
+				uidHeaders:          []string{"uid-val"},
 				groupHeaders:        []string{"group-val-scenario-3"},
 				extraHeaderPrefixes: []string{"extra-val"},
 				allowedClientNames:  []string{"names-val"},
@@ -156,9 +162,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 		},
 		{
 			name: "scenario 4: all headers values have changed (prev set by scenario 3)",
-			cm:   defaultConfigMap(t, []string{"user-val-scenario-4"}, []string{"group-val-scenario-4"}, []string{"extra-val-scenario-4"}, []string{"names-val-scenario-4"}),
+			cm:   defaultConfigMap(t, []string{"user-val-scenario-4"}, []string{"uid-val-scenario-4"}, []string{"group-val-scenario-4"}, []string{"extra-val-scenario-4"}, []string{"names-val-scenario-4"}),
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val-scenario-4"},
+				uidHeaders:          []string{"uid-val-scenario-4"},
 				groupHeaders:        []string{"group-val-scenario-4"},
 				extraHeaderPrefixes: []string{"extra-val-scenario-4"},
 				allowedClientNames:  []string{"names-val-scenario-4"},
@@ -204,9 +211,10 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 	}{
 		{
 			name: "headers values are populated form a config map",
-			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
+			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
 				usernameHeaders:     []string{"user-val"},
+				uidHeaders:          []string{"uid-val"},
 				groupHeaders:        []string{"group-val"},
 				extraHeaderPrefixes: []string{"extra-val"},
 				allowedClientNames:  []string{"names-val"},
@@ -238,7 +246,7 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 	}
 }
 
-func defaultConfigMap(t *testing.T, usernameHeaderVal, groupHeadersVal, extraHeaderPrefixesVal, allowedClientNamesVal []string) *corev1.ConfigMap {
+func defaultConfigMap(t *testing.T, usernameHeaderVal, uidHeaderVal, groupHeadersVal, extraHeaderPrefixesVal, allowedClientNamesVal []string) *corev1.ConfigMap {
 	encode := func(val []string) string {
 		encodedVal, err := json.Marshal(val)
 		if err != nil {
@@ -253,6 +261,7 @@ func defaultConfigMap(t *testing.T, usernameHeaderVal, groupHeadersVal, extraHea
 		},
 		Data: map[string]string{
 			defUsernameHeadersKey:     encode(usernameHeaderVal),
+			defUIDHeadersKey:          encode(uidHeaderVal),
 			defGroupHeadersKey:        encode(groupHeadersVal),
 			defExtraHeaderPrefixesKey: encode(extraHeaderPrefixesVal),
 			defAllowedClientNamesKey:  encode(allowedClientNamesVal),
@@ -265,6 +274,7 @@ func newDefaultTarget() *RequestHeaderAuthRequestController {
 		configmapName:          defConfigMapName,
 		configmapNamespace:     defConfigMapNamespace,
 		usernameHeadersKey:     defUsernameHeadersKey,
+		uidHeadersKey:          defUIDHeadersKey,
 		groupHeadersKey:        defGroupHeadersKey,
 		extraHeaderPrefixesKey: defExtraHeaderPrefixesKey,
 		allowedClientNamesKey:  defAllowedClientNamesKey,

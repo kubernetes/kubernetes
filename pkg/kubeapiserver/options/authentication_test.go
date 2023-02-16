@@ -286,6 +286,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		},
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			UsernameHeaders:     []string{"x-remote-user"},
+			UIDHeaders:          []string{"x-remote-uid"},
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			ClientCAFile:        "testdata/root.pem",
@@ -335,6 +336,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
 			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+			UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
 			GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 			ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 			CAContentProvider:   nil, // this is nil because you can't compare functions
@@ -380,6 +382,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 		"--client-ca-file=client-cacert",
 		"--requestheader-client-ca-file=testdata/root.pem",
 		"--requestheader-username-headers=x-remote-user-custom",
+		"--requestheader-uid-headers=x-remote-uid-custom",
 		"--requestheader-group-headers=x-remote-group-custom",
 		"--requestheader-allowed-names=kube-aggregator",
 		"--service-account-key-file=cert",
@@ -413,6 +416,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			ClientCAFile:    "testdata/root.pem",
 			UsernameHeaders: []string{"x-remote-user-custom"},
+			UIDHeaders:      []string{"x-remote-uid-custom"},
 			GroupHeaders:    []string{"x-remote-group-custom"},
 			AllowedNames:    []string{"kube-aggregator"},
 		},

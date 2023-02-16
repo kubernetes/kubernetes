@@ -29,6 +29,7 @@ import (
 func TestRequestHeader(t *testing.T) {
 	testcases := map[string]struct {
 		nameHeaders        []string
+		uidHeaders         []string
 		groupHeaders       []string
 		extraPrefixHeaders []string
 		requestHeaders     http.Header
@@ -128,13 +129,66 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedOk: true,
 		},
-
+		"uid none": {
+			nameHeaders: []string{"X-Remote-User"},
+			uidHeaders:  []string{"X-Remote-Uid"},
+			requestHeaders: http.Header{
+				"X-Remote-User": {"Bob"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				UID:    "",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
+		"uid exact match": {
+			nameHeaders: []string{"X-Remote-User"},
+			uidHeaders:  []string{"X-Remote-Uid"},
+			requestHeaders: http.Header{
+				"X-Remote-User": {"Bob"},
+				// The keys in http.Header MUST be http.CanonicalHeaderKey.
+				// Hence X-Remote-Uid-1 instead of X-Remote-UID-1.
+				"X-Remote-Uid-1": {"8f5ea9d1-a5ed-4d02-80a2-26709216350b"},
+				"X-Remote-Uid-2": {"c7644180-c774-4a9b-81e5-3eef76f087ab"},
+			},
+			finalHeaders: http.Header{
+				"X-Remote-Uid-1": {"8f5ea9d1-a5ed-4d02-80a2-26709216350b"},
+				"X-Remote-Uid-2": {"c7644180-c774-4a9b-81e5-3eef76f087ab"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				UID:    "",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
+		"uid first match": {
+			nameHeaders: []string{"X-Remote-User"},
+			uidHeaders:  []string{"X-Remote-Uid-1", "X-Remote-Uid-2"},
+			requestHeaders: http.Header{
+				"X-Remote-User":  {"Bob"},
+				"X-Remote-Uid-1": {"8f5ea9d1-a5ed-4d02-80a2-26709216350b"},
+				"X-Remote-Uid-2": {"c7644180-c774-4a9b-81e5-3eef76f087ab"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				UID:    "8f5ea9d1-a5ed-4d02-80a2-26709216350b",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
 		"extra prefix matches case-insensitive": {
 			nameHeaders:        []string{"X-Remote-User"},
+			uidHeaders:         []string{"X-Remote-UID"},
 			groupHeaders:       []string{"X-Remote-Group-1", "X-Remote-Group-2"},
 			extraPrefixHeaders: []string{"X-Remote-Extra-1-", "X-Remote-Extra-2-"},
 			requestHeaders: http.Header{
 				"X-Remote-User":         {"Bob"},
+				"X-Remote-Uid":          {"2ca80fb0-60ea-4ecf-951c-89af843b0402"},
 				"X-Remote-Group-1":      {"one-a", "one-b"},
 				"X-Remote-Group-2":      {"two-a", "two-b"},
 				"X-Remote-extra-1-key1": {"alfa", "bravo"},
@@ -146,6 +200,7 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "Bob",
+				UID:    "2ca80fb0-60ea-4ecf-951c-89af843b0402",
 				Groups: []string{"one-a", "one-b", "two-a", "two-b"},
 				Extra: map[string][]string{
 					"key1": {"alfa", "bravo", "echo", "foxtrot"},
@@ -191,10 +246,12 @@ func TestRequestHeader(t *testing.T) {
 
 		"escaped extra keys": {
 			nameHeaders:        []string{"X-Remote-User"},
+			uidHeaders:         []string{"X-Remote-Uid"},
 			groupHeaders:       []string{"X-Remote-Group"},
 			extraPrefixHeaders: []string{"X-Remote-Extra-"},
 			requestHeaders: http.Header{
 				"X-Remote-User":                                            {"Bob"},
+				"X-Remote-Uid":                                             {"2ca80fb0-60ea-4ecf-951c-89af843b0402"},
 				"X-Remote-Group":                                           {"one-a", "one-b"},
 				"X-Remote-Extra-Alpha":                                     {"alphabetical"},
 				"X-Remote-Extra-Alph4num3r1c":                              {"alphanumeric"},
@@ -206,6 +263,7 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "Bob",
+				UID:    "2ca80fb0-60ea-4ecf-951c-89af843b0402",
 				Groups: []string{"one-a", "one-b"},
 				Extra: map[string][]string{
 					"alpha":                         {"alphabetical"},
@@ -223,7 +281,7 @@ func TestRequestHeader(t *testing.T) {
 
 	for k, testcase := range testcases {
 		t.Run(k, func(t *testing.T) {
-			auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
+			auth, err := New(testcase.nameHeaders, testcase.uidHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
 			if err != nil {
 				t.Fatal(err)
 			}
