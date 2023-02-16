@@ -4071,3 +4071,76 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
 	}
 }
+
+func TestRequest_tryThrottleWithInfo_errors(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		rateLimiter func() flowcontrol.RateLimiter
+		context     func() (context.Context, context.CancelFunc)
+		err         error
+	}{
+		{
+			name:        "already cancelled context",
+			rateLimiter: func() flowcontrol.RateLimiter { return flowcontrol.NewTokenBucketRateLimiter(0, 1) },
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancelFn := context.WithCancel(context.Background())
+				cancelFn()
+				return ctx, cancelFn
+			},
+			err: context.Canceled,
+		},
+		{
+			name:        "already past deadline context",
+			rateLimiter: func() flowcontrol.RateLimiter { return flowcontrol.NewTokenBucketRateLimiter(0, 1) },
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancelFn := context.WithTimeout(context.Background(), 0*time.Millisecond)
+				time.Sleep(1 * time.Millisecond)
+				return ctx, cancelFn
+			},
+			err: context.DeadlineExceeded,
+		},
+		{
+			name:        "limiter bucket is zero",
+			rateLimiter: func() flowcontrol.RateLimiter { return flowcontrol.NewTokenBucketRateLimiter(0, 0) },
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Millisecond)
+				return ctx, cancelFn
+			},
+			err: fmt.Errorf("client rate limiter Wait returned an error: %w", fmt.Errorf("rate: Wait(n=1) exceeds limiter's burst 0")),
+		},
+		{
+			name: "context expires before rate limit is available",
+			rateLimiter: func() flowcontrol.RateLimiter {
+				limiter := flowcontrol.NewTokenBucketRateLimiter(100, 1)
+				limiter.Accept()
+				return limiter
+			},
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Millisecond)
+				return ctx, cancelFn
+			},
+			err: context.DeadlineExceeded,
+		},
+		{
+			name:        "context with unexpired deadline",
+			rateLimiter: func() flowcontrol.RateLimiter { return flowcontrol.NewTokenBucketRateLimiter(0, 1) },
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancelFn := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+				return ctx, cancelFn
+			},
+			err: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancelFn := tc.context()
+			defer cancelFn()
+			r := &Request{
+				rateLimiter: tc.rateLimiter(),
+				c:           &RESTClient{base: &url.URL{Host: "foo.com"}},
+			}
+			if err := r.tryThrottleWithInfo(ctx, "reason"); !reflect.DeepEqual(err, tc.err) {
+				t.Errorf("unexpected cancellation error: %v", err)
+			}
+		})
+	}
+}

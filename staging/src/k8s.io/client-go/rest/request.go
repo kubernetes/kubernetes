@@ -612,7 +612,18 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 
 	err := r.rateLimiter.Wait(ctx)
 	if err != nil {
-		err = fmt.Errorf("client rate limiter Wait returned an error: %w", err)
+		// Wait can return either a context error (Canceled or DeadlineExceeded), a
+		// "too many tokens" error (doesn't apply here because we're asking for one
+		// token), or a "wait would exceed deadline" error. That last is effectively
+		// context.DeadlineExceeded, so we error out early and return that error so
+		// that callers can properly handle the scenario.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			err = ctxErr
+		} else if strings.Contains(err.Error(), "would exceed context deadline") {
+			err = context.DeadlineExceeded
+		} else {
+			err = fmt.Errorf("client rate limiter Wait returned an error: %w", err)
+		}
 	}
 	latency := time.Since(now)
 
