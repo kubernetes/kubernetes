@@ -305,7 +305,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					}
 
 					// setting the system-masters identity ensures that we will always have access rights
-					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
+					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", "", []string{"system:masters"}, nil)
 					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
