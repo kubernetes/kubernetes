@@ -205,10 +205,18 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	}
 
 	for _, pod := range dswp.podManager.GetPods() {
-		if dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
+		// Keep consistency of adding pod during reconstruction
+		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
 			// Do not (re)add volumes for pods that can't also be starting containers
 			continue
 		}
+
+		if !dswp.hasAddedPods && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+			// When kubelet restarts, we need to add pods to dsw if there is a possibility
+			// that the container may still be running
+			continue
+		}
+
 		dswp.processPodVolumes(pod, mountedVolumesForPod)
 	}
 }
