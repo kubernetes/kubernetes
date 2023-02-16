@@ -46,6 +46,7 @@ import (
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -279,6 +280,7 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 	// we coast on the last valid key ID that we have observed
 	if err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
 		h.keyID.Store(&p.KeyID)
+		metrics.RecordKeyIDFromStatus(h.name, p.KeyID)
 	}
 
 	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
@@ -598,7 +600,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 
 		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := value.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, probe.getCurrentKeyID, aestransformer.NewGCMTransformer),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentKeyID, probe.check, aestransformer.NewGCMTransformer),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 

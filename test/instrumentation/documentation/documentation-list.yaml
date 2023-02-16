@@ -3251,7 +3251,9 @@
   type: Histogram
   stabilityLevel: ALPHA
   labels:
+  - status
   - transformation_type
+  - transformer_prefix
   buckets:
   - 5e-06
   - 1e-05
