@@ -61,9 +61,6 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
-	if len(nodes) == 0 {
-		return nil
-	}
 	state := &balancedAllocationPreScoreState{
 		podRequest: ba.calculatePodResourceRequestMap(pod, ba.resources),
 	}
