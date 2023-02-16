@@ -631,14 +631,14 @@ type KubeletConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// systemReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `systemReserved` compute resource reservation for OS system daemons.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// doc for more information.
 	// Default: ""
 	// +optional
 	SystemReservedCgroup string `json:"systemReservedCgroup,omitempty"`
 	// kubeReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// doc for more information.
 	// Default: ""
 	// +optional
@@ -650,7 +650,7 @@ type KubeletConfiguration struct {
 	// When `system-reserved` is in the list, systemReservedCgroup must be specified.
 	// When `kube-reserved` is in the list, kubeReservedCgroup must be specified.
 	// This field is supported only when `cgroupsPerQOS` is set to true.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// for more information.
 	// Default: ["pods"]
 	// +optional

@@ -121,7 +121,7 @@ message PodSpec {
   map<string, string> nodeSelector = 7;
 
   // ServiceAccountName is the name of the ServiceAccount to use to run this pod.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/auth/service_accounts.md
+  // More info: https://kubernetes.io/docs/concepts/security/service-accounts/
   // +optional
   optional string serviceAccountName = 8;
 
