@@ -302,9 +302,6 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	uniqueValues := sets.NewInt32()
 	for j, exitCodeValue := range onExitCode.Values {
 		valuePath := valuesPath.Index(j)
-		if onExitCode.Operator == batch.PodFailurePolicyOnExitCodesOpIn && exitCodeValue == 0 {
-			allErrs = append(allErrs, field.Invalid(valuePath, exitCodeValue, "must not be 0 for the In operator"))
-		}
 		if uniqueValues.Has(exitCodeValue) {
 			allErrs = append(allErrs, field.Duplicate(valuePath, exitCodeValue))
 		} else {

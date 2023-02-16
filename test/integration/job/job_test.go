@@ -461,20 +461,21 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 // TestJobPodFailurePolicy tests handling of pod failures with respect to the
 // configured pod failure policy rules
 func TestJobPodFailurePolicy(t *testing.T) {
-	job := batchv1.Job{
-		Spec: batchv1.JobSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:                     "main-container",
-							Image:                    "foo",
-							ImagePullPolicy:          v1.PullIfNotPresent,
-							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
-						},
-					},
+	jobTemplateSpec := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:                     "main-container",
+					Image:                    "foo",
+					ImagePullPolicy:          v1.PullIfNotPresent,
+					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				},
 			},
+		},
+	}
+	job := batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: jobTemplateSpec,
 			PodFailurePolicy: &batchv1.PodFailurePolicy{
 				Rules: []batchv1.PodFailurePolicyRule{
 					{
@@ -551,6 +552,45 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		wantJobConditionType                     batchv1.JobConditionType
 		wantPodFailuresHandledByPolicyRuleMetric *metricLabelsWithValue
 	}{
+		"pod status matching the configured FailJob rule on exit codes when exit code=0; job terminated when JobPodFailurePolicy enabled": {
+			enableJobPodFailurePolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: jobTemplateSpec,
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{0},
+								},
+							},
+						},
+					},
+				},
+			},
+			podStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "main-container",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 0,
+							},
+						},
+					},
+				},
+			},
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
+			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
+				Labels: []string{"FailJob"},
+				Value:  1,
+			},
+		},
 		"pod status matching the configured FailJob rule on exit codes; job terminated when JobPodFailurePolicy enabled": {
 			enableJobPodFailurePolicy: true,
 			job:                       job,

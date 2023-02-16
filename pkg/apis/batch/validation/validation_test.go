@@ -463,24 +463,6 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
-		`spec.podFailurePolicy.rules[0].onExitCodes.values[1]: Invalid value: 0: must not be 0 for the In operator`: {
-			ObjectMeta: validJobObjectMeta,
-			Spec: batch.JobSpec{
-				Selector: validGeneratedSelector,
-				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
-				PodFailurePolicy: &batch.PodFailurePolicy{
-					Rules: []batch.PodFailurePolicyRule{
-						{
-							Action: batch.PodFailurePolicyActionIgnore,
-							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-								Values:   []int32{1, 0, 2},
-							},
-						},
-					},
-				},
-			},
-		},
 		`spec.podFailurePolicy.rules[1].onExitCodes.containerName: Invalid value: "xyz": must be one of the container or initContainer names in the pod template`: {
 			ObjectMeta: validJobObjectMeta,
 			Spec: batch.JobSpec{
