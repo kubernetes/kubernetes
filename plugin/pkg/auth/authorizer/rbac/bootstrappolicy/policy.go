@@ -370,7 +370,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 		{
 			// a role for nodes to use to have the access they need for running pods
-			ObjectMeta: metav1.ObjectMeta{Name: "system:node"},
+			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
 			Rules:      NodeRules(),
 		},
 		{
