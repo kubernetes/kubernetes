@@ -18,14 +18,8 @@ package benchmark
 
 import (
 	"flag"
-	"fmt"
-	"os"
 	"testing"
 
-	"github.com/spf13/pflag"
-
-	logsapi "k8s.io/component-base/logs/api/v1"
-	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -35,23 +29,6 @@ func TestMain(m *testing.M) {
 	ktesting.DefaultConfig = ktesting.NewConfig(ktesting.Verbosity(2))
 	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
 	flag.Parse()
-
-	c := logsapi.NewLoggingConfiguration()
-
-	// component-base only supports pflag at the moment.
-	var fs pflag.FlagSet
-	logsapi.AddFlags(c, &fs)
-	// Not ideal. https://github.com/spf13/pflag/pull/330 would be better.
-	fs.VisitAll(func(f *pflag.Flag) {
-		if flag.CommandLine.Lookup(f.Name) == nil {
-			flag.CommandLine.Var(f.Value, f.Name, f.Usage)
-		}
-	})
-	flag.Parse()
-	if err := logsapi.ValidateAndApply(c, nil /* no feature gates */); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
 
 	framework.EtcdMain(m.Run)
 }
