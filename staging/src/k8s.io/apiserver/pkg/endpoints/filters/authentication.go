@@ -51,6 +51,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 	}
 	standardRequestHeaderConfig := &authenticatorfactory.RequestHeaderConfig{
 		UsernameHeaders:     headerrequest.StaticStringSlice{"X-Remote-User"},
+		UIDHeaders:          headerrequest.StaticStringSlice{"X-Remote-Uid"},
 		GroupHeaders:        headerrequest.StaticStringSlice{"X-Remote-Group"},
 		ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"X-Remote-Extra-"},
 	}
@@ -87,6 +88,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		headerrequest.ClearAuthenticationHeaders(
 			req.Header,
 			standardRequestHeaderConfig.UsernameHeaders,
+			standardRequestHeaderConfig.UIDHeaders,
 			standardRequestHeaderConfig.GroupHeaders,
 			standardRequestHeaderConfig.ExtraHeaderPrefixes,
 		)
@@ -96,6 +98,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			headerrequest.ClearAuthenticationHeaders(
 				req.Header,
 				requestHeaderConfig.UsernameHeaders,
+				requestHeaderConfig.UIDHeaders,
 				requestHeaderConfig.GroupHeaders,
 				requestHeaderConfig.ExtraHeaderPrefixes,
 			)
