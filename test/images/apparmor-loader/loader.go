@@ -207,13 +207,13 @@ func loadProfiles(path string) error {
 // If the given fileinfo is a symlink, return the FileInfo of the target. Otherwise, return the
 // given fileinfo.
 func resolveSymlink(basePath string, entry os.DirEntry) (os.FileInfo, error) {
-	if info, err := entry.Info(); err != nil {
+	info, err := entry.Info()
+	if err != nil {
 		return nil, fmt.Errorf("error getting the fileInfo: %v", err)
-	} else {
-		if info.Mode()&os.ModeSymlink == 0 {
-			// Not a symlink.
-			return info, nil
-		}
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		// Not a symlink.
+		return info, nil
 	}
 
 	fpath := filepath.Join(basePath, entry.Name())
