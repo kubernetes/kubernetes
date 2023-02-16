@@ -252,7 +252,7 @@ func useHostNamespaces(p *corev1.Pod) {
 // shareProcessNamespace configures all containers in the pod to share the
 // process namespace.
 func shareProcessNamespace(p *corev1.Pod) {
-	p.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+	p.Spec.ShareProcessNamespace = pointer.Bool(true)
 }
 
 // clearSecurityContext clears the security context for the container.
@@ -275,7 +275,7 @@ func setPrivileged(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.Privileged = pointer.BoolPtr(true)
+		c.SecurityContext.Privileged = pointer.Bool(true)
 		return false
 	})
 }
@@ -287,7 +287,7 @@ func disallowRoot(p *corev1.Pod, containerName string) {
 			return true
 		}
 		c.SecurityContext = &corev1.SecurityContext{
-			RunAsNonRoot: pointer.BoolPtr(true),
+			RunAsNonRoot: pointer.Bool(true),
 		}
 		return false
 	})
