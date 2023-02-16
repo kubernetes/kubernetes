@@ -605,7 +605,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/extensions/v1beta1.NetworkPolicyPeer":                                                 schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref),
 		"k8s.io/api/extensions/v1beta1.NetworkPolicyPort":                                                 schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref),
 		"k8s.io/api/extensions/v1beta1.NetworkPolicySpec":                                                 schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyStatus":                                               schema_k8sio_api_extensions_v1beta1_NetworkPolicyStatus(ref),
 		"k8s.io/api/extensions/v1beta1.ReplicaSet":                                                        schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref),
 		"k8s.io/api/extensions/v1beta1.ReplicaSetCondition":                                               schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref),
 		"k8s.io/api/extensions/v1beta1.ReplicaSetList":                                                    schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref),
@@ -735,7 +734,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/networking/v1.NetworkPolicyPeer":                                                      schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref),
 		"k8s.io/api/networking/v1.NetworkPolicyPort":                                                      schema_k8sio_api_networking_v1_NetworkPolicyPort(ref),
 		"k8s.io/api/networking/v1.NetworkPolicySpec":                                                      schema_k8sio_api_networking_v1_NetworkPolicySpec(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyStatus":                                                    schema_k8sio_api_networking_v1_NetworkPolicyStatus(ref),
 		"k8s.io/api/networking/v1.ServiceBackendPort":                                                     schema_k8sio_api_networking_v1_ServiceBackendPort(ref),
 		"k8s.io/api/networking/v1alpha1.ClusterCIDR":                                                      schema_k8sio_api_networking_v1alpha1_ClusterCIDR(ref),
 		"k8s.io/api/networking/v1alpha1.ClusterCIDRList":                                                  schema_k8sio_api_networking_v1alpha1_ClusterCIDRList(ref),
@@ -30843,18 +30841,11 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref common.ReferenceCallb
 							Ref:         ref("k8s.io/api/extensions/v1beta1.NetworkPolicySpec"),
 						},
 					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is the current state of the NetworkPolicy. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/extensions/v1beta1.NetworkPolicyStatus"),
-						},
-					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/extensions/v1beta1.NetworkPolicySpec", "k8s.io/api/extensions/v1beta1.NetworkPolicyStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/extensions/v1beta1.NetworkPolicySpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -31127,45 +31118,6 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 		},
 		Dependencies: []string{
 			"k8s.io/api/extensions/v1beta1.NetworkPolicyEgressRule", "k8s.io/api/extensions/v1beta1.NetworkPolicyIngressRule", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
-	}
-}
-
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NetworkPolicyStatus describe the current state of the NetworkPolicy.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy. Current service state",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 
@@ -36566,18 +36518,11 @@ func schema_k8sio_api_networking_v1_NetworkPolicy(ref common.ReferenceCallback) 
 							Ref:         ref("k8s.io/api/networking/v1.NetworkPolicySpec"),
 						},
 					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "status represents the current state of the NetworkPolicy. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/networking/v1.NetworkPolicyStatus"),
-						},
-					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/networking/v1.NetworkPolicySpec", "k8s.io/api/networking/v1.NetworkPolicyStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/networking/v1.NetworkPolicySpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -36850,45 +36795,6 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 		},
 		Dependencies: []string{
 			"k8s.io/api/networking/v1.NetworkPolicyEgressRule", "k8s.io/api/networking/v1.NetworkPolicyIngressRule", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
-	}
-}
-
-func schema_k8sio_api_networking_v1_NetworkPolicyStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NetworkPolicyStatus describes the current state of the NetworkPolicy.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy. Current service state",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 
