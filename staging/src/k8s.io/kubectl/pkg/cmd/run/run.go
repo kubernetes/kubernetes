@@ -126,6 +126,7 @@ type RunOptions struct {
 	fieldManager   string
 
 	Namespace        string
+	ContainerName    string
 	EnforceNamespace bool
 
 	genericclioptions.IOStreams
@@ -165,6 +166,8 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+
+	cmdutil.AddContainerVarFlags(cmd, &o.ContainerName, o.ContainerName)
 
 	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
 	// TODO: Remove the cascade flag from the run command in kubectl 1.29
@@ -345,10 +348,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 		opts := &attach.AttachOptions{
 			StreamOptions: exec.StreamOptions{
-				IOStreams: o.IOStreams,
-				Stdin:     o.Interactive,
-				TTY:       o.TTY,
-				Quiet:     o.Quiet,
+				IOStreams:     o.IOStreams,
+				Stdin:         o.Interactive,
+				TTY:           o.TTY,
+				Quiet:         o.Quiet,
+				ContainerName: o.ContainerName,
 			},
 			GetPodTimeout: timeout,
 			CommandName:   cmd.Parent().CommandPath() + " attach",
