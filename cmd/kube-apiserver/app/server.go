@@ -303,6 +303,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
+		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUIDHeaders = requestHeaderConfig.UIDHeaders
 	}
 
 	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
