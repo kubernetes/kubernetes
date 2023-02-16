@@ -278,9 +278,11 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 		return fmt.Errorf("failed to perform status section of the healthz check for KMS Provider %s, error: %w", h.name, err)
 	}
 	// we coast on the last valid key ID that we have observed
-	if err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
+	if errCode, err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
 		h.keyID.Store(&p.KeyID)
 		metrics.RecordKeyIDFromStatus(h.name, p.KeyID)
+	} else {
+		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
 	}
 
 	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
@@ -312,7 +314,7 @@ func isKMSv2ProviderHealthy(name string, response *kmsservice.StatusResponse) er
 	if response.Version != envelopekmsv2.KMSAPIVersion {
 		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
 	}
-	if err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
+	if _, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
 		errs = append(errs, fmt.Errorf("expected KMSv2 KeyID to be set, got %s", response.KeyID))
 	}
 

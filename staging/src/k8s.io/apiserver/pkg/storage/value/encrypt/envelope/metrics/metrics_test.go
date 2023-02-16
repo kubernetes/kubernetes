@@ -38,6 +38,10 @@ const (
 	testProviderNameForMetric = "providerName"
 )
 
+var (
+	errCode = "empty"
+)
+
 func TestRecordKMSOperationLatency(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -185,7 +189,7 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 	}
 }
 
-func TestEnvelopeMetrics_Serial(t *testing.T) {
+func TestRecordKeyID_Serial(t *testing.T) {
 	testCases := []struct {
 		desc               string
 		keyID              string
@@ -287,7 +291,7 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 	}
 }
 
-func TestEnvelopeMetricsLRUKey(t *testing.T) {
+func TestRecordKeyIDLRUKey(t *testing.T) {
 	RegisterMetrics()
 
 	cacheSize = 3
@@ -330,5 +334,64 @@ func TestEnvelopeMetricsLRUKey(t *testing.T) {
 	}
 	if validMetrics != cacheSize {
 		t.Fatalf("expected total valid metrics to be the same as cacheSize %d, got %d", cacheSize, validMetrics)
+	}
+}
+
+func TestRecordInvalidKeyIDFromStatus(t *testing.T) {
+	testCases := []struct {
+		desc         string
+		count        int
+		metrics      []string
+		providerName string
+		want         string
+	}{
+		{
+			desc:  "invalid KeyID From Status Total 3",
+			count: 3,
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			providerName: testProviderNameForMetric,
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+        	# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+        	apiserver_envelope_encryption_invalid_key_id_from_status_total{error="%s",provider_name="%s"} %d
+			`, errCode, testProviderNameForMetric, 3),
+		},
+		{
+			desc:  "invalid KeyID From Status Total 10",
+			count: 10,
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			providerName: testProviderNameForMetric,
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+        	# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+        	apiserver_envelope_encryption_invalid_key_id_from_status_total{error="%s",provider_name="%s"} %d
+			`, errCode, testProviderNameForMetric, 10),
+		},
+	}
+
+	InvalidKeyIDFromStatusTotal.Reset()
+	RegisterMetrics()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer InvalidKeyIDFromStatusTotal.Reset()
+			var wg sync.WaitGroup
+			for i := 0; i < tt.count; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					RecordInvalidKeyIDFromStatus(tt.providerName, errCode)
+				}()
+			}
+			wg.Wait()
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
