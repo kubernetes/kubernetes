@@ -18696,7 +18696,10 @@ func TestValidateSchedulingGates(t *testing.T) {
 				{Name: "foo"},
 				{Name: ""},
 			},
-			wantFieldErrors: []*field.Error{field.Required(fieldPath.Index(1), "must not be empty")},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fieldPath.Index(1), "", "name part must be non-empty"),
+				field.Invalid(fieldPath.Index(1), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+			},
 		},
 		{
 			name: "legal gates",
@@ -18705,6 +18708,14 @@ func TestValidateSchedulingGates(t *testing.T) {
 				{Name: "bar"},
 			},
 			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "illegal gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "\nbar"},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPath.Index(1), "\nbar", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
 		},
 		{
 			name: "duplicated gates (single duplication)",
