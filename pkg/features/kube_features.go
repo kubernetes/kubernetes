@@ -573,6 +573,7 @@ const (
 	// owner: @mortent, @atiratree, @ravig
 	// kep: http://kep.k8s.io/3018
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables PDBUnhealthyPodEvictionPolicy for PodDisruptionBudgets
 	PDBUnhealthyPodEvictionPolicy featuregate.Feature = "PDBUnhealthyPodEvictionPolicy"
@@ -989,7 +990,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
 
-	PDBUnhealthyPodEvictionPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
