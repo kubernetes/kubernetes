@@ -23,9 +23,12 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+	"unsafe"
 
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
@@ -608,7 +611,134 @@ func TestDetectSafeNotMountedBehavior(t *testing.T) {
 	}
 }
 
-func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction {
+func TestCheckUmountError(t *testing.T) {
+	target := "/test/path"
+	withSafeNotMountedBehavior := true
+
+	pState := &os.ProcessState{}
+	var ref_pState reflect.Value = reflect.ValueOf(pState).Elem()
+	var ref_status reflect.Value = ref_pState.FieldByName("status")
+	status := (*uint32)(unsafe.Pointer(ref_status.UnsafeAddr()))
+	*status = 0
+
+	command := &exec.Cmd{ProcessState: pState} // dummy command return status 0
+
+	testcases := []struct {
+		output   []byte
+		err      error
+		expected bool
+	}{
+		{
+			err:      errors.New("wait: no child processes"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: not mounted."),
+			err:      errors.New("exit status 1"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: No such file or directory"),
+			err:      errors.New("exit status 1"),
+			expected: false,
+		},
+	}
+
+	for _, v := range testcases {
+		if err := checkUmountError(target, command, v.output, v.err, withSafeNotMountedBehavior); (err == nil) != v.expected {
+			if v.expected {
+				t.Errorf("Expected to return nil, but did not. err: %s", err)
+			} else {
+				t.Errorf("Expected to return error, but did not.")
+			}
+		}
+	}
+}
+
+func TestFormat(t *testing.T) {
+	const (
+		formatCount    = 5
+		fstype         = "ext4"
+		output         = "complete"
+		cmdDuration    = 1 * time.Millisecond
+		defaultTimeout = 1 * time.Minute
+	)
+
+	tests := []struct {
+		desc           string
+		max            int
+		timeout        time.Duration
+		wantConcurrent int
+	}{
+		{
+			max:            0,
+			wantConcurrent: formatCount,
+		},
+		{
+			max:            -1,
+			wantConcurrent: formatCount,
+		},
+		{
+			max:            1,
+			wantConcurrent: 1,
+		},
+		{
+			max:            3,
+			wantConcurrent: 3,
+		},
+		{
+			max:            3,
+			timeout:        1 * time.Nanosecond,
+			wantConcurrent: formatCount,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("max=%d,timeout=%s", tc.max, tc.timeout.String()), func(t *testing.T) {
+			if tc.timeout == 0 {
+				tc.timeout = defaultTimeout
+			}
+
+			var concurrent, maxConcurrent int
+			var mu sync.Mutex
+
+			exec := &testexec.FakeExec{}
+			for i := 0; i < formatCount; i++ {
+				exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
+					mu.Lock()
+					concurrent++
+					if concurrent > maxConcurrent {
+						maxConcurrent = concurrent
+					}
+					mu.Unlock()
+
+					time.Sleep(cmdDuration)
+
+					mu.Lock()
+					concurrent--
+					mu.Unlock()
+				}))
+			}
+			mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(tc.max, tc.timeout))
+
+			var wg sync.WaitGroup
+			for i := 0; i < formatCount; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					mounter.format(fstype, nil)
+				}()
+			}
+			wg.Wait()
+
+			if maxConcurrent != tc.wantConcurrent {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", maxConcurrent, tc.wantConcurrent)
+			}
+		})
+	}
+}
+
+func makeFakeCommandAction(stdout string, err error, cmdFn func()) testexec.FakeCommandAction {
 	c := testexec.FakeCmd{
 		CombinedOutputScript: []testexec.FakeAction{
 			func() ([]byte, []byte, error) {
@@ -618,30 +748,5 @@ func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction 
 	}
 	return func(cmd string, args ...string) utilexec.Cmd {
 		return testexec.InitFakeCmd(&c, cmd, args...)
-	}
-}
-
-func TestNotMountedBehaviorOfUnmount(t *testing.T) {
-	target, err := ioutil.TempDir("", "kubelet-umount")
-	if err != nil {
-		t.Errorf("Cannot create temp dir: %v", err)
-	}
-
-	defer os.RemoveAll(target)
-
-	m := Mounter{withSafeNotMountedBehavior: true}
-	if err = m.Unmount(target); err != nil {
-		t.Errorf(`Expect complete Unmount(), but it dose not: %v`, err)
-	}
-
-	if err = tryUnmount(target, m.withSafeNotMountedBehavior, time.Minute); err != nil {
-		t.Errorf(`Expect complete tryUnmount(), but it does not: %v`, err)
-	}
-
-	// forceUmount exec "umount -f", so skip this case if user is not root.
-	if os.Getuid() == 0 {
-		if err = forceUmount(target, m.withSafeNotMountedBehavior); err != nil {
-			t.Errorf(`Expect complete forceUnmount(), but it does not: %v`, err)
-		}
 	}
 }
