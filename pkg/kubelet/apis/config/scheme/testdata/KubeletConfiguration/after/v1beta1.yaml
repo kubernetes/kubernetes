@@ -58,6 +58,7 @@ logging:
       infoBufferSize: "0"
   verbosity: 0
 makeIPTablesUtilChains: true
+maxCheckpointsPerContainer: 10
 maxOpenFiles: 1000000
 maxPods: 110
 memoryManagerPolicy: None

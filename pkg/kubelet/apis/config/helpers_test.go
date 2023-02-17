@@ -241,6 +241,7 @@ var (
 		"ServerTLSBootstrap",
 		"StaticPodURL",
 		"StaticPodURLHeader[*][*]",
+		"MaxCheckpointsPerContainer",
 		"MaxOpenFiles",
 		"MaxPods",
 		"MemoryManagerPolicy",

@@ -50,6 +50,7 @@ var (
 		KubeAPIBurst:                    10,
 		KubeAPIQPS:                      5,
 		MaxOpenFiles:                    1000000,
+		MaxCheckpointsPerContainer:      10,
 		MaxPods:                         110,
 		OOMScoreAdj:                     -999,
 		PodsPerCore:                     100,

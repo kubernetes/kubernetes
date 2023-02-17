@@ -824,6 +824,16 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
+
+	// MaxCheckpointsPerContainer specifies the maximum number of checkpoints
+	// that Kubernetes will create of one specific container before removing old
+	// checkpoints. This option exists to ensure the local disk is not filled
+	// with container checkpoints. This option is per container.
+	// The field value must be greater than 0.
+	// Unlimited is not supported.
+	// Default: 10
+	// +optional
+	MaxCheckpointsPerContainer int32 `json:"maxCheckpointsPerContainer,omitempty"`
 }
 
 type KubeletAuthorizationMode string

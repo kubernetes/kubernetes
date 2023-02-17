@@ -132,6 +132,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.NodeLeaseDurationSeconds == 0 {
 		obj.NodeLeaseDurationSeconds = 40
 	}
+	if obj.MaxCheckpointsPerContainer == 0 {
+		obj.MaxCheckpointsPerContainer = 10
+	}
 	if obj.ImageMinimumGCAge == zeroDuration {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}

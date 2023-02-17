@@ -19,7 +19,9 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -1623,6 +1625,88 @@ func TestFilterOutInactivePods(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestHandleMaxCheckpointsPerContainer(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	containerID := kubecontainer.ContainerID{
+		Type: "test",
+		ID:   "abc1234",
+	}
+
+	fakePod := &containertest.FakePod{
+		Pod: &kubecontainer.Pod{
+			ID:        "12345678",
+			Name:      "podFoo",
+			Namespace: "nsFoo",
+			Containers: []*kubecontainer.Container{
+				{
+					Name: "containerFoo",
+					ID:   containerID,
+				},
+			},
+		},
+	}
+
+	// For the test let's set it to the smallest value.
+	kubelet.maxCheckpointsPerContainer = 1
+	checkpointDirectoryPath := filepath.Join(kubelet.getCheckpointsDir(), string(fakePod.Pod.ID))
+	// The checkpoint directory creation is behind the feature gate.
+	// Let's create it manually here.
+	// It will be removed by the Cleanup() function.
+	require.NoError(t, os.MkdirAll(checkpointDirectoryPath, 0o700))
+
+	podFullName := fmt.Sprintf("%s_%s", fakePod.Pod.Name, fakePod.Pod.Namespace)
+	containerName := fakePod.Pod.Containers[0].Name
+
+	options := &runtimeapi.CheckpointContainerRequest{}
+	// First checkpoint archive
+	firstCheckpointArchive := filepath.Join(checkpointDirectoryPath, fmt.Sprintf("checkpoint-%s-%s-%d-%0*d.tar", podFullName, containerName, time.Now().UnixNano(), int(math.Log10(float64(math.MaxInt32)))+1, 2))
+
+	createTestFile := func(name string) {
+		checkpointContent := "checkpoint archive"
+		err := os.WriteFile(name, []byte(checkpointContent), 0o600)
+		require.NoError(t, err)
+	}
+
+	options.Location = firstCheckpointArchive
+	createTestFile(options.Location)
+
+	err := testKubelet.kubelet.handleMaxCheckpointsPerContainer(fakePod.Pod.ID, podFullName, containerName, options)
+	require.NoError(t, err)
+	// The first checkpoint archive should still exist
+	_, err = os.Stat(firstCheckpointArchive)
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	// second checkpoint archive
+	secondCheckpointArchive := filepath.Join(checkpointDirectoryPath, fmt.Sprintf("checkpoint-%s-%s-%d-%0*d.tar", podFullName, containerName, time.Now().UnixNano(), int(math.Log10(float64(math.MaxInt32)))+1, 4))
+
+	options.Location = secondCheckpointArchive
+	createTestFile(options.Location)
+
+	err = testKubelet.kubelet.handleMaxCheckpointsPerContainer(fakePod.Pod.ID, podFullName, fakePod.Pod.Containers[0].Name, options)
+	require.NoError(t, err)
+
+	// Now the first checkpoint archive should have been deleted
+	_, err = os.Stat(firstCheckpointArchive)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, os.ErrNotExist))
+
+	// The second checkpoint archive should still exist
+	_, err = os.Stat(secondCheckpointArchive)
+	require.NoError(t, err)
+
+	globPattern := filepath.Join(checkpointDirectoryPath, fmt.Sprintf("checkpoint-%s-%s-*.tar", podFullName, containerName))
+
+	checkpointArchives, err := filepath.Glob(globPattern)
+	require.NoError(t, err)
+	fmt.Println(checkpointArchives)
+
+	require.Equal(t, 1, len(checkpointArchives))
+}
+
 func TestCheckpointContainer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -1633,6 +1717,12 @@ func TestCheckpointContainer(t *testing.T) {
 		Type: "test",
 		ID:   "abc1234",
 	}
+
+	// The checkpoint directory creation is behind the feature gate.
+	// Let's create it manually here.
+	// It will be removed by the Cleanup() function.
+	require.NoError(t, os.MkdirAll(kubelet.getCheckpointsDir(), 0o700))
+	kubelet.maxCheckpointsPerContainer = 1
 
 	fakePod := &containertest.FakePod{
 		Pod: &kubecontainer.Pod{
@@ -1672,6 +1762,7 @@ func TestCheckpointContainer(t *testing.T) {
 			expectedStatus:     nil,
 			expectedLocation: filepath.Join(
 				kubelet.getCheckpointsDir(),
+				string(fakePod.Pod.ID),
 				fmt.Sprintf(
 					"checkpoint-%s_%s-%s",
 					fakePod.Pod.Name,
@@ -1687,6 +1778,7 @@ func TestCheckpointContainer(t *testing.T) {
 			expectedStatus:     nil,
 			expectedLocation: filepath.Join(
 				kubelet.getCheckpointsDir(),
+				string(fakePod.Pod.ID),
 				fmt.Sprintf(
 					"checkpoint-%s_%s-%s",
 					fakePod.Pod.Name,

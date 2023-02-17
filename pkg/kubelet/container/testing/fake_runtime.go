@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 	"net/url"
+	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -401,6 +402,10 @@ func (f *FakeRuntime) DeleteContainer(_ context.Context, containerID kubecontain
 func (f *FakeRuntime) CheckpointContainer(_ context.Context, options *runtimeapi.CheckpointContainerRequest) error {
 	f.Lock()
 	defer f.Unlock()
+
+	if err := os.WriteFile(options.Location, []byte("checkpoint archive"), 0o600); err != nil {
+		return err
+	}
 
 	f.CalledFunctions = append(f.CalledFunctions, "CheckpointContainer")
 	return f.Err

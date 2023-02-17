@@ -19,12 +19,15 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	sysruntime "runtime"
 	"sort"
 	"sync"
@@ -554,6 +557,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
+		maxCheckpointsPerContainer:     kubeCfg.MaxCheckpointsPerContainer,
 	}
 
 	if klet.cloud != nil {
@@ -1298,6 +1302,19 @@ type Kubelet struct {
 
 	// Track node startup latencies
 	nodeStartupLatencyTracker util.NodeStartupLatencyTracker
+
+	// Maximum number of checkpoints per container
+	maxCheckpointsPerContainer int32
+
+	// maxCheckpointsPerContainerLock is a lock on writing the checkpoint archive
+	// with a unique counter.
+	maxCheckpointsPerContainerLock sync.Mutex
+
+	// maxCheckpointsPreContainerOnNodeCounter is a counter to ensure that the file
+	// name of the checkpoint archive is unique. It already contains a time
+	// stamp but in case the clock resolution is not good enough this counter
+	// make it unique.
+	maxCheckpointsPreContainerOnNodeCounter int32
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2952,6 +2969,87 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 	}, 100*time.Millisecond, stopCh)
 }
 
+// handleMaxCheckpointsPerContainer goes through the list of checkpoints of a
+// container in a pod and deletes old checkpoints if there are more than
+// 'kl.maxCheckpointsPerContainer'.
+func (kl *Kubelet) handleMaxCheckpointsPerContainer(podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
+
+	if kl.maxCheckpointsPerContainer <= 0 {
+		// This cannot really happen as the kubelet config parser will
+		// error out early if this is <= 0. This additional error
+		// handling is mainly here to make sure tests are working.
+		return errors.New("maxCheckpointsPerContainer must be greater than 0")
+	}
+
+	// Lock while accessing the checkpoints on disk to avoid chaos
+	// if multiple threads would do it at the same time.
+	kl.maxCheckpointsPerContainerLock.Lock()
+	defer kl.maxCheckpointsPerContainerLock.Unlock()
+
+	checkpointDirectoryPath := filepath.Join(
+		kl.getCheckpointsDir(),
+		string(podUID),
+	)
+
+	checkpointDirectory, err := os.ReadDir(checkpointDirectoryPath)
+	if err != nil {
+		return fmt.Errorf("error reading checkpoint archive directory %s: %w", checkpointDirectoryPath, err)
+	}
+
+	regexString := fmt.Sprintf(`checkpoint-%s-%s-\d+-\d{%d}.tar`, podFullName, containerName, int(math.Log10(float64(math.MaxInt32))+1))
+
+	re, err := regexp.Compile(regexString)
+	if err != nil {
+		return fmt.Errorf("error compiling regex %s: %w", regexString, err)
+	}
+
+	var checkpointArchives = []fs.FileInfo{}
+	for _, archive := range checkpointDirectory {
+		// only select checkpoint archives which have been created from the same
+		// namespace/pod/container combination
+		if re.MatchString(archive.Name()) {
+			archiveFileinfo, err := archive.Info()
+			if err != nil {
+				return fmt.Errorf("error getting file info %s:%w", archive.Name(), err)
+			}
+			checkpointArchives = append(checkpointArchives, archiveFileinfo)
+		}
+	}
+
+	checkpointArchivesCounter := len(checkpointArchives)
+	if checkpointArchivesCounter <= int(kl.maxCheckpointsPerContainer) {
+		// Nothing to clean up, return early.
+		return nil
+	}
+
+	sort.Slice(checkpointArchives, func(i, j int) bool {
+		return checkpointArchives[i].Name() < checkpointArchives[j].Name()
+	})
+
+	klog.InfoS(
+		"More than maxCheckpointsPerContainer",
+		"container",
+		containerName,
+		"numberOfCheckpoints",
+		checkpointArchivesCounter,
+		"maxCheckpointsPerContainer",
+		kl.maxCheckpointsPerContainer,
+	)
+	for _, archive := range checkpointArchives[:checkpointArchivesCounter-int(kl.maxCheckpointsPerContainer)] {
+		archiveWithPath := filepath.Join(checkpointDirectoryPath, archive.Name())
+		klog.InfoS("Deleting container checkpoint archive", "container", containerName, "archive", archiveWithPath)
+		err = os.Remove(archiveWithPath)
+		if err != nil {
+			// If the removal fails the checkpoint archive might have been
+			// deleted externally. This is not fatal but unexpected.
+			// Logging it as Info, but including the error message.
+			klog.InfoS("Removal of checkpoint archive failed", "container", containerName, "archive", archiveWithPath, "error", err)
+		}
+	}
+
+	return nil
+}
+
 // CheckpointContainer tries to checkpoint a container. The parameters are used to
 // look up the specified container. If the container specified by the given parameters
 // cannot be found an error is returned. If the container is found the container
@@ -2972,19 +3070,44 @@ func (kl *Kubelet) CheckpointContainer(
 		return fmt.Errorf("container %v not found", containerName)
 	}
 
-	options.Location = filepath.Join(
+	checkpointDirectory := filepath.Join(
 		kl.getCheckpointsDir(),
+		string(podUID),
+	)
+
+	checkPointDirectoryInfo, err := os.Lstat(checkpointDirectory)
+	if err == nil && !checkPointDirectoryInfo.Mode().IsDir() {
+		return fmt.Errorf("checkpoint destination %s needs to be a directory", checkpointDirectory)
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error stating checkpoint destination %s:%w", checkpointDirectory, err)
+	} else if err != nil && os.IsNotExist(err) {
+		if err = os.Mkdir(checkpointDirectory, 0700); err != nil {
+			return fmt.Errorf("error creating checkpoint directory %s:%w", checkpointDirectory, err)
+		}
+	}
+
+	kl.maxCheckpointsPerContainerLock.Lock()
+	options.Location = filepath.Join(
+		checkpointDirectory,
 		fmt.Sprintf(
-			"checkpoint-%s-%s-%s.tar",
+			// Including leading zeroes in the time stamp and counter for easier sorting.
+			"checkpoint-%s-%s-%019d-%010d.tar",
 			podFullName,
 			containerName,
-			time.Now().Format(time.RFC3339),
+			time.Now().UnixNano(),
+			kl.maxCheckpointsPreContainerOnNodeCounter,
 		),
 	)
+	kl.maxCheckpointsPreContainerOnNodeCounter++
+	kl.maxCheckpointsPerContainerLock.Unlock()
 
 	options.ContainerId = string(container.ID.ID)
 
 	if err := kl.containerRuntime.CheckpointContainer(ctx, options); err != nil {
+		return err
+	}
+
+	if err := kl.handleMaxCheckpointsPerContainer(podUID, podFullName, containerName, options); err != nil {
 		return err
 	}
 
