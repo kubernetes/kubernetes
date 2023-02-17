@@ -74,6 +74,7 @@ var supportedPriorityLevelEnablement = sets.NewString(
 var supportedLimitResponseType = sets.NewString(
 	string(flowcontrol.LimitResponseTypeQueue),
 	string(flowcontrol.LimitResponseTypeReject),
+	string(flowcontrol.LimitResponseTypeTokenBucket),
 )
 
 // ValidateFlowSchema validates the content of flow-schema
@@ -457,6 +458,12 @@ func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) fi
 		} else {
 			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
 		}
+	case flowcontrol.LimitResponseTypeTokenBucket:
+		if lr.TokenBucket == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("tokenBucket"), "must not be empty if limited.limitResponse.type is TokenBucket"))
+		} else {
+			allErrs = append(allErrs, ValidatePriorityLevelTokenBucketConfiguration(lr.TokenBucket, fldPath.Child("tokenBucket"))...)
+		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
 	}
@@ -487,6 +494,16 @@ func ValidatePriorityLevelQueuingConfiguration(queuing *flowcontrol.QueuingConfi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), queuing.HandSize,
 			fmt.Sprintf("required entropy bits of deckSize %d and handSize %d should not be greater than %d", queuing.Queues, queuing.HandSize, shufflesharding.MaxHashBits)))
 	}
+	return allErrs
+}
+
+// ValidatePriorityLevelTokenBucketConfiguration validates queuing-configuration for a priority-level
+func ValidatePriorityLevelTokenBucketConfiguration(tokenBucket *flowcontrol.TokenBucketConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if tokenBucket.Burst < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("qps"), tokenBucket.Burst, "must be positive or zero"))
+	}
+
 	return allErrs
 }
 

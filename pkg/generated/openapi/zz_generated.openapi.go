@@ -626,6 +626,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1alpha1.ResourcePolicyRule":                                              schema_k8sio_api_flowcontrol_v1alpha1_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject":                                           schema_k8sio_api_flowcontrol_v1alpha1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.Subject":                                                         schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref),
+		"k8s.io/api/flowcontrol/v1alpha1.TokenBucketConfiguration":                                        schema_k8sio_api_flowcontrol_v1alpha1_TokenBucketConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.UserAgentSubject":                                                schema_k8sio_api_flowcontrol_v1alpha1_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.UserSubject":                                                     schema_k8sio_api_flowcontrol_v1alpha1_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta1_FlowDistinguisherMethod(ref),
@@ -649,6 +650,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta1.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta1_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta1.TokenBucketConfiguration":                                         schema_k8sio_api_flowcontrol_v1beta1_TokenBucketConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta1.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta1_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta1_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta2_FlowDistinguisherMethod(ref),
@@ -672,6 +674,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta2.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta2_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta2_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta2.TokenBucketConfiguration":                                         schema_k8sio_api_flowcontrol_v1beta2_TokenBucketConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta2.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta2_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta2_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta3_FlowDistinguisherMethod(ref),
@@ -695,6 +698,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta3.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta3_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta3_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta3.TokenBucketConfiguration":                                         schema_k8sio_api_flowcontrol_v1beta3_TokenBucketConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta3.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta3_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta3_UserSubject(ref),
 		"k8s.io/api/imagepolicy/v1alpha1.ImageReview":                                                     schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref),
@@ -31248,7 +31252,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_LimitResponse(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -31260,6 +31264,12 @@ func schema_k8sio_api_flowcontrol_v1alpha1_LimitResponse(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.QueuingConfiguration"),
 						},
 					},
+					"tokenBucket": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.TokenBucketConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -31269,7 +31279,8 @@ func schema_k8sio_api_flowcontrol_v1alpha1_LimitResponse(ref common.ReferenceCal
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
-								"queuing": "Queuing",
+								"queuing":     "Queuing",
+								"tokenBucket": "TokenBucket",
 							},
 						},
 					},
@@ -31277,7 +31288,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_LimitResponse(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1alpha1.QueuingConfiguration"},
+			"k8s.io/api/flowcontrol/v1alpha1.QueuingConfiguration", "k8s.io/api/flowcontrol/v1alpha1.TokenBucketConfiguration"},
 	}
 }
 
@@ -31935,6 +31946,35 @@ func schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref common.ReferenceCallback)
 	}
 }
 
+func schema_k8sio_api_flowcontrol_v1alpha1_TokenBucketConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"qps": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+							Default:     0,
+							Type:        []string{"number"},
+							Format:      "float",
+						},
+					},
+					"burst": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_flowcontrol_v1alpha1_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -32276,7 +32316,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -32288,6 +32328,12 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.QueuingConfiguration"),
 						},
 					},
+					"tokenBucket": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.TokenBucketConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -32297,7 +32343,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
-								"queuing": "Queuing",
+								"queuing":     "Queuing",
+								"tokenBucket": "TokenBucket",
 							},
 						},
 					},
@@ -32305,7 +32352,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta1.QueuingConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta1.QueuingConfiguration", "k8s.io/api/flowcontrol/v1beta1.TokenBucketConfiguration"},
 	}
 }
 
@@ -32963,6 +33010,35 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_k8sio_api_flowcontrol_v1beta1_TokenBucketConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"qps": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+							Default:     0,
+							Type:        []string{"number"},
+							Format:      "float",
+						},
+					},
+					"burst": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_flowcontrol_v1beta1_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -33304,7 +33380,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -33316,6 +33392,12 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.QueuingConfiguration"),
 						},
 					},
+					"tokenBucket": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.TokenBucketConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -33325,7 +33407,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
-								"queuing": "Queuing",
+								"queuing":     "Queuing",
+								"tokenBucket": "TokenBucket",
 							},
 						},
 					},
@@ -33333,7 +33416,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta2.QueuingConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta2.QueuingConfiguration", "k8s.io/api/flowcontrol/v1beta2.TokenBucketConfiguration"},
 	}
 }
 
@@ -33991,6 +34074,35 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_k8sio_api_flowcontrol_v1beta2_TokenBucketConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"qps": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+							Default:     0,
+							Type:        []string{"number"},
+							Format:      "float",
+						},
+					},
+					"burst": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_flowcontrol_v1beta2_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -34334,7 +34446,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -34346,6 +34458,12 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.QueuingConfiguration"),
 						},
 					},
+					"tokenBucket": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.TokenBucketConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -34355,7 +34473,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
-								"queuing": "Queuing",
+								"queuing":     "Queuing",
+								"tokenBucket": "TokenBucket",
 							},
 						},
 					},
@@ -34363,7 +34482,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta3.QueuingConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta3.QueuingConfiguration", "k8s.io/api/flowcontrol/v1beta3.TokenBucketConfiguration"},
 	}
 }
 
@@ -35020,6 +35139,35 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			"k8s.io/api/flowcontrol/v1beta3.GroupSubject", "k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta3.UserAgentSubject", "k8s.io/api/flowcontrol/v1beta3.UserSubject"},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta3_TokenBucketConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"qps": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+							Default:     0,
+							Type:        []string{"number"},
+							Format:      "float",
+						},
+					},
+					"burst": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

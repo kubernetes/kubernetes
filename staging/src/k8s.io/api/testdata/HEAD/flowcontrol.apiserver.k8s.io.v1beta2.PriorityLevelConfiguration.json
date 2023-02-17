@@ -53,6 +53,10 @@
           "queues": 1,
           "handSize": 2,
           "queueLengthLimit": 3
+        },
+        "tokenBucket": {
+          "qps": 1.5,
+          "burst": 2
         }
       },
       "lendablePercent": 3,

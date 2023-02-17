@@ -519,12 +519,14 @@ type LimitedPriorityLevelConfiguration struct {
 // LimitResponse defines how to handle requests that can not be executed right now.
 // +union
 type LimitResponse struct {
-	// `type` is "Queue" or "Reject".
+	// `type` is "Queue" or "Reject" or "TokenBucket".
 	// "Queue" means that requests that can not be executed upon arrival
 	// are held in a queue until they can be executed or a queuing limit
 	// is reached.
 	// "Reject" means that requests that can not be executed upon arrival
 	// are rejected.
+	// "TokenBucket" means that requests that will be processed or rejected
+	// based on token-bucket algorithm.
 	// Required.
 	// +unionDiscriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
@@ -533,6 +535,11 @@ type LimitResponse struct {
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
 	Queuing *QueuingConfiguration `json:"queuing,omitempty" protobuf:"bytes,2,opt,name=queuing"`
+
+	// `tokenBucket` holds the configuration parameters for token-bucket.
+	// This field may be non-empty only if `type` is `"TokenBucket"`.
+	// +optional
+	TokenBucket *TokenBucketConfiguration `json:"tokenBucket,omitempty" protobuf:"bytes,3,opt,name=tokenBucket"`
 }
 
 // LimitResponseType identifies how a Limited priority level handles a request that can not be executed right now
@@ -545,6 +552,9 @@ const (
 
 	// LimitResponseTypeReject means that requests that can not be executed right now are rejected
 	LimitResponseTypeReject LimitResponseType = "Reject"
+
+	// LimitResponseTypeTokenBucket means that requests will be processed or rejected based on token-bucket algorithm
+	LimitResponseTypeTokenBucket LimitResponseType = "TokenBucket"
 )
 
 // QueuingConfiguration holds the configuration parameters for queuing
@@ -578,6 +588,19 @@ type QueuingConfiguration struct {
 	// not specified, it will be defaulted to 50.
 	// +optional
 	QueueLengthLimit int32 `json:"queueLengthLimit" protobuf:"varint,3,opt,name=queueLengthLimit"`
+}
+
+// TokenBucketConfiguration holds the configuration parameters for token-bucket
+type TokenBucketConfiguration struct {
+	// `qps` is the number of queries per second allowed for this level. T
+	// This field has a default value of 0, which means reject all requests.
+	// +optional
+	QPS float32 `json:"qps" protobuf:"float,1,opt,name=qps"`
+
+	// `burst` allows extra requests to accumulate when a client is exceeding qps.
+	// This field has a default value of 0, which means reject all requests
+	// +optional
+	Burst int32 `json:"burst" protobuf:"varint,2,opt,name=burst"`
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type

@@ -42,6 +42,9 @@ spec:
         handSize: 2
         queueLengthLimit: 3
         queues: 1
+      tokenBucket:
+        burst: 2
+        qps: 1.5
       type: typeValue
   type: typeValue
 status:
