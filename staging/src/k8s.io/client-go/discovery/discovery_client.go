@@ -308,9 +308,6 @@ func (d *DiscoveryClient) downloadAPIs() (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
-		return &metav1.APIGroupList{}, nil, nil
-	}
 
 	apiGroupList := &metav1.APIGroupList{}
 	failedGVs := map[schema.GroupVersion]error{}
@@ -362,8 +359,10 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	}
 	err = d.restClient.Get().AbsPath(url.String()).Do(context.TODO()).Into(resources)
 	if err != nil {
-		// ignore 403 or 404 error to be compatible with an v1.0 server.
-		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+		// Tolerate core/v1 not found response by returning empty resource list;
+		// this probably should not happen. But we should verify all callers are
+		// not depending on this toleration before removal.
+		if groupVersion == "v1" && errors.IsNotFound(err) {
 			return resources, nil
 		}
 		return nil, err

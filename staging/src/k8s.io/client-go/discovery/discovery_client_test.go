@@ -110,7 +110,6 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.ServerGroups()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -121,32 +120,49 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}
 }
 
-func TestGetServerGroupsWithBrokenServer(t *testing.T) {
-	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.WriteHeader(statusCode)
-		}))
-		defer server.Close()
-		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		// ServerGroups should not return an error even if server returns Not Found or Forbidden error at all end points
-		apiGroupList, err := client.ServerGroups()
+func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
+	// Discovery tolerates 404 from /api. Aggregated api servers can do this.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			w.WriteHeader(http.StatusNotFound)
+		case "/apis":
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "extensions",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
+				},
+			}
+		}
+		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
+			return
 		}
-		groupVersions := metav1.ExtractGroupVersions(apiGroupList)
-		if len(groupVersions) != 0 {
-			t.Errorf("expected empty list, got: %q", groupVersions)
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	defer server.Close()
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	// ServerGroups should not return an error even if server returns 404 at /api.
+	apiGroupList, err := client.ServerGroups()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
+	if !reflect.DeepEqual(groupVersions, []string{"extensions/v1beta1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"extensions/v1beta1"}, groupVersions)
 	}
 }
 
-func TestTimeoutIsSet(t *testing.T) {
-	cfg := &restclient.Config{}
-	setDiscoveryDefaults(cfg)
-	assert.Equal(t, defaultTimeout, cfg.Timeout)
-}
-
-func TestGetServerResourcesWithV1Server(t *testing.T) {
+func TestDiscoveryFailsWhenNonCoreGroupsMissing(t *testing.T) {
+	// Discovery fails when /apis returns 404.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
 		switch req.URL.Path {
@@ -156,13 +172,12 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 					"v1",
 				},
 			}
-		default:
+		case "/apis":
 			w.WriteHeader(http.StatusNotFound)
-			return
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -171,15 +186,32 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	// ServerResources should not return an error even if server returns error at /api/v1.
-	_, serverResources, err := client.ServerGroupsAndResources()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	_, err := client.ServerGroups()
+	if err == nil {
+		t.Fatal("expected error, received none")
 	}
-	gvs := groupVersions(serverResources)
-	if !sets.NewString(gvs...).Has("v1") {
-		t.Errorf("missing v1 in resource list: %v", serverResources)
+}
+
+func TestGetServerGroupsWithBrokenServer(t *testing.T) {
+	// 404 Not Found errors because discovery at /apis returns an error.
+	// 403 Forbidden errors because discovery at both /api and /apis returns error.
+	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.WriteHeader(statusCode)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		_, err := client.ServerGroups()
+		if err == nil {
+			t.Fatal("expected error, received none")
+		}
 	}
+}
+
+func TestTimeoutIsSet(t *testing.T) {
+	cfg := &restclient.Config{}
+	setDiscoveryDefaults(cfg)
+	assert.Equal(t, defaultTimeout, cfg.Timeout)
 }
 
 func TestGetServerResourcesForGroupVersion(t *testing.T) {
@@ -964,17 +996,33 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 		expected map[schema.GroupVersionResource]struct{}
 	}{
 		{
+			// Combines discovery for /api and /apis.
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
 				switch req.URL.Path {
-				case "/api/v1":
-					list = &stable
 				case "/api":
 					list = &metav1.APIVersions{
 						Versions: []string{
 							"v1",
 						},
 					}
+				case "/api/v1":
+					list = &stable
+				case "/apis":
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
+							{
+								Name: "batch",
+								Versions: []metav1.GroupVersionForDiscovery{
+									{GroupVersion: "batch/v1", Version: "v1"},
+								},
+								PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "batch/v1", Version: "v1"},
+							},
+						},
+					}
+				case "/apis/batch/v1":
+					list = &batchv1
+
 				default:
 					t.Logf("unexpected request: %s", req.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
@@ -990,11 +1038,14 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
-				{Group: "", Version: "v1", Resource: "pods"}:     {},
-				{Group: "", Version: "v1", Resource: "services"}: {},
+				{Group: "", Version: "v1", Resource: "pods"}:      {},
+				{Group: "", Version: "v1", Resource: "services"}:  {},
+				{Group: "batch", Version: "v1", Resource: "jobs"}: {},
 			},
 		},
 		{
+			// Only return /apis (not legacy /api); does not error. 404 for legacy
+			// core/v1 at /api is tolerated.
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
 				switch req.URL.Path {
