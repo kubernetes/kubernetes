@@ -250,6 +250,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 				resource.BinarySI)
 		}
 	}
+	klog.V(4).InfoS("Load node capacity from cadvisor", "capacity", capacity)
 
 	for k, v := range capacity {
 		internalCapacity[k] = v

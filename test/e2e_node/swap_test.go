@@ -48,6 +48,8 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FailSwapOn = false
 			initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+			// to test
+			initialConfig.FeatureGates[string(kubefeatures.PDBUnhealthyPodEvictionPolicy)] = true
 			initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
 				SwapBehavior: "LimitedSwap",
 			}
