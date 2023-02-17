@@ -568,13 +568,15 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 }
 
 func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
+	if !feature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob) {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
 	// Completions is immutable for non-indexed jobs.
 	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
 	// fall back to validating that spec.Completions is always immutable.
+	var allErrs field.ErrorList
 	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
-	if !isIndexedJob || !feature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob) {
+	if !isIndexedJob {
 		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
 	}
 
