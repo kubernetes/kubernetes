@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		gomega.Expect(GetReadySchedulableNodeInfos()).NotTo(gomega.BeEmpty())
+		gomega.Expect(GetReadySchedulableNodeInfos(client)).NotTo(gomega.BeEmpty())
 	})
 
 	ginkgo.It("verify fstype - ext3 formatted volume", func() {
