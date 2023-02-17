@@ -78,6 +78,8 @@ const (
 	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
 	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
 	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointRequestsGetKey            = "pod_resources_endpoint_requests_get"
+	PodResourcesEndpointErrorsGetKey              = "pod_resources_endpoint_errors_get"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
@@ -441,6 +443,30 @@ var (
 		[]string{"server_api_version"},
 	)
 
+	// PodResourcesEndpointRequestsGetCount is a Counter that tracks the number of requests to the PodResource Get() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointRequestsGetKey,
+			Help:           "Number of requests to the PodResource Get endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointErrorsGetKey,
+			Help:           "Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
 	// Broken down by RuntimeClass.Handler.
 	RunPodSandboxDuration = metrics.NewHistogramVec(
@@ -758,6 +784,10 @@ func Register(collectors ...metrics.StableCollector) {
 				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
 				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
 				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 			}
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
