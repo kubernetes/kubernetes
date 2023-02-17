@@ -21,8 +21,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -177,4 +179,14 @@ func InitTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		t.Errorf("Error running command (exit code %d): %s", code, str)
 	})
+}
+
+func WithAlphaEnv(key string, t *testing.T, f func(*testing.T)) {
+	if key != "" {
+		oldValue := os.Getenv(key)
+		err := os.Setenv(key, "true")
+		require.NoError(t, err, "unexpected error setting alpha env")
+		defer os.Setenv(key, oldValue)
+	}
+	f(t)
 }

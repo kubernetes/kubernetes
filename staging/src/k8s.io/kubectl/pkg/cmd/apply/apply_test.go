@@ -84,17 +84,33 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	c := NewCmdApply("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-	if validateApplyArgs(c, []string{"rc"}) == nil {
-		t.Fatalf("unexpected non-error")
-	}
+	cmd := &cobra.Command{}
+	flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+	flags.AddFlags(cmd)
+	_, err := flags.ToOptions(f, cmd, "kubectl", []string{"rc"})
+	require.EqualError(t, err, "Unexpected args: [rc]\nSee ' -h' for help and examples")
 }
 
-func validateApplyArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+func TestAlphaEnablement(t *testing.T) {
+	alphas := map[string]string{
+		cmdutil.ApplySetEnv: "applyset",
 	}
-	return nil
+	for env, flag := range alphas {
+		f := cmdtesting.NewTestFactory()
+		defer f.Cleanup()
+
+		cmd := &cobra.Command{}
+		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+		flags.AddFlags(cmd)
+		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q alpha env var set", flag, env)
+
+		cmdtesting.WithAlphaEnv(env, t, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+			flags.AddFlags(cmd)
+			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q alpha env var set", flag, env)
+		})
+	}
 }
 
 func TestApplyFlagValidation(t *testing.T) {
@@ -103,6 +119,7 @@ func TestApplyFlagValidation(t *testing.T) {
 
 	tests := []struct {
 		args        [][]string
+		enableAlpha string
 		expectedErr string
 	}{
 		{
@@ -149,33 +166,95 @@ func TestApplyFlagValidation(t *testing.T) {
 		},
 		{
 			args: [][]string{
+				{"prune", "true"},
+				{"force", "true"},
+				{"applyset", "mySecret"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--force cannot be used with --prune",
+		},
+		{
+			args: [][]string{
 				{"server-side", "true"},
 				{"prune", "true"},
 				{"all", "true"},
 			},
 			expectedErr: "--prune is in alpha and doesn't currently work on objects created by server-side apply",
 		},
+		{
+			args: [][]string{
+				{"prune", "true"},
+			},
+			expectedErr: "all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector",
+		},
+		{
+			args: [][]string{
+				{"prune", "false"},
+				{"applyset", "mySecret"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--applyset requires --prune",
+		},
+		{
+			args: [][]string{
+				{"prune", "true"},
+				{"applyset", "mySecret"},
+				{"selector", "foo=bar"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--selector is incompatible with --applyset",
+		},
+		{
+			args: [][]string{
+				{"prune", "true"},
+				{"applyset", "mySecret"},
+				{"all", "true"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--all is incompatible with --applyset",
+		},
+		{
+			args: [][]string{
+				{"prune", "true"},
+				{"applyset", "mySecret"},
+				{"prune-allowlist", "core/v1/ConfigMap"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--prune-allowlist is incompatible with --applyset",
+		},
+		{
+			args: [][]string{
+				{"prune", "true"},
+				{"applyset", "foo"},
+			},
+			enableAlpha: cmdutil.ApplySetEnv,
+			expectedErr: "--applyset is not yet supported",
+		},
 	}
 
-	for _, test := range tests {
-		cmd := &cobra.Command{}
-		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
-		flags.AddFlags(cmd)
-		cmd.Flags().Set("filename", "unused")
-		for _, arg := range test.args {
-			cmd.Flags().Set(arg[0], arg[1])
-		}
-		o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
-		if err != nil {
-			t.Fatalf("unexpected error creating apply options: %s", err)
-		}
-		err = o.Validate()
-		if err == nil {
-			t.Fatalf("missing expected error")
-		}
-		if test.expectedErr != err.Error() {
-			t.Errorf("expected error %s, got %s", test.expectedErr, err)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			cmdtesting.WithAlphaEnv(test.enableAlpha, t, func(t *testing.T) {
+				cmd := &cobra.Command{}
+				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags.AddFlags(cmd)
+				cmd.Flags().Set("filename", "unused")
+				for _, arg := range test.args {
+					cmd.Flags().Set(arg[0], arg[1])
+				}
+				o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
+				if err != nil {
+					t.Fatalf("unexpected error creating apply options: %s", err)
+				}
+				err = o.Validate()
+				if err == nil {
+					t.Fatalf("missing expected error for case %d with args %+v", i, test.args)
+				}
+				if test.expectedErr != err.Error() {
+					t.Errorf("expected error %s, got %s", test.expectedErr, err)
+				}
+			})
+		})
 	}
 }
 
