@@ -28,7 +28,8 @@ import (
 type FakeRecorder struct {
 	Events chan string
 
-	IncludeObject bool
+	IncludeObject      bool
+	IncludeAnnotations bool
 }
 
 func objectString(object runtime.Object, includeObject bool) string {
@@ -54,7 +55,12 @@ func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageF
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(object, eventtype, reason, messageFmt, args...)
+	if f.IncludeAnnotations {
+		args = append(args, fmt.Sprint(annotations))
+		f.Eventf(object, eventtype, reason, messageFmt+" %s", args...)
+	} else {
+		f.Eventf(object, eventtype, reason, messageFmt, args...)
+	}
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with
