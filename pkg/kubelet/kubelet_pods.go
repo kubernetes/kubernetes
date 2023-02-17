@@ -77,6 +77,8 @@ const (
 	ContainerCreating = "ContainerCreating"
 )
 
+var boolFalse = false
+
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := os.ReadDir(kl.getPodsDir())
@@ -1669,6 +1671,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Image:        cs.Image,
 			ImageID:      cs.ImageID,
 			ContainerID:  cid,
+			Started:      &boolFalse,
 		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
@@ -1730,9 +1733,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 	for _, container := range containers {
 		status := &v1.ContainerStatus{
-			Name:  container.Name,
-			Image: container.Image,
-			State: defaultWaitingState,
+			Name:    container.Name,
+			Image:   container.Image,
+			State:   defaultWaitingState,
+			Started: &boolFalse,
 		}
 		oldStatus, found := oldStatuses[container.Name]
 		if found {

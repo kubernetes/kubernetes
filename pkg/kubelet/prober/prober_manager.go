@@ -256,6 +256,8 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 }
 
 func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
+	initContainerStartedValue := true      // init containers have no probes (yet!) - defaulting to true
+	ephemeralContainerStartedValue := true // ephemeral containers have no probes - should always be true
 	for i, c := range podStatus.ContainerStatuses {
 		var started bool
 		if c.State.Running == nil {
@@ -291,14 +293,18 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			podStatus.ContainerStatuses[i].Ready = ready
 		}
 	}
-	// init containers are ready if they have exited with success or if a readiness probe has
-	// succeeded.
+	// init containers are ready if they have exited with success
 	for i, c := range podStatus.InitContainerStatuses {
 		var ready bool
 		if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
 			ready = true
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready
+		podStatus.InitContainerStatuses[i].Started = &initContainerStartedValue
+	}
+	// enforcing ephemeral container statuses
+	for i := range podStatus.EphemeralContainerStatuses {
+		podStatus.EphemeralContainerStatuses[i].Started = &ephemeralContainerStartedValue
 	}
 }
 

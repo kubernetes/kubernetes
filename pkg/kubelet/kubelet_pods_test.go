@@ -1766,6 +1766,7 @@ func waitingStateWithReason(cName, reason string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{Reason: reason},
 		},
+		Started: &boolFalse,
 	}
 }
 func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
@@ -1779,6 +1780,7 @@ func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 				ExitCode: 0,
 			},
 		},
+		Started: &boolFalse,
 	}
 }
 func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
@@ -1792,6 +1794,7 @@ func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
 				ExitCode: -1,
 			},
 		},
+		Started: &boolFalse,
 	}
 }
 func runningState(cName string) v1.ContainerStatus {
@@ -1800,6 +1803,7 @@ func runningState(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{},
 		},
+		Started: &boolFalse,
 	}
 }
 func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerStatus {
@@ -1808,6 +1812,7 @@ func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerSt
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{Time: startedAt}},
 		},
+		Started: &boolFalse,
 	}
 }
 func stoppedState(cName string) v1.ContainerStatus {
@@ -1816,6 +1821,7 @@ func stoppedState(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{},
 		},
+		Started: &boolFalse,
 	}
 }
 func succeededState(cName string) v1.ContainerStatus {
@@ -1826,6 +1832,7 @@ func succeededState(cName string) v1.ContainerStatus {
 				ExitCode: 0,
 			},
 		},
+		Started: &boolFalse,
 	}
 }
 func failedState(cName string) v1.ContainerStatus {
@@ -1836,6 +1843,7 @@ func failedState(cName string) v1.ContainerStatus {
 				ExitCode: -1,
 			},
 		},
+		Started: &boolFalse,
 	}
 }
 func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.ContainerStatus {
@@ -1852,6 +1860,7 @@ func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.Cont
 			},
 		},
 		RestartCount: restartCount,
+		Started:      &boolFalse,
 	}
 }
 func ready(status v1.ContainerStatus) v1.ContainerStatus {
@@ -2867,6 +2876,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 			},
 			expectedPodHasNetworkCondition: v1.PodCondition{
 				Type:   kubetypes.PodHasNetwork,
@@ -2925,6 +2936,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
 				},
+				InitContainerStatuses: []v1.ContainerStatus{},
 			},
 			expectedPodHasNetworkCondition: v1.PodCondition{
 				Type:   kubetypes.PodHasNetwork,
