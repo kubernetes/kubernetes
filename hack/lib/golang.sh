@@ -480,8 +480,9 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  # TODO(liggitt): Need to switch this to 1.19 once we update images to newer go version
-  minimum_go_version=go1.17.0
+  # we continue to test in the original go version which was go1.17
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-release/3744-stay-on-supported-go-versions#proposal
+  minimum_go_version=go1.17
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
