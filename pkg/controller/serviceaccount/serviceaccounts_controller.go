@@ -179,7 +179,7 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.FromContext(ctx).V(4).Info("Finished syncing namespace", "namespace", key, "time", time.Since(startTime))
+		klog.FromContext(ctx).V(4).Info("Finished syncing namespace", "namespace", key, "duration", time.Since(startTime))
 	}()
 
 	ns, err := c.nsLister.Get(key)

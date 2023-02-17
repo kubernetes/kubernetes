@@ -231,14 +231,14 @@ func (e *TokensController) syncServiceAccount() {
 
 	saInfo, err := parseServiceAccountKey(key)
 	if err != nil {
-		logger.Error(err, "Error parseing service account Key")
+		logger.Error(err, "Parsing service account key")
 		return
 	}
 
 	sa, err := e.getServiceAccount(saInfo.namespace, saInfo.name, saInfo.uid, false)
 	switch {
 	case err != nil:
-		logger.Error(err, "Error getting service account")
+		logger.Error(err, "Getting service account")
 		retry = true
 	case sa == nil:
 		// service account no longer exists, so delete related tokens
@@ -267,14 +267,14 @@ func (e *TokensController) syncSecret() {
 	logger := klog.FromContext(context.TODO())
 	secretInfo, err := parseSecretQueueKey(key)
 	if err != nil {
-		logger.Error(err, "Error parseing secret queue Key")
+		logger.Error(err, "Parsing secret queue key")
 		return
 	}
 
 	secret, err := e.getSecret(secretInfo.namespace, secretInfo.name, secretInfo.uid, false)
 	switch {
 	case err != nil:
-		logger.Error(err, "Error getting secret")
+		logger.Error(err, "Getting secret")
 		retry = true
 	case secret == nil:
 		// If the service account exists
@@ -283,7 +283,7 @@ func (e *TokensController) syncSecret() {
 			if err := clientretry.RetryOnConflict(RemoveTokenBackoff, func() error {
 				return e.removeSecretReference(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, secretInfo.name)
 			}); err != nil {
-				logger.Error(err, "Error removing secret reference")
+				logger.Error(err, "Removing secret reference")
 			}
 		}
 	default:
@@ -291,19 +291,19 @@ func (e *TokensController) syncSecret() {
 		sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, true)
 		switch {
 		case saErr != nil:
-			logger.Error(saErr, "Error getting service account")
+			logger.Error(saErr, "Getting service account")
 			retry = true
 		case sa == nil:
 			// Delete token
-			logger.V(4).Info("service account does not exist, deleting token", "namespace", secretInfo.namespace, "key", secretInfo.name)
+			logger.V(4).Info("Service account does not exist, deleting token", "secret", klog.KRef(secretInfo.namespace, secretInfo.name))
 			if retriable, err := e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
-				logger.Error(err, "Error deleting serviceaccount token", "namespace", secretInfo.namespace, "key", secretInfo.name, "service account", secretInfo.saName)
+				logger.Error(err, "Deleting serviceaccount token", "secret", klog.KRef(secretInfo.namespace, secretInfo.name), "serviceAccount", klog.KRef(secretInfo.namespace, secretInfo.saName))
 				retry = retriable
 			}
 		default:
 			// Update token if needed
 			if retriable, err := e.generateTokenIfNeeded(logger, sa, secret); err != nil {
-				logger.Error(err, "Error populating serviceaccount token", "namespace", secretInfo.namespace, "key", secretInfo.name, "service account", secretInfo.saName)
+				logger.Error(err, "Populating serviceaccount token", "secret", klog.KRef(secretInfo.namespace, secretInfo.name), "serviceAccount", klog.KRef(secretInfo.namespace, secretInfo.saName))
 				retry = retriable
 			}
 		}
@@ -375,7 +375,7 @@ func (e *TokensController) generateTokenIfNeeded(logger klog.Logger, serviceAcco
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		logger.V(2).Info("secret is not up to date, skipping token population", "namespace", liveSecret.Namespace, "key", liveSecret.Name)
+		logger.V(2).Info("Secret is not up to date, skipping token population", klog.KRef(liveSecret.Namespace, liveSecret.Name))
 		return false, nil
 	}
 
