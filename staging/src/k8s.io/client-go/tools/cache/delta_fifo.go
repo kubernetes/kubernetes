@@ -571,12 +571,11 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // using the Sync or Replace DeltaType and then (2) it does some deletions.
 // In particular: for every pre-existing key K that is not the key of
 // an object in `list` there is the effect of
-// `Delete(DeletedFinalStateUnknown{K, O})` where O is current object
-// of K.  If `f.knownObjects == nil` then the pre-existing keys are
-// those in `f.items` and the current object of K is the `.Newest()`
-// of the Deltas associated with K.  Otherwise the pre-existing keys
-// are those listed by `f.knownObjects` and the current object of K is
-// what `f.knownObjects.GetByKey(K)` returns.
+// `Delete(DeletedFinalStateUnknown{K, O})` where O is the latest known
+// object of K. The pre-existing keys are those in the union set of the keys in
+// `f.items` and `f.knownObjects` (if not nil). The last known object for key K is
+// the one present in the last delta in `f.items`. If there is no delta for K
+// in `f.items`, it is the object in `f.knownObjects`
 func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -600,55 +599,53 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 		}
 	}
 
-	if f.knownObjects == nil {
-		// Do deletion detection against our own list.
-		queuedDeletions := 0
-		for k, oldItem := range f.items {
+	// Do deletion detection against objects in the queue
+	queuedDeletions := 0
+	for k, oldItem := range f.items {
+		if keys.Has(k) {
+			continue
+		}
+		// Delete pre-existing items not in the new list.
+		// This could happen if watch deletion event was missed while
+		// disconnected from apiserver.
+		var deletedObj interface{}
+		if n := oldItem.Newest(); n != nil {
+			deletedObj = n.Object
+
+			// if the previous object is a DeletedFinalStateUnknown, we have to extract the actual Object
+			if d, ok := deletedObj.(DeletedFinalStateUnknown); ok {
+				deletedObj = d.Obj
+			}
+		}
+		queuedDeletions++
+		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
+			return err
+		}
+	}
+
+	if f.knownObjects != nil {
+		// Detect deletions for objects not present in the queue, but present in KnownObjects
+		knownKeys := f.knownObjects.ListKeys()
+		for _, k := range knownKeys {
 			if keys.Has(k) {
 				continue
 			}
-			// Delete pre-existing items not in the new list.
-			// This could happen if watch deletion event was missed while
-			// disconnected from apiserver.
-			var deletedObj interface{}
-			if n := oldItem.Newest(); n != nil {
-				deletedObj = n.Object
+			if len(f.items[k]) > 0 {
+				continue
+			}
+
+			deletedObj, exists, err := f.knownObjects.GetByKey(k)
+			if err != nil {
+				deletedObj = nil
+				klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+			} else if !exists {
+				deletedObj = nil
+				klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
 			}
 			queuedDeletions++
 			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 				return err
 			}
-		}
-
-		if !f.populated {
-			f.populated = true
-			// While there shouldn't be any queued deletions in the initial
-			// population of the queue, it's better to be on the safe side.
-			f.initialPopulationCount = keys.Len() + queuedDeletions
-		}
-
-		return nil
-	}
-
-	// Detect deletions not already in the queue.
-	knownKeys := f.knownObjects.ListKeys()
-	queuedDeletions := 0
-	for _, k := range knownKeys {
-		if keys.Has(k) {
-			continue
-		}
-
-		deletedObj, exists, err := f.knownObjects.GetByKey(k)
-		if err != nil {
-			deletedObj = nil
-			klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
-		} else if !exists {
-			deletedObj = nil
-			klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
-		}
-		queuedDeletions++
-		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
-			return err
 		}
 	}
 
