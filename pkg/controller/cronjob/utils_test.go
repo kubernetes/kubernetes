@@ -19,6 +19,7 @@ package cronjob
 import (
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,22 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 )
+
+func BenchmarkDeleteFromActiveList(b *testing.B) {
+	cj := &batchv1.CronJob{}
+	cj.Status.Active = []v1.ObjectReference{}
+	activeCount := 10
+	times := 2
+	testError := false
+	for n := 0; n < b.N; n++ {
+		initActive(cj, activeCount, times)
+		deleteFromActiveList(cj, types.UID(strconv.Itoa(activeCount-1)))
+		if !testError && len(cj.Status.Active) != activeCount*times-times {
+			testError = true
+			b.Errorf("Wrong number(%d) of ActiveList", len(cj.Status.Active))
+		}
+	}
+}
 
 func TestGetJobFromTemplate2(t *testing.T) {
 	// getJobFromTemplate2() needs to take the job template and copy the labels and annotations
@@ -478,4 +495,16 @@ func deltaTimeAfterTopOfTheHour(duration time.Duration) *time.Time {
 	}
 	t := T1.Add(duration)
 	return &t
+}
+
+func initActive(cj *batchv1.CronJob, count, times int) {
+	active := make([]v1.ObjectReference, 0, count*times)
+	for j := 0; j < times; j++ {
+		for i := 0; i < count; i++ {
+			active = append(active, v1.ObjectReference{
+				UID: types.UID(strconv.Itoa(i)),
+			})
+		}
+	}
+	cj.Status.Active = active
 }

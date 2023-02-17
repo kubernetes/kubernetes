@@ -58,15 +58,14 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 	if cj == nil {
 		return
 	}
-	// TODO: @alpatel the memory footprint can may be reduced here by
-	//  cj.Status.Active = append(cj.Status.Active[:indexToRemove], cj.Status.Active[indexToRemove:]...)
-	newActive := []corev1.ObjectReference{}
-	for _, j := range cj.Status.Active {
-		if j.UID != uid {
-			newActive = append(newActive, j)
+	i := 0
+	for _, active := range cj.Status.Active {
+		if active.UID != uid {
+			cj.Status.Active[i] = active
+			i++
 		}
 	}
-	cj.Status.Active = newActive
+	cj.Status.Active = cj.Status.Active[:i]
 }
 
 // mostRecentScheduleTime returns:
