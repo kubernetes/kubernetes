@@ -109,9 +109,6 @@ func ValidateFlowSchemaSpec(fsName string, spec *flowcontrol.FlowSchemaSpec, fld
 	if spec.MatchingPrecedence > flowcontrol.FlowSchemaMaxMatchingPrecedence {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, fmt.Sprintf("must not be greater than %v", flowcontrol.FlowSchemaMaxMatchingPrecedence)))
 	}
-	if (spec.MatchingPrecedence == 1) && (fsName != flowcontrol.FlowSchemaNameExempt) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, "only the schema named 'exempt' may have matchingPrecedence 1"))
-	}
 	if spec.DistinguisherMethod != nil {
 		if !supportedDistinguisherMethods.Has(string(spec.DistinguisherMethod.Type)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("distinguisherMethod").Child("type"), spec.DistinguisherMethod, supportedDistinguisherMethods.List()))
