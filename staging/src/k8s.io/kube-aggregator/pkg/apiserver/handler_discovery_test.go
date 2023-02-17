@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -134,7 +135,7 @@ func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList,
 // Test that a handler associated with an APIService gets pinged after the
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
-	pinged := false
+	var pinged atomic.Bool
 	service := discoveryendpoint.NewResourceManager()
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
 
@@ -152,7 +153,7 @@ func TestDirty(t *testing.T) {
 			},
 		},
 	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pinged = true
+		pinged.Store(true)
 		service.ServeHTTP(w, r)
 	}))
 	testCtx, cancel := context.WithCancel(context.Background())
@@ -162,7 +163,7 @@ func TestDirty(t *testing.T) {
 	require.True(t, waitForEmptyQueue(testCtx.Done(), aggregatedManager))
 
 	// immediately check for ping, since Run() should block for local services
-	if !pinged {
+	if !pinged.Load() {
 		t.Errorf("service handler never pinged")
 	}
 }
