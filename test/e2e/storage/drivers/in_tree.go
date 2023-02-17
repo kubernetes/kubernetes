@@ -1289,7 +1289,7 @@ func (v *vSphereDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 	ginkgo.DeferCleanup(func() {
 		// Driver Cleanup function
 		// Logout each vSphere client connection to prevent session leakage
-		nodes := vspheretest.GetReadySchedulableNodeInfos()
+		nodes := vspheretest.GetReadySchedulableNodeInfos(f.ClientSet)
 		for _, node := range nodes {
 			if node.VSphere.Client != nil {
 				node.VSphere.Client.Logout(context.TODO())
@@ -1306,7 +1306,7 @@ func (v *vSphereDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	vspheretest.Bootstrap(f)
-	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
+	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo(f.ClientSet)
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
 	framework.ExpectNoError(err)
 	return &vSphereVolume{

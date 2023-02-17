@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		clientPod = nil
 		pvc = nil
 		pv = nil
-		nodeInfo = GetReadySchedulableRandomNodeInfo()
+		nodeInfo = GetReadySchedulableRandomNodeInfo(c)
 
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
