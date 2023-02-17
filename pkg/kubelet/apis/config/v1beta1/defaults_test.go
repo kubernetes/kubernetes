@@ -256,6 +256,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler:         utilpointer.Bool(false),
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
+				RegisterNode:                    utilpointer.Bool(false),
+				LocalStorageCapacityIsolation:   utilpointer.Bool(false),
 				PodLogsDir:                      "",
 			},
 			&v1beta1.KubeletConfiguration{

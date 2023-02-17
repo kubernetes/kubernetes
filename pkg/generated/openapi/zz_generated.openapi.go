@@ -58146,7 +58146,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"podLogsDir": {
 						SchemaProps: spec.SchemaProps{
-							Description: "podLogsDir is a custom root directory path kubelet will use to place pod's log files. Default: \"/var/log/pods\"",
+							Description: "podLogsDir is a custom root directory path kubelet will use to place pod's log files. Default: \"/var/log/pods/\" Note: it is not recommended to use the temp folder as a log directory as it may cause unexpected behavior in many places.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

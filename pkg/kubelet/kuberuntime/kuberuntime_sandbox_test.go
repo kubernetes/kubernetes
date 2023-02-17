@@ -44,7 +44,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	require.NoError(t, err)
 	pod := newTestPod()
 
-	expectedLogDirectory := filepath.Join(testPodLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
+	expectedLogDirectory := filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
 	expectedLabels := map[string]string{
 		"io.kubernetes.pod.name":      pod.Name,
 		"io.kubernetes.pod.namespace": pod.Namespace,
