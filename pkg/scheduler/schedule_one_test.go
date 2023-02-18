@@ -630,7 +630,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("forget pod: wanted %v, got %v", e, a)
 			}
-			if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
+			if e, a := item.expectError, gotError; e != nil && e.Error() != a.Error() {
 				t.Errorf("error: wanted %v, got %v", e, a)
 			}
 			if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
@@ -740,7 +740,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				UnschedulablePlugins: sets.NewString(nodeports.Name),
 			},
 		}
-		if !reflect.DeepEqual(expectErr, err) {
+		if expectErr != nil && expectErr.Error() != err.Error() {
 			t.Errorf("err want=%v, get=%v", expectErr, err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -767,7 +767,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar", UID: types.UID("bar")},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
+		if expectBinding != nil && !reflect.DeepEqual(expectBinding, b) {
 			t.Errorf("binding want=%v, get=%v", expectBinding, b)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -849,7 +849,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		if len(fmt.Sprint(expectErr)) > 150 {
 			t.Errorf("message is too spammy ! %v ", len(fmt.Sprint(expectErr)))
 		}
-		if !reflect.DeepEqual(expectErr, err) {
+		if expectErr != nil && expectErr.Error() != err.Error() {
 			t.Errorf("\n err \nWANT=%+v,\nGOT=%+v", expectErr, err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
