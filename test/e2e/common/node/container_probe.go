@@ -524,7 +524,7 @@ var _ = SIGDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port:    2379,
+					Port:    5000,
 					Service: nil,
 				},
 			},
