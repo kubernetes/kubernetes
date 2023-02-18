@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -525,7 +524,7 @@ var _ = SIGDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port:    6379,
+					Port:    2379,
 					Service: nil,
 				},
 			},
@@ -548,7 +547,7 @@ var _ = SIGDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port: 6333, // this port is wrong
+					Port: 2333, // this port is wrong
 				},
 			},
 			InitialDelaySeconds: probeTestInitialDelaySeconds * 4,
@@ -1036,11 +1035,6 @@ func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.P
 }
 
 func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
-	agnhostLocalhostAddress := "127.0.0.1"
-	if framework.TestContext.ClusterIsIPv6() {
-		agnhostLocalhostAddress = "::1"
-	}
-	agnhostURL := fmt.Sprintf("http://%s", net.JoinHostPort(agnhostLocalhostAddress, "6379"))
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
@@ -1049,13 +1043,10 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 					Name:  containerName,
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
-						"/usr/local/bin/agnhost",
-						"--listen-client-urls",
-						"http://0.0.0.0:6379", //should listen on all addresses
-						"--advertise-client-urls",
-						agnhostURL,
+						"/agnhost",
+						"grpc-health-checking",
 					},
-					Ports:          []v1.ContainerPort{{ContainerPort: int32(6379)}},
+					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},
