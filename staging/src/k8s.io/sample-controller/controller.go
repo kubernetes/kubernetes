@@ -359,22 +359,11 @@ func (c *Controller) enqueueFoo(obj interface{}) {
 // It then enqueues that Foo resource to be processed. If the object does not
 // have an appropriate OwnerReference, it will simply be skipped.
 func (c *Controller) handleObject(obj interface{}) {
-	var object metav1.Object
-	var ok bool
-	logger := klog.FromContext(context.Background())
-	if object, ok = obj.(metav1.Object); !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
-			return
-		}
-		object, ok = tombstone.Obj.(metav1.Object)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
-			return
-		}
-		logger.V(4).Info("Recovered deleted object", "resourceName", object.GetName())
+	object, ok := cache.DeletionHandlingCast[metav1.Object](obj)
+	if !ok {
+		return
 	}
+	logger := klog.FromContext(context.Background())
 	logger.V(4).Info("Processing object", "object", klog.KObj(object))
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a Foo, we should not do anything more

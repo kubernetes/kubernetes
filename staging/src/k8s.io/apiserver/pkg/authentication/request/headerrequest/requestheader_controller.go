@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"sync/atomic"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"sync/atomic"
 )
 
 const (
@@ -114,13 +115,8 @@ func NewRequestHeaderAuthRequestController(
 
 	c.configmapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
-			if cast, ok := obj.(*corev1.ConfigMap); ok {
+			if cast, ok := cache.DeletionHandlingCast[*corev1.ConfigMap](obj); ok {
 				return cast.Name == c.configmapName && cast.Namespace == c.configmapNamespace
-			}
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
-					return cast.Name == c.configmapName && cast.Namespace == c.configmapNamespace
-				}
 			}
 			return true // always return true just in case.  The checks are fairly cheap
 		},

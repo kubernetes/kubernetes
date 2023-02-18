@@ -169,18 +169,9 @@ func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 }
 
 func (ttlc *Controller) deleteNode(obj interface{}) {
-	_, ok := obj.(*v1.Node)
+	_, ok := cache.DeletionHandlingCast[*v1.Node](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		_, ok = tombstone.Obj.(*v1.Node)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
-			return
-		}
+		return
 	}
 
 	func() {

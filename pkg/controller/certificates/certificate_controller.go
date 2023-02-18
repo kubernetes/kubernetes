@@ -84,18 +84,9 @@ func NewCertificateController(
 			cc.enqueueCertificateRequest(new)
 		},
 		DeleteFunc: func(obj interface{}) {
-			csr, ok := obj.(*certificates.CertificateSigningRequest)
+			csr, ok := cache.DeletionHandlingCast[*certificates.CertificateSigningRequest](obj)
 			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					logger.V(2).Info("Couldn't get object from tombstone", "object", obj)
-					return
-				}
-				csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
-				if !ok {
-					logger.V(2).Info("Tombstone contained object that is not a CSR", "object", obj)
-					return
-				}
+				return
 			}
 			logger.V(4).Info("Deleting certificate request", "csr", csr.Name)
 			cc.enqueueCertificateRequest(obj)

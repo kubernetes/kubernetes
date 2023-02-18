@@ -43,7 +43,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -751,20 +751,9 @@ func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			g.updateNodeZones(prevNode, newNode)
 		},
 		DeleteFunc: func(obj interface{}) {
-			node, isNode := obj.(*v1.Node)
-			// We can get DeletedFinalStateUnknown instead of *v1.Node here
-			// and we need to handle that correctly.
+			node, isNode := cache.DeletionHandlingCast[*v1.Node](obj)
 			if !isNode {
-				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					klog.Errorf("Received unexpected object: %v", obj)
-					return
-				}
-				node, ok = deletedState.Obj.(*v1.Node)
-				if !ok {
-					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-					return
-				}
+				return
 			}
 			g.updateNodeZones(node, nil)
 		},

@@ -114,9 +114,8 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 }
 
 func (c *Publisher) configMapDeleted(obj interface{}) {
-	cm, err := convertToCM(obj)
-	if err != nil {
-		utilruntime.HandleError(err)
+	cm, ok := cache.DeletionHandlingCast[*v1.ConfigMap](obj)
+	if ok{
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
@@ -126,9 +125,8 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 }
 
 func (c *Publisher) configMapUpdated(_, newObj interface{}) {
-	cm, err := convertToCM(newObj)
-	if err != nil {
-		utilruntime.HandleError(err)
+	cm, ok := cache.DeletionHandlingCast[*v1.ConfigMap](newObj)
+	if ok{
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
@@ -221,19 +219,4 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(ctx, cm, metav1.UpdateOptions{})
 	return err
-}
-
-func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
-	cm, ok := obj.(*v1.ConfigMap)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			return nil, fmt.Errorf("couldn't get object from tombstone %#v", obj)
-		}
-		cm, ok = tombstone.Obj.(*v1.ConfigMap)
-		if !ok {
-			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
-		}
-	}
-	return cm, nil
 }

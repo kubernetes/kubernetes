@@ -206,13 +206,8 @@ func NewController(
 }
 
 func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
-	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = d.Obj
-	}
-	pod, ok := obj.(*v1.Pod)
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		// Not a pod?!
-		logger.Error(nil, "enqueuePod called for unexpected object", "type", fmt.Sprintf("%T", obj))
 		return
 	}
 

@@ -250,18 +250,9 @@ func (dsc *DaemonSetsController) updateDaemonset(logger klog.Logger, cur, old in
 }
 
 func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interface{}) {
-	ds, ok := obj.(*apps.DaemonSet)
+	ds, ok := cache.DeletionHandlingCast[*apps.DaemonSet](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		ds, ok = tombstone.Obj.(*apps.DaemonSet)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
-			return
-		}
+		return
 	}
 	logger.V(4).Info("Deleting daemon set", "daemonset", klog.KObj(ds))
 
@@ -465,23 +456,9 @@ func (dsc *DaemonSetsController) updateHistory(logger klog.Logger, old, cur inte
 // the ControllerRevision is deleted. obj could be an *app.ControllerRevision, or
 // a DeletionFinalStateUnknown marker item.
 func (dsc *DaemonSetsController) deleteHistory(logger klog.Logger, obj interface{}) {
-	history, ok := obj.(*apps.ControllerRevision)
-
-	// When a delete is dropped, the relist will notice a ControllerRevision in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the ControllerRevision
-	// changed labels the new DaemonSet will not be woken up till the periodic resync.
+	history, ok := cache.DeletionHandlingCast[*apps.ControllerRevision](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
-			return
-		}
-		history, ok = tombstone.Obj.(*apps.ControllerRevision)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(history)
@@ -602,23 +579,9 @@ func (dsc *DaemonSetsController) updatePod(logger klog.Logger, old, cur interfac
 }
 
 func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new daemonset will not be woken up till the periodic
-	// resync.
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(pod)

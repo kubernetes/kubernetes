@@ -325,22 +325,9 @@ func (jm *ControllerV2) updateJob(old, cur interface{}) {
 }
 
 func (jm *ControllerV2) deleteJob(obj interface{}) {
-	job, ok := obj.(*batchv1.Job)
-
-	// When a delete is dropped, the relist will notice a job in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale.
+	job, ok := cache.DeletionHandlingCast[*batchv1.Job](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		job, ok = tombstone.Obj.(*batchv1.Job)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Job %#v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(job)

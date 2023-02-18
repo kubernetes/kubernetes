@@ -111,18 +111,9 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 			c.queue.Add(cast.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
-			cast, ok := obj.(*v1.APIService)
+			cast, ok := cache.DeletionHandlingCast[*v1.APIService](obj)
 			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
-					return
-				}
-				cast, ok = tombstone.Obj.(*v1.APIService)
-				if !ok {
-					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
-					return
-				}
+				return
 			}
 			c.queue.Add(cast.Name)
 		},

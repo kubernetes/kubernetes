@@ -193,18 +193,9 @@ func (dc *DeploymentController) updateDeployment(logger klog.Logger, old, cur in
 }
 
 func (dc *DeploymentController) deleteDeployment(logger klog.Logger, obj interface{}) {
-	d, ok := obj.(*apps.Deployment)
+	d, ok := cache.DeletionHandlingCast[*apps.Deployment](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		d, ok = tombstone.Obj.(*apps.Deployment)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", obj))
-			return
-		}
+		return
 	}
 	logger.V(4).Info("Deleting deployment", "deployment", klog.KObj(d))
 	dc.enqueueDeployment(d)
@@ -315,23 +306,9 @@ func (dc *DeploymentController) updateReplicaSet(logger klog.Logger, old, cur in
 // the ReplicaSet is deleted. obj could be an *apps.ReplicaSet, or
 // a DeletionFinalStateUnknown marker item.
 func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interface{}) {
-	rs, ok := obj.(*apps.ReplicaSet)
-
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the ReplicaSet
-	// changed labels the new deployment will not be woken up till the periodic resync.
+	rs, ok := cache.DeletionHandlingCast[*apps.ReplicaSet](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(rs)
@@ -349,23 +326,9 @@ func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interfa
 
 // deletePod will enqueue a Recreate Deployment once all of its pods have stopped running.
 func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the Pod
-	// changed labels the new deployment will not be woken up till the periodic resync.
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
-			return
-		}
+		return
 	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
 	if d := dc.getDeploymentForPod(logger, pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {

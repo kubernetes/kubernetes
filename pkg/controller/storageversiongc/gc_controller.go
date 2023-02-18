@@ -247,18 +247,9 @@ func (c *Controller) enqueueStorageVersion(logger klog.Logger, obj *apiserverint
 }
 
 func (c *Controller) onDeleteLease(logger klog.Logger, obj interface{}) {
-	castObj, ok := obj.(*coordinationv1.Lease)
+	castObj, ok := cache.DeletionHandlingCast[*coordinationv1.Lease](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		castObj, ok = tombstone.Obj.(*coordinationv1.Lease)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Lease %#v", obj))
-			return
-		}
+		return
 	}
 
 	if castObj.Namespace == metav1.NamespaceSystem &&

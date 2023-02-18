@@ -359,18 +359,9 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 	if obj == nil {
 		return nil
 	}
-	pod, ok := obj.(*v1.Pod)
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return nil
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
-			return nil
-		}
+		return nil
 	}
 	return pod
 }

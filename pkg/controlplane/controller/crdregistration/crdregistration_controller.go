@@ -83,18 +83,9 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 			c.enqueueCRD(newObj.(*apiextensionsv1.CustomResourceDefinition))
 		},
 		DeleteFunc: func(obj interface{}) {
-			cast, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
+			cast, ok := cache.DeletionHandlingCast[*apiextensionsv1.CustomResourceDefinition](obj)
 			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
-					return
-				}
-				cast, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
-				if !ok {
-					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
-					return
-				}
+				return
 			}
 			c.enqueueCRD(cast)
 		},

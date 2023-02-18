@@ -136,17 +136,9 @@ func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface
 }
 
 func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
-	endpointSlice, ok := obj.(*discovery.EndpointSlice)
+	endpointSlice, ok := cache.DeletionHandlingCast[*discovery.EndpointSlice](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
-			return
-		}
-		if endpointSlice, ok = tombstone.Obj.(*discovery.EndpointSlice); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
-			return
-		}
+		return
 	}
 	for _, h := range c.eventHandlers {
 		klog.V(4).InfoS("Calling handler.OnEndpointsDelete")
@@ -227,17 +219,9 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 }
 
 func (c *ServiceConfig) handleDeleteService(obj interface{}) {
-	service, ok := obj.(*v1.Service)
+	service, ok := cache.DeletionHandlingCast[*v1.Service](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		if service, ok = tombstone.Obj.(*v1.Service); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
+		return
 	}
 	for i := range c.eventHandlers {
 		klog.V(4).InfoS("Calling handler.OnServiceDelete")
@@ -354,17 +338,9 @@ func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
 }
 
 func (c *NodeConfig) handleDeleteNode(obj interface{}) {
-	node, ok := obj.(*v1.Node)
+	node, ok := cache.DeletionHandlingCast[*v1.Node](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		if node, ok = tombstone.Obj.(*v1.Node); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
+		return
 	}
 	for i := range c.eventHandlers {
 		klog.V(4).InfoS("Calling handler.OnNodeDelete")

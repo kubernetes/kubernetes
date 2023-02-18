@@ -253,18 +253,9 @@ func (c *Controller) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 }
 
 func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
+	castObj, ok := cache.DeletionHandlingCast[*apiextensionsv1.CustomResourceDefinition](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		castObj, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
-		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
-			return
-		}
+		return
 	}
 	klog.V(4).Infof("Deleting customresourcedefinition %q", castObj.Name)
 	c.enqueue(castObj)

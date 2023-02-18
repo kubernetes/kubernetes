@@ -195,20 +195,8 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, 
 // GetPodFromDeleteAction returns a pointer to a pod if one can be derived from
 // obj (could be a *v1.Pod, or a DeletionFinalStateUnknown marker item).
 func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
-	if pod, ok := obj.(*v1.Pod); ok {
-		// Enqueue all the services that the pod used to be a member of.
-		// This is the same thing we do when we add a pod.
-		return pod
-	}
-	// If we reached here it means the pod was deleted but its final state is unrecorded.
-	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-		return nil
-	}
-	pod, ok := tombstone.Obj.(*v1.Pod)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
 		return nil
 	}
 	return pod

@@ -98,22 +98,11 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 }
 
 func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
-	logger := sched.logger
-	var node *v1.Node
-	switch t := obj.(type) {
-	case *v1.Node:
-		node = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		node, ok = t.Obj.(*v1.Node)
-		if !ok {
-			logger.Error(nil, "Cannot convert to *v1.Node", "obj", t.Obj)
-			return
-		}
-	default:
-		logger.Error(nil, "Cannot convert to *v1.Node", "obj", t)
+	node, ok := cache.DeletionHandlingCast[*v1.Node](obj)
+	if !ok {
 		return
 	}
+	logger := sched.logger
 	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
 	if err := sched.Cache.RemoveNode(logger, node); err != nil {
 		logger.Error(err, "Scheduler cache RemoveNode failed")
@@ -152,22 +141,11 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 }
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
-	logger := sched.logger
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = obj.(*v1.Pod)
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
-			return
-		}
-	default:
-		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
+	if !ok {
 		return
 	}
+	logger := sched.logger
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
@@ -225,22 +203,11 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
-	logger := sched.logger
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
-			return
-		}
-	default:
-		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t)
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
+	if !ok {
 		return
 	}
+	logger := sched.logger
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
 		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))

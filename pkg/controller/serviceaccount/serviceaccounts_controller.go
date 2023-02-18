@@ -124,18 +124,9 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 
 // serviceAccountDeleted reacts to a ServiceAccount deletion by recreating a default ServiceAccount in the namespace if needed
 func (c *ServiceAccountsController) serviceAccountDeleted(obj interface{}) {
-	sa, ok := obj.(*v1.ServiceAccount)
+	sa, ok := cache.DeletionHandlingCast[*v1.ServiceAccount](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
-			return
-		}
-		sa, ok = tombstone.Obj.(*v1.ServiceAccount)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ServiceAccount %#v", obj))
-			return
-		}
+		return
 	}
 	c.queue.Add(sa.Namespace)
 }

@@ -116,12 +116,8 @@ func resourceClaimStatusesEqual(statusA, statusB []corev1.PodResourceClaimStatus
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	pod, ok := obj.(*corev1.Pod)
+	pod, ok := cache.DeletionHandlingCast[*corev1.Pod](obj)
 	if !ok {
-		klog.Infof("unexpected type %T", obj)
 		return
 	}
 	if len(pod.Spec.NodeName) == 0 {
@@ -146,12 +142,8 @@ func (g *graphPopulator) updatePV(oldObj, obj interface{}) {
 }
 
 func (g *graphPopulator) deletePV(obj interface{}) {
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	pv, ok := obj.(*corev1.PersistentVolume)
+	pv, ok := cache.DeletionHandlingCast[*corev1.PersistentVolume](obj)
 	if !ok {
-		klog.Infof("unexpected type %T", obj)
 		return
 	}
 	g.graph.DeletePV(pv.Name)
@@ -174,12 +166,8 @@ func (g *graphPopulator) updateVolumeAttachment(oldObj, obj interface{}) {
 }
 
 func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	attachment, ok := obj.(*storagev1.VolumeAttachment)
+	attachment, ok := cache.DeletionHandlingCast[*storagev1.VolumeAttachment](obj)
 	if !ok {
-		klog.Infof("unexpected type %T", obj)
 		return
 	}
 	g.graph.DeleteVolumeAttachment(attachment.Name)

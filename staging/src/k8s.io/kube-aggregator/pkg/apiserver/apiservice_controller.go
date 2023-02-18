@@ -178,18 +178,9 @@ func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) 
 }
 
 func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
-	castObj, ok := obj.(*v1.APIService)
+	castObj, ok := cache.DeletionHandlingCast[*v1.APIService](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		castObj, ok = tombstone.Obj.(*v1.APIService)
-		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
-			return
-		}
+		return
 	}
 	klog.V(4).Infof("Deleting %q", castObj.Name)
 	c.enqueueInternal(castObj)

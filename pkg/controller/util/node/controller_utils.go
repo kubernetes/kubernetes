@@ -267,20 +267,9 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 // CreateDeleteNodeHandler creates a delete node handler. (Common to lifecycle and ipam)
 func CreateDeleteNodeHandler(logger klog.Logger, f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
-		originalNode, isNode := originalObj.(*v1.Node)
-		// We can get DeletedFinalStateUnknown instead of *v1.Node here and
-		// we need to handle that correctly. #34692
+		originalNode, isNode := cache.DeletionHandlingCast[*v1.Node](originalObj)
 		if !isNode {
-			deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
-			if !ok {
-				logger.Error(nil, "Received unexpected object", "object", originalObj)
-				return
-			}
-			originalNode, ok = deletedState.Obj.(*v1.Node)
-			if !ok {
-				logger.Error(nil, "DeletedFinalStateUnknown contained non-Node object", "object", deletedState.Obj)
-				return
-			}
+			return
 		}
 		node := originalNode.DeepCopy()
 		if err := f(node); err != nil {

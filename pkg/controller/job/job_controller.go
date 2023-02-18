@@ -400,21 +400,9 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 		recordFinishedPodWithTrackingFinalizer(pod, nil)
 	}
 
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new job will not be woken up till the periodic resync.
+	pod, ok = cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(pod)
@@ -491,18 +479,9 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 // have a finalizer.
 func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	jm.enqueueSyncJobImmediately(logger, obj)
-	jobObj, ok := obj.(*batch.Job)
+	jobObj, ok := cache.DeletionHandlingCast[*batch.Job](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
-			return
-		}
-		jobObj, ok = tombstone.Obj.(*batch.Job)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %+v", obj))
-			return
-		}
+		return
 	}
 	// Listing pods shouldn't really fail, as we are just querying the informer cache.
 	selector, err := metav1.LabelSelectorAsSelector(jobObj.Spec.Selector)

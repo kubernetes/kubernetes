@@ -473,18 +473,9 @@ func (dc *DisruptionController) updateDB(logger klog.Logger, old, cur interface{
 }
 
 func (dc *DisruptionController) removeDB(logger klog.Logger, obj interface{}) {
-	pdb, ok := obj.(*policy.PodDisruptionBudget)
+	pdb, ok := cache.DeletionHandlingCast[*policy.PodDisruptionBudget](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			logger.Error(nil, "Couldn't get object from tombstone", "obj", obj)
-			return
-		}
-		pdb, ok = tombstone.Obj.(*policy.PodDisruptionBudget)
-		if !ok {
-			logger.Error(nil, "Tombstone contained object that is not a PDB", "obj", obj)
-			return
-		}
+		return
 	}
 	logger.V(4).Info("Remove DB", "podDisruptionBudget", klog.KObj(pdb))
 	dc.enqueuePdb(logger, pdb)
@@ -521,23 +512,9 @@ func (dc *DisruptionController) updatePod(logger klog.Logger, _, cur interface{}
 }
 
 func (dc *DisruptionController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new ReplicaSet will not be woken up till the periodic
-	// resync.
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			logger.Error(nil, "Couldn't get object from tombstone", "obj", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			logger.Error(nil, "Tombstone contained object that is not a pod", "obj", obj)
-			return
-		}
+		return
 	}
 	logger.V(4).Info("DeletePod called on pod", "pod", klog.KObj(pod))
 	pdb := dc.getPdbForPod(logger, pod)

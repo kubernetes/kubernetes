@@ -105,13 +105,8 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 
 	kubeSystemConfigMapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
-			if cast, ok := obj.(*corev1.ConfigMap); ok {
+			if cast, ok := cache.DeletionHandlingCast[*corev1.ConfigMap](obj); ok {
 				return cast.Name == configMapName
-			}
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
-					return cast.Name == configMapName
-				}
 			}
 			return true // always return true just in case.  The checks are fairly cheap
 		},

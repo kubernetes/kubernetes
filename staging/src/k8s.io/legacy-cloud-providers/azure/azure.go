@@ -751,20 +751,9 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			az.updateNodeCaches(prevNode, newNode)
 		},
 		DeleteFunc: func(obj interface{}) {
-			node, isNode := obj.(*v1.Node)
-			// We can get DeletedFinalStateUnknown instead of *v1.Node here
-			// and we need to handle that correctly.
+			node, isNode := cache.DeletionHandlingCast[*v1.Node](obj)
 			if !isNode {
-				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					klog.Errorf("Received unexpected object: %v", obj)
-					return
-				}
-				node, ok = deletedState.Obj.(*v1.Node)
-				if !ok {
-					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-					return
-				}
+				return
 			}
 			az.updateNodeCaches(node, nil)
 		},

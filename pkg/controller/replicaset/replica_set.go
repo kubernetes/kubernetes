@@ -349,18 +349,9 @@ func (rsc *ReplicaSetController) updateRS(logger klog.Logger, old, cur interface
 }
 
 func (rsc *ReplicaSetController) deleteRS(logger klog.Logger, obj interface{}) {
-	rs, ok := obj.(*apps.ReplicaSet)
+	rs, ok := cache.DeletionHandlingCast[*apps.ReplicaSet](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
-			return
-		}
+		return
 	}
 
 	key, err := controller.KeyFunc(rs)
@@ -496,23 +487,9 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 // When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new ReplicaSet will not be woken up till the periodic resync.
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(pod)

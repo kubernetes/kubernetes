@@ -24,7 +24,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	endpointsliceutil "k8s.io/endpointslice/util"
@@ -154,19 +153,8 @@ func epPortsToEpsPorts(epPorts []corev1.EndpointPort) []discovery.EndpointPort {
 // getServiceFromDeleteAction parses a Service resource from a delete
 // action.
 func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
-	if service, ok := obj.(*corev1.Service); ok {
-		return service
-	}
-	// If we reached here it means the Service was deleted but its final state
-	// is unrecorded.
-	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	 service, ok := cache.DeletionHandlingCast[*corev1.Service](obj)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-		return nil
-	}
-	service, ok := tombstone.Obj.(*corev1.Service)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", obj))
 		return nil
 	}
 	return service
@@ -175,19 +163,8 @@ func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
 // getEndpointsFromDeleteAction parses an Endpoints resource from a delete
 // action.
 func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
-	if endpoints, ok := obj.(*corev1.Endpoints); ok {
-		return endpoints
-	}
-	// If we reached here it means the Endpoints resource was deleted but its
-	// final state is unrecorded.
-	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	endpoints, ok := cache.DeletionHandlingCast[*corev1.Endpoints](obj)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-		return nil
-	}
-	endpoints, ok := tombstone.Obj.(*corev1.Endpoints)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", obj))
 		return nil
 	}
 	return endpoints
@@ -195,19 +172,8 @@ func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
 
 // getEndpointSliceFromDeleteAction parses an EndpointSlice from a delete action.
 func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice {
-	if endpointSlice, ok := obj.(*discovery.EndpointSlice); ok {
-		return endpointSlice
-	}
-	// If we reached here it means the EndpointSlice was deleted but its final
-	// state is unrecorded.
-	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	endpointSlice, ok := cache.DeletionHandlingCast[*discovery.EndpointSlice](obj)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-		return nil
-	}
-	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", obj))
 		return nil
 	}
 	return endpointSlice

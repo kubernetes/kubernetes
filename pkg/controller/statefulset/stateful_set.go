@@ -264,22 +264,9 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 
 // deletePod enqueues the statefulset for the pod accounting for deletion tombstones.
 func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale.
+	pod, ok := cache.DeletionHandlingCast[*v1.Pod](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
-			return
-		}
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(pod)

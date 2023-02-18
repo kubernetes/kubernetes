@@ -18,6 +18,8 @@ package cache
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -335,6 +337,28 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	}
 	return MetaNamespaceKeyFunc(obj)
 }
+
+// DeletionHandlingCast is used to cast the object for OneDelete event handler,
+// it will check whether it is a DeletedFinalStateUnknown mark item.
+func DeletionHandlingCast[T any](obj any) (T, bool) {
+	var zero T
+	t, ok := obj.(T)
+	if !ok {
+		tombstone, ok := obj.(DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return zero, false
+		}
+		t, ok  = tombstone.Obj.(T)
+		if !ok {
+			tname := reflect.TypeOf(zero).String()
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a %s %#v",tname, obj))
+			return zero, false
+		}
+	}
+	return t, true
+}
+
 
 // NewInformer returns a Store and a controller for populating the store
 // while also providing event notifications. You should only used the returned

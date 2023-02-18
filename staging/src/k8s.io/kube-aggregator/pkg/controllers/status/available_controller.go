@@ -483,18 +483,9 @@ func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface
 }
 
 func (c *AvailableConditionController) deleteAPIService(obj interface{}) {
-	castObj, ok := obj.(*apiregistrationv1.APIService)
+	castObj, ok := cache.DeletionHandlingCast[*apiregistrationv1.APIService](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		castObj, ok = tombstone.Obj.(*apiregistrationv1.APIService)
-		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
-			return
-		}
+		return
 	}
 	klog.V(4).Infof("Deleting %q", castObj.Name)
 	if castObj.Spec.Service != nil {
@@ -550,18 +541,9 @@ func (c *AvailableConditionController) updateService(obj, _ interface{}) {
 }
 
 func (c *AvailableConditionController) deleteService(obj interface{}) {
-	castObj, ok := obj.(*v1.Service)
+	castObj, ok := cache.DeletionHandlingCast[*v1.Service](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		castObj, ok = tombstone.Obj.(*v1.Service)
-		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
-			return
-		}
+		return
 	}
 	for _, apiService := range c.getAPIServicesFor(castObj) {
 		c.queue.Add(apiService)
@@ -581,18 +563,9 @@ func (c *AvailableConditionController) updateEndpoints(obj, _ interface{}) {
 }
 
 func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
-	castObj, ok := obj.(*v1.Endpoints)
+	castObj, ok := cache.DeletionHandlingCast[*v1.Endpoints](obj)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		castObj, ok = tombstone.Obj.(*v1.Endpoints)
-		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
-			return
-		}
+		return
 	}
 	for _, apiService := range c.getAPIServicesFor(castObj) {
 		c.queue.Add(apiService)
