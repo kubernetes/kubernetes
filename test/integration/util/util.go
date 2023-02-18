@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -455,6 +456,8 @@ func PodScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // InitDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
 func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.DisruptionController {
+
+	_, ctx := ktesting.NewTestContext(t)
 	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, 12*time.Hour)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
@@ -468,6 +471,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 	}
 
 	dc := disruption.NewDisruptionController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

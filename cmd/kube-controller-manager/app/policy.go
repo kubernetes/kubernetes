@@ -25,10 +25,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
+	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 )
 
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "disruption"))
 	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
 	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
@@ -38,6 +40,7 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 	}
 
 	go disruption.NewDisruptionController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Policy().V1().PodDisruptionBudgets(),
 		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),

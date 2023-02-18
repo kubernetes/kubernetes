@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -168,6 +169,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	fakeClock := clocktesting.NewFakeClock(now)
 
 	dc := NewDisruptionControllerInternal(
+		ctx,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Policy().V1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -1380,7 +1382,8 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 }
 
 func TestInvalidSelectors(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	testCases := map[string]struct {
 		labelSelector *metav1.LabelSelector
@@ -1536,7 +1539,8 @@ func TestStalePodDisruption(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			dc, _ := newFakeDisruptionControllerWithTime(ctx, now)
 			go dc.Run(ctx)
