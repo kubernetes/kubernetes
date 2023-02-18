@@ -29,7 +29,6 @@ import (
 type InternalContainerLifecycle interface {
 	PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
-	PreStopContainer(containerID string) error
 	PostStopContainer(containerID string) error
 }
 
@@ -52,10 +51,6 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		i.topologyManager.AddContainer(pod, container, containerID)
 	}
-	return nil
-}
-
-func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
 	return nil
 }
 
