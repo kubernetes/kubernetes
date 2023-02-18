@@ -484,7 +484,7 @@ func (gc *GarbageCollector) classifyReferences(ctx context.Context, item *node, 
 }
 
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
-	var ret []types.UID
+	ret := make([]types.UID, 0, len(refs))
 	for _, ref := range refs {
 		ret = append(ret, ref.UID)
 	}
