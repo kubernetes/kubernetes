@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cel
+package openapi
 
 import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestMapList(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
-		sts           schema.Structural
+		sts           *spec.Schema
 		items         []interface{}
 		warmUpQueries []interface{}
 		query         interface{}
@@ -34,61 +34,53 @@ func TestMapList(t *testing.T) {
 	}{
 		{
 			name: "default list type",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-			},
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
+				}},
 			query:    map[string]interface{}{},
 			expected: nil,
 		},
 		{
 			name: "non list type",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "map",
-				},
-			},
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"map"},
+				}},
 			query:    map[string]interface{}{},
 			expected: nil,
 		},
 		{
 			name: "non-map list type",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType: &listTypeSet,
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType: listTypeSet,
+				}}},
 			query:    map[string]interface{}{},
 			expected: nil,
 		},
 		{
 			name: "no keys",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType: &listTypeMap,
-				},
-			},
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
+				}},
 			query:    map[string]interface{}{},
 			expected: nil,
 		},
 		{
 			name: "single key",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"k"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k":  "a",
@@ -110,15 +102,10 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "single key ignoring non-map query",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
+				}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k":  "a",
@@ -130,15 +117,14 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "single key ignoring unkeyable query",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"k"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k":  "a",
@@ -156,15 +142,14 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "ignores item of invalid type",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"k"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k":  "a",
@@ -183,15 +168,14 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "keep first entry when duplicated keys are encountered",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"k"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k":  "a",
@@ -213,15 +197,14 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "keep first entry when duplicated multi-keys are encountered",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
 				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k1", "k2"},
-				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"k1", "k2"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"k1": "a",
@@ -257,37 +240,29 @@ func TestMapList(t *testing.T) {
 		},
 		{
 			name: "multiple keys with defaults ignores item with nil value for key",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"kb", "kf", "ki", "ks"},
-				},
-				Properties: map[string]schema.Structural{
-					"kb": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: true},
-						},
-					},
-					"kf": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: float64(2.0)},
-						},
-					},
-					"ki": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: int64(42)},
-						},
-					},
-					"ks": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: "hello"},
-						},
+			sts: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"array"},
+					Properties: map[string]spec.Schema{
+						"kb": {SchemaProps: spec.SchemaProps{
+							Default: true,
+						}},
+						"kf": {SchemaProps: spec.SchemaProps{
+							Default: 2.0,
+						}},
+						"ki": {SchemaProps: spec.SchemaProps{
+							Default: int64(64),
+						}},
+						"ks": {
+							SchemaProps: spec.SchemaProps{
+								Default: "hello",
+							}},
 					},
 				},
-			},
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					extListType:    listTypeMap,
+					extListMapKeys: []any{"kb", "kf", "ki", "ks"},
+				}}},
 			items: []interface{}{
 				map[string]interface{}{
 					"kb": nil,
@@ -321,7 +296,7 @@ func TestMapList(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mapList := makeMapList(&tc.sts, tc.items)
+			mapList := MakeMapList(tc.sts, tc.items)
 			for _, warmUp := range tc.warmUpQueries {
 				mapList.Get(warmUp)
 			}

@@ -27,7 +27,6 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	celmodel "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/metrics"
@@ -53,6 +52,10 @@ const (
 	// checkFrequency configures the number of iterations within a comprehension to evaluate
 	// before checking whether the function evaluation has been interrupted
 	checkFrequency = 100
+
+	// maxRequestSizeBytes is the maximum size of a request to the API server
+	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
+	maxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
 )
 
 // CompilationResult represents the cel compilation result for one rule
@@ -149,7 +152,7 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	estimator := newCostEstimator(root)
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
-	maxCardinality := celmodel.MaxCardinality(root.MinSerializedSize)
+	maxCardinality := maxCardinality(root.MinSerializedSize)
 	for i, rule := range celRules {
 		compResults[i] = compileRule(rule, env, perCallLimit, estimator, maxCardinality)
 	}
@@ -261,4 +264,15 @@ func (c *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 
 func (c *sizeEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
 	return nil
+}
+
+// maxCardinality returns the maximum number of times data conforming to the minimum size given could possibly exist in
+// an object serialized to JSON. For cases where a schema is contained under map or array schemas of unbounded
+// size, this can be used as an estimate as the worst case number of times data matching the schema could be repeated.
+// Note that this only assumes a single comma between data elements, so if the schema is contained under only maps,
+// this estimates a higher cardinality that would be possible. DeclType.MinSerializedSize is meant to be passed to
+// this function.
+func maxCardinality(minSize int64) uint64 {
+	sz := minSize + 1 // assume at least one comma between elements
+	return uint64(maxRequestSizeBytes / sz)
 }
