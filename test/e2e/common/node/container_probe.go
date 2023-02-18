@@ -533,7 +533,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 
-		pod := gRPCServerPodSpec(nil, livenessProbe, "Agnhost")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
@@ -554,7 +554,7 @@ var _ = SIGDescribe("Probing container", func() {
 			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
-		pod := gRPCServerPodSpec(nil, livenessProbe, "Agnhost")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
