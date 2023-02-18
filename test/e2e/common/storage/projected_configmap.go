@@ -462,8 +462,9 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-configmap-volumes"
-		pod, err := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
+		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 
 	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
@@ -471,8 +472,9 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod, err := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
+		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 })
 

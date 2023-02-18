@@ -25,6 +25,18 @@ run_kubectl_debug_pod_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kubectl debug (pod tests)"
 
+  ### Pod Troubleshooting by ephemeral containers
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --image=busybox --attach=false -c debug-container "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
   ### Pod Troubleshooting by Copy
 
   # Pre-Condition: Pod "nginx" is created
@@ -57,6 +69,19 @@ run_kubectl_debug_pod_tests() {
   kube::test::get_object_assert pod/target '{{(index .spec.containers 0).name}}' 'target'
   # Command: copy the pod and replace the image of an existing container
   kubectl debug target --image=busybox --container=target --copy-to=target-copy "${kube_flags[@]:?}" -- sleep 1m
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy "{{(len .spec.containers)}}:{{${image_field:?}}}" '1:busybox'
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  kube::test::get_object_assert pod/target '{{(index .spec.containers 0).name}}' 'target'
+  # Command: copy the pod and replace the image of an existing container
+  kubectl get pod/target -o yaml > "${KUBE_TEMP}"/test-pod-debug.yaml
+  kubectl debug -f "${KUBE_TEMP}"/test-pod-debug.yaml --image=busybox --container=target --copy-to=target-copy "${kube_flags[@]:?}" -- sleep 1m
   # Post-Conditions
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
   kube::test::get_object_assert pod/target-copy "{{(len .spec.containers)}}:{{${image_field:?}}}" '1:busybox'

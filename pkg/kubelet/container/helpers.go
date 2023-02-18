@@ -60,6 +60,12 @@ type RuntimeHelper interface {
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 	GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error)
+
+	// PrepareDynamicResources prepares resources for a pod.
+	PrepareDynamicResources(pod *v1.Pod) error
+
+	// UnprepareDynamicResources unprepares resources for a a pod.
+	UnprepareDynamicResources(pod *v1.Pod) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

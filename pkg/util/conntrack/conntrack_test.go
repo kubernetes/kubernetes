@@ -44,7 +44,7 @@ func TestExecConntrackTool(t *testing.T) {
 			},
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -62,7 +62,7 @@ func TestExecConntrackTool(t *testing.T) {
 	expectErr := []bool{false, false, true}
 
 	for i := range testCases {
-		err := Exec(&fexec, testCases[i]...)
+		err := Exec(fexec, testCases[i]...)
 
 		if expectErr[i] {
 			if err == nil {
@@ -94,7 +94,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -116,7 +116,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 
 	svcCount := 0
 	for _, tc := range testCases {
-		if err := ClearEntriesForIP(&fexec, tc.ip, v1.ProtocolUDP); err != nil {
+		if err := ClearEntriesForIP(fexec, tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s test case:, Unexpected error: %v", tc.name, err)
 		}
 		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.ip) + familyParamStr(utilnet.IsIPv6String(tc.ip))
@@ -141,7 +141,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -161,7 +161,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 	svcCount := 0
 	for _, tc := range testCases {
-		err := ClearEntriesForPort(&fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		err := ClearEntriesForPort(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: Unexpected error: %v", tc.name, err)
 		}
@@ -192,7 +192,7 @@ func TestDeleteConnections(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -249,7 +249,7 @@ func TestDeleteConnections(t *testing.T) {
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForNAT(&fexec, tc.origin, tc.dest, tc.proto)
+		err := ClearEntriesForNAT(fexec, tc.origin, tc.dest, tc.proto)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}
@@ -272,7 +272,7 @@ func TestClearConntrackForPortNAT(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -300,7 +300,7 @@ func TestClearConntrackForPortNAT(t *testing.T) {
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForPortNAT(&fexec, tc.dest, tc.port, tc.proto)
+		err := ClearEntriesForPortNAT(fexec, tc.dest, tc.port, tc.proto)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}

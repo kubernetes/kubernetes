@@ -178,8 +178,9 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
-	klog.Infof("Starting HPA controller")
-	defer klog.Infof("Shutting down HPA controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting HPA controller")
+	defer logger.Info("Shutting down HPA controller")
 
 	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
 		return
@@ -239,7 +240,8 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 func (a *HorizontalController) worker(ctx context.Context) {
 	for a.processNextWorkItem(ctx) {
 	}
-	klog.Infof("horizontal pod autoscaler controller worker shutting down")
+	logger := klog.FromContext(ctx)
+	logger.Info("Horizontal Pod Autoscaler controller worker shutting down")
 }
 
 func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
@@ -447,9 +449,11 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 		return true, err
 	}
 
+	logger := klog.FromContext(ctx)
+
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
+		logger.Info("Horizontal Pod Autoscaler has been deleted", "HPA", klog.KRef(namespace, name))
 
 		a.recommendationsLock.Lock()
 		delete(a.recommendations, key)
@@ -738,6 +742,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	}
 
 	rescale := true
+	logger := klog.FromContext(ctx)
 
 	if scale.Spec.Replicas == 0 && minReplicas != 0 {
 		// Autoscaling is disabled for this resource
@@ -762,7 +767,11 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			return fmt.Errorf("failed to compute desired number of replicas based on listed metrics for %s: %v", reference, err)
 		}
 
-		klog.V(4).Infof("proposing %v desired replicas (based on %s from %s) for %s", metricDesiredReplicas, metricName, metricTimestamp, reference)
+		logger.V(4).Info("Proposing desired replicas",
+			"desiredReplicas", metricDesiredReplicas,
+			"metric", metricName,
+			"timestamp", metricTimestamp,
+			"scaleTarget", reference)
 
 		rescaleMetric := ""
 		if metricDesiredReplicas > desiredReplicas {
@@ -798,10 +807,16 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededRescale", "the HPA controller was able to update the target scale to %d", desiredReplicas)
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
 		a.storeScaleEvent(hpa.Spec.Behavior, key, currentReplicas, desiredReplicas)
-		klog.Infof("Successful rescale of %s, old size: %d, new size: %d, reason: %s",
-			hpa.Name, currentReplicas, desiredReplicas, rescaleReason)
+		logger.Info("Successfully rescaled",
+			"HPA", klog.KObj(hpa),
+			"currentReplicas", currentReplicas,
+			"desiredReplicas", desiredReplicas,
+			"reason", rescaleReason)
 	} else {
-		klog.V(4).Infof("decided not to scale %s to %v (last scale time was %s)", reference, desiredReplicas, hpa.Status.LastScaleTime)
+		logger.V(4).Info("Decided not to scale",
+			"scaleTarget", reference,
+			"desiredReplicas", desiredReplicas,
+			"lastScaleTime", hpa.Status.LastScaleTime)
 		desiredReplicas = currentReplicas
 	}
 
@@ -1286,7 +1301,8 @@ func (a *HorizontalController) updateStatus(ctx context.Context, hpa *autoscalin
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
 	}
-	klog.V(2).Infof("Successfully updated status for %s", hpa.Name)
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Successfully updated status", "HPA", klog.KObj(hpa))
 	return nil
 }
 

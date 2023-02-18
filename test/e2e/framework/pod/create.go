@@ -56,17 +56,17 @@ func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, nam
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to become Unschedulable
 	err = WaitForPodNameUnschedulableInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Unschedulable: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
@@ -81,17 +81,17 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to be running
 	err = WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
@@ -105,23 +105,23 @@ func CreateSecPod(ctx context.Context, client clientset.Interface, podConfig *Co
 func CreateSecPodWithNodeSelection(ctx context.Context, client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
 	pod, err := MakeSecPod(podConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create pod: %v", err)
+		return nil, fmt.Errorf("Unable to create pod: %w", err)
 	}
 
 	pod, err = client.CoreV1().Pods(podConfig.NS).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 
 	// Waiting for pod to be running
 	err = WaitTimeoutForPodRunningInNamespace(ctx, client, pod.Name, podConfig.NS, timeout)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(podConfig.NS).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }

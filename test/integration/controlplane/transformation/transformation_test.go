@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -75,7 +74,6 @@ type transformTest struct {
 	logger            kubeapiservertesting.Logger
 	storageConfig     *storagebackend.Config
 	configDir         string
-	configParentDir   string
 	transformerConfig string
 	kubeAPIServer     kubeapiservertesting.TestServer
 	restClient        *kubernetes.Clientset
@@ -83,7 +81,7 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, ecSymLink bool) (*transformTest, error) {
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string) (*transformTest, error) {
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
@@ -93,7 +91,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 	var err error
 	// create config dir with provided config yaml
 	if transformerConfigYAML != "" && configDir == "" {
-		if e.configDir, e.configParentDir, err = e.createEncryptionConfig(ecSymLink); err != nil {
+		if e.configDir, err = e.createEncryptionConfig(); err != nil {
 			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %v", err)
 		}
 	} else {
@@ -128,8 +126,10 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
-	os.RemoveAll(e.configParentDir)
-	e.shutdownAPIServer()
+
+	if e.kubeAPIServer.ClientConfig != nil {
+		e.shutdownAPIServer()
+	}
 }
 
 func (e *transformTest) shutdownAPIServer() {
@@ -254,7 +254,7 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 func (e *transformTest) getEncryptionOptions(reload bool) []string {
 	if e.transformerConfig != "" {
 		return []string{
-			"--encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName),
+			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
 			"--disable-admission-plugins", "ServiceAccount"}
 	}
@@ -262,40 +262,21 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 	return nil
 }
 
-func (e *transformTest) createEncryptionConfig(ecSymLink bool) (string, string, error) {
+func (e *transformTest) createEncryptionConfig() (
+	filePathForEncryptionConfig string,
+	err error,
+) {
 	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create temp directory: %v", err)
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 
-	if ecSymLink {
-		// create another temp dir
-		parentTempDir, err := os.MkdirTemp("", "secrets-encryption-symlink-test")
-		if err != nil {
-			return tempDir, "", fmt.Errorf("failed to create temp directory: %v", err)
-		}
-
-		// create config file
-		if err := os.WriteFile(filepath.Join(parentTempDir, encryptionConfigFileName), []byte(e.transformerConfig), 0644); err != nil {
-			return tempDir, parentTempDir, fmt.Errorf("failed to write encryption config file: %v", err)
-		}
-
-		// create symlink
-		if err := os.Symlink(filepath.Join(parentTempDir, encryptionConfigFileName), filepath.Join(tempDir, encryptionConfigFileName)); err != nil {
-			return tempDir, parentTempDir, fmt.Errorf("failed to create symlink: %v", err)
-		}
-
-		return tempDir, parentTempDir, nil
-	}
-
-	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
-
-	if err := os.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(tempDir, encryptionConfigFileName), []byte(e.transformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
-		return tempDir, "", fmt.Errorf("error while writing encryption config: %v", err)
+		return tempDir, fmt.Errorf("error while writing encryption config: %v", err)
 	}
 
-	return tempDir, "", nil
+	return tempDir, nil
 }
 
 func (e *transformTest) getEncryptionConfig() (*apiserverconfigv1.ProviderConfiguration, error) {
@@ -368,6 +349,10 @@ func createResource(client dynamic.Interface, gvr schema.GroupVersionResource, n
 	return client.Resource(gvr).Namespace(ns).Create(context.TODO(), stubObj, metav1.CreateOptions{})
 }
 
+func inplaceUpdateResource(client dynamic.Interface, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	return client.Resource(gvr).Namespace(ns).Update(context.TODO(), obj, metav1.UpdateOptions{})
+}
+
 func getStubObj(gvr schema.GroupVersionResource) (*unstructured.Unstructured, error) {
 	stub := ""
 	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
@@ -387,6 +372,15 @@ func getStubObj(gvr schema.GroupVersionResource) (*unstructured.Unstructured, er
 func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
 	podGVR := gvr("", "v1", "pods")
 	pod, err := createResource(dynamicInterface, podGVR, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("error while writing pod: %v", err)
+	}
+	return pod, nil
+}
+
+func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
+	podGVR := gvr("", "v1", "pods")
+	pod, err := inplaceUpdateResource(dynamicInterface, podGVR, namespace, obj)
 	if err != nil {
 		return nil, fmt.Errorf("error while writing pod: %v", err)
 	}

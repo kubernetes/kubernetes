@@ -1315,7 +1315,7 @@ type PodSandboxConfig struct {
 	// structured logs, systemd-journald journal files, gRPC trace files, etc.
 	// E.g.,
 	//
-	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
 	//	ContainerConfig.LogPath = `containerName/Instance#.log`
 	LogDirectory string `protobuf:"bytes,3,opt,name=log_directory,json=logDirectory,proto3" json:"log_directory,omitempty"`
 	// DNS config for the sandbox.
@@ -4716,13 +4716,8 @@ type ContainerConfig struct {
 	// the log (STDOUT and STDERR) on the host.
 	// E.g.,
 	//
-	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
 	//	ContainerConfig.LogPath = `containerName/Instance#.log`
-	//
-	// WARNING: Log management and how kubelet should interface with the
-	// container logs are under active discussion in
-	// https://issues.k8s.io/24677. There *may* be future change of direction
-	// for logging as the discussion carries on.
 	LogPath string `protobuf:"bytes,11,opt,name=log_path,json=logPath,proto3" json:"log_path,omitempty"`
 	// Variables for interactive containers, these have very specialized
 	// use-cases (e.g. debugging).

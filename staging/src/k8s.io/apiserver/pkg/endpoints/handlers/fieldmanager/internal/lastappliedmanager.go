@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,7 +99,7 @@ func (f *lastAppliedManager) allowedConflictsFromLastApplied(liveObj runtime.Obj
 	if annotations == nil {
 		return nil, fmt.Errorf("no last applied annotation")
 	}
-	var lastApplied, ok = annotations[corev1.LastAppliedConfigAnnotation]
+	var lastApplied, ok = annotations[LastAppliedConfigAnnotation]
 	if !ok || lastApplied == "" {
 		return nil, fmt.Errorf("no last applied annotation")
 	}

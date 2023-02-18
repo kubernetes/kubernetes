@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To regenerate api.pb.go run hack/update-generated-kubelet-plugin-registration.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 
 syntax = "proto3";
 
 package v1alpha1;
+option go_package = "k8s.io/kubelet/pkg/apis/dra/v1alpha1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-option go_package = "dra";
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.stringer_all) =  true;
 option (gogoproto.goproto_getters_all) = true;

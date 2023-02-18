@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -693,5 +694,11 @@ func isTooLargeResourceVersionError(err error) bool {
 			return true
 		}
 	}
+
+	// Matches the message returned by api server before 1.17.0
+	if strings.Contains(apierr.Status().Message, "Too large resource version") {
+		return true
+	}
+
 	return false
 }

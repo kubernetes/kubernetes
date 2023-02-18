@@ -622,11 +622,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	var disabledParams []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		disabledParams = []string{"fieldValidation"}
-	}
-
 	// Create Routes for the actions.
 	// TODO: Add status documentation using Returns()
 	// Errors (see api/errors/errors.go as well as go-restful router):
@@ -857,7 +852,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedUpdateOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedUpdateOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
@@ -886,7 +881,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedPatchOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
@@ -917,7 +912,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusAccepted, "Accepted", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedCreateOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedCreateOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)

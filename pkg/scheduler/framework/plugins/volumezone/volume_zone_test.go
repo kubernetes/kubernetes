@@ -215,6 +215,19 @@ func TestSingleZone(t *testing.T) {
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
+		{
+			name: "pv with zone,node with beta zone",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+					Labels: map[string]string{
+						v1.LabelFailureDomainBetaZone: "us-west1-a",
+					},
+				},
+			},
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
 	}
 
 	for _, test := range tests {

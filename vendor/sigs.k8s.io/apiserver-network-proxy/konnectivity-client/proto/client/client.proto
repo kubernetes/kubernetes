@@ -32,11 +32,6 @@ enum PacketType {
   DIAL_CLS = 5;
 }
 
-enum Error {
-  EOF = 0;
-  // ...
-}
-
 message Packet {
   PacketType type = 1;
 

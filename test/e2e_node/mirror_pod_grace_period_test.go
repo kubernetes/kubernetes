@@ -157,7 +157,7 @@ spec:
   terminationGracePeriodSeconds: 20
   containers:
   - name: m-test
-    image: busybox:1.31.1
+    image: %s
     command:
       - /bin/sh
     args:
@@ -171,7 +171,7 @@ spec:
         sleep 1000
 `
 	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace)
+	podYaml := fmt.Sprintf(template, name, namespace, imageutils.GetE2EImage(imageutils.BusyBox))
 
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
@@ -187,7 +187,7 @@ spec:
 func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
 	}
 	if pod.UID != oUID {
 		return fmt.Errorf("expected the uid of mirror pod %q to be same, got %q", name, pod.UID)

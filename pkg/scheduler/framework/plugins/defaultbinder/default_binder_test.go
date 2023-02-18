@@ -73,7 +73,7 @@ func TestDefaultBinder(t *testing.T) {
 				t.Fatal(err)
 			}
 			binder := &DefaultBinder{handle: fh}
-			status := binder.Bind(ctx, nil, testPod, "foohost.kubernetes.mydomain.com")
+			status := binder.Bind(ctx, nil, testPod, testNode)
 			if got := status.AsError(); (tt.injectErr != nil) != (got != nil) {
 				t.Errorf("got error %q, want %q", got, tt.injectErr)
 			}

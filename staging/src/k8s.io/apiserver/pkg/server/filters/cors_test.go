@@ -68,6 +68,25 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			origins:        []string{"http://example.com", "example.com"},
 			allowed:        true,
 		},
+		{
+			// CVE-2022-1996: regular expression 'example.com' matches
+			// 'example.com.hacker.org' because it does not pin to the start
+			// and end of the host.
+			// The CVE should not occur in a real kubernetes cluster since we
+			// validate the regular expression specified in --cors-allowed-origins
+			// to ensure that it pins to the start and end of the host name.
+			name:           "regex does not pin, CVE-2022-1996 is not prevented",
+			allowedOrigins: []string{"example.com"},
+			origins:        []string{"http://example.com.hacker.org", "http://example.com.hacker.org:8080"},
+			allowed:        true,
+		},
+		{
+			// with a proper regular expression we can prevent CVE-2022-1996
+			name:           "regex pins to start/end of the host name, CVE-2022-1996 is prevented",
+			allowedOrigins: []string{`//example.com(:|$)`},
+			origins:        []string{"http://example.com.hacker.org", "http://example.com.hacker.org:8080"},
+			allowed:        false,
+		},
 	}
 
 	for _, test := range tests {

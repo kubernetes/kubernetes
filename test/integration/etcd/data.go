@@ -245,7 +245,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("policy", "v1", "poddisruptionbudgets"): {
 			Stub:             `{"metadata": {"name": "pdbv1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
 			ExpectedEtcdPath: "/registry/poddisruptionbudgets/" + namespace + "/pdbv1",
-			ExpectedGVK:      gvkP("policy", "v1beta1", "PodDisruptionBudget"),
 		},
 		// --
 
@@ -253,6 +252,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("policy", "v1beta1", "poddisruptionbudgets"): {
 			Stub:             `{"metadata": {"name": "pdb1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
 			ExpectedEtcdPath: "/registry/poddisruptionbudgets/" + namespace + "/pdb1",
+			ExpectedGVK:      gvkP("policy", "v1", "PodDisruptionBudget"),
 		},
 		// --
 

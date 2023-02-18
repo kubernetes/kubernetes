@@ -17,10 +17,10 @@ limitations under the License.
 package internal_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,10 +78,10 @@ func TestUpdateBeforeFirstApply(t *testing.T) {
 		)
 	})
 
-	updatedObj := &corev1.Pod{}
-	updatedObj.Kind = "Pod"
-	updatedObj.APIVersion = "v1"
-	updatedObj.ObjectMeta.Labels = map[string]string{"app": "my-nginx"}
+	updatedObj := &unstructured.Unstructured{}
+	if err := json.Unmarshal([]byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": {"labels": {"app": "my-nginx"}}}`), updatedObj); err != nil {
+		t.Fatalf("Failed to unmarshal object: %v", err)
+	}
 
 	if err := f.Update(updatedObj, "fieldmanager_test_update"); err != nil {
 		t.Fatalf("failed to update object: %v", err)

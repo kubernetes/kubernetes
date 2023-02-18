@@ -230,7 +230,7 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		initPods:         1,
 		perPodCPURequest: 500,
 		perPodMemRequest: 500,
-		targetValue:      getTargetValueByType(150, 30, metricTargetType),
+		targetValue:      getTargetValueByType(100, 20, metricTargetType),
 		minPods:          1,
 		maxPods:          5,
 		firstScale:       3,

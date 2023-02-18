@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,6 +29,16 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/spf13/pflag"
+)
+
+const (
+	corsAllowedOriginsHelpText = "List of allowed origins for CORS, comma separated. " +
+		"An allowed origin can be a regular expression to support subdomain matching. " +
+		"If this list is empty CORS will not be enabled. " +
+		"Please ensure each expression matches the entire hostname by anchoring " +
+		"to the start with '^' or including the '//' prefix, and by anchoring to the " +
+		"end with '$' or including the ':' port separator suffix. " +
+		"Examples of valid expressions are '//example\\.com(:|$)' and '^https://example\\.com(:|$)'"
 )
 
 // ServerRunOptions contains the options while running a generic api server.
@@ -160,6 +171,10 @@ func (s *ServerRunOptions) Validate() []error {
 	if err := validateHSTSDirectives(s.HSTSDirectives); err != nil {
 		errors = append(errors, err)
 	}
+
+	if err := validateCorsAllowedOriginList(s.CorsAllowedOriginList); err != nil {
+		errors = append(errors, err)
+	}
 	return errors
 }
 
@@ -182,6 +197,57 @@ func validateHSTSDirectives(hstsDirectives []string) error {
 	return errors.NewAggregate(allErrors)
 }
 
+func validateCorsAllowedOriginList(corsAllowedOriginList []string) error {
+	allErrors := []error{}
+	validateRegexFn := func(regexpStr string) error {
+		if _, err := regexp.Compile(regexpStr); err != nil {
+			return err
+		}
+
+		// the regular expression should pin to the start and end of the host
+		// in the origin header, this will prevent CVE-2022-1996.
+		// possible ways it can pin to the start of host in the origin header:
+		//   - match the start of the origin with '^'
+		//   - match what separates the scheme and host with '//' or '://',
+		//     this pins to the start of host in the origin header.
+		// possible ways it can match the end of the host in the origin header:
+		//   - match the end of the origin with '$'
+		//   - with a capture group that matches the host and port separator '(:|$)'
+		// We will relax the validation to check if these regex markers
+		// are present in the user specified expression.
+		var pinStart, pinEnd bool
+		for _, prefix := range []string{"^", "//"} {
+			if strings.Contains(regexpStr, prefix) {
+				pinStart = true
+				break
+			}
+		}
+		for _, suffix := range []string{"$", ":"} {
+			if strings.Contains(regexpStr, suffix) {
+				pinEnd = true
+				break
+			}
+		}
+		if !pinStart || !pinEnd {
+			return fmt.Errorf("regular expression does not pin to start/end of host in the origin header")
+		}
+		return nil
+	}
+
+	for _, regexp := range corsAllowedOriginList {
+		if len(regexp) == 0 {
+			allErrors = append(allErrors, fmt.Errorf("empty value in --cors-allowed-origins, help: %s", corsAllowedOriginsHelpText))
+			continue
+		}
+
+		if err := validateRegexFn(regexp); err != nil {
+			err = fmt.Errorf("--cors-allowed-origins has an invalid regular expression: %v, help: %s", err, corsAllowedOriginsHelpText)
+			allErrors = append(allErrors, err)
+		}
+	}
+	return errors.NewAggregate(allErrors)
+}
+
 // AddUniversalFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
@@ -193,9 +259,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
 
-	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
-		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
-		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
+	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, corsAllowedOriginsHelpText)
 
 	fs.StringSliceVar(&s.HSTSDirectives, "strict-transport-security-directives", s.HSTSDirectives, ""+
 		"List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not "+

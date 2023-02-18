@@ -140,9 +140,9 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, err
 	}
 	if len(files) == 0 {
-		return 0, err
+		return 0, nil
 	}
-	restartCountLogFileRegex := regexp.MustCompile(`(\d+).log(\..*)?`)
+	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -153,7 +153,9 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		}
 		count, err := strconv.Atoi(matches[1])
 		if err != nil {
-			return restartCount, err
+			// unlikely kubelet created this file,
+			// likely custom file with random numbers as a name
+			continue
 		}
 		count++
 		if count > restartCount {
@@ -200,7 +202,8 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
 		restartCount, err = calcRestartCountByLogDir(logDir)
 		if err != nil {
-			klog.InfoS("Log directory exists but could not calculate restartCount", "logDir", logDir, "err", err)
+			klog.InfoS("Cannot calculate restartCount from the log directory", "logDir", logDir, "err", err)
+			restartCount = 0
 		}
 	}
 
@@ -1006,7 +1009,7 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Container, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
 	if probe != nil && probe.TerminationGracePeriodSeconds != nil {
 		if *probe.TerminationGracePeriodSeconds > *pod.Spec.TerminationGracePeriodSeconds {
-			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "pod-uid", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probe-type", probeType, "probe-grace-period", *probe.TerminationGracePeriodSeconds, "pod-grace-period", *pod.Spec.TerminationGracePeriodSeconds)
+			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probeType", probeType, "probeGracePeriod", *probe.TerminationGracePeriodSeconds, "podGracePeriod", *pod.Spec.TerminationGracePeriodSeconds)
 		}
 		return true
 	}

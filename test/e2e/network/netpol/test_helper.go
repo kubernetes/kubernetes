@@ -111,10 +111,13 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 	ginkgo.By("Validating reachability matrix...")
 
-	// 1st try
+	// 1st try, exponential backoff (starting at 1s) will happen for every probe to accommodate infra that might be
+	// network-congested, as is common in some GH actions or other heavily oversubscribed CI systems.
 	ginkgo.By("Validating reachability matrix... (FIRST TRY)")
 	ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)
-	// 2nd try, in case first one failed
+
+	// the aforementioned individual probe's exponential retries (introduced in january 2023) might be able to obviate
+	//  this step, let's investigate removing this massive secondary polling of the matrix some day.
 	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
 		framework.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
 		ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)

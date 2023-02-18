@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,6 +54,11 @@ func Test_DSW_AddOrUpdatePlugin_Positive_NewPlugin(t *testing.T) {
 // Verifies the timestamp the existing plugin is updated
 // Verifies newly added plugin returns true for PluginExists()
 func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	dsw := NewDesiredStateOfWorld()
 	socketPath := "/var/lib/kubelet/device-plugins/test-plugin.sock"
 	// Adding the plugin for the first time

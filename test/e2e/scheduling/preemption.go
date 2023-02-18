@@ -192,14 +192,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.By("Run a high priority pod that has same requirements as that of lower priority pod")
 		// Create a high priority pod and make sure it is scheduled on the same node as the low priority pod.
-		runPausePodWithTimeout(ctx, f, pausePodConfig{
+		runPausePod(ctx, f, pausePodConfig{
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		})
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(ctx, pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
@@ -290,7 +290,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
 			}
 		}()
-		runPausePodWithTimeout(ctx, f, pausePodConfig{
+		runPausePod(ctx, f, pausePodConfig{
 			Name:              "critical-pod",
 			Namespace:         metav1.NamespaceSystem,
 			PriorityClassName: scheduling.SystemClusterCritical,
@@ -298,7 +298,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		})
 
 		defer func() {
 			// Clean-up the critical pod
@@ -930,7 +930,7 @@ func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, ne
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
 	if err != nil {
-		return fmt.Errorf("failed to create merge patch for node %q: %v", old.Name, err)
+		return fmt.Errorf("failed to create merge patch for node %q: %w", old.Name, err)
 	}
 	_, err = client.CoreV1().Nodes().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
@@ -948,7 +948,7 @@ func patchPriorityClass(ctx context.Context, cs clientset.Interface, old, new *s
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1.PriorityClass{})
 	if err != nil {
-		return fmt.Errorf("failed to create merge patch for PriorityClass %q: %v", old.Name, err)
+		return fmt.Errorf("failed to create merge patch for PriorityClass %q: %w", old.Name, err)
 	}
 	_, err = cs.SchedulingV1().PriorityClasses().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err

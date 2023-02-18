@@ -75,7 +75,8 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+	ctx, cancel := context.WithCancel(ctx)
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
@@ -106,12 +107,11 @@ func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, podInformer, schedulerShutdown := util.StartScheduler(client, cfg, config)
-	fakePVControllerShutdown := util.StartFakePVController(client)
+	_, podInformer := util.StartScheduler(ctx, client, cfg, config)
+	util.StartFakePVController(ctx, client)
 
 	shutdownFn := func() {
-		fakePVControllerShutdown()
-		schedulerShutdown()
+		cancel()
 		tearDownFn()
 	}
 

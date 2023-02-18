@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 func TestCompile(t *testing.T) {
@@ -219,8 +220,8 @@ func getValidPolicy(validations []v1alpha1.Validation, params *v1alpha1.ParamKin
 	}
 }
 
-func generatedDecision(k policyDecisionAction, m string, r metav1.StatusReason) policyDecision {
-	return policyDecision{action: k, message: m, reason: r}
+func generatedDecision(k PolicyDecisionAction, m string, r metav1.StatusReason) PolicyDecision {
+	return PolicyDecision{Action: k, Message: m, Reason: r}
 }
 
 func TestValidate(t *testing.T) {
@@ -270,7 +271,7 @@ func TestValidate(t *testing.T) {
 		policy          *v1alpha1.ValidatingAdmissionPolicy
 		attributes      admission.Attributes
 		params          runtime.Object
-		policyDecisions []policyDecision
+		policyDecisions []PolicyDecision
 	}{
 		{
 			name: "valid syntax for object",
@@ -280,8 +281,8 @@ func TestValidate(t *testing.T) {
 				},
 			}, nil, nil),
 			attributes: newValidAttribute(nil, false),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -292,8 +293,8 @@ func TestValidate(t *testing.T) {
 				},
 			}, nil, nil),
 			attributes: newValidAttribute(nil, false),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -307,9 +308,9 @@ func TestValidate(t *testing.T) {
 				},
 			}, nil, nil),
 			attributes: newValidAttribute(nil, false),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -318,8 +319,8 @@ func TestValidate(t *testing.T) {
 				{Expression: "request.operation == 'CREATE'"},
 			}, nil, nil),
 			attributes: newValidAttribute(nil, false),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -329,8 +330,8 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -347,8 +348,8 @@ func TestValidate(t *testing.T) {
 					"fakeString": "fake",
 				},
 			},
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -363,9 +364,9 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, ignorePolicy),
 			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
-				generatedDecision(actionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
+				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -380,9 +381,9 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "failed expression: oldObject != null", metav1.StatusReasonInvalid),
-				generatedDecision(actionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "failed expression: oldObject != null", metav1.StatusReasonInvalid),
+				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -397,9 +398,9 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -412,8 +413,8 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "failed expression: oldObject == null", metav1.StatusReasonForbidden),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "failed expression: oldObject == null", metav1.StatusReasonForbidden),
 			},
 		},
 		{
@@ -427,8 +428,8 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "old object should be present", metav1.StatusReasonForbidden),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "old object should be present", metav1.StatusReasonForbidden),
 			},
 		},
 		{
@@ -440,8 +441,8 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "resulted in error", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "resulted in error", ""),
 			},
 		},
 		{
@@ -453,8 +454,8 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -469,9 +470,9 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, nil),
 			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "compilation error: compilation failed: ERROR: <input>:1:6: Syntax error:", ""),
-				generatedDecision(actionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "compilation error: compilation failed: ERROR: <input>:1:6: Syntax error:", ""),
+				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -486,9 +487,9 @@ func TestValidate(t *testing.T) {
 			}, hasParamKind, ignorePolicy),
 			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "compilation error: compilation failed: ERROR:", ""),
-				generatedDecision(actionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "compilation error: compilation failed: ERROR:", ""),
+				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -500,8 +501,8 @@ func TestValidate(t *testing.T) {
 			}, nil, nil),
 			attributes: newValidAttribute(&podObject, false),
 			params:     crdParams,
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 		{
@@ -517,8 +518,8 @@ func TestValidate(t *testing.T) {
 			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
 			// if paramRef is unset on a binding
 			params: runtime.Object(nilUnstructured),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionDeny, "params as required", metav1.StatusReasonForbidden),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionDeny, "params as required", metav1.StatusReasonForbidden),
 			},
 		},
 		{
@@ -533,8 +534,8 @@ func TestValidate(t *testing.T) {
 			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
 			// if paramRef is unset on a binding
 			params: runtime.Object(nilUnstructured),
-			policyDecisions: []policyDecision{
-				generatedDecision(actionAdmit, "", ""),
+			policyDecisions: []PolicyDecision{
+				generatedDecision(ActionAdmit, "", ""),
 			},
 		},
 	}
@@ -550,20 +551,25 @@ func TestValidate(t *testing.T) {
 			CompilationResults := validator.(*CELValidator).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
-			policyResults, err := validator.Validate(tc.attributes, newObjectInterfacesForTest(), tc.params, tc.attributes.GetKind())
+			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
+			if err != nil {
+				t.Fatalf("unexpected error on conversion: %v", err)
+			}
+
+			policyResults, err := validator.Validate(versionedAttr, tc.params)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			require.Equal(t, len(policyResults), len(tc.policyDecisions))
 			for i, policyDecision := range tc.policyDecisions {
-				if policyDecision.action != policyResults[i].action {
-					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.action, policyResults[i].action)
+				if policyDecision.Action != policyResults[i].Action {
+					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.Action, policyResults[i].Action)
 				}
-				if !strings.Contains(policyResults[i].message, policyDecision.message) {
-					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.message, policyResults[i].message)
+				if !strings.Contains(policyResults[i].Message, policyDecision.Message) {
+					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.Message, policyResults[i].Message)
 				}
-				if policyDecision.reason != policyResults[i].reason {
-					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.reason, policyResults[i].reason)
+				if policyDecision.Reason != policyResults[i].Reason {
+					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, policyResults[i].Reason)
 				}
 			}
 		})

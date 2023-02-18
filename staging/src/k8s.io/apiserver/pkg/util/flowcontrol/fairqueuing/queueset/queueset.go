@@ -148,6 +148,22 @@ type queueSet struct {
 
 	// enqueues is the number of requests that have ever been enqueued
 	enqueues int
+
+	// totRequestsDispatched is the total number of requests of this
+	// queueSet that have been processed.
+	totRequestsDispatched int
+
+	// totRequestsRejected is the total number of requests of this
+	// queueSet that have been rejected.
+	totRequestsRejected int
+
+	// totRequestsTimedout is the total number of requests of this
+	// queueSet that have been timeouted.
+	totRequestsTimedout int
+
+	// totRequestsCancelled is the total number of requests of this
+	// queueSet that have been cancelled.
+	totRequestsCancelled int
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
@@ -304,6 +320,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 		if !qs.canAccommodateSeatsLocked(workEstimate.MaxSeats()) {
 			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d seats are asked for, %d seats are in use (%d are executing) and the limit is %d",
 				qs.qCfg.Name, fsName, descr1, descr2, workEstimate, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
+			qs.totRequestsRejected++
 			metrics.AddReject(ctx, qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
@@ -323,6 +340,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 	// concurrency shares and at max queue length already
 	if req == nil {
 		klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v due to queue full", qs.qCfg.Name, fsName, descr1, descr2)
+		qs.totRequestsRejected++
 		metrics.AddReject(ctx, qs.qCfg.Name, fsName, "queue-full")
 		return nil, qs.isIdleLocked()
 	}
@@ -400,6 +418,8 @@ func (req *request) wait() (bool, bool) {
 	switch decisionAny {
 	case decisionReject:
 		klog.V(5).Infof("QS(%s): request %#+v %#+v timed out after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
+		qs.totRequestsRejected++
+		qs.totRequestsTimedout++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
 		return false, qs.isIdleLocked()
 	case decisionCancel:
@@ -418,6 +438,8 @@ func (req *request) wait() (bool, bool) {
 		defer qs.boundNextDispatchLocked(queue)
 		qs.totRequestsWaiting--
 		qs.totSeatsWaiting -= req.MaxSeats()
+		qs.totRequestsRejected++
+		qs.totRequestsCancelled++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		req.NoteQueued(false)
@@ -1038,9 +1060,27 @@ func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 		Executing:    qs.totRequestsExecuting,
 		SeatsInUse:   qs.totSeatsInUse,
 		SeatsWaiting: qs.totSeatsWaiting,
+		Dispatched:   qs.totRequestsDispatched,
+		Rejected:     qs.totRequestsRejected,
+		Timedout:     qs.totRequestsTimedout,
+		Cancelled:    qs.totRequestsCancelled,
 	}
 	for i, q := range qs.queues {
 		d.Queues[i] = q.dumpLocked(includeRequestDetails)
 	}
 	return d
+}
+
+func OnRequestDispatched(r fq.Request) {
+	req, ok := r.(*request)
+	if !ok {
+		return
+	}
+
+	qs := req.qs
+	if qs != nil {
+		qs.lock.Lock()
+		defer qs.lock.Unlock()
+		qs.totRequestsDispatched++
+	}
 }

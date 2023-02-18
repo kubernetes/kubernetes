@@ -74,6 +74,34 @@
   stabilityLevel: STABLE
   labels:
   - zone
+- name: kube_pod_resource_limit
+  help: Resources limit for workloads on the cluster, broken down by pod. This shows
+    the resource usage the scheduler and kubelet expect per pod for resources along
+    with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
+- name: kube_pod_resource_request
+  help: Resources requested by workloads on the cluster, broken down by pod. This
+    shows the resource usage the scheduler and kubelet expect per pod for resources
+    along with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
   help: Latency for running all plugins of a specific extension point.
@@ -262,6 +290,8 @@
   - 0.5
   - 1
   - 2.5
+  - 10
+  - 25
 - name: current_inflight_requests
   subsystem: apiserver
   help: Maximal number of currently used inflight request limit of this apiserver

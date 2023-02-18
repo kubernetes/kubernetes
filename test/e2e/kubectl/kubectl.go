@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elazarl/goproxy"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"sigs.k8s.io/yaml"
@@ -52,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -412,7 +411,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, simplePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -472,8 +471,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
-			ginkgo.By("Starting goproxy")
-			testSrv, proxyLogs := startLocalProxy()
+			ginkgo.By("Starting http_proxy")
+			var proxyLogs bytes.Buffer
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoT(), func(req *http.Request) bool {
+				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
+				return true
+			}))
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
 
@@ -731,7 +734,7 @@ metadata:
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
-				framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "failure-3", ns, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
 			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
@@ -795,9 +798,7 @@ metadata:
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			framework.ExpectNoError(err)
-			if !e2epod.CheckPodsRunningReady(ctx, c, ns, []string{runTestPod.Name}, time.Minute) {
-				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
-			}
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, runTestPod.Name, ns, time.Minute))
 
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
@@ -1381,7 +1382,7 @@ metadata:
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
-					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
+					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
 				}
 				return len(cj.Items) > 0, nil
 			})
@@ -1497,7 +1498,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, pausePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1536,7 +1537,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, busyboxPodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -2025,11 +2026,11 @@ func checkContainersImage(containers []v1.Container, expectImage string) bool {
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 	body, err := curl(apiEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("Failed http.Get of %s: %v", apiEndpoint, err)
+		return nil, fmt.Errorf("Failed http.Get of %s: %w", apiEndpoint, err)
 	}
 	var apiVersions metav1.APIVersions
 	if err := json.Unmarshal([]byte(body), &apiVersions); err != nil {
-		return nil, fmt.Errorf("Failed to parse /api output %s: %v", body, err)
+		return nil, fmt.Errorf("Failed to parse /api output %s: %w", body, err)
 	}
 	return &apiVersions, nil
 }
@@ -2047,7 +2048,7 @@ func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	buf := make([]byte, 128)
 	var n int
 	if n, err = stdout.Read(buf); err != nil {
-		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %v", err)
+		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %w", err)
 	}
 	output := string(buf[:n])
 	match := proxyRegexp.FindStringSubmatch(output)
@@ -2260,30 +2261,22 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 	return r, w, nil
 }
 
-func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
-	logs = &bytes.Buffer{}
-	p := goproxy.NewProxyHttpServer()
-	p.Verbose = true
-	p.Logger = log.New(logs, "", 0)
-	return httptest.NewServer(p), logs
-}
-
 // createApplyCustomResource asserts that given CustomResource be created and applied
 // without being rejected by kubectl validation
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ginkgo.By("successfully create CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "create", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to create CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	ginkgo.By("successfully apply CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "apply", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to apply CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	return nil
 }

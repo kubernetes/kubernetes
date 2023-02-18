@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To regenerate api.pb.go run hack/update-generated-kms.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
 package v2alpha1;
+option go_package = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1";
 
 // EncryptedObject is the representation of data stored in etcd after envelope encryption.
 message EncryptedObject {

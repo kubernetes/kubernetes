@@ -43,19 +43,3 @@ var fakeTypeConverter = func() internal.TypeConverter {
 	}
 	return typeConverter
 }()
-
-var testTypeConverter = func() internal.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
-	if err != nil {
-		panic(err)
-	}
-	spec := spec.Swagger{}
-	if err := json.Unmarshal(data, &spec); err != nil {
-		panic(err)
-	}
-	typeConverter, err := internal.NewTypeConverter(&spec, false)
-	if err != nil {
-		panic(err)
-	}
-	return typeConverter
-}()

@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -395,7 +396,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
-							UID:      "1",
+							UID:      types.UID(fmt.Sprintf("%d", i)),
 						})
 				}
 				return claim
@@ -410,7 +411,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
-							UID:      "1",
+							UID:      types.UID(fmt.Sprintf("%d", i)),
 						})
 				}
 				return claim
@@ -425,19 +426,15 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
-							UID:      "1",
+							UID:      types.UID(fmt.Sprintf("%d", i)),
 						})
 				}
 				return claim
 			},
 		},
 		"invalid-reserved-for-duplicate": {
-			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1), resource.ResourceClaimConsumerReference{
-				Resource: "pods",
-				Name:     "foo",
-				UID:      "1",
-			})},
-			oldClaim: validAllocatedClaim,
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1).Child("uid"), types.UID("1"))},
+			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < 2; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
@@ -463,7 +460,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
-							UID:      "1",
+							UID:      types.UID(fmt.Sprintf("%d", i)),
 						})
 				}
 				return claim

@@ -522,7 +522,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
 		shutdownTimeout = 2 * time.Second
-		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
+		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "shutdownTimeout", shutdownTimeout)
 	}
 
 	notAcceptingNewRequestCh := s.lifecycleSignals.NotAcceptingNewRequest

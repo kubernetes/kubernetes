@@ -789,34 +789,42 @@ func TestEtcdCreateWithSchedulingGates(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
-			storage, bindingStorage, _, server := newStorage(t)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
-			ctx := genericapirequest.NewDefaultContext()
+		for _, flipFeatureGateBeforeBinding := range []bool{false, true} {
+			if flipFeatureGateBeforeBinding {
+				tt.name = fmt.Sprintf("%v and flipped before binding", tt.name)
+			}
+			t.Run(tt.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+				storage, bindingStorage, _, server := newStorage(t)
+				defer server.Terminate(t)
+				defer storage.Store.DestroyFunc()
+				ctx := genericapirequest.NewDefaultContext()
 
-			pod := validNewPod()
-			pod.Spec.SchedulingGates = tt.schedulingGates
-			if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine"},
-			}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-			if tt.wantErr == nil {
-				if err != nil {
-					t.Errorf("Want nil err, but got %v", err)
+				pod := validNewPod()
+				pod.Spec.SchedulingGates = tt.schedulingGates
+				if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
 				}
-			} else {
-				if err == nil {
-					t.Errorf("Want %v, but got nil err", tt.wantErr)
-				} else if tt.wantErr.Error() != err.Error() {
-					t.Errorf("Want %v, but got %v", tt.wantErr, err)
+				if flipFeatureGateBeforeBinding {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, !tt.featureEnabled)()
 				}
-			}
-		})
+				_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+					Target:     api.ObjectReference{Name: "machine"},
+				}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if tt.wantErr == nil {
+					if err != nil {
+						t.Errorf("Want nil err, but got %v", err)
+					}
+				} else {
+					if err == nil {
+						t.Errorf("Want %v, but got nil err", tt.wantErr)
+					} else if tt.wantErr.Error() != err.Error() {
+						t.Errorf("Want %v, but got %v", tt.wantErr, err)
+					}
+				}
+			})
+		}
 	}
 }
 

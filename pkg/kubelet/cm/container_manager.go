@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -118,11 +117,11 @@ type ContainerManager interface {
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
-	// PrepareResource prepares pod resources
-	PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error)
+	// PrepareDynamicResource prepares dynamic pod resources
+	PrepareDynamicResources(*v1.Pod) error
 
-	// UnrepareResources unprepares pod resources
-	UnprepareResources(*v1.Pod) error
+	// UnrepareDynamicResources unprepares dynamic pod resources
+	UnprepareDynamicResources(*v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.

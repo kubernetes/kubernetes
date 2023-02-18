@@ -223,6 +223,33 @@ func (cf ConditionFunc) WithContext() ConditionWithContextFunc {
 	}
 }
 
+// ContextForChannel provides a context that will be treated as cancelled
+// when the provided parentCh is closed. The implementation returns
+// context.Canceled for Err() if and only if the parentCh is closed.
+func ContextForChannel(parentCh <-chan struct{}) context.Context {
+	return channelContext{stopCh: parentCh}
+}
+
+var _ context.Context = channelContext{}
+
+// channelContext will behave as if the context were cancelled when stopCh is
+// closed.
+type channelContext struct {
+	stopCh <-chan struct{}
+}
+
+func (c channelContext) Done() <-chan struct{} { return c.stopCh }
+func (c channelContext) Err() error {
+	select {
+	case <-c.stopCh:
+		return context.Canceled
+	default:
+		return nil
+	}
+}
+func (c channelContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (c channelContext) Value(key any) any           { return nil }
+
 // runConditionWithCrashProtection runs a ConditionFunc with crash protection
 func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
 	return runConditionWithCrashProtectionWithContext(context.TODO(), condition.WithContext())
@@ -288,25 +315,6 @@ func (b *Backoff) Step() time.Duration {
 		duration = Jitter(duration, b.Jitter)
 	}
 	return duration
-}
-
-// ContextForChannel derives a child context from a parent channel.
-//
-// The derived context's Done channel is closed when the returned cancel function
-// is called or when the parent channel is closed, whichever happens first.
-//
-// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		select {
-		case <-parentCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
 }
 
 // BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
@@ -466,9 +474,7 @@ func PollWithContext(ctx context.Context, interval, timeout time.Duration, condi
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := ContextForChannel(stopCh)
-	defer cancel()
-	return PollUntilWithContext(ctx, interval, condition.WithContext())
+	return PollUntilWithContext(ContextForChannel(stopCh), interval, condition.WithContext())
 }
 
 // PollUntilWithContext tries a condition func until it returns true,
@@ -533,9 +539,7 @@ func PollImmediateWithContext(ctx context.Context, interval, timeout time.Durati
 // PollImmediateUntil runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
 func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := ContextForChannel(stopCh)
-	defer cancel()
-	return PollImmediateUntilWithContext(ctx, interval, condition.WithContext())
+	return PollImmediateUntilWithContext(ContextForChannel(stopCh), interval, condition.WithContext())
 }
 
 // PollImmediateUntilWithContext tries a condition func until it returns true,
@@ -712,7 +716,7 @@ func poller(interval, timeout time.Duration) waitWithContextFunc {
 
 // ExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
 // exceeds the deadline specified by the request context.
-func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionFunc) error {
+func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
 	for backoff.Steps > 0 {
 		select {
 		case <-ctx.Done():
@@ -720,7 +724,7 @@ func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, conditi
 		default:
 		}
 
-		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
+		if ok, err := runConditionWithCrashProtectionWithContext(ctx, condition); err != nil || ok {
 			return err
 		}
 

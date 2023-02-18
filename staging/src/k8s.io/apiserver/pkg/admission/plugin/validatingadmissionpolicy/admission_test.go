@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/features"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
@@ -58,6 +61,11 @@ var (
 		if err := v1alpha1.AddToScheme(res); err != nil {
 			panic(err)
 		}
+
+		if err := fake.AddToScheme(res); err != nil {
+			panic(err)
+		}
+
 		return res
 	}()
 	paramsGVK schema.GroupVersionKind = schema.GroupVersionKind{
@@ -77,6 +85,7 @@ var (
 		res.Add(paramsGVK, meta.RESTScopeNamespace)
 		res.Add(definitionGVK, meta.RESTScopeRoot)
 		res.Add(bindingGVK, meta.RESTScopeRoot)
+		res.Add(v1.SchemeGroupVersion.WithKind("ConfigMap"), meta.RESTScopeNamespace)
 		return res
 	}()
 
@@ -141,9 +150,9 @@ var (
 // So that we can test the controller without pulling in any CEL functionality
 type fakeCompiler struct {
 	DefaultMatch         bool
-	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
-	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
-	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+	CompileFuncs         map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
+	DefinitionMatchFuncs map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
+	BindingMatchFuncs    map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
 }
 
 var _ ValidatorCompiler = &fakeCompiler{}
@@ -160,20 +169,26 @@ func (f *fakeCompiler) ValidateInitialization() error {
 // resource request
 func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
 	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a), schema.GroupVersionKind{}, nil
+		return fun(definition, a), a.GetKind(), nil
 	}
 
 	// Default is match everything
-	return f.DefaultMatch, schema.GroupVersionKind{}, nil
+	return f.DefaultMatch, a.GetKind(), nil
 }
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
 func (f *fakeCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.BindingMatchFuncs[key]; ok {
 		return fun(binding, a), nil
 	}
@@ -186,8 +201,10 @@ func (f *fakeCompiler) Compile(
 	definition *v1alpha1.ValidatingAdmissionPolicy,
 ) Validator {
 	namespace, name := definition.Namespace, definition.Name
-
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.CompileFuncs[key]; ok {
 		return fun(definition)
 	}
@@ -197,18 +214,21 @@ func (f *fakeCompiler) Compile(
 
 func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func(*v1alpha1.ValidatingAdmissionPolicy) Validator, matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if compileFunc != nil {
 
 		if f.CompileFuncs == nil {
-			f.CompileFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
+			f.CompileFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
 		}
 		f.CompileFuncs[key] = compileFunc
 	}
 
 	if matchFunc != nil {
 		if f.DefinitionMatchFuncs == nil {
-			f.DefinitionMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
+			f.DefinitionMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
 		}
 		f.DefinitionMatchFuncs[key] = matchFunc
 	}
@@ -216,11 +236,14 @@ func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissi
 
 func (f *fakeCompiler) RegisterBinding(binding *v1alpha1.ValidatingAdmissionPolicyBinding, matchFunc func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool) {
 	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 
 	if matchFunc != nil {
 		if f.BindingMatchFuncs == nil {
-			f.BindingMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
+			f.BindingMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
 		}
 		f.BindingMatchFuncs[key] = matchFunc
 	}
@@ -252,13 +275,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 		features.ValidatingAdmissionPolicy: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
-		// FIXME: handle error.
-		panic("Unexpected error")
+		t.Fatalf("Unable to add feature gate: %v", err)
 	}
 	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
 	if err != nil {
-		// FIXME: handle error.
-		panic("Unexpected error.")
+		t.Fatalf("Unable to store flag gate: %v", err)
 	}
 
 	plug, err := NewPlugin()
@@ -373,30 +394,6 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 	defer c.policyController.mutex.RUnlock()
 
 	switch obj.(type) {
-	case *unstructured.Unstructured:
-		paramSourceGVK := obj.GetObjectKind().GroupVersionKind()
-		paramKind := v1alpha1.ParamKind{
-			APIVersion: paramSourceGVK.GroupVersion().String(),
-			Kind:       paramSourceGVK.Kind,
-		}
-		var paramInformer generic.Informer[*unstructured.Unstructured]
-		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
-			paramInformer = paramInfo.controller.Informer()
-		} else {
-			// Treat unknown CRD the same as not found
-			return nil, nil
-		}
-
-		// Param type. Just check informer for its GVK
-		item, err := paramInformer.Get(accessor.GetName())
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-
-		return item, nil
 	case *v1alpha1.ValidatingAdmissionPolicyBinding:
 		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
 		info, ok := c.policyController.bindingInfos[nn]
@@ -414,7 +411,32 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 
 		return info.lastReconciledValue, nil
 	default:
-		panic(fmt.Errorf("unhandled object type: %T", obj))
+		// If test isn't trying to fetch a policy or binding, assume it is
+		// fetching a param
+		paramSourceGVK := obj.GetObjectKind().GroupVersionKind()
+		paramKind := v1alpha1.ParamKind{
+			APIVersion: paramSourceGVK.GroupVersion().String(),
+			Kind:       paramSourceGVK.Kind,
+		}
+
+		var paramInformer generic.Informer[runtime.Object]
+		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
+			paramInformer = paramInfo.controller.Informer()
+		} else {
+			// Treat unknown CRD the same as not found
+			return nil, nil
+		}
+
+		// Param type. Just check informer for its GVK
+		item, err := paramInformer.Get(accessor.GetName())
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+
+		return item, nil
 	}
 }
 
@@ -633,15 +655,21 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	require.ErrorContains(t, err, `Denied`)
 }
 
+type validatorFunc func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error)
+
+func (f validatorFunc) Validate(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
+	return f(versionedAttr, versionedParams)
+}
+
 type testValidator struct {
 }
 
-func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+func (v testValidator) Validate(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
 	// Policy always denies
-	return []policyDecision{
+	return []PolicyDecision{
 		{
-			action:  actionDeny,
-			message: "Denied",
+			Action:  ActionDeny,
+			Message: "Denied",
 		},
 	}, nil
 }
@@ -1074,4 +1102,214 @@ func TestEmptyParamSource(t *testing.T) {
 
 	require.ErrorContains(t, err, `Denied`)
 	require.Equal(t, 1, numCompiles)
+}
+
+// Shows what happens when multiple policies share one param type, then
+// one policy stops using the param. The expectation is the second policy
+// keeps behaving normally
+func TestMultiplePoliciesSharedParamType(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{
+		// Match everything by default
+		DefaultMatch: true,
+	}
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+
+	// Use ConfigMap native-typed param
+	policy1 := *denyPolicy
+	policy1.Name = "denypolicy1.example.com"
+
+	policy2 := *denyPolicy
+	policy2.Name = "denypolicy2.example.com"
+
+	binding1 := *denyBinding
+	binding2 := *denyBinding
+
+	binding1.Name = "denybinding1.example.com"
+	binding1.Spec.PolicyName = policy1.Name
+	binding2.Name = "denybinding2.example.com"
+	binding2.Spec.PolicyName = policy2.Name
+
+	compiles1 := atomic.Int64{}
+	evaluations1 := atomic.Int64{}
+
+	compiles2 := atomic.Int64{}
+	evaluations2 := atomic.Int64{}
+
+	compiler.RegisterDefinition(&policy1, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+		compiles1.Add(1)
+
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
+			evaluations1.Add(1)
+			return []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+			}, nil
+		})
+	}, nil)
+
+	compiler.RegisterDefinition(&policy2, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+		compiles2.Add(1)
+
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
+			evaluations2.Add(1)
+			return []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Policy2Denied",
+				},
+			}, nil
+		})
+	}, nil)
+
+	require.NoError(t, tracker.Create(definitionsGVR, &policy1, policy1.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &binding1, binding1.Namespace))
+	require.NoError(t, paramTracker.Add(fakeParams))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&binding1, &policy1, fakeParams))
+
+	// Make sure policy 1 is created and bound to the params type first
+	require.NoError(t, tracker.Create(definitionsGVR, &policy2, policy2.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &binding2, binding2.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&binding1, &binding2, &policy1, &policy2, fakeParams))
+
+	err := handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns admit meaning the params
+		// passed was a configmap
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, `Denied`)
+	require.EqualValues(t, 1, compiles1.Load())
+	require.EqualValues(t, 1, evaluations1.Load())
+	require.EqualValues(t, 1, compiles2.Load())
+	require.EqualValues(t, 1, evaluations2.Load())
+
+	// Remove param type from policy1
+	// Show that policy2 evaluator is still being passed the configmaps
+	policy1.Spec.ParamKind = nil
+	policy1.ResourceVersion = "2"
+
+	binding1.Spec.ParamRef = nil
+	binding1.ResourceVersion = "2"
+
+	require.NoError(t, tracker.Update(definitionsGVR, &policy1, policy1.Namespace))
+	require.NoError(t, tracker.Update(bindingsGVR, &binding1, binding1.Namespace))
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&binding1, &policy1))
+
+	err = handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns admit meaning the params
+		// passed was a configmap
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, `Policy2Denied`)
+	require.EqualValues(t, 2, compiles1.Load())
+	require.EqualValues(t, 2, evaluations1.Load())
+	require.EqualValues(t, 1, compiles2.Load())
+	require.EqualValues(t, 2, evaluations2.Load())
+}
+
+// Shows that we can refer to native-typed params just fine
+// (as opposed to CRD params)
+func TestNativeTypeParam(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+	compiler := &fakeCompiler{
+		// Match everything by default
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+		compiles.Add(1)
+
+		return validatorFunc(func(versionedAttr *whgeneric.VersionedAttributes, params runtime.Object) ([]PolicyDecision, error) {
+			evaluations.Add(1)
+
+			// show that the passed params was a ConfigMap native type
+			if _, ok := params.(*v1.ConfigMap); ok {
+				return []PolicyDecision{
+					{
+						Action:  ActionDeny,
+						Message: "correct type",
+					},
+				}, nil
+			}
+			return []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			}, nil
+		})
+	}, nil)
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "coolvalue",
+		},
+	}
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBinding, denyPolicy, configMapParam))
+
+	err := handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns admit meaning the params
+		// passed was a configmap
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "correct type")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 1, evaluations.Load())
 }

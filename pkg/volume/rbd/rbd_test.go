@@ -359,6 +359,11 @@ type testcase struct {
 }
 
 func TestPlugin(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)

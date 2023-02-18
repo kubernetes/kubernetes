@@ -94,6 +94,7 @@ const (
 	// Skip is used in the following scenarios:
 	// - when a Bind plugin chooses to skip binding.
 	// - when a PreFilter plugin returns Skip so that coupled Filter plugin/PreFilterExtensions() will be skipped.
+	// - when a PreScore plugin returns Skip so that coupled Score plugin will be skipped.
 	Skip
 )
 
@@ -411,6 +412,8 @@ type PreScorePlugin interface {
 	// PreScore is called by the scheduling framework after a list of nodes
 	// passed the filtering phase. All prescore plugins must return success or
 	// the pod will be rejected
+	// When it returns Skip status, other fields in status are just ignored,
+	// and coupled Score plugin will be skipped in this scheduling cycle.
 	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 }
 

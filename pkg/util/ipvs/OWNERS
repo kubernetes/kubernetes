@@ -3,9 +3,11 @@
 reviewers:
   - thockin
   - andrewsykim
+  - uablrek
 approvers:
   - thockin
   - andrewsykim
+  - uablrek
 labels:
   - sig/network
   - area/ipvs

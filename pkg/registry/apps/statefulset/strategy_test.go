@@ -335,9 +335,27 @@ func createOrdinalsWithStart(start int) *apps.StatefulSetOrdinals {
 }
 
 func makeStatefulSetWithStatefulSetOrdinals(ordinals *apps.StatefulSetOrdinals) *apps.StatefulSet {
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
 	return &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "ss", Namespace: metav1.NamespaceDefault},
 		Spec: apps.StatefulSetSpec{
-			Ordinals: ordinals,
+			Ordinals:            ordinals,
+			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
 		},
 	}
 }
@@ -449,5 +467,68 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 				t.Fatalf("%v: unexpected statefulSet spec: %v, want %v, got %v", tc.name, diff, tc.expectedSS, tc.ss)
 			}
 		})
+	}
+}
+
+func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	ss := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	expectedSS := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ss.Spec.Replicas = 1
+
+	ctx := genericapirequest.NewDefaultContext()
+	Strategy.PrepareForCreate(ctx, ss)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ss.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForCreate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ss, diff)
+	}
+
+	errs := Strategy.Validate(ctx, ss)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ss, errs)
+	}
+
+	if ss.Generation != 1 {
+		t.Errorf("Generation = %v, want = 1 for StatefulSet: %v", ss.Generation, ss)
+	}
+
+	// Validate that the ordinals field is retained when StatefulSetStartOridnal is disabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	ssWhenDisabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ssWhenDisabled.Spec.Replicas = 2
+
+	Strategy.PrepareForUpdate(ctx, ssWhenDisabled, ss)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ssWhenDisabled.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForUpdate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ssWhenDisabled, diff)
+	}
+
+	errs = Strategy.Validate(ctx, ssWhenDisabled)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ssWhenDisabled, errs)
+	}
+
+	if ssWhenDisabled.Generation != 2 {
+		t.Errorf("Generation = %v, want = 2 for StatefulSet: %v", ssWhenDisabled.Generation, ssWhenDisabled)
+	}
+
+	// Validate that the ordinal field is after re-enablement.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	ssWhenEnabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ssWhenEnabled.Spec.Replicas = 3
+
+	Strategy.PrepareForUpdate(ctx, ssWhenEnabled, ssWhenDisabled)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ssWhenEnabled.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForUpdate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ssWhenEnabled, diff)
+	}
+
+	errs = Strategy.Validate(ctx, ssWhenEnabled)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ssWhenEnabled, errs)
+	}
+
+	if ssWhenEnabled.Generation != 3 {
+		t.Errorf("Generation = %v, want = 3 for StatefulSet: %v", ssWhenEnabled.Generation, ssWhenEnabled)
 	}
 }

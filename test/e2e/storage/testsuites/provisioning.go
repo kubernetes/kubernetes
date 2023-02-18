@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -165,15 +164,16 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}, l.config.Framework.Namespace.Name)
 		framework.Logf("In creating storage class object and pvc objects for driver - sc: %v, pvc: %v, src-pvc: %v", l.sc, l.pvc, l.sourcePVC)
 		l.testCase = &StorageClassTest{
-			Client:       l.config.Framework.ClientSet,
-			Timeouts:     f.Timeouts,
-			Claim:        l.pvc,
-			SourceClaim:  l.sourcePVC,
-			Class:        l.sc,
-			Provisioner:  l.sc.Provisioner,
-			ClaimSize:    claimSize,
-			ExpectedSize: claimSize,
-			VolumeMode:   pattern.VolMode,
+			Client:        l.config.Framework.ClientSet,
+			Timeouts:      f.Timeouts,
+			Claim:         l.pvc,
+			SourceClaim:   l.sourcePVC,
+			Class:         l.sc,
+			Provisioner:   l.sc.Provisioner,
+			ClaimSize:     claimSize,
+			ExpectedSize:  claimSize,
+			VolumeMode:    pattern.VolMode,
+			NodeSelection: l.config.ClientNodeSelection,
 		}
 	}
 
@@ -846,7 +846,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		e2epod.DeletePodOrFail(ctx, t.Client, pod.Namespace, pod.Name)
-		return e2epod.WaitForPodToDisappear(ctx, t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, t.Timeouts.PodDelete)
+		return e2epod.WaitForPodNotFoundInNamespace(ctx, t.Client, pod.Name, pod.Namespace, t.Timeouts.PodDelete)
 	})
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.

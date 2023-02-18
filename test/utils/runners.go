@@ -1346,7 +1346,10 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
-		if err := makeCreatePod(client, namespace, podTemplate); err != nil {
+		// client-go writes into the object that is passed to Create,
+		// causing a data race unless we create a new copy for each
+		// parallel call.
+		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy()); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err

@@ -1,5 +1,5 @@
-//go:build cgo && linux
-// +build cgo,linux
+//go:build linux
+// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.

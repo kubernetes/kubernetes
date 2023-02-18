@@ -33,7 +33,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -196,7 +195,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(ctx, host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
-					e2epod.WaitForPodToDisappear(ctx, cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
+					e2epod.WaitForPodNotFoundInNamespace(ctx, cs, host0Pod.Name, host0Pod.Namespace, f.Timeouts.PodDelete)
 					framework.Logf("deleted host0Pod %q disappeared", host0Pod.Name)
 				}
 
@@ -527,7 +526,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 	} else if framework.TestContext.Provider == "aws" {
 		awsSession, err := session.NewSession()
 		if err != nil {
-			return fmt.Errorf("error creating session: %v", err)
+			return fmt.Errorf("error creating session: %w", err)
 		}
 		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
@@ -537,7 +536,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		}
 		_, err = client.DetachVolume(&request)
 		if err != nil {
-			return fmt.Errorf("error detaching EBS volume: %v", err)
+			return fmt.Errorf("error detaching EBS volume: %w", err)
 		}
 		return nil
 
@@ -562,7 +561,7 @@ func attachPD(nodeName types.NodeName, pdName string) error {
 	} else if framework.TestContext.Provider == "aws" {
 		awsSession, err := session.NewSession()
 		if err != nil {
-			return fmt.Errorf("error creating session: %v", err)
+			return fmt.Errorf("error creating session: %w", err)
 		}
 		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
@@ -570,7 +569,7 @@ func attachPD(nodeName types.NodeName, pdName string) error {
 		ebsUtil := utils.NewEBSUtil(client)
 		err = ebsUtil.AttachDisk(awsVolumeID, string(nodeName))
 		if err != nil {
-			return fmt.Errorf("error attaching volume %s to node %s: %v", awsVolumeID, nodeName, err)
+			return fmt.Errorf("error attaching volume %s to node %s: %w", awsVolumeID, nodeName, err)
 		}
 		return nil
 	} else {

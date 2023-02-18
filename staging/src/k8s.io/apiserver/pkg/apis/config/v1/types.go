@@ -109,7 +109,7 @@ type KMSConfiguration struct {
 	// name is the name of the KMS plugin to be used.
 	Name string `json:"name"`
 	// cachesize is the maximum number of secrets which are cached in memory. The default value is 1000.
-	// Set to a negative value to disable caching.
+	// Set to a negative value to disable caching. This field is only allowed for KMS v1 providers.
 	// +optional
 	CacheSize *int32 `json:"cachesize,omitempty"`
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".

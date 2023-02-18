@@ -398,7 +398,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 			return
 		}
 		now := jm.now()
-		t := nextScheduledTimeDuration(*newCJ, sched, now)
+		t := nextScheduleTimeDuration(newCJ, now, sched)
 
 		jm.enqueueControllerAfter(curr, *t)
 		return
@@ -431,13 +431,13 @@ func (jm *ControllerV2) syncCronJob(
 	childrenJobs := make(map[types.UID]bool)
 	for _, j := range jobs {
 		childrenJobs[j.ObjectMeta.UID] = true
-		found := inActiveList(*cronJob, j.ObjectMeta.UID)
+		found := inActiveList(cronJob, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(j) {
 			cjCopy, err := jm.cronJobControl.GetCronJob(ctx, cronJob.Namespace, cronJob.Name)
 			if err != nil {
 				return nil, nil, updateStatus, err
 			}
-			if inActiveList(*cjCopy, j.ObjectMeta.UID) {
+			if inActiveList(cjCopy, j.ObjectMeta.UID) {
 				cronJob = cjCopy
 				continue
 			}
@@ -517,7 +517,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cronJob, nil, updateStatus, nil
 	}
 
-	scheduledTime, err := getNextScheduleTime(*cronJob, now, sched, jm.recorder)
+	scheduledTime, err := nextScheduleTime(cronJob, now, sched, jm.recorder)
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
@@ -531,7 +531,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
 		// the scheduled time, that will give atleast 1 unmet time schedule
 		klog.V(4).InfoS("No unmet start times", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
-		t := nextScheduledTimeDuration(*cronJob, sched, now)
+		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return cronJob, t, updateStatus, nil
 	}
 
@@ -550,16 +550,16 @@ func (jm *ControllerV2) syncCronJob(
 		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
-		t := nextScheduledTimeDuration(*cronJob, sched, now)
+		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return cronJob, t, updateStatus, nil
 	}
-	if isJobInActiveList(&batchv1.Job{
+	if inActiveListByName(cronJob, &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getJobName(cronJob, *scheduledTime),
 			Namespace: cronJob.Namespace,
-		}}, cronJob.Status.Active) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
+		}}) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "schedule", scheduledTime)
-		t := nextScheduledTimeDuration(*cronJob, sched, now)
+		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(cronJob.Status.Active) > 0 {
@@ -574,7 +574,7 @@ func (jm *ControllerV2) syncCronJob(
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		klog.V(4).InfoS("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
 		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
-		t := nextScheduledTimeDuration(*cronJob, sched, now)
+		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
@@ -635,36 +635,12 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
 	updateStatus = true
 
-	t := nextScheduledTimeDuration(*cronJob, sched, now)
+	t := nextScheduleTimeDuration(cronJob, now, sched)
 	return cronJob, t, updateStatus, nil
 }
 
 func getJobName(cj *batchv1.CronJob, scheduledTime time.Time) string {
 	return fmt.Sprintf("%s-%d", cj.Name, getTimeHashInMinutes(scheduledTime))
-}
-
-// nextScheduledTimeDuration returns the time duration to requeue based on
-// the schedule and last schedule time. It adds a 100ms padding to the next requeue to account
-// for Network Time Protocol(NTP) time skews. If the time drifts are adjusted which in most
-// realistic cases would be around 100s, scheduled cron will still be executed without missing
-// the schedule.
-func nextScheduledTimeDuration(cj batchv1.CronJob, sched cron.Schedule, now time.Time) *time.Duration {
-	earliestTime := cj.ObjectMeta.CreationTimestamp.Time
-	if cj.Status.LastScheduleTime != nil {
-		earliestTime = cj.Status.LastScheduleTime.Time
-	}
-	mostRecentTime, _, err := getMostRecentScheduleTime(earliestTime, now, sched)
-	if err != nil {
-		// we still have to requeue at some point, so aim for the next scheduling slot from now
-		mostRecentTime = &now
-	} else if mostRecentTime == nil {
-		// no missed schedules since earliestTime
-		mostRecentTime = &earliestTime
-	}
-
-	t := sched.Next(*mostRecentTime).Add(nextScheduleDelta).Sub(now)
-
-	return &t
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
@@ -724,7 +700,7 @@ func (jm *ControllerV2) removeOldestJobs(cj *batchv1.CronJob, js []*batchv1.Job,
 
 	klog.V(4).InfoS("Cleaning up jobs from CronJob list", "deletejobnum", numToDelete, "jobnum", len(js), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 
-	sort.Sort(byJobStartTimeStar(js))
+	sort.Sort(byJobStartTime(js))
 	for i := 0; i < numToDelete; i++ {
 		klog.V(4).InfoS("Removing job from CronJob list", "job", js[i].Name, "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		if deleteJob(cj, js[i], jm.jobControl, jm.recorder) {
@@ -732,17 +708,6 @@ func (jm *ControllerV2) removeOldestJobs(cj *batchv1.CronJob, js []*batchv1.Job,
 		}
 	}
 	return updateStatus
-}
-
-// isJobInActiveList take a job and checks if activeJobs has a job with the same
-// name and namespace.
-func isJobInActiveList(job *batchv1.Job, activeJobs []corev1.ObjectReference) bool {
-	for _, j := range activeJobs {
-		if j.Name == job.Name && j.Namespace == job.Namespace {
-			return true
-		}
-	}
-	return false
 }
 
 // deleteJob reaps a job, deleting the job, the pods and the reference in the active list

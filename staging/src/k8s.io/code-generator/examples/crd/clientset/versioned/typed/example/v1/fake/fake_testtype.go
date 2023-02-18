@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -27,6 +29,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
+	examplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 )
 
 // FakeTestTypes implements TestTypeInterface
@@ -133,6 +136,51 @@ func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts metav1.Delete
 func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &v1.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.TestType), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied testType.
+func (c *FakeTestTypes) Apply(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
+	if testType == nil {
+		return nil, fmt.Errorf("testType provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(testType)
+	if err != nil {
+		return nil, err
+	}
+	name := testType.Name
+	if name == nil {
+		return nil, fmt.Errorf("testType.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, *name, types.ApplyPatchType, data), &v1.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.TestType), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeTestTypes) ApplyStatus(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error) {
+	if testType == nil {
+		return nil, fmt.Errorf("testType provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(testType)
+	if err != nil {
+		return nil, err
+	}
+	name := testType.Name
+	if name == nil {
+		return nil, fmt.Errorf("testType.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err

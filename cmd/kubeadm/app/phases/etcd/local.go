@@ -150,7 +150,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	} else {
 		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
 		if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
-			cluster, err = etcdClient.AddMemberAsLeanerAndPromote(nodeName, etcdPeerAddress)
+			cluster, err = etcdClient.AddMemberAsLearner(nodeName, etcdPeerAddress)
 		} else {
 			cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
 		}
@@ -170,6 +170,17 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	if isDryRun {
 		fmt.Println("[etcd] Would wait for the new etcd member to join the cluster")
 		return nil
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
+		learnerID, err := etcdClient.GetMemberID(etcdPeerAddress)
+		if err != nil {
+			return err
+		}
+		err = etcdClient.MemberPromote(learnerID)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)

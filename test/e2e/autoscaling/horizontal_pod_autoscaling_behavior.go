@@ -37,7 +37,16 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 
 	podCPURequest := 500
 	targetCPUUtilizationPercent := 25
-	usageForSingleReplica := 110
+
+	// usageForReplicas returns usage for (n - 0.5) replicas as if they would consume all CPU
+	// under the target. The 0.5 replica reduction is to accommodate for the deviation between
+	// the actual consumed cpu and requested usage by the ResourceConsumer.
+	// HPA rounds up the recommendations. So, if the usage is e.g. for 3.5 replicas,
+	// the recommended replica number will be 4.
+	usageForReplicas := func(replicas int) int {
+		usagePerReplica := podCPURequest * targetCPUUtilizationPercent / 100
+		return replicas*usagePerReplica - usagePerReplica/2
+	}
 
 	fullWindowOfNewUsage := 30 * time.Second
 	windowWithOldUsagePasses := 30 * time.Second
@@ -58,7 +67,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should scale down soon after the stabilization period", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			upScaleStabilization := 0 * time.Minute
 			downScaleStabilization := 1 * time.Minute
 
@@ -78,11 +87,11 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before lowering the consumption
 			ginkgo.By("triggering scale up to record a recommendation")
-			rc.ConsumeCPU(3 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(3))
 			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("triggering scale down by lowering consumption")
-			rc.ConsumeCPU(2 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(2))
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, downScaleStabilization+maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 			timeWaited := time.Now().Sub(waitStart)
@@ -99,7 +108,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should scale up only after the stabilization period", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			upScaleStabilization := 3 * time.Minute
 			downScaleStabilization := 0 * time.Minute
 
@@ -119,11 +128,11 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before increasing the consumption
 			ginkgo.By("triggering scale down to record a recommendation")
-			rc.ConsumeCPU(1 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(1))
 			rc.WaitForReplicas(ctx, 1, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(3 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(3))
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 3, upScaleStabilization+maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 			timeWaited := time.Now().Sub(waitStart)
@@ -140,7 +149,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("shouldn't scale up", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 
 			rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
@@ -157,7 +166,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 
 			ginkgo.By("trying to trigger scale up")
-			rc.ConsumeCPU(8 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(8))
 			waitStart := time.Now()
 
 			rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, waitDeadline, hpa.Name)
@@ -175,7 +184,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("shouldn't scale down", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 3
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 
 			rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
@@ -193,7 +202,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + defaultDownscaleStabilisation
 
 			ginkgo.By("trying to trigger scale down")
-			rc.ConsumeCPU(1 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(1))
 			waitStart := time.Now()
 
 			rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, waitDeadline, hpa.Name)
@@ -211,14 +220,10 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	})
 
 	ginkgo.Describe("with scale limited by number of Pods rate", func() {
-		podCPURequest := 200
-		targetCPUUtilizationPercent := 25
-		usageForSingleReplica := 45
-
 		ginkgo.It("should scale up no more than given number of Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			limitWindowLength := 1 * time.Minute
 			podsLimitPerMinute := 1
 
@@ -236,7 +241,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(3 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(3))
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
@@ -260,7 +265,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should scale down no more than given number of Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 3
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			limitWindowLength := 1 * time.Minute
 			podsLimitPerMinute := 1
 
@@ -278,7 +283,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale down by lowering consumption")
-			rc.ConsumeCPU(1 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(1))
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
@@ -301,14 +306,10 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	})
 
 	ginkgo.Describe("with scale limited by percentage", func() {
-		podCPURequest := 200
-		targetCPUUtilizationPercent := 25
-		usageForSingleReplica := 45
-
 		ginkgo.It("should scale up no more than given percentage of current Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			limitWindowLength := 1 * time.Minute
 			percentageLimitPerMinute := 50
 
@@ -326,7 +327,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(8 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(8))
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
@@ -351,7 +352,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should scale down no more than given percentage of current Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 7
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			limitWindowLength := 1 * time.Minute
 			percentageLimitPerMinute := 25
 
@@ -369,7 +370,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale down by lowering consumption")
-			rc.ConsumeCPU(1 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(1))
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
@@ -398,7 +399,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should keep recommendation within the range over two stabilization windows", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			upScaleStabilization := 3 * time.Minute
 			downScaleStabilization := 3 * time.Minute
 
@@ -416,7 +417,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(4 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(4))
 			waitDeadline := upScaleStabilization
 
 			ginkgo.By("verifying number of replicas stay in desired range within stabilisation window")
@@ -431,7 +432,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
 			ginkgo.By("triggering scale down by lowering consumption")
-			rc.ConsumeCPU(2 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(2))
 			waitDeadline = downScaleStabilization
 
 			ginkgo.By("verifying number of replicas stay in desired range within stabilisation window")
@@ -449,7 +450,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		ginkgo.It("should keep recommendation within the range with stabilization window and pod limit rate", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
-			initCPUUsageTotal := initPods * usageForSingleReplica
+			initCPUUsageTotal := usageForReplicas(initPods)
 			downScaleStabilization := 3 * time.Minute
 			limitWindowLength := 2 * time.Minute
 			podsLimitPerMinute := 1
@@ -470,7 +471,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(4 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(4))
 			waitDeadline := limitWindowLength
 
 			ginkgo.By("verifying number of replicas stay in desired range with pod limit rate")
@@ -485,7 +486,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			gomega.Default.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
 			ginkgo.By("triggering scale down by lowering consumption")
-			rc.ConsumeCPU(2 * usageForSingleReplica)
+			rc.ConsumeCPU(usageForReplicas(2))
 
 			ginkgo.By("verifying number of replicas stay in desired range within stabilisation window")
 			waitDeadline = downScaleStabilization

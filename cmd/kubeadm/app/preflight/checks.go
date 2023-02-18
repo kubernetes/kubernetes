@@ -813,6 +813,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 type ImagePullCheck struct {
 	runtime         utilruntime.ContainerRuntime
 	imageList       []string
+	sandboxImage    string
 	imagePullPolicy v1.PullPolicy
 }
 
@@ -826,6 +827,15 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	policy := ipc.imagePullPolicy
 	klog.V(1).Infof("using image pull policy: %s", policy)
 	for _, image := range ipc.imageList {
+		if image == ipc.sandboxImage {
+			criSandboxImage, err := ipc.runtime.SandboxImage()
+			if err != nil {
+				klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
+			} else if criSandboxImage != ipc.sandboxImage {
+				klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm. It is recommended that using %q as the CRI sandbox image.",
+					criSandboxImage, ipc.sandboxImage)
+			}
+		}
 		switch policy {
 		case v1.PullNever:
 			klog.V(1).Infof("skipping pull of image: %s", image)
@@ -1036,7 +1046,12 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration), imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy},
+		ImagePullCheck{
+			runtime:         containerRuntime,
+			imageList:       images.GetControlPlaneImages(&cfg.ClusterConfiguration),
+			sandboxImage:    images.GetPauseImage(&cfg.ClusterConfiguration),
+			imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy,
+		},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

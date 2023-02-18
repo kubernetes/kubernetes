@@ -54,20 +54,46 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	return storage.Node, server
 }
 
-func validNewNode() *api.Node {
-	return &api.Node{
+type tweak func(*api.Node)
+
+func newNode(name string, tweaks ...tweak) *api.Node {
+	node := &api.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name: name,
 			Labels: map[string]string{
-				"name": "foo",
+				"name": name,
 			},
 		},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-				api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				api.ResourceCPU:    resource.MustParse("10"),
+				api.ResourceMemory: resource.MustParse("0"),
 			},
 		},
+	}
+
+	for _, tweak := range tweaks {
+		tweak(node)
+	}
+
+	return node
+}
+
+func setNodeIPAddress(addr string) tweak {
+	return func(node *api.Node) {
+		node.Status.Addresses = []api.NodeAddress{
+			{Type: api.NodeInternalIP, Address: addr},
+		}
+	}
+}
+
+func setNodeDaemonEndpoint(port int32) tweak {
+	return func(node *api.Node) {
+		node.Status.DaemonEndpoints = api.NodeDaemonEndpoints{
+			KubeletEndpoint: api.DaemonEndpoint{
+				Port: port,
+			},
+		}
 	}
 }
 
@@ -76,15 +102,11 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	node := validNewNode()
-	node.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
-		node,
+		newNode("foo"),
 		// invalid
-		&api.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: "_-a123-a_"},
-		},
+		newNode("_-a123-a_"),
 	)
 }
 
@@ -95,7 +117,7 @@ func TestUpdate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
-		validNewNode(),
+		newNode("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Node)
@@ -110,7 +132,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestDelete(validNewNode())
+	test.TestDelete(newNode("foo"))
 }
 
 func TestGet(t *testing.T) {
@@ -118,7 +140,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestGet(validNewNode())
+	test.TestGet(newNode("foo"))
 }
 
 func TestList(t *testing.T) {
@@ -126,7 +148,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestList(validNewNode())
+	test.TestList(newNode("foo"))
 }
 
 func TestWatch(t *testing.T) {
@@ -135,7 +157,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
-		validNewNode(),
+		newNode("foo"),
 		// matching labels
 		[]labels.Set{
 			{"name": "foo"},
@@ -165,126 +187,48 @@ func TestShortNames(t *testing.T) {
 }
 
 func TestResourceLocation(t *testing.T) {
-	testCases := []struct {
-		name     string
-		node     api.Node
-		query    string
-		location string
-		err      error
-	}{
-		{
-			name: "proxyable hostname with default port",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "10.0.0.1",
-						},
-					},
-				},
-			},
-			query:    "node0",
-			location: "10.0.0.1:10250",
-			err:      nil,
-		},
-		{
-			name: "proxyable hostname with kubelet port in query",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "10.0.0.1",
-						},
-					},
-				},
-			},
-			query:    "node0:5000",
-			location: "10.0.0.1:5000",
-			err:      nil,
-		},
-		{
-			name: "proxyable hostname with kubelet port in status",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "10.0.0.1",
-						},
-					},
-					DaemonEndpoints: api.NodeDaemonEndpoints{
-						KubeletEndpoint: api.DaemonEndpoint{
-							Port: 5000,
-						},
-					},
-				},
-			},
-			query:    "node0",
-			location: "10.0.0.1:5000",
-			err:      nil,
-		},
-		{
-			name: "non-proxyable hostname with default port",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "127.0.0.1",
-						},
-					},
-				},
-			},
-			query:    "node0",
-			location: "",
-			err:      proxyutil.ErrAddressNotAllowed,
-		},
-		{
-			name: "non-proxyable hostname with kubelet port in query",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "127.0.0.1",
-						},
-					},
-				},
-			},
-			query:    "node0:5000",
-			location: "",
-			err:      proxyutil.ErrAddressNotAllowed,
-		},
-		{
-			name: "non-proxyable hostname with kubelet port in status",
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: "node0"},
-				Status: api.NodeStatus{
-					Addresses: []api.NodeAddress{
-						{
-							Type:    api.NodeInternalIP,
-							Address: "127.0.0.1",
-						},
-					},
-					DaemonEndpoints: api.NodeDaemonEndpoints{
-						KubeletEndpoint: api.DaemonEndpoint{
-							Port: 443,
-						},
-					},
-				},
-			},
-			query:    "node0",
-			location: "",
-			err:      proxyutil.ErrAddressNotAllowed,
-		},
+	type testCase struct {
+		name  string
+		node  *api.Node
+		query string
+		host  string
+		err   error
 	}
+
+	testCases := []testCase{{
+		name:  "proxyable hostname with default port",
+		node:  newNode("node0", setNodeIPAddress("10.0.0.1")),
+		query: "node0",
+		host:  "10.0.0.1:10250",
+	}, {
+		name:  "proxyable hostname with kubelet port in query",
+		node:  newNode("node0", setNodeIPAddress("10.0.0.1")),
+		query: "node0:5000",
+		host:  "10.0.0.1:5000",
+	}, {
+		name:  "proxyable hostname with kubelet port in status",
+		node:  newNode("node0", setNodeIPAddress("10.0.0.1"), setNodeDaemonEndpoint(5000)),
+		query: "node0",
+		host:  "10.0.0.1:5000",
+	}, {
+		name:  "non-proxyable hostname with default port",
+		node:  newNode("node0", setNodeIPAddress("127.0.0.1")),
+		query: "node0",
+		host:  "",
+		err:   proxyutil.ErrAddressNotAllowed,
+	}, {
+		name:  "non-proxyable hostname with kubelet port in query",
+		node:  newNode("node0", setNodeIPAddress("127.0.0.1")),
+		query: "node0:5000",
+		host:  "",
+		err:   proxyutil.ErrAddressNotAllowed,
+	}, {
+		name:  "non-proxyable hostname with kubelet port in status",
+		node:  newNode("node0", setNodeIPAddress("127.0.0.1"), setNodeDaemonEndpoint(443)),
+		query: "node0",
+		host:  "",
+		err:   proxyutil.ErrAddressNotAllowed,
+	}}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -294,7 +238,7 @@ func TestResourceLocation(t *testing.T) {
 
 			ctx := genericapirequest.WithNamespace(genericapirequest.NewDefaultContext(), fmt.Sprintf("namespace-%s", testCase.name))
 			key, _ := storage.KeyFunc(ctx, testCase.node.Name)
-			if err := storage.Storage.Create(ctx, key, &testCase.node, nil, 0, false); err != nil {
+			if err := storage.Storage.Create(ctx, key, testCase.node, nil, 0, false); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -319,8 +263,8 @@ func TestResourceLocation(t *testing.T) {
 				t.Errorf("Unexpected nil resource location: %v", location)
 			}
 
-			if location.Host != testCase.location {
-				t.Errorf("Unexpected host: expected %v, but got %v", testCase.location, location.Host)
+			if location.Host != testCase.host {
+				t.Errorf("Unexpected host: expected %v, but got %v", testCase.host, location.Host)
 			}
 		})
 	}

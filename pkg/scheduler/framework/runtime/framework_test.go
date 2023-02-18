@@ -1061,13 +1061,139 @@ func TestPreEnqueuePlugins(t *testing.T) {
 	}
 }
 
+func TestRunPreScorePlugins(t *testing.T) {
+	tests := []struct {
+		name               string
+		plugins            []*TestPlugin
+		wantSkippedPlugins sets.Set[string]
+		wantStatusCode     framework.Code
+	}{
+		{
+			name: "all PreScorePlugins returned success",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantStatusCode: framework.Success,
+		},
+		{
+			name: "one PreScore plugin returned success, but another PreScore plugin returned non-success",
+			plugins: []*TestPlugin{
+				{
+					name: "success",
+				},
+				{
+					name: "error",
+					inj:  injectedResult{PreScoreStatus: int(framework.Error)},
+				},
+			},
+			wantStatusCode: framework.Error,
+		},
+		{
+			name: "one PreScore plugin returned skip, but another PreScore plugin returned non-success",
+			plugins: []*TestPlugin{
+				{
+					name: "skip",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+				{
+					name: "error",
+					inj:  injectedResult{PreScoreStatus: int(framework.Error)},
+				},
+			},
+			wantStatusCode: framework.Error,
+		},
+		{
+			name: "all PreScore plugins returned skip",
+			plugins: []*TestPlugin{
+				{
+					name: "skip1",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+				{
+					name: "skip2",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+				{
+					name: "skip3",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+			},
+			wantSkippedPlugins: sets.New("skip1", "skip2", "skip3"),
+			wantStatusCode:     framework.Success,
+		},
+		{
+			name: "some PreScore plugins returned skip",
+			plugins: []*TestPlugin{
+				{
+					name: "skip1",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+				{
+					name: "success1",
+				},
+				{
+					name: "skip2",
+					inj:  injectedResult{PreScoreStatus: int(framework.Skip)},
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantSkippedPlugins: sets.New("skip1", "skip2"),
+			wantStatusCode:     framework.Success,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := make(Registry)
+			enabled := make([]config.Plugin, len(tt.plugins))
+			for i, p := range tt.plugins {
+				p := p
+				enabled[i].Name = p.name
+				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return p, nil
+				})
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			f, err := newFrameworkWithQueueSortAndBind(
+				r,
+				config.KubeSchedulerProfile{Plugins: &config.Plugins{PreScore: config.PluginSet{Enabled: enabled}}},
+				ctx.Done(),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			state := framework.NewCycleState()
+			status := f.RunPreScorePlugins(ctx, state, nil, nil)
+			if status.Code() != tt.wantStatusCode {
+				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
+			}
+			skipped := state.SkipScorePlugins
+			if d := cmp.Diff(skipped, tt.wantSkippedPlugins); d != "" {
+				t.Errorf("wrong skip score plugins. got: %v, want: %v, diff: %s", skipped, tt.wantSkippedPlugins, d)
+			}
+		})
+	}
+}
+
 func TestRunScorePlugins(t *testing.T) {
 	tests := []struct {
-		name          string
-		registry      Registry
-		plugins       *config.Plugins
-		pluginConfigs []config.PluginConfig
-		want          []framework.NodePluginScores
+		name           string
+		registry       Registry
+		plugins        *config.Plugins
+		pluginConfigs  []config.PluginConfig
+		want           []framework.NodePluginScores
+		skippedPlugins sets.Set[string]
 		// If err is true, we expect RunScorePlugin to fail.
 		err bool
 	}{
@@ -1345,6 +1471,70 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "one success plugin, one skip plugin",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{
+						Raw: []byte(`{ "scoreRes": 1 }`),
+					},
+				},
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{
+						Raw: []byte(`{ "scoreStatus": 1 }`), // To make sure this plugin isn't called, set error as an injected result.
+					},
+				},
+			},
+			skippedPlugins: sets.New(scoreWithNormalizePlugin1),
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
+					TotalScore: 1,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
+					TotalScore: 1,
+				},
+			},
+		},
+		{
+			name:    "all plugins are skipped in prescore",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{
+						Raw: []byte(`{ "scoreStatus": 1 }`), // To make sure this plugin isn't called, set error as an injected result.
+					},
+				},
+			},
+			skippedPlugins: sets.New(scorePlugin1),
+			want: []framework.NodePluginScores{
+				{
+					Name:   "node1",
+					Scores: []framework.PluginScore{},
+				},
+				{
+					Name:   "node2",
+					Scores: []framework.PluginScore{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1361,6 +1551,8 @@ func TestRunScorePlugins(t *testing.T) {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
+			state := framework.NewCycleState()
+			state.SkipScorePlugins = tt.skippedPlugins
 			res, status := f.RunScorePlugins(ctx, state, pod, nodes)
 
 			if tt.err {
@@ -2637,7 +2829,7 @@ func TestPermitPlugins(t *testing.T) {
 }
 
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metricsRecorder) Option {
+func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = recorder
 	}
@@ -2793,7 +2985,7 @@ func TestRecordingMetrics(t *testing.T) {
 			}
 
 			stopCh := make(chan struct{})
-			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				PercentageOfNodesToScore: pointer.Int32(testPercentageOfNodesToScore),
 				SchedulerName:            testProfileName,
@@ -2809,9 +3001,9 @@ func TestRecordingMetrics(t *testing.T) {
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
 			close(stopCh)
-			<-recorder.isStoppedCh
+			<-recorder.IsStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
-			recorder.flushMetrics()
+			recorder.FlushMetrics()
 
 			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
@@ -2905,7 +3097,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
 			stopCh := make(chan struct{})
-			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName:            testProfileName,
 				PercentageOfNodesToScore: pointer.Int32(testPercentageOfNodesToScore),
@@ -2924,9 +3116,9 @@ func TestRunBindPlugins(t *testing.T) {
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
 			close(stopCh)
-			<-recorder.isStoppedCh
+			<-recorder.IsStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
-			recorder.flushMetrics()
+			recorder.FlushMetrics()
 			collectAndCompareFrameworkMetrics(t, "Bind", tt.wantStatus)
 		})
 	}

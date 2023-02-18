@@ -328,6 +328,12 @@ func (c *Controller) syncService(key string) error {
 		return nil
 	}
 
+	if service.Spec.Type == v1.ServiceTypeExternalName {
+		// services with Type ExternalName receive no endpoints from this controller;
+		// Ref: https://issues.k8s.io/105986
+		return nil
+	}
+
 	if service.Spec.Selector == nil {
 		// services without a selector receive no endpoint slices from this controller;
 		// these services will receive endpoint slices that are created out-of-band via the REST API.

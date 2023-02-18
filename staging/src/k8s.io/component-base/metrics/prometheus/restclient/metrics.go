@@ -82,6 +82,15 @@ var (
 		[]string{"code", "method", "host"},
 	)
 
+	requestRetry = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_request_retries_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of request retries, partitioned by status code, verb, and host.",
+		},
+		[]string{"code", "verb", "host"},
+	)
+
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
 
 	execPluginCertTTL = k8smetrics.NewGaugeFunc(
@@ -152,6 +161,7 @@ func init() {
 	legacyregistry.MustRegister(responseSize)
 	legacyregistry.MustRegister(rateLimiterLatency)
 	legacyregistry.MustRegister(requestResult)
+	legacyregistry.MustRegister(requestRetry)
 	legacyregistry.RawMustRegister(execPluginCertTTL)
 	legacyregistry.MustRegister(execPluginCertRotation)
 	metrics.Register(metrics.RegisterOpts{
@@ -162,6 +172,7 @@ func init() {
 		ResponseSize:          &sizeAdapter{m: responseSize},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:         &resultAdapter{requestResult},
+		RequestRetry:          &retryAdapter{requestRetry},
 		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
 	})
 }
@@ -212,4 +223,12 @@ type callsAdapter struct {
 
 func (r *callsAdapter) Increment(code int, callStatus string) {
 	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
+}
+
+type retryAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *retryAdapter) IncrementRetry(ctx context.Context, code, method, host string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }

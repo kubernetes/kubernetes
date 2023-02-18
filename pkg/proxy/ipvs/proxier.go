@@ -1180,6 +1180,10 @@ func (proxier *Proxier) syncProxyRules() {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 		}
+		// Set the source hash flag needed for the distribution method "mh"
+		if proxier.ipvsScheduler == "mh" {
+			serv.Flags |= utilipvs.FlagSourceHash
+		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 			activeIPVSServices[serv.String()] = true
@@ -1232,6 +1236,10 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+			}
+			// Set the source hash flag needed for the distribution method "mh"
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
 			}
 			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 				activeIPVSServices[serv.String()] = true
@@ -1332,6 +1340,10 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+			}
+			// Set the source hash flag needed for the distribution method "mh"
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
 			}
 			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 				activeIPVSServices[serv.String()] = true
@@ -1475,6 +1487,10 @@ func (proxier *Proxier) syncProxyRules() {
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
 					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+				}
+				// Set the source hash flag needed for the distribution method "mh"
+				if proxier.ipvsScheduler == "mh" {
+					serv.Flags |= utilipvs.FlagSourceHash
 				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcPortNameString, serv, false, bindedAddresses); err == nil {

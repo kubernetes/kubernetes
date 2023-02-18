@@ -120,7 +120,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 	var metadata Metadata
 	err := json.Unmarshal(response, &metadata)
 	if err != nil {
-		return false, fmt.Errorf("Failed to unmarshall: %s", err)
+		return false, fmt.Errorf("Failed to unmarshall: %w", err)
 	}
 
 	for _, result := range metadata.Results {
@@ -130,7 +130,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 		}
 		resource, err := parseResource(rawResource)
 		if err != nil {
-			return false, fmt.Errorf("No 'resource' label: %s", err)
+			return false, fmt.Errorf("No 'resource' label: %w", err)
 		}
 		if resource.resourceType == "k8s_container" &&
 			resource.resourceLabels["container_name"] == containerName {

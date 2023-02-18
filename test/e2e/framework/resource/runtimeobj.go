@@ -83,7 +83,7 @@ func GetSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	case *autoscalingv1.Scale:
 		selector, err := metav1.ParseToLabelSelector(typed.Status.Selector)
 		if err != nil {
-			return nil, fmt.Errorf("Parsing selector for: %v encountered an error: %v", obj, err)
+			return nil, fmt.Errorf("Parsing selector for: %v encountered an error: %w", obj, err)
 		}
 		return metav1.LabelSelectorAsSelector(selector)
 	default:

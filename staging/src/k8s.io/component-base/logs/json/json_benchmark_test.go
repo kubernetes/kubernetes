@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package json
 
 import (
 	"fmt"
@@ -32,8 +32,8 @@ func BenchmarkInfoLoggerInfo(b *testing.B) {
 		for pb.Next() {
 			logger.Info("test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",
@@ -62,8 +62,8 @@ func BenchmarkZapLoggerError(b *testing.B) {
 			logger.Error(fmt.Errorf("test for error:%s", "default"),
 				"test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",
@@ -91,8 +91,8 @@ func BenchmarkZapLoggerV(b *testing.B) {
 		for pb.Next() {
 			logger.V(1).Info("test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",

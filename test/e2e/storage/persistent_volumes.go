@@ -70,7 +70,7 @@ func completeMultiTest(ctx context.Context, f *framework.Framework, c clientset.
 	for pvcKey := range claims {
 		pvc, err := c.CoreV1().PersistentVolumeClaims(pvcKey.Namespace).Get(ctx, pvcKey.Name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("error getting pvc %q: %v", pvcKey.Name, err)
+			return fmt.Errorf("error getting pvc %q: %w", pvcKey.Name, err)
 		}
 		if len(pvc.Spec.VolumeName) == 0 {
 			continue // claim is not bound
@@ -450,7 +450,7 @@ func createWaitAndDeletePod(ctx context.Context, c clientset.Interface, t *frame
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
 	runPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("pod Create API error: %v", err)
+		return fmt.Errorf("pod Create API error: %w", err)
 	}
 	defer func() {
 		delErr := e2epod.DeletePodWithWait(ctx, c, runPod)
@@ -461,7 +461,7 @@ func createWaitAndDeletePod(ctx context.Context, c clientset.Interface, t *frame
 
 	err = testPodSuccessOrFail(ctx, c, t, ns, runPod)
 	if err != nil {
-		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
+		return fmt.Errorf("pod %q did not exit with Success: %w", runPod.Name, err)
 	}
 	return // note: named return value
 }
@@ -470,7 +470,7 @@ func createWaitAndDeletePod(ctx context.Context, c clientset.Interface, t *frame
 func testPodSuccessOrFail(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns string, pod *v1.Pod) error {
 	framework.Logf("Pod should terminate with exitcode 0 (success)")
 	if err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, ns, t.PodStart); err != nil {
-		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
+		return fmt.Errorf("pod %q failed to reach Success: %w", pod.Name, err)
 	}
 	framework.Logf("Pod %v succeeded ", pod.Name)
 	return nil

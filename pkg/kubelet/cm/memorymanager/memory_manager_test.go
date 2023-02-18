@@ -2437,7 +2437,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "test name", testCase.description)
+			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(testCase),
 				state:        state.NewMemoryState(),

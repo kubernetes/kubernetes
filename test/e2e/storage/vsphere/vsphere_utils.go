@@ -782,7 +782,7 @@ func invokeVCenterServiceControl(ctx context.Context, command, service, host str
 	result, err := e2essh.SSH(ctx, sshCmd, host, framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't execute command: %s on vCenter host: %v", sshCmd, err)
+		return fmt.Errorf("couldn't execute command: %s on vCenter host: %w", sshCmd, err)
 	}
 	return nil
 }

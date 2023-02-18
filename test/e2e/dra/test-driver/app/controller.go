@@ -148,7 +148,7 @@ func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resou
 func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
 	configMap, err := c.clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("get config map: %v", err)
+		return nil, fmt.Errorf("get config map: %w", err)
 	}
 	return configMap.Data, nil
 }
@@ -198,8 +198,9 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 				// number of allocations (even spreading) or the most (packing).
 				node = viableNodes[rand.Intn(len(viableNodes))]
 				logger.Info("picked a node ourselves", "selectedNode", selectedNode)
-			} else if c.resources.MaxAllocations > 0 &&
-				c.countAllocations(node) >= c.resources.MaxAllocations {
+			} else if !contains(c.resources.Nodes, node) ||
+				c.resources.MaxAllocations > 0 &&
+					c.countAllocations(node) >= c.resources.MaxAllocations {
 				return nil, fmt.Errorf("resources exhausted on node %q", node)
 			}
 		} else {
@@ -221,7 +222,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 	toEnvVars("admin", classParameters, p.EnvVars)
 	data, err := json.Marshal(p)
 	if err != nil {
-		return nil, fmt.Errorf("encode parameters: %v", err)
+		return nil, fmt.Errorf("encode parameters: %w", err)
 	}
 	allocation.ResourceHandle = string(data)
 	var nodes []string
@@ -292,7 +293,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 				// can only work if a node has capacity left
 				// for all of them. Also, nodes that the driver
 				// doesn't run on cannot be used.
-				if contains(c.resources.Nodes, node) &&
+				if !contains(c.resources.Nodes, node) ||
 					allocationsPerNode[node]+len(claims) > c.resources.MaxAllocations {
 					claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 				}
@@ -305,7 +306,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	for _, claim := range claims {
 		claim.UnsuitableNodes = nil
 		for _, node := range potentialNodes {
-			if contains(c.resources.Nodes, node) &&
+			if !contains(c.resources.Nodes, node) ||
 				allocations+len(claims) > c.resources.MaxAllocations {
 				claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 			}

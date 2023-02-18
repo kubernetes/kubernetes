@@ -178,7 +178,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 				Subsystem:      subsystem,
 				Name:           "webhook_admission_duration_seconds",
 				Help:           "Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
-				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5, 10, 25},
 				StabilityLevel: metrics.STABLE,
 			},
 			[]string{"name", "type", "operation", "rejected"},
