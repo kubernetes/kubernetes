@@ -1045,9 +1045,11 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 					Command: []string{
 						"/agnhost",
 						"grpc-health-checking",
+						"delay-unhealthy-sec 0",
+						"--http-port 2379",
 					},
 					// 2380 is an automatic peer URL
-					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
+					Ports:          []v1.ContainerPort{{ContainerPort: int32(2379)}, {ContainerPort: int32(2380)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},
