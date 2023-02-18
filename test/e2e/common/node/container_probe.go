@@ -1045,7 +1045,6 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 					Command: []string{
 						"/agnhost",
 						"grpc-health-checking",
-						"delay-unhealthy-sec 0",
 						"--http-port 2379",
 					},
 					// 2380 is an automatic peer URL
