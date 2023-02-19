@@ -1501,7 +1501,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Set the KUBE-IPVS-IPS set to the "activeBindAddrs"
-	proxier.ipsetList[kubeIPVSSet].activeEntries = sets.StringKeySet(activeBindAddrs)
+	proxier.ipsetList[kubeIPVSSet].activeEntries = activeBindAddrs
 
 	// sync ipset entries
 	for _, set := range proxier.ipsetList {
