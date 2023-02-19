@@ -36,6 +36,7 @@ var isDisabledBuild bool
 // Validator is a interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
+	ValidateHost() error
 }
 
 // NewValidator is in order to find AppArmor FS
