@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"reflect"
 	"strings"
 
 	"k8s.io/gengo/generator"
@@ -76,8 +77,14 @@ type memberParams struct {
 	Member     types.Member
 	MemberType *types.Type
 	JSONTags   JSONTags
+	PatchMeta  PatchMeta
 	ArgType    *types.Type   // only set for maps and slices
 	EmbeddedIn *memberParams // parent embedded member, if any
+}
+
+type PatchMeta struct {
+	PatchStrategies string
+	PatcheMergeKey  string
 }
 
 func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
@@ -137,6 +144,18 @@ func blocklisted(t *types.Type, member types.Member) bool {
 		return true
 	}
 	return false
+}
+
+func lookupPatchMeta(m types.Member) (PatchMeta, bool) {
+	strategyTag := reflect.StructTag(m.Tags).Get("patchStrategy")
+	mergeKeyTag := reflect.StructTag(m.Tags).Get("patchMergeKey")
+	if strategyTag == "" && mergeKeyTag == "" {
+		return PatchMeta{}, false
+	}
+	return PatchMeta{
+		PatchStrategies: strategyTag,
+		PatcheMergeKey:  mergeKeyTag,
+	}, true
 }
 
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
@@ -210,17 +229,31 @@ func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter
 				MemberType: g.refGraph.applyConfigForType(structMember.Type),
 				JSONTags:   structMemberTags,
 			}
+			if patchmeta, ok := lookupPatchMeta(structMember); ok {
+				params.PatchMeta = patchmeta
+			}
+			template := ""
 			if structMember.Embedded {
 				if structMemberTags.inline {
-					sw.Do("$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
+					template = "$.MemberType|raw$"
 				} else {
-					sw.Do("*$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
+					template = "*$.MemberType|raw$"
 				}
 			} else if isNillable(structMember.Type) {
-				sw.Do("$.Member.Name$ $.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
+				template = "$.Member.Name$ $.MemberType|raw$"
 			} else {
-				sw.Do("$.Member.Name$ *$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
+				template = "$.Member.Name$ *$.MemberType|raw$"
 			}
+			template += " `json:\"$.JSONTags$\""
+
+			if len(params.PatchMeta.PatchStrategies) > 0 {
+				template += " patchStrategy:\"$.PatchMeta.PatchStrategies$\""
+			}
+			if len(params.PatchMeta.PatcheMergeKey) > 0 {
+				template += " patchMergeKey:\"$.PatchMeta.PatcheMergeKey$\""
+			}
+			template += "`\n"
+			sw.Do(template, params)
 		}
 	}
 	sw.Do("}\n", typeParams)
