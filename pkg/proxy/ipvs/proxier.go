@@ -264,8 +264,6 @@ type Proxier struct {
 	healthzServer       healthcheck.ProxierHealthUpdater
 
 	ipvsScheduler string
-	// Added as a member to the struct to allow injection for testing.
-	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
 	iptablesData     *bytes.Buffer
@@ -300,18 +298,6 @@ type Proxier struct {
 	serviceNoLocalEndpointsExternal sets.String
 }
 
-// IPGetter helps get node network interface IP and IPs binded to the IPVS dummy interface
-type IPGetter interface {
-	NodeIPs() ([]net.IP, error)
-	BindedIPs() (sets.String, error)
-}
-
-// realIPGetter is a real NodeIP handler, it implements IPGetter.
-type realIPGetter struct {
-	// nl is a handle for revoking netlink interface
-	nl NetLinkHandle
-}
-
 // NodeIPs returns all LOCAL type IP addresses from host which are
 // taken as the Node IPs of NodePort service. Filtered addresses:
 //
@@ -319,15 +305,15 @@ type realIPGetter struct {
 //   - Addresses of the "other" family (not handled by this proxier instance)
 //   - Link-local IPv6 addresses
 //   - Addresses on the created dummy device `kube-ipvs0`
-func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
+func (p *Proxier) ipGetterNodeIPs() (ips []net.IP, err error) {
 
-	nodeAddress, err := r.nl.GetAllLocalAddresses()
+	nodeAddress, err := p.netlinkHandle.GetAllLocalAddresses()
 	if err != nil {
 		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
 	}
 
 	// We must exclude the addresses on the IPVS dummy interface
-	bindedAddress, err := r.BindedIPs()
+	bindedAddress, err := p.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
 	if err != nil {
 		return nil, err
 	}
@@ -339,11 +325,6 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 		ips = append(ips, a)
 	}
 	return ips, nil
-}
-
-// BindedIPs returns all addresses that are binded to the IPVS dummy interface kube-ipvs0
-func (r *realIPGetter) BindedIPs() (sets.String, error) {
-	return r.nl.GetLocalAddresses(defaultDummyDevice)
 }
 
 // Proxier implements proxy.Provider
@@ -484,7 +465,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(ipFamily == v1.IPv6Protocol)},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
 		natChains:             utilproxy.LineBuffer{},
@@ -1049,7 +1029,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// activeBindAddrs represents ip address successfully bind to defaultDummyDevice in this round of sync
 	activeBindAddrs := map[string]bool{}
 
-	bindedAddresses, err := proxier.ipGetter.BindedIPs()
+	bindedAddresses, err := proxier.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Error listing addresses binded to dummy interface")
 	}
@@ -1084,7 +1064,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs, err = proxier.ipGetter.NodeIPs()
+					nodeIPs, err = proxier.ipGetterNodeIPs()
 					if err != nil {
 						klog.ErrorS(err, "Failed to list all node IPs from host")
 					}
