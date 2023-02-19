@@ -446,8 +446,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// Give some tolerance to avoid flakiness since we are using real time.
 		var leeway int64 = 2
-		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
-		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		actualExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
+		assumedExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
 		exp, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "exp"), 10, 64)
 		if err != nil {
 			t.Fatalf("error parsing exp: %v", err)
@@ -500,8 +500,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// Give some tolerance to avoid flakiness since we are using real time.
 		var leeway int64 = 10
-		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(60*60) * time.Second))
-		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		actualExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(60*60) * time.Second))
+		assumedExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
 
 		warnAfter := getSubObject(t, getPayload(t, treq.Status.Token), "kubernetes.io", "warnafter")
 		if warnAfter != "null" {

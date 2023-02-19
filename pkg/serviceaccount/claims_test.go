@@ -85,9 +85,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -107,9 +107,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -130,9 +130,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -152,9 +152,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1", "2"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -175,16 +175,16 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 60*60*24),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+60*60*24, 0)),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
 					Namespace: "myns",
 					Svcacct:   ref{Name: "mysvcacct", UID: "mysvcacct-uid"},
 					Pod:       &ref{Name: "mypod", UID: "mypod-uid"},
-					WarnAfter: jwt.NumericDate(1514764800 + 60*60),
+					WarnAfter: jwt.NewNumericDate(time.Unix(1514764800+60*60, 0)),
 				},
 			},
 		},
@@ -276,14 +276,14 @@ func TestValidatePrivateClaims(t *testing.T) {
 			name:      "expired",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-			expiry:    jwt.NewNumericDate(now().Add(-1_000 * time.Hour)),
+			expiry:    *jwt.NewNumericDate(now().Add(-1_000 * time.Hour)),
 			expectErr: "service account token has expired",
 		},
 		{
 			name:      "not yet valid",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-			notBefore: jwt.NewNumericDate(now().Add(1_000 * time.Hour)),
+			notBefore: *jwt.NewNumericDate(now().Add(1_000 * time.Hour)),
 			expectErr: "service account token is not valid yet",
 		},
 		{
@@ -369,7 +369,7 @@ func TestValidatePrivateClaims(t *testing.T) {
 			if tc.expiry != 0 {
 				expiry = tc.expiry
 			}
-			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: expiry, NotBefore: tc.notBefore}, tc.private)
+			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: &expiry, NotBefore: &tc.notBefore}, tc.private)
 			if len(tc.expectErr) > 0 {
 				if errStr := errString(err); tc.expectErr != errStr {
 					t.Fatalf("expected error %q but got %q", tc.expectErr, errStr)

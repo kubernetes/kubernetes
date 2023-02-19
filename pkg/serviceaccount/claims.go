@@ -46,11 +46,11 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string          `json:"namespace,omitempty"`
-	Svcacct   ref             `json:"serviceaccount,omitempty"`
-	Pod       *ref            `json:"pod,omitempty"`
-	Secret    *ref            `json:"secret,omitempty"`
-	WarnAfter jwt.NumericDate `json:"warnafter,omitempty"`
+	Namespace string           `json:"namespace,omitempty"`
+	Svcacct   ref              `json:"serviceaccount,omitempty"`
+	Pod       *ref             `json:"pod,omitempty"`
+	Secret    *ref             `json:"secret,omitempty"`
+	WarnAfter *jwt.NumericDate `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -198,7 +198,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 
 	// Check special 'warnafter' field for projected service account token transition.
 	warnafter := private.Kubernetes.WarnAfter
-	if warnafter != 0 {
+	if warnafter != nil {
 		if nowTime.After(warnafter.Time()) {
 			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
 			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)
