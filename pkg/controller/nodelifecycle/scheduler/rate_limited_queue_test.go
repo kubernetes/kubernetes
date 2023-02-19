@@ -35,7 +35,7 @@ func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
 }
 
 func CheckSetEq(lhs, rhs sets.String) bool {
-	return lhs.HasAll(rhs.List()...) && rhs.HasAll(lhs.List()...)
+	return lhs.IsSuperset(rhs) && rhs.IsSuperset(lhs)
 }
 
 func TestAddNode(t *testing.T) {

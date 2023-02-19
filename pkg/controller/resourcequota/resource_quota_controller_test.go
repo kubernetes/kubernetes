@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -797,7 +797,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		for _, action := range kubeClient.Actions() {
 			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 		}
-		if !actionSet.HasAll(testCase.expectedActionSet.List()...) {
+		if !actionSet.IsSuperset(testCase.expectedActionSet) {
 			t.Errorf("test: %s,\nExpected actions:\n%v\n but got:\n%v\nDifference:\n%v", testName, testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
 		}
 
