@@ -74,11 +74,12 @@ func NewvSphereCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassToCSI translates InTree vSphere storage class parameters to CSI storage class
-func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(ctx context.Context, sc *storage.StorageClass) (*storage.StorageClass, error) {
 	if sc == nil {
 		return nil, fmt.Errorf("sc is nil")
 	}
 	var params = map[string]string{}
+	logger := klog.FromContext(ctx)
 	for k, v := range sc.Parameters {
 		switch strings.ToLower(k) {
 		case fsTypeKey:
@@ -102,7 +103,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 		case "iopslimit":
 			params[paramIopslimit] = v
 		default:
-			klog.V(2).Infof("StorageClass parameter [name:%q, value:%q] is not supported", k, v)
+			logger.V(2).Info("StorageClass parameter [name:%q, value:%q] is not supported", k, v)
 		}
 	}
 
