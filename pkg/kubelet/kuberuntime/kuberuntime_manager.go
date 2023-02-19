@@ -764,7 +764,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// When runc supports slash as sysctl separator, this function can no longer be used.
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
-		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
+		// Prepare resources allocated by the Dynamic Resource Allocation feature for the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			if m.runtimeHelper.PrepareDynamicResources(pod) != nil {
 				return
