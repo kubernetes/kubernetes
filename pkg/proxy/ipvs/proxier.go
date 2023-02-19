@@ -1024,9 +1024,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// activeIPVSServices represents IPVS service successfully created in this round of sync
 	activeIPVSServices := sets.New[string]()
-	// currentIPVSServices represent IPVS services listed from the system
-	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
-	// activeBindAddrs represents ip address successfully bind to defaultDummyDevice in this round of sync
+	// activeBindAddrs Represents addresses we want on the defaultDummyDevice after this round of sync
 	activeBindAddrs := sets.New[string]()
 
 	bindedAddresses, err := proxier.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
@@ -1552,7 +1550,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Clean up legacy IPVS services and unbind addresses
+	// currentIPVSServices represent IPVS services listed from the system
+	// (including any we have created in this sync)
+	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
 	appliedSvcs, err := proxier.ipvs.GetVirtualServers()
 	if err == nil {
 		for _, appliedSvc := range appliedSvcs {
