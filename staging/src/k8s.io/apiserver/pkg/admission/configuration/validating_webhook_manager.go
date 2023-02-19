@@ -18,7 +18,6 @@ package configuration
 
 import (
 	"fmt"
-	"sort"
 
 	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -79,7 +78,6 @@ func (v *validatingWebhookConfigurationManager) getConfiguration() ([]webhook.We
 }
 
 func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
-	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
 	for _, c := range configurations {
 		// webhook names are not validated for uniqueness, so we check for duplicates and
@@ -93,10 +91,4 @@ func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhook
 		}
 	}
 	return accessors
-}
-
-type ValidatingWebhookConfigurationSorter []*v1.ValidatingWebhookConfiguration
-
-func (a ValidatingWebhookConfigurationSorter) ByName(i, j int) bool {
-	return a[i].Name < a[j].Name
 }
