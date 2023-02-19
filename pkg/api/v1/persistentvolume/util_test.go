@@ -267,7 +267,7 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	secretPaths := sets.NewString()
 
 	if tp.Kind() == reflect.Pointer {
-		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
+		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).UnsortedList()...)
 		return secretPaths
 	}
 
@@ -277,7 +277,7 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 
 	switch tp.Kind() {
 	case reflect.Pointer:
-		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
+		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).UnsortedList()...)
 	case reflect.Struct:
 		// ObjectMeta should not have any field with the word "secret" in it;
 		// it contains cycles so it's easiest to just skip it.
@@ -286,14 +286,14 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			secretPaths.Insert(collectSecretPaths(t, path.Child(field.Name), field.Name, field.Type).List()...)
+			secretPaths.Insert(collectSecretPaths(t, path.Child(field.Name), field.Name, field.Type).UnsortedList()...)
 		}
 	case reflect.Interface:
 		t.Errorf("cannot find secret fields in interface{} field %s", path.String())
 	case reflect.Map:
-		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).UnsortedList()...)
 	case reflect.Slice:
-		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).UnsortedList()...)
 	default:
 		// all primitive types
 	}

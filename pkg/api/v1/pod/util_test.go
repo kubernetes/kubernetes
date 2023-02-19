@@ -528,7 +528,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	resourcePaths := sets.NewString()
 
 	if tp.Kind() == reflect.Pointer {
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).UnsortedList()...)
 		return resourcePaths
 	}
 
@@ -538,7 +538,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 
 	switch tp.Kind() {
 	case reflect.Pointer:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).UnsortedList()...)
 	case reflect.Struct:
 		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
 		// it contains cycles so it's easiest to just skip it.
@@ -547,14 +547,14 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)
+			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).UnsortedList()...)
 		}
 	case reflect.Interface:
 		t.Errorf("cannot find %s fields in interface{} field %s", resourcename, path.String())
 	case reflect.Map:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).UnsortedList()...)
 	case reflect.Slice:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).UnsortedList()...)
 	default:
 		// all primitive types
 	}
