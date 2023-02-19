@@ -27,20 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetAppArmorFS(t *testing.T) {
-	// This test only passes on systems running AppArmor with the default configuration.
-	// The test should be manually run if modifying the getAppArmorFS function.
-	t.Skip()
-
-	const expectedPath = "/sys/kernel/security/apparmor"
-	actualPath, err := getAppArmorFS()
-	assert.NoError(t, err)
-	assert.Equal(t, expectedPath, actualPath)
-}
-
 func TestValidateHost(t *testing.T) {
 	// This test only passes on systems running AppArmor with the default configuration.
-	// The test should be manually run if modifying the getAppArmorFS function.
 	t.Skip()
 
 	assert.NoError(t, validateHost())
@@ -72,9 +60,7 @@ func TestValidateBadHost(t *testing.T) {
 }
 
 func TestValidateValidHost(t *testing.T) {
-	v := &validator{
-		appArmorFS: "./testdata/",
-	}
+	v := &validator{}
 
 	tests := []struct {
 		profile     string
