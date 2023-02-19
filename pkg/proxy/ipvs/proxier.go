@@ -298,35 +298,6 @@ type Proxier struct {
 	serviceNoLocalEndpointsExternal sets.Set[string]
 }
 
-// NodeIPs returns all LOCAL type IP addresses from host which are
-// taken as the Node IPs of NodePort service. Filtered addresses:
-//
-//   - Loopback addresses
-//   - Addresses of the "other" family (not handled by this proxier instance)
-//   - Link-local IPv6 addresses
-//   - Addresses on the created dummy device `kube-ipvs0`
-func (p *Proxier) ipGetterNodeIPs() (ips []net.IP, err error) {
-
-	nodeAddress, err := p.netlinkHandle.GetAllLocalAddresses()
-	if err != nil {
-		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
-	}
-
-	// We must exclude the addresses on the IPVS dummy interface
-	bindedAddress, err := p.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
-	if err != nil {
-		return nil, err
-	}
-	ipset := nodeAddress.Difference(bindedAddress)
-
-	// translate ip string to IP
-	for _, ipStr := range ipset.UnsortedList() {
-		a := netutils.ParseIPSloppy(ipStr)
-		ips = append(ips, a)
-	}
-	return ips, nil
-}
-
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
@@ -1068,27 +1039,18 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs, err = proxier.ipGetterNodeIPs()
-					if err != nil {
-						klog.ErrorS(err, "Failed to list all node IPs from host")
+					nodeIPs = nil
+					for _, ipStr := range nodeAddressSet.UnsortedList() {
+						nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
 					}
 					break
 				}
-				nodeIPs = append(nodeIPs, a)
+				if getIPFamily(a) == proxier.ipFamily {
+					nodeIPs = append(nodeIPs, a)
+				}
 			}
 		}
 	}
-
-	// filter node IPs by proxier ipfamily
-	idx := 0
-	for _, nodeIP := range nodeIPs {
-		if (proxier.ipFamily == v1.IPv6Protocol) == netutils.IsIPv6(nodeIP) {
-			nodeIPs[idx] = nodeIP
-			idx++
-		}
-	}
-	// reset slice to filtered entries
-	nodeIPs = nodeIPs[:idx]
 
 	// Build IPVS rules for each service.
 	for svcPortName, svcPort := range proxier.svcPortMap {
