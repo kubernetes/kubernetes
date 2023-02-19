@@ -18762,14 +18762,14 @@ func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.
 	paths := sets.NewString()
 	switch tp.Kind() {
 	case reflect.Pointer:
-		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).List()...)
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).UnsortedList()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			paths.Insert(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)).List()...)
+			paths.Insert(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)).UnsortedList()...)
 		}
 	case reflect.Map, reflect.Slice:
-		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")).List()...)
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")).UnsortedList()...)
 	case reflect.Interface:
 		t.Fatalf("unexpected interface{} field %s", path.String())
 	default:

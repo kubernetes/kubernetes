@@ -6034,7 +6034,7 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, fld 
 		sets.NewString(string(core.ResourceQuotaScopeTerminating), string(core.ResourceQuotaScopeNotTerminating)),
 	}
 	for _, invalidScopePair := range invalidScopePairs {
-		if scopeSet.HasAll(invalidScopePair.List()...) {
+		if scopeSet.IsSuperset(invalidScopePair) {
 			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "conflicting scopes"))
 		}
 	}
@@ -6088,7 +6088,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 		sets.NewString(string(core.ResourceQuotaScopeTerminating), string(core.ResourceQuotaScopeNotTerminating)),
 	}
 	for _, invalidScopePair := range invalidScopePairs {
-		if scopeSet.HasAll(invalidScopePair.List()...) {
+		if scopeSet.IsSuperset(invalidScopePair) {
 			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "conflicting scopes"))
 		}
 	}
