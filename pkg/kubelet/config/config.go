@@ -103,7 +103,7 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
 	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
-	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
+	return seenSources.IsSuperset(c.sources) && c.pods.seenSourcesSet(c.sources)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
@@ -325,10 +325,10 @@ func (s *podStorage) markSourceSet(source string) {
 	s.sourcesSeen.Insert(source)
 }
 
-func (s *podStorage) seenSources(sources ...string) bool {
+func (s *podStorage) seenSourcesSet(sources sets.String) bool {
 	s.sourcesSeenLock.RLock()
 	defer s.sourcesSeenLock.RUnlock()
-	return s.sourcesSeen.HasAll(sources...)
+	return s.sourcesSeen.IsSuperset(sources)
 }
 
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {

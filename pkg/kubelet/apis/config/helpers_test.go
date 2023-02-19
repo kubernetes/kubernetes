@@ -70,14 +70,14 @@ func allPrimitiveFieldPaths(t *testing.T, skipRecurseList sets.String, tp reflec
 	paths := sets.NewString()
 	switch tp.Kind() {
 	case reflect.Pointer:
-		paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, tp.Elem(), path).List()...)
+		paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, tp.Elem(), path).UnsortedList()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, field.Type, path.Child(field.Name)).List()...)
+			paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, field.Type, path.Child(field.Name)).UnsortedList()...)
 		}
 	case reflect.Map, reflect.Slice:
-		paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, tp.Elem(), path.Key("*")).List()...)
+		paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, tp.Elem(), path.Key("*")).UnsortedList()...)
 	case reflect.Interface:
 		t.Fatalf("unexpected interface{} field %s", path.String())
 	default:
