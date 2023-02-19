@@ -23,6 +23,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -45,6 +46,11 @@ var _ admission.ValidationInterface = &Plugin{}
 
 // NewSecurityContextDeny creates a new instance of the SecurityContextDeny admission controller
 func NewSecurityContextDeny() *Plugin {
+	// DEPRECATED: SecurityContextDeny will be removed in favor of PodSecurity admission.
+	klog.Warningf("%s admission controller is deprecated. "+
+		"Please remove this controller from your configuration files and scripts. "+
+		"See https://k8s.io/docs/reference/access-authn-authz/admission-controllers/#securitycontextdeny for more information.",
+		PluginName)
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
