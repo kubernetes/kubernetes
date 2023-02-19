@@ -92,15 +92,17 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 }
 
 // Run runs the controller
-func (c *controller) Run(stopCh <-chan struct{}) {
+func (c *controller) Run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	if c.leaseClient == nil {
-		klog.Infof("lease controller has nil lease client, will not claim or renew leases")
+		logger.Info("lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
-	wait.JitterUntil(c.sync, c.renewInterval, 0.04, true, stopCh)
+	wait.JitterUntil(c.sync, c.renewInterval, 0.04, true, ctx.Done())
 }
 
-func (c *controller) sync() {
+func (c *controller) sync(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	if c.latestLease != nil {
 		// As long as the lease is not (or very rarely) updated by any other agent than the component itself,
 		// we can optimistically assume it didn't change since our last update and try updating
@@ -109,19 +111,19 @@ func (c *controller) sync() {
 		// If at some point other agents will also be frequently updating the Lease object, this
 		// can result in performance degradation, because we will end up with calling additional
 		// GET/PUT - at this point this whole "if" should be removed.
-		err := c.retryUpdateLease(c.latestLease)
+		err := c.retryUpdateLease(ctx, c.latestLease)
 		if err == nil {
 			return
 		}
-		klog.Infof("failed to update lease using latest lease, fallback to ensure lease, err: %v", err)
+		logger.Info("failed to update lease using latest lease, fallback to ensure lease, err: %v", err)
 	}
 
-	lease, created := c.backoffEnsureLease()
+	lease, created := c.backoffEnsureLease(ctx)
 	c.latestLease = lease
 	// we don't need to update the lease if we just created it
 	if !created && lease != nil {
-		if err := c.retryUpdateLease(lease); err != nil {
-			klog.Errorf("%v, will retry after %v", err, c.renewInterval)
+		if err := c.retryUpdateLease(ctx, lease); err != nil {
+			logger.Error(err, "retrying", "retry interval", c.renewInterval)
 		}
 	}
 }
@@ -130,7 +132,7 @@ func (c *controller) sync() {
 // and uses exponentially increasing waits to prevent overloading the API server
 // with retries. Returns the lease, and true if this call created the lease,
 // false otherwise.
-func (c *controller) backoffEnsureLease() (*coordinationv1.Lease, bool) {
+func (c *controller) backoffEnsureLease(ctx context.Context) (*coordinationv1.Lease, bool) {
 	var (
 		lease   *coordinationv1.Lease
 		created bool
@@ -143,7 +145,7 @@ func (c *controller) backoffEnsureLease() (*coordinationv1.Lease, bool) {
 			break
 		}
 		sleep = minDuration(2*sleep, maxBackoff)
-		klog.Errorf("failed to ensure lease exists, will retry in %v, error: %v", sleep, err)
+		klog.FromContext(ctx).Error(err, "failed to ensure lease exists", "retry interval", sleep)
 		// backoff wait
 		c.clock.Sleep(sleep)
 	}
@@ -178,7 +180,7 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 
 // retryUpdateLease attempts to update the lease for maxUpdateRetries,
 // call this once you're sure the lease has been created
-func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
+func (c *controller) retryUpdateLease(ctx context.Context, base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
 		leaseToUpdate, _ := c.newLease(base)
 		lease, err := c.leaseClient.Update(context.TODO(), leaseToUpdate, metav1.UpdateOptions{})
@@ -186,10 +188,10 @@ func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 			c.latestLease = lease
 			return nil
 		}
-		klog.Errorf("failed to update lease, error: %v", err)
+		klog.FromContext(ctx).Error(err, "failed to update lease")
 		// OptimisticLockError requires getting the newer version of lease to proceed.
 		if apierrors.IsConflict(err) {
-			base, _ = c.backoffEnsureLease()
+			base, _ = c.backoffEnsureLease(ctx)
 			continue
 		}
 		if i > 0 && c.onRepeatedHeartbeatFailure != nil {

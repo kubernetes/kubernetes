@@ -37,8 +37,9 @@ type nodeSpecForMergePatch struct {
 }
 
 // PatchNodeCIDRs patches the specified node.CIDR=cidrs[0] and node.CIDRs to the given value.
-func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) error {
+func PatchNodeCIDRs(ctx context.Context, c clientset.Interface, node types.NodeName, cidrs []string) error {
 	// set the pod cidrs list and set the old pod cidr field
+	logger := klog.FromContext(ctx)
 	patch := nodeForCIDRMergePatch{
 		Spec: nodeSpecForMergePatch{
 			PodCIDR:  cidrs[0],
@@ -50,7 +51,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 	if err != nil {
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
-	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
+	logger.V(4).Info("cidrs patch bytes", "patch bytes", string(patchBytes))
 	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}

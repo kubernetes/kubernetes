@@ -443,7 +443,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 
 // setNodeOwnerFunc helps construct a newLeasePostProcessFunc which sets
 // a node OwnerReference to the given lease object
-func setNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
+func setNodeOwnerFunc(ctx context.Context, c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
 	return func(lease *coordinationv1.Lease) error {
 		// Setting owner reference needs node's UID. Note that it is different from
 		// kubelet.nodeRef.UID. When lease is initially created, it is possible that
@@ -460,7 +460,7 @@ func setNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordi
 					},
 				}
 			} else {
-				klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", nodeName, err)
+				klog.FromContext(ctx).Error(err, "failed to get node when trying to set owner ref to the node lease", "nodeName", nodeName)
 				return err
 			}
 		}
