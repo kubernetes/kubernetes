@@ -126,6 +126,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 				klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
 
+				// NOTE: Passing CDI device names as annotations is a temporary solution
+				// It will be removed after all runtimes are updated
+				// to get CDI device names from the ContainerConfig.CDIDevices field
 				annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
 				if err != nil {
 					return fmt.Errorf("failed to generate container annotations, err: %+v", err)
@@ -163,6 +166,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 // This information is used by the caller to update a container config.
 func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	annotations := []kubecontainer.Annotation{}
+	cdiDevices := []kubecontainer.CDIDevice{}
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
@@ -179,10 +183,13 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 
 			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
 			annotations = append(annotations, claimInfo.annotations...)
+			for _, cdiDevice := range claimInfo.cdiDevices {
+				cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: cdiDevice})
+			}
 		}
 	}
 
-	return &ContainerInfo{Annotations: annotations}, nil
+	return &ContainerInfo{Annotations: annotations, CDIDevices: cdiDevices}, nil
 }
 
 // UnprepareResources calls a plugin's NodeUnprepareResource API for each resource claim owned by a pod.

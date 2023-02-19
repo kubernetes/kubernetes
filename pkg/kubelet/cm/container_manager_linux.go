@@ -661,7 +661,11 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 		if err != nil {
 			return nil, err
 		}
+		// NOTE: Passing CDI device names as annotations is a temporary solution
+		// It will be removed after all runtimes are updated
+		// to get CDI device names from the ContainerConfig.CDIDevices field
 		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
+		opts.CDIDevices = append(opts.CDIDevices, resOpts.CDIDevices...)
 	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here

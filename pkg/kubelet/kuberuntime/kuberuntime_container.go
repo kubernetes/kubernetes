@@ -335,6 +335,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
+		CDIDevices:  makeCDIDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
 		Stdin:       container.Stdin,
@@ -384,6 +385,19 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 			HostPath:      device.PathOnHost,
 			ContainerPath: device.PathInContainer,
 			Permissions:   device.Permissions,
+		}
+	}
+
+	return devices
+}
+
+// makeCDIDevices generates container CDIDevices for kubelet runtime v1.
+func makeCDIDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.CDIDevice {
+	devices := make([]*runtimeapi.CDIDevice, len(opts.CDIDevices))
+
+	for i, device := range opts.CDIDevices {
+		devices[i] = &runtimeapi.CDIDevice{
+			Name: device.Name,
 		}
 	}
 

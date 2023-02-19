@@ -71,6 +71,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Tty:         container.TTY,
 		Linux:       l,
 		Envs:        envs,
+		CDIDevices:  makeCDIDevices(opts),
 	}
 	return expectedConfig
 }
