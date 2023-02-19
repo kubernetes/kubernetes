@@ -35,9 +35,9 @@ type NetLinkHandle interface {
 	// GetAllLocalAddresses return all local addresses on the node.
 	// Only the addresses of the current family are returned.
 	// IPv6 link-local and loopback addresses are excluded.
-	GetAllLocalAddresses() (sets.String, error)
+	GetAllLocalAddresses() (sets.Set[string], error)
 	// GetLocalAddresses return all local addresses for an interface.
 	// Only the addresses of the current family are returned.
 	// IPv6 link-local and loopback addresses are excluded.
-	GetLocalAddresses(dev string) (sets.String, error)
+	GetLocalAddresses(dev string) (sets.Set[string], error)
 }

@@ -1026,11 +1026,17 @@ func (proxier *Proxier) syncProxyRules() {
 	activeIPVSServices := sets.New[string]()
 	// activeBindAddrs Represents addresses we want on the defaultDummyDevice after this round of sync
 	activeBindAddrs := sets.New[string]()
-
-	bindedAddresses, err := proxier.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
+	// alreadyBoundAddrs Represents addresses currently assigned to the dummy interface
+	alreadyBoundAddrs, err := proxier.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Error listing addresses binded to dummy interface")
 	}
+	// nodeAddressSet All addresses *except* those on the dummy interface
+	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddresses()
+	if err != nil {
+		klog.ErrorS(err, "Error listing node addresses")
+	}
+	nodeAddressSet = nodeAddressSet.Difference(alreadyBoundAddrs)
 
 	hasNodePort := false
 	for _, svc := range proxier.svcPortMap {
@@ -1163,7 +1169,7 @@ func (proxier *Proxier) syncProxyRules() {
 			serv.Flags |= utilipvs.FlagSourceHash
 		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
-		if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
+		if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
 			activeIPVSServices.Insert(serv.String())
 			activeBindAddrs.Insert(serv.Address.String())
 			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
@@ -1219,7 +1225,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if proxier.ipvsScheduler == "mh" {
 				serv.Flags |= utilipvs.FlagSourceHash
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
+			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
 				activeIPVSServices.Insert(serv.String())
 				activeBindAddrs.Insert(serv.Address.String())
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
@@ -1322,7 +1328,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if proxier.ipvsScheduler == "mh" {
 				serv.Flags |= utilipvs.FlagSourceHash
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
+			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
 				activeIPVSServices.Insert(serv.String())
 				activeBindAddrs.Insert(serv.Address.String())
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
@@ -1470,7 +1476,7 @@ func (proxier *Proxier) syncProxyRules() {
 					serv.Flags |= utilipvs.FlagSourceHash
 				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
-				if err := proxier.syncService(svcPortNameString, serv, false, bindedAddresses); err == nil {
+				if err := proxier.syncService(svcPortNameString, serv, false, alreadyBoundAddrs); err == nil {
 					activeIPVSServices.Insert(serv.String())
 					if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 						klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
@@ -1539,7 +1545,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Remove superfluous addresses from the dummy device
-	alreadyBoundAddrs := sets.New(bindedAddresses.List()...)
 	superfluousAddresses := alreadyBoundAddrs.Difference(activeBindAddrs)
 	if superfluousAddresses.Len() > 0 {
 		klog.V(2).InfoS("Removing addresses", "interface", defaultDummyDevice, "addresses", superfluousAddresses)
@@ -1883,7 +1888,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
-func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool, bindedAddresses sets.String) error {
+func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool, alreadyBoundAddrs sets.Set[string]) error {
 	appliedVirtualServer, _ := proxier.ipvs.GetVirtualServer(vs)
 	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
 		if appliedVirtualServer == nil {
@@ -1906,9 +1911,9 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 
 	// bind service address to dummy interface
 	if bindAddr {
-		// always attempt to bind if bindedAddresses is nil,
+		// always attempt to bind if alreadyBoundAddrs is nil,
 		// otherwise check if it's already binded and return early
-		if bindedAddresses != nil && bindedAddresses.Has(vs.Address.String()) {
+		if alreadyBoundAddrs != nil && alreadyBoundAddrs.Has(vs.Address.String()) {
 			return nil
 		}
 
