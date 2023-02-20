@@ -132,6 +132,14 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	// waiting for.
 	notReady := int32(-1)
 
+	// notReadyWithoutController is the number of pods that are
+	// not ready, but not controlled by a controller.
+	// This is used to output a more informative error message
+	// in the logs when the number of not-ready pods is below
+	// or equal to the allowed threshold, but a part of those
+	// pods are not controlled by a controller.
+	notReadyWithoutController := int32(0)
+
 	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
 		// Reset notReady at the start of a poll attempt.
 		notReady = -1
@@ -181,6 +189,8 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 				// ignore failed pods that are controlled by some controller
 				if metav1.GetControllerOf(&pod) == nil {
 					failedPods = append(failedPods, pod)
+					framework.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
+					notReadyWithoutController++
 				}
 			default:
 				notReady++
@@ -213,7 +223,13 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 
 	// An error might not be fatal.
 	if err != nil && notReady >= 0 && notReady <= allowedNotReadyPods {
-		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+		framework.Logf("Number of not-ready pods (%d) is below or equal to the allowed threshold (%d).", notReady, allowedNotReadyPods)
+
+		// Log the number of not-ready pods that are not controlled by a controller
+		if notReadyWithoutController > 0 {
+			framework.Logf("Number of not-ready pods not controlled by a controller is %d.", notReadyWithoutController)
+		}
+
 		return nil
 	}
 	return err
