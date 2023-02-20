@@ -593,7 +593,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
-			klog.FromContext(ctx).V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "pods skipped", skippedPods, "kind", rsc.Kind, "namespace", rs.Namespace, "name", rs.Name)
+			klog.FromContext(ctx).V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "podsSkipped", skippedPods, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
 				rsc.expectations.CreationObserved(rsKey)
@@ -793,14 +793,14 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(logger klog.Logger, rs
 		}
 		for _, pod := range pods {
 			if otherRS, found := seen[pod.UID]; found {
-				logger.V(5).Info("Pod is owned by both", "pod namespace", pod.Namespace, "pod name", pod.Name, "kind", rsc.Kind, "namespace", otherRS.Namespace, "name", otherRS.Name, "kind", rsc.Kind, "namespace", relatedRS.Namespace, "name", relatedRS.Name)
+				logger.V(5).Info("Pod is owned by both", "pod", klog.KObj(pod), "kind", rsc.Kind, "replicaSets", klog.KObjSlice([]klog.KMetadata{otherRS, relatedRS}))
 				continue
 			}
 			seen[pod.UID] = relatedRS
 			relatedPods = append(relatedPods, pod)
 		}
 	}
-	logger.V(4).Info("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjSlice(relatedPods))
+	logger.V(4).Info("Found related pods", "kind", rsc.Kind, "replicaSet", klog.KObj(rs), "pods", klog.KObjSlice(relatedPods))
 	return relatedPods, nil
 }
 

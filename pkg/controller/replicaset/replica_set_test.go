@@ -393,7 +393,7 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 	pendingDeletionRS.ObjectMeta.OwnerReferences[0].UID = "789"
 	now := metav1.Now()
 	pendingDeletionRS.DeletionTimestamp = &now
-	_, ctx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -427,7 +427,7 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 		for _, r := range c.rss {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		actualRSs := manager.getReplicaSetsWithSameController(klog.FromContext(ctx), c.rs)
+		actualRSs := manager.getReplicaSetsWithSameController(logger, c.rs)
 		var actualRSNames, expectedRSNames []string
 		for _, r := range actualRSs {
 			actualRSNames = append(actualRSNames, r.Name)
@@ -557,7 +557,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 	pod2 := newPod("pod2", someRS, v1.PodRunning, nil, true)
 	pod3 := newPod("pod3", relatedRS, v1.PodRunning, nil, true)
 	pod4 := newPod("pod4", unrelatedRS, v1.PodRunning, nil, true)
-	_, ctx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -599,7 +599,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 			informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
 			manager.addPod(pod)
 		}
-		actualPods, err := manager.getIndirectlyRelatedPods(klog.FromContext(ctx), c.rs)
+		actualPods, err := manager.getIndirectlyRelatedPods(logger, c.rs)
 		if err != nil {
 			t.Errorf("Unexpected error from getIndirectlyRelatedPods: %v", err)
 		}
@@ -885,8 +885,8 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	fakeRSClient := fakeClient.AppsV1().ReplicaSets("default")
 	numReplicas := int32(10)
 	newStatus := apps.ReplicaSetStatus{Replicas: numReplicas}
-	_, ctx := ktesting.NewTestContext(t)
-	updateReplicaSetStatus(klog.FromContext(ctx), fakeRSClient, rs, newStatus)
+	logger, _ := ktesting.NewTestContext(t)
+	updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {
@@ -1250,7 +1250,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		logger.V(8).Info("Waiting for queue to have 1 item", "currently has", manager.queue.Len())
+		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
@@ -1292,7 +1292,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		logger.V(8).Info("Waiting for queue to have 1 item", "currently has", manager.queue.Len())
+		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
