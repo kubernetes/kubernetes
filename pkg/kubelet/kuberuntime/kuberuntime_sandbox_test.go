@@ -67,39 +67,39 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 	tests := []struct {
 		description     string
 		pod             *v1.Pod
-		expectedProfile string
+		expectedProfile v1.SeccompProfileType
 	}{
 		{
 			description:     "no seccomp defined at pod level should return runtime/default",
 			pod:             newSeccompPod(nil, nil, "", "runtime/default"),
-			expectedProfile: "runtime/default",
+			expectedProfile: v1.SeccompProfileTypeRuntimeDefault,
 		},
 		{
 			description:     "seccomp field defined at pod level should not be honoured",
 			pod:             newSeccompPod(&v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, nil, "", ""),
-			expectedProfile: "runtime/default",
+			expectedProfile: v1.SeccompProfileTypeRuntimeDefault,
 		},
 		{
 			description:     "seccomp field defined at container level should not be honoured",
 			pod:             newSeccompPod(nil, &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, "", ""),
-			expectedProfile: "runtime/default",
+			expectedProfile: v1.SeccompProfileTypeRuntimeDefault,
 		},
 		{
 			description:     "seccomp annotation defined at pod level should not be honoured",
 			pod:             newSeccompPod(nil, nil, "unconfined", ""),
-			expectedProfile: "runtime/default",
+			expectedProfile: v1.SeccompProfileTypeRuntimeDefault,
 		},
 		{
 			description:     "seccomp annotation defined at container level should not be honoured",
 			pod:             newSeccompPod(nil, nil, "", "unconfined"),
-			expectedProfile: "runtime/default",
+			expectedProfile: v1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
 
 	for i, test := range tests {
 		config, _ := m.generatePodSandboxLinuxConfig(test.pod)
-		actualProfile := config.SecurityContext.SeccompProfilePath
-		assert.Equal(t, test.expectedProfile, actualProfile, "TestCase[%d]: %s", i, test.description)
+		actualProfile := config.SecurityContext.Seccomp.ProfileType.String()
+		assert.EqualValues(t, test.expectedProfile, actualProfile, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
