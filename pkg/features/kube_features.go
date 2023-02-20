@@ -687,6 +687,7 @@ const (
 	// kep: https://kep.k8s.io/2413
 	// alpha: v1.22
 	// beta: v1.25
+	// ga: v1.27
 	//
 	// Enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
 	SeccompDefault featuregate.Feature = "SeccompDefault"
@@ -1020,7 +1021,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
-	SeccompDefault: {Default: true, PreRelease: featuregate.Beta},
+	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
