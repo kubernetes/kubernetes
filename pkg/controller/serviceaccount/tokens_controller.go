@@ -375,7 +375,7 @@ func (e *TokensController) generateTokenIfNeeded(logger klog.Logger, serviceAcco
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		logger.V(2).Info("Secret is not up to date, skipping token population", klog.KRef(liveSecret.Namespace, liveSecret.Name))
+		logger.V(2).Info("Secret is not up to date, skipping token population", "secret", klog.KRef(liveSecret.Namespace, liveSecret.Name))
 		return false, nil
 	}
 
