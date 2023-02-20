@@ -752,6 +752,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				PodLogsDir:                    DefaultPodLogsDir,
 			},
 		},
 		{
@@ -843,6 +844,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				PodLogsDir:                    DefaultPodLogsDir,
 			},
 		},
 		{

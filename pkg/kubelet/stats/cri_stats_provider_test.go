@@ -89,7 +89,7 @@ const (
 	cName9 = "container9-name"
 )
 
-const testPodLogDirectory = "/var/log/pods/"
+const testPodLogDirectory = "/var/log/kube/pods/" // Use non-default path to ensure stats are collected properly
 
 func TestCRIListPodStats(t *testing.T) {
 	ctx := context.Background()

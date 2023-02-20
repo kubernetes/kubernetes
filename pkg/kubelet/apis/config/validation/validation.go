@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"time"
+	"unicode"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -298,6 +299,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	if filepath.Clean(kc.PodLogsDir) != kc.PodLogsDir {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be normalized", kc.PodLogsDir))
+	}
+
+	// Since pod logs path is used in metrics, make sure it contains only ASCII characters.
+	for _, c := range kc.PodLogsDir {
+		if c > unicode.MaxASCII {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q mut contains ASCII characters only", kc.PodLogsDir))
+			break
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrors)

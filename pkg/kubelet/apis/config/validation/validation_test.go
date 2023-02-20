@@ -570,13 +570,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s",
 	}, {
-		name: "invalid podLogsPath",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.PodLogsDir = ""
-			return conf
-		},
-		errMsg: "invalid configuration: podLogsPath was not specified",
-	}, {
 		name: "pod logs path must be absolute",
 		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			config.PodLogsDir = "./test"
@@ -590,7 +583,15 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return config
 		},
 		errMsg: `invalid configuration: pod logs path "/path/../" must be normalized`,
-	}}
+	}, {
+		name: "pod logs path is ascii only",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "/🧪"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "/🧪" mut contains ASCII characters only`,
+	},
+	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
