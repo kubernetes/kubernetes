@@ -130,7 +130,7 @@ func (h *Handler) startTrace(w http.ResponseWriter, r *http.Request) (*http.Requ
 		}
 	}
 	span.AddAttributes(requestAttrs(r)...)
-	if r.Body == nil {
+	if r.Body == http.NoBody {
 		// TODO: Handle cases where ContentLength is not set.
 	} else if r.ContentLength > 0 {
 		span.AddMessageReceiveEvent(0, /* TODO: messageID */
@@ -156,7 +156,7 @@ func (h *Handler) startStats(w http.ResponseWriter, r *http.Request) (http.Respo
 		ctx:    ctx,
 		writer: w,
 	}
-	if r.Body == nil {
+	if r.Body == http.NoBody {
 		// TODO: Handle cases where ContentLength is not set.
 		track.reqSize = -1
 	} else if r.ContentLength > 0 {
