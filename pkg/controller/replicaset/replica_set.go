@@ -658,7 +658,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.FromContext(ctx).V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "time taken", time.Since(startTime))
+		klog.FromContext(ctx).V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
