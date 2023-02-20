@@ -752,8 +752,8 @@ func getUUIDFromProviderID(providerID string) string {
 }
 
 // GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
-func GetReadySchedulableNodeInfos() []*NodeInfo {
-	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+func GetReadySchedulableNodeInfos(c clientset.Interface) []*NodeInfo {
+	nodeList, err := e2enode.GetReadySchedulableNodes(c)
 	framework.ExpectNoError(err)
 	var nodesInfo []*NodeInfo
 	for _, node := range nodeList.Items {
@@ -768,8 +768,8 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // GetReadySchedulableRandomNodeInfo returns NodeInfo object for one of the Ready and Schedulable Node.
 // if multiple nodes are present with Ready and Schedulable state then one of the Node is selected randomly
 // and it's associated NodeInfo object is returned.
-func GetReadySchedulableRandomNodeInfo() *NodeInfo {
-	nodesInfo := GetReadySchedulableNodeInfos()
+func GetReadySchedulableRandomNodeInfo(c clientset.Interface) *NodeInfo {
+	nodesInfo := GetReadySchedulableNodeInfos(c)
 	gomega.Expect(nodesInfo).NotTo(gomega.BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
 }
