@@ -15,6 +15,7 @@ filters:
     - sttts
     - soltysh
     - mfojtik
+    - tkashem
 
   "^\\.go.(mod|sum)$":
     labels:
