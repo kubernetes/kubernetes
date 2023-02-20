@@ -2063,21 +2063,6 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 	return false
 }
 
-func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
-	legacyAddrs := make(map[string]bool)
-	isIPv6 := netutils.IsIPv6(proxier.nodeIP)
-	for _, addr := range currentBindAddrs {
-		addrIsIPv6 := netutils.IsIPv6(netutils.ParseIPSloppy(addr))
-		if addrIsIPv6 && !isIPv6 || !addrIsIPv6 && isIPv6 {
-			continue
-		}
-		if _, ok := activeBindAddrs[addr]; !ok {
-			legacyAddrs[addr] = true
-		}
-	}
-	return legacyAddrs
-}
-
 func getIPFamily(ip net.IP) v1.IPFamily {
 	if netutils.IsIPv4(ip) {
 		return v1.IPv4Protocol
