@@ -30,17 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -203,7 +200,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		now                 time.Time
 		jobCreateError      error
 		jobGetErr           error
-		enableTimeZone      bool
 
 		// expectations
 		expectCreate               bool
@@ -251,7 +247,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
-			enableTimeZone:             true,
 			expectedWarnings:           1,
 			jobPresentInCJActiveStatus: true,
 		},
@@ -291,7 +286,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
-			enableTimeZone:             true,
 			expectRequeueAfter:         true,
 			expectedRequeueDuration:    1*time.Minute + nextScheduleDelta,
 			jobPresentInCJActiveStatus: true,
@@ -342,7 +336,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
-			enableTimeZone:             false,
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
@@ -357,7 +350,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
-			enableTimeZone:             true,
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
@@ -372,7 +364,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
-			enableTimeZone:             true,
 			expectCreate:               true,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
@@ -1172,8 +1163,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, tc.enableTimeZone)()
-
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend

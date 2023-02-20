@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -48,7 +47,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -380,7 +378,6 @@ func (jm *ControllerV2) enqueueControllerAfter(obj interface{}, t time.Duration)
 // updateCronJob re-queues the CronJob for next scheduled time if there is a
 // change in spec.schedule otherwise it re-queues it now
 func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr interface{}) {
-	timeZoneEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone)
 	oldCJ, okOld := old.(*batchv1.CronJob)
 	newCJ, okNew := curr.(*batchv1.CronJob)
 
@@ -391,9 +388,9 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// if the change in schedule results in next requeue having to be sooner than it already was,
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
-	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || (timeZoneEnabled && !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone)) {
+	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone) {
 		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
-		sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, newCJ, nil))
+		sched, err := cron.ParseStandard(formatSchedule(newCJ, nil))
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
@@ -430,7 +427,6 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob = cronJob.DeepCopy()
 	now := jm.now()
 	updateStatus := false
-	timeZoneEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone)
 
 	childrenJobs := make(map[types.UID]bool)
 	for _, j := range jobs {
@@ -499,9 +495,9 @@ func (jm *ControllerV2) syncCronJob(
 	}
 
 	logger := klog.FromContext(ctx)
-	if timeZoneEnabled && cronJob.Spec.TimeZone != nil {
-		if _, err := time.LoadLocation(*cronJob.Spec.TimeZone); err != nil {
-			timeZone := pointer.StringDeref(cronJob.Spec.TimeZone, "")
+	if cronJob.Spec.TimeZone != nil {
+		timeZone := pointer.StringDeref(cronJob.Spec.TimeZone, "")
+		if _, err := time.LoadLocation(timeZone); err != nil {
 			logger.V(4).Info("Not starting job because timeZone is invalid", "cronjob", klog.KObj(cronJob), "timeZone", timeZone, "err", err)
 			jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnknownTimeZone", "invalid timeZone: %q: %s", timeZone, err)
 			return cronJob, nil, updateStatus, nil
@@ -513,7 +509,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cronJob, nil, updateStatus, nil
 	}
 
-	sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, cronJob, jm.recorder))
+	sched, err := cron.ParseStandard(formatSchedule(cronJob, jm.recorder))
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
@@ -733,7 +729,7 @@ func getRef(object runtime.Object) (*corev1.ObjectReference, error) {
 	return ref.GetReference(scheme.Scheme, object)
 }
 
-func formatSchedule(timeZoneEnabled bool, cj *batchv1.CronJob, recorder record.EventRecorder) string {
+func formatSchedule(cj *batchv1.CronJob, recorder record.EventRecorder) string {
 	if strings.Contains(cj.Spec.Schedule, "TZ") {
 		if recorder != nil {
 			recorder.Eventf(cj, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cj.Spec.Schedule)
@@ -742,7 +738,7 @@ func formatSchedule(timeZoneEnabled bool, cj *batchv1.CronJob, recorder record.E
 		return cj.Spec.Schedule
 	}
 
-	if timeZoneEnabled && cj.Spec.TimeZone != nil {
+	if cj.Spec.TimeZone != nil {
 		if _, err := time.LoadLocation(*cj.Spec.TimeZone); err != nil {
 			return cj.Spec.Schedule
 		}
