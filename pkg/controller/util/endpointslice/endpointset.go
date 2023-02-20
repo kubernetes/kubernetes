@@ -25,11 +25,13 @@ import (
 
 // endpointHash is used to uniquely identify endpoints. Only including addresses
 // and hostnames as unique identifiers allows us to do more in place updates
-// should attributes such as topology, conditions, or targetRef change.
+// should attributes such as topology or conditions change.
 type endpointHash string
 type endpointHashObj struct {
 	Addresses []string
 	Hostname  string
+	Namespace string
+	Name      string
 }
 
 func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
@@ -37,6 +39,10 @@ func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
 	hashObj := endpointHashObj{Addresses: endpoint.Addresses}
 	if endpoint.Hostname != nil {
 		hashObj.Hostname = *endpoint.Hostname
+	}
+	if endpoint.TargetRef != nil {
+		hashObj.Namespace = endpoint.TargetRef.Namespace
+		hashObj.Name = endpoint.TargetRef.Name
 	}
 
 	return endpointHash(endpointutil.DeepHashObjectToString(hashObj))
