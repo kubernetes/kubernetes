@@ -1423,6 +1423,9 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 				},
 			}})
 	}
+	testPod := makePod(v1.ResourceList{
+		testResourceName: *resource.NewQuantity(int64(1), resource.DecimalSI),
+	})
 	topology := []cadvisorapi.Node{
 		{Id: 0},
 	}
@@ -1433,28 +1436,19 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 		testfunc    func(manager *wrappedManagerImpl)
 	}{
 		{
-			description: "getAvailableDevices data race when update device",
-			count:       1,
+			description: "GetTopologyHints data race when update device",
+			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.getAvailableDevices(testResourceName)
+				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
 			},
 		},
 		{
-			description: "generateDeviceTopologyHints data race when update device",
-			count:       1,
+			description: "GetPodTopologyHints data race when update device",
+			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.generateDeviceTopologyHints(
-					testResourceName, sets.NewString(), sets.NewString(), 1)
-			},
-		},
-		{
-			description: "deviceHasTopologyAlignment data race when update device",
-			count:       1000,
-			devices:     devs[:1],
-			testfunc: func(manager *wrappedManagerImpl) {
-				manager.deviceHasTopologyAlignment(testResourceName)
+				manager.GetPodTopologyHints(testPod)
 			},
 		},
 	}
