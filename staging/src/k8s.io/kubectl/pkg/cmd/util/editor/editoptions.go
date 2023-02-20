@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor/crlf"
 	"k8s.io/kubectl/pkg/scheme"
@@ -120,14 +121,20 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 }
 
 type editPrinterOptions struct {
-	printFlags *genericclioptions.PrintFlags
-	ext        string
-	addHeader  bool
+	printFlags        *genericclioptions.PrintFlags
+	ext               string
+	addHeader         bool
+	showManagedFields bool
 }
 
 func (e *editPrinterOptions) Complete(fromPrintFlags *genericclioptions.PrintFlags) error {
 	if e.printFlags == nil {
 		return fmt.Errorf("missing PrintFlags in editor printer options")
+	}
+
+	if fromPrintFlags != nil && fromPrintFlags.JSONYamlPrintFlags != nil {
+		e.printFlags.JSONYamlPrintFlags.ShowManagedFields = fromPrintFlags.JSONYamlPrintFlags.ShowManagedFields
+		e.showManagedFields = fromPrintFlags.JSONYamlPrintFlags.ShowManagedFields
 	}
 
 	// bind output format from existing printflags
@@ -364,12 +371,32 @@ func (o *EditOptions) Run() error {
 			containsError = false
 			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
-			// we need to add back managedFields to both updated and original object
-			if err := o.restoreManagedFields(updatedInfos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
-			}
-			if err := o.restoreManagedFields(infos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
+			if o.editPrinterOptions.showManagedFields {
+				// we are already showing managed fields and no need to restore it.
+				// but we need to verify that user does not make any changes on managed fields.
+				err = updatedVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+					metaObjs, err := meta.Accessor(info.Object)
+					if err != nil {
+						return err
+					}
+					mf := o.managedFields[metaObjs.GetUID()]
+					if changed := cmp.Diff(mf, metaObjs.GetManagedFields()); changed != "" {
+						return fmt.Errorf("managed fields can not be edited")
+					}
+
+					return nil
+				})
+				if err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+			} else {
+				// we need to add back managedFields to both updated and original object
+				if err := o.restoreManagedFields(updatedInfos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+				if err := o.restoreManagedFields(infos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
 			}
 
 			// need to make sure the original namespace wasn't changed while editing
@@ -475,7 +502,7 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 	o.managedFields = make(map[types.UID][]metav1.ManagedFieldsEntry)
 	if meta.IsListType(obj) {
 		err := meta.EachListItem(obj, func(obj runtime.Object) error {
-			uid, mf, err := clearManagedFields(obj)
+			uid, mf, err := o.clearManagedFields(obj)
 			if err != nil {
 				return err
 			}
@@ -484,7 +511,7 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 		})
 		return err
 	}
-	uid, mf, err := clearManagedFields(obj)
+	uid, mf, err := o.clearManagedFields(obj)
 	if err != nil {
 		return err
 	}
@@ -492,13 +519,15 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 	return nil
 }
 
-func clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
+func (o *EditOptions) clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
 	metaObjs, err := meta.Accessor(obj)
 	if err != nil {
 		return "", nil, err
 	}
 	mf := metaObjs.GetManagedFields()
-	metaObjs.SetManagedFields(nil)
+	if !o.editPrinterOptions.showManagedFields {
+		metaObjs.SetManagedFields(nil)
+	}
 	return metaObjs.GetUID(), mf, nil
 }
 
