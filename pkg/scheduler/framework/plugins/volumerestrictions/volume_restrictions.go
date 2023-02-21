@@ -144,7 +144,7 @@ func haveOverlap(a1, a2 []string) bool {
 	if len(a1) > len(a2) {
 		a1, a2 = a2, a1
 	}
-	m := sets.New[string](a1...)
+	m := sets.New(a1...)
 	for _, val := range a2 {
 		if _, ok := m[val]; ok {
 			return true
