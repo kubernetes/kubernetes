@@ -28,8 +28,7 @@ import (
 type FakeRecorder struct {
 	Events chan string
 
-	IncludeObject      bool
-	IncludeAnnotations bool
+	IncludeObject bool
 }
 
 func objectString(object runtime.Object, includeObject bool) string {
@@ -42,13 +41,6 @@ func objectString(object runtime.Object, includeObject bool) string {
 	)
 }
 
-func annotationString(annotations map[string]string, includeAnnotations bool) string {
-	if !includeAnnotations {
-		return ""
-	}
-	return " " + fmt.Sprint(annotations)
-}
-
 func (f *FakeRecorder) writeEvent(event string) {
 	if f.Events != nil {
 		f.Events <- event
@@ -57,7 +49,6 @@ func (f *FakeRecorder) writeEvent(event string) {
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
 	f.writeEvent(fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject)))
-
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
@@ -71,7 +62,7 @@ func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[st
 	f.writeEvent(
 		fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) +
 			objectString(object, f.IncludeObject) +
-			annotationString(annotations, f.IncludeAnnotations),
+			" " + fmt.Sprint(annotations),
 	)
 }
 
