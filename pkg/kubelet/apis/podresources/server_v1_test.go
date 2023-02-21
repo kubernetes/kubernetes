@@ -172,7 +172,13 @@ func TestListPodResourcesV1(t *testing.T) {
 			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).AnyTimes()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).AnyTimes()
 
-			server := NewV1PodResourcesServer(mockPodsProvider, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider)
+			providers := PodResourcesProviders{
+				Pods:    mockPodsProvider,
+				Devices: mockDevicesProvider,
+				Cpus:    mockCPUsProvider,
+				Memory:  mockMemoryProvider,
+			}
+			server := NewV1PodResourcesServer(providers)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
@@ -459,7 +465,13 @@ func TestAllocatableResources(t *testing.T) {
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return(tc.allCPUs).AnyTimes()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return(tc.allMemory).AnyTimes()
 
-			server := NewV1PodResourcesServer(mockPodsProvider, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider)
+			providers := PodResourcesProviders{
+				Pods:    mockPodsProvider,
+				Devices: mockDevicesProvider,
+				Cpus:    mockCPUsProvider,
+				Memory:  mockMemoryProvider,
+			}
+			server := NewV1PodResourcesServer(providers)
 
 			resp, err := server.GetAllocatableResources(context.TODO(), &podresourcesapi.AllocatableResourcesRequest{})
 			if err != nil {

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
-// podResourcesServerV1alpha1 implements PodResourcesListerServer
+// v1PodResourcesServer implements PodResourcesListerServer
 type v1PodResourcesServer struct {
 	podsProvider    PodsProvider
 	devicesProvider DevicesProvider
@@ -37,12 +37,12 @@ type v1PodResourcesServer struct {
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider, cpusProvider CPUsProvider, memoryProvider MemoryProvider) v1.PodResourcesListerServer {
+func NewV1PodResourcesServer(providers PodResourcesProviders) v1.PodResourcesListerServer {
 	return &v1PodResourcesServer{
-		podsProvider:    podsProvider,
-		devicesProvider: devicesProvider,
-		cpusProvider:    cpusProvider,
-		memoryProvider:  memoryProvider,
+		podsProvider:    providers.Pods,
+		devicesProvider: providers.Devices,
+		cpusProvider:    providers.Cpus,
+		memoryProvider:  providers.Memory,
 	}
 }
 

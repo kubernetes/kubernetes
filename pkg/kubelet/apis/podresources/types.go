@@ -51,3 +51,10 @@ type MemoryProvider interface {
 	// GetAllocatableMemory returns the allocatable memory from the node
 	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
 }
+
+type PodResourcesProviders struct {
+	Pods    PodsProvider
+	Devices DevicesProvider
+	Cpus    CPUsProvider
+	Memory  MemoryProvider
+}
