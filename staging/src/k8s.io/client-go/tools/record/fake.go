@@ -57,15 +57,15 @@ func (f *FakeRecorder) writeEvent(object runtime.Object, annotations map[string]
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	f.writeEvent(object, map[string]string{}, eventtype, reason, "%s", message)
+	f.writeEvent(object, nil, eventtype, reason, "%s", message)
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.writeEvent(object, map[string]string{}, eventtype, reason, messageFmt, args)
+	f.writeEvent(object, nil, eventtype, reason, messageFmt, args...)
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.writeEvent(object, annotations, eventtype, reason, messageFmt, args)
+	f.writeEvent(object, annotations, eventtype, reason, messageFmt, args...)
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with
