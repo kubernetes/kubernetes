@@ -295,37 +295,6 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-// usesHugePagesInProjectedVolume returns true if hugepages are used in downward api for volume
-func usesHugePagesInProjectedVolume(podSpec *api.PodSpec) bool {
-	// determine if any container is using hugepages in downward api volume
-	for _, volumeSource := range podSpec.Volumes {
-		if volumeSource.DownwardAPI != nil {
-			for _, item := range volumeSource.DownwardAPI.Items {
-				if item.ResourceFieldRef != nil {
-					if strings.HasPrefix(item.ResourceFieldRef.Resource, "requests.hugepages-") || strings.HasPrefix(item.ResourceFieldRef.Resource, "limits.hugepages-") {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
-}
-
-// usesHugePagesInProjectedEnv returns true if hugepages are used in downward api for volume
-func usesHugePagesInProjectedEnv(item api.Container) bool {
-	for _, env := range item.Env {
-		if env.ValueFrom != nil {
-			if env.ValueFrom.ResourceFieldRef != nil {
-				if strings.HasPrefix(env.ValueFrom.ResourceFieldRef.Resource, "requests.hugepages-") || strings.HasPrefix(env.ValueFrom.ResourceFieldRef.Resource, "limits.hugepages-") {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
 func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
 	for resourceName, quantity := range container.Resources.Limits {
 		if helper.IsHugePageResourceName(resourceName) {
@@ -418,8 +387,6 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
 	opts := apivalidation.PodValidationOptions{
-		// Allow pod spec to use hugepages in downward API if feature is enabled
-		AllowDownwardAPIHugePages:   utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIHugePages),
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
@@ -430,16 +397,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	if oldPodSpec != nil {
-		// if old spec used hugepages in downward api, we must allow it
-		opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedVolume(oldPodSpec)
-		// determine if any container is using hugepages in env var
-		if !opts.AllowDownwardAPIHugePages {
-			VisitContainers(oldPodSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-				opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedEnv(*c)
-				return !opts.AllowDownwardAPIHugePages
-			})
-		}
-
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 

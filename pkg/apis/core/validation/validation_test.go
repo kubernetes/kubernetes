@@ -4269,53 +4269,6 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowDownwardAPIHugePages: true},
-		},
-		{
-			name: "hugepages-downwardAPI-requests-disabled",
-			vol: core.Volume{
-				Name: "downwardapi",
-				VolumeSource: core.VolumeSource{
-					DownwardAPI: &core.DownwardAPIVolumeSource{
-						Items: []core.DownwardAPIVolumeFile{
-							{
-								Path: "hugepages_request",
-								ResourceFieldRef: &core.ResourceFieldSelector{
-									ContainerName: "test-container",
-									Resource:      "requests.hugepages-2Mi",
-								},
-							},
-						},
-					},
-				},
-			},
-			errs: []verr{{
-				etype: field.ErrorTypeNotSupported,
-				field: "downwardAPI.resourceFieldRef.resource",
-			}},
-		},
-		{
-			name: "hugepages-downwardAPI-limits-disabled",
-			vol: core.Volume{
-				Name: "downwardapi",
-				VolumeSource: core.VolumeSource{
-					DownwardAPI: &core.DownwardAPIVolumeSource{
-						Items: []core.DownwardAPIVolumeFile{
-							{
-								Path: "hugepages_limit",
-								ResourceFieldRef: &core.ResourceFieldSelector{
-									ContainerName: "test-container",
-									Resource:      "limits.hugepages-2Mi",
-								},
-							},
-						},
-					},
-				},
-			},
-			errs: []verr{{
-				etype: field.ErrorTypeNotSupported,
-				field: "downwardAPI.resourceFieldRef.resource",
-			}},
 		},
 		{
 			name: "downapi valid defaultMode",
@@ -5555,19 +5508,9 @@ func TestHugePagesEnv(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.Name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, true)()
-			opts := PodValidationOptions{AllowDownwardAPIHugePages: true}
+			opts := PodValidationOptions{}
 			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
-			}
-		})
-	}
-	// disable gate
-	for _, testCase := range testCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, false)()
-			opts := PodValidationOptions{AllowDownwardAPIHugePages: false}
-			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) == 0 {
-				t.Errorf("expected failure")
 			}
 		})
 	}

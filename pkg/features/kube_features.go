@@ -240,6 +240,7 @@ const (
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	// beta: v1.21 (off by default until 1.22)
+	// ga: v1.27
 	//
 	// Enables usage of hugepages-<size> in downward API.
 	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
@@ -901,7 +902,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
 
-	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
+	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.29
 
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.28
 
