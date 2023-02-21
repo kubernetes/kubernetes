@@ -44,7 +44,7 @@ func NewValidator() Validator {
 	if err := validateHost(); err != nil {
 		return nil
 	}
-	return nil
+	return &validator{}
 }
 
 type validator struct {
