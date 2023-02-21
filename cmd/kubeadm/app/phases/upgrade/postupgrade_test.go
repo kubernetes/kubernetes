@@ -138,7 +138,7 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		{
 			name:       "aggregate errs: no kubelet config file and cannot read config file",
 			dryrun:     true,
-			errPattern: "no kubelet component config found.*no such file or directory",
+			errPattern: missingKubeletConfig,
 			cfg:        &kubeadmapi.InitConfiguration{},
 		},
 		{
