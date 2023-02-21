@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -195,6 +196,71 @@ type prepare struct {
 	unreserve  change
 	postbind   change
 	postfilter change
+}
+
+func TestHaveAllNodes(t *testing.T) {
+	tests := []*struct {
+		name      string
+		nodeNames []string
+		nodes     []*v1.Node
+		has       bool
+	}{
+		{
+			name:      "same-nodes",
+			nodeNames: []string{"worker-a"},
+			nodes: []*v1.Node{
+				&st.MakeNode().Name("worker-a").Node,
+			},
+			has: true,
+		},
+		{
+			name:      "have-all",
+			nodeNames: []string{"worker-a", "worker-b"},
+			nodes: []*v1.Node{
+				&st.MakeNode().Name("worker-a").Node,
+			},
+			has: true,
+		},
+		{
+			name:      "not-all",
+			nodeNames: []string{"worker-a"},
+			nodes: []*v1.Node{
+				&st.MakeNode().Name("worker-a").Node,
+				&st.MakeNode().Name("worker-b").Node,
+			},
+			has: false,
+		},
+	}
+	// Test for the time complexity is O(n*n)
+	for _, test := range tests {
+		for i := 0; i < 40; i++ {
+			test.nodeNames = append(test.nodeNames, "worker-"+strconv.Itoa(i))
+			test.nodes = append(test.nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
+		}
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.has != haveAllNodes(test.nodeNames, test.nodes) {
+				t.Errorf("test haveAllNodes wrong, test name is: %s", test.name)
+			}
+		})
+	}
+
+	// Test for the time complexity is O(n)
+	for _, test := range tests {
+		for i := 40; i < 100; i++ {
+			test.nodeNames = append(test.nodeNames, "worker-"+strconv.Itoa(i))
+			test.nodes = append(test.nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
+		}
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.has != haveAllNodes(test.nodeNames, test.nodes) {
+				t.Errorf("test haveAllNodes wrong, test name is: %s", test.name)
+			}
+		})
+	}
+
 }
 
 func TestPlugin(t *testing.T) {

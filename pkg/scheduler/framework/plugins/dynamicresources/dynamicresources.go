@@ -45,6 +45,8 @@ const (
 	Name = names.DynamicResources
 
 	stateKey framework.StateKey = Name
+	// haveAllNodesThreshold is the threshold for using different lookup algorithms in the method (haveAllNodes)
+	haveAllNodesThreshold = 50
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -581,9 +583,22 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 }
 
 func haveAllNodes(nodeNames []string, nodes []*v1.Node) bool {
-	for _, node := range nodes {
-		if !haveNode(nodeNames, node.Name) {
-			return false
+	if len(nodeNames) < len(nodes) {
+		return false
+	}
+	// The time complexity is O(n)
+	if len(nodeNames) > haveAllNodesThreshold {
+		m := sets.New(nodeNames...)
+		for _, node := range nodes {
+			if _, ok := m[node.Name]; !ok {
+				return false
+			}
+		}
+	} else { // The time complexity is O(n*n)
+		for _, node := range nodes {
+			if !haveNode(nodeNames, node.Name) {
+				return false
+			}
 		}
 	}
 	return true
