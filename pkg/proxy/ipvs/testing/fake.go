@@ -33,9 +33,10 @@ type FakeNetlinkHandle struct {
 }
 
 // NewFakeNetlinkHandle will create a new FakeNetlinkHandle
-func NewFakeNetlinkHandle() *FakeNetlinkHandle {
+func NewFakeNetlinkHandle(isIPv6 bool) *FakeNetlinkHandle {
 	fake := &FakeNetlinkHandle{
 		localAddresses: make(map[string][]string),
+		IsIPv6:         isIPv6,
 	}
 	return fake
 }
@@ -115,8 +116,8 @@ func (h *FakeNetlinkHandle) ListBindAddress(devName string) ([]string, error) {
 }
 
 // GetLocalAddresses is a mock implementation
-func (h *FakeNetlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
-	res := sets.NewString()
+func (h *FakeNetlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) {
+	res := sets.New[string]()
 	// list all addresses from a given network interface.
 	for _, addr := range h.localAddresses[dev] {
 		if h.isValidForSet(addr) {
@@ -125,8 +126,8 @@ func (h *FakeNetlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
 	}
 	return res, nil
 }
-func (h *FakeNetlinkHandle) GetAllLocalAddresses() (sets.String, error) {
-	res := sets.NewString()
+func (h *FakeNetlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
+	res := sets.New[string]()
 	// List all addresses from all available network interfaces.
 	for linkName := range h.localAddresses {
 		// list all addresses from a given network interface.
