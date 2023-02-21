@@ -482,6 +482,13 @@ func (c *Cacher) Delete(
 // Watch implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	pred := opts.Predicate
+	// If the resourceVersion is unset, ensure that the rv
+	// from which the watch is being served, is the latest
+	// one. "latest" is ensured by serving the watch from
+	// the underlying storage.
+	if opts.ResourceVersion == "" {
+		return c.storage.Watch(ctx, key, opts)
+	}
 	watchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
