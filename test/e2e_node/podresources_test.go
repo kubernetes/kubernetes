@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -45,7 +46,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 const (
@@ -892,12 +892,12 @@ func getOnlineCPUs() (cpuset.CPUSet, error) {
 func setupSampleDevicePluginOrFail(ctx context.Context, f *framework.Framework) *v1.Pod {
 	e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
 
-	dp := getSampleDevicePluginPod()
+	dp := getSampleDevicePluginPod(kubeletdevicepluginv1beta1.DevicePluginPath)
 	dp.Spec.NodeName = framework.TestContext.NodeName
 
 	ginkgo.By("Create the sample device plugin pod")
 
-	dpPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
+	dpPod := e2epod.NewPodClient(f).CreateSync(ctx, dp)
 
 	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, dpPod.Namespace, dpPod.Name, "Ready", 120*time.Second, testutils.PodRunningReady)
 	if err != nil {
@@ -920,50 +920,14 @@ func teardownSampleDevicePluginOrFail(ctx context.Context, f *framework.Framewor
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
-func findTopologyUnawareResource(node *v1.Node) int64 {
-	framework.Logf("Node status allocatable: %v", node.Status.Allocatable)
-	for key, val := range node.Status.Allocatable {
-		if string(key) == defaultTopologyUnawareResourceName {
-			v := val.Value()
-			if v > 0 {
-				return v
-			}
-		}
-	}
-	return 0
-}
-
-func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Waiting for %q resources to become available on the local node", defaultTopologyUnawareResourceName))
 
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		node := getLocalNode(ctx, f)
-		resourceAmount := findTopologyUnawareResource(node)
-		return resourceAmount != 0
+		resourceAmount := CountSampleDeviceAllocatable(node)
+		return resourceAmount > 0
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
-}
-
-// getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
-func getSampleDevicePluginPod() *v1.Pod {
-	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
-	if err != nil {
-		framework.Fail(err.Error())
-	}
-
-	ds := readDaemonSetV1OrDie(data)
-	dp := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: sampleDevicePluginName,
-		},
-		Spec: ds.Spec.Template.Spec,
-	}
-	for i := range dp.Spec.Containers[0].Env {
-		if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
-			dp.Spec.Containers[0].Env[i].Value = pluginSockDir
-		}
-	}
-
-	return dp
 }
 
 func getPodResourcesMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
