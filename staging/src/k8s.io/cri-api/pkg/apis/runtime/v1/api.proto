@@ -1211,6 +1211,7 @@ message ContainerStatus {
     // image ID
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
+    // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
     string reason = 10;
     // Human-readable message indicating details about why container is in its
     // current state.
