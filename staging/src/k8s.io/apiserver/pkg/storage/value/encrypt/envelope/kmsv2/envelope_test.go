@@ -46,6 +46,10 @@ const (
 	testCacheTTL    = 10 * time.Second
 )
 
+var (
+	errCode = "empty"
+)
+
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
 // for testing of Envelope based encryption providers.
 type testEnvelopeService struct {
@@ -478,24 +482,28 @@ func TestValidateAnnotations(t *testing.T) {
 func TestValidateKeyID(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		name          string
-		keyID         string
-		expectedError string
+		name              string
+		keyID             string
+		expectedError     string
+		expectedErrorCode string
 	}{
 		{
-			name:          "valid key ID",
-			keyID:         "1234",
-			expectedError: "",
+			name:              "valid key ID",
+			keyID:             "1234",
+			expectedError:     "",
+			expectedErrorCode: "ok",
 		},
 		{
-			name:          "empty key ID",
-			keyID:         "",
-			expectedError: "keyID is empty",
+			name:              "empty key ID",
+			keyID:             "",
+			expectedError:     "keyID is empty",
+			expectedErrorCode: "empty",
 		},
 		{
-			name:          "keyID size is greater than 1 kB",
-			keyID:         strings.Repeat("a", 1024+1),
-			expectedError: "which exceeds the max size of",
+			name:              "keyID size is greater than 1 kB",
+			keyID:             strings.Repeat("a", 1024+1),
+			expectedError:     "which exceeds the max size of",
+			expectedErrorCode: "too_long",
 		},
 	}
 
@@ -503,7 +511,7 @@ func TestValidateKeyID(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := ValidateKeyID(tt.keyID)
+			errCode, err := ValidateKeyID(tt.keyID)
 			if tt.expectedError != "" {
 				if err == nil {
 					t.Fatalf("expected error %q, got nil", tt.expectedError)
@@ -515,6 +523,9 @@ func TestValidateKeyID(t *testing.T) {
 				if err != nil {
 					t.Fatalf("expected no error, got %q", err)
 				}
+			}
+			if tt.expectedErrorCode != string(errCode) {
+				t.Fatalf("expected %s errCode, got %s", tt.expectedErrorCode, string(errCode))
 			}
 		})
 	}
@@ -576,8 +587,10 @@ func TestEnvelopeMetrics(t *testing.T) {
 		func(ctx context.Context) (string, error) {
 			return testKeyVersion, nil
 		},
+		// health probe check to ensure keyID freshness
 		func(ctx context.Context) error {
-			return fmt.Errorf("health check probe called when encryption keyID is different")
+			metrics.RecordInvalidKeyIDFromStatus(testProviderName, errCode)
+			return nil
 		},
 		aestransformer.NewGCMTransformer)
 
@@ -606,15 +619,34 @@ func TestEnvelopeMetrics(t *testing.T) {
         		apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
 				`, testKeyHash, testProviderName, metrics.FromStorageLabel, testKeyHash, testProviderName, metrics.ToStorageLabel),
 		},
+		{
+			// keyVersionFromEncrypt is returned from kms v2 envelope service
+			// when it is different from the key ID returned from last status call
+			// it will trigger health probe check immediately to ensure keyID freshness
+			// during probe check above, it will call RecordInvalidKeyIDFromStatus
+			desc:                  "invalid KeyID From Status Total",
+			keyVersionFromEncrypt: "2",
+			prefix:                value.NewPrefixTransformers(nil, kmsv2Transformer),
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="%s",provider_name="%s"} 1
+			`, errCode, testProviderName),
+		},
 	}
 
 	metrics.DekCacheInterArrivals.Reset()
 	metrics.KeyIDHashTotal.Reset()
+	metrics.InvalidKeyIDFromStatusTotal.Reset()
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			defer metrics.DekCacheInterArrivals.Reset()
 			defer metrics.KeyIDHashTotal.Reset()
+			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
 			ctx := testContext(t)
 			envelopeService.keyVersion = tt.keyVersionFromEncrypt
 			transformedData, err := tt.prefix.TransformToStorage(ctx, []byte(testText), dataCtx)

@@ -142,6 +142,17 @@ var (
 		},
 		[]string{"provider_name", "key_id_hash"},
 	)
+
+	InvalidKeyIDFromStatusTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "invalid_key_id_from_status_total",
+			Help:           "Number of times an invalid keyID is returned by the Status RPC call split by error.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"provider_name", "error"},
+	)
 )
 
 var registerMetricsFunc sync.Once
@@ -186,6 +197,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(KeyIDHashTotal)
 		legacyregistry.MustRegister(KeyIDHashLastTimestampSeconds)
 		legacyregistry.MustRegister(KeyIDHashStatusLastTimestampSeconds)
+		legacyregistry.MustRegister(InvalidKeyIDFromStatusTotal)
 		legacyregistry.MustRegister(KMSOperationsLatencyMetric)
 	})
 }
@@ -207,6 +219,10 @@ func RecordKeyIDFromStatus(providerName, keyID string) {
 
 	keyIDHash := addLabelToCache(keyIDHashStatusLastTimestampSecondsMetricLabels, "", providerName, keyID)
 	KeyIDHashStatusLastTimestampSeconds.WithLabelValues(providerName, keyIDHash).SetToCurrentTime()
+}
+
+func RecordInvalidKeyIDFromStatus(providerName, errCode string) {
+	InvalidKeyIDFromStatusTotal.WithLabelValues(providerName, errCode).Inc()
 }
 
 func RecordArrival(transformationType string, start time.Time) {

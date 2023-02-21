@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,14 +34,22 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
+	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	kmsservice "k8s.io/kms/service"
 )
 
 const (
 	sampleText        = "abcdefghijklmnopqrstuvwxyz"
 	sampleContextText = "0123456789"
+)
+
+var (
+	sampleInvalidKeyID = string(make([]byte, envelopekmsv2.KeyIDMaxSize+1))
 )
 
 // testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
@@ -66,7 +75,8 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 // testKMSv2EnvelopeService is a mock kmsv2 envelope service which can be used to simulate remote Envelope v2 services
 // for testing of the envelope transformer with other transformers.
 type testKMSv2EnvelopeService struct {
-	err error
+	err   error
+	keyID string
 }
 
 func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
@@ -82,7 +92,7 @@ func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data
 	}
 	return &kmsservice.EncryptResponse{
 		Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
-		KeyID:      "1",
+		KeyID:      t.keyID,
 	}, nil
 }
 
@@ -90,7 +100,7 @@ func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*kmsservice.Stat
 	if t.err != nil {
 		return nil, t.err
 	}
-	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: "1", Version: "v2alpha1"}, nil
+	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: t.keyID, Version: "v2alpha1"}, nil
 }
 
 // The factory method to create mock envelope service.
@@ -105,12 +115,17 @@ func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelo
 
 // The factory method to create mock envelope kmsv2 service.
 func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint, providerName string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{nil}, nil
+	return &testKMSv2EnvelopeService{nil, "1"}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service which always returns error.
 func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{errors.New("test")}, nil
+	return &testKMSv2EnvelopeService{errors.New("test"), "1"}, nil
+}
+
+// The factory method to create mock envelope kmsv2 service that always returns invalid keyID.
+func newMockInvalidKeyIDEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration, keyID string) (kmsservice.Service, error) {
+	return &testKMSv2EnvelopeService{nil, keyID}, nil
 }
 
 func TestLegacyConfig(t *testing.T) {
@@ -716,6 +731,84 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 			_ = tt.probe.check(ctx)
 			if tt.probe.ttl != tt.wantTTL {
 				t.Fatalf("want ttl %v, got ttl %v", tt.wantTTL, tt.probe.ttl)
+			}
+		})
+	}
+}
+
+func TestKMSv2InvalidKeyID(t *testing.T) {
+	ctx := testContext(t)
+	invalidKeyIDService, _ := newMockInvalidKeyIDEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", 3*time.Second, "")
+	invalidLongKeyIDService, _ := newMockInvalidKeyIDEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", 3*time.Second, sampleInvalidKeyID)
+	service, _ := newMockInvalidKeyIDEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", 3*time.Second, "1")
+
+	testCases := []struct {
+		desc    string
+		probe   *kmsv2PluginProbe
+		metrics []string
+		want    string
+	}{
+		{
+			desc: "kmsv2 provider returns an invalid empty keyID",
+			probe: &kmsv2PluginProbe{
+				name:         "test",
+				ttl:          kmsPluginHealthzNegativeTTL,
+				service:      invalidKeyIDService,
+				l:            &sync.Mutex{},
+				lastResponse: &kmsPluginHealthzResponse{},
+			},
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			want: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="empty",provider_name="test"} 1
+			`,
+		},
+		{
+			desc: "kmsv2 provider returns a valid keyID",
+			probe: &kmsv2PluginProbe{
+				name:         "test",
+				ttl:          kmsPluginHealthzNegativeTTL,
+				service:      service,
+				l:            &sync.Mutex{},
+				lastResponse: &kmsPluginHealthzResponse{},
+			},
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			want: ``,
+		},
+		{
+			desc: "kmsv2 provider returns an invalid long keyID",
+			probe: &kmsv2PluginProbe{
+				name:         "test",
+				ttl:          kmsPluginHealthzNegativeTTL,
+				service:      invalidLongKeyIDService,
+				l:            &sync.Mutex{},
+				lastResponse: &kmsPluginHealthzResponse{},
+			},
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			want: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="too_long",provider_name="test"} 1
+			`,
+		},
+	}
+
+	metrics.InvalidKeyIDFromStatusTotal.Reset()
+	metrics.RegisterMetrics()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
+			_ = tt.probe.check(ctx)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
