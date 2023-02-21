@@ -81,6 +81,11 @@ const (
 	// kube proxy canary chain is used for monitoring rule reload
 	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
 
+	// kubeletFirewallChain is a duplicate of kubelet's firewall containing
+	// the anti-martian-packet rule. It should not be used for any other
+	// rules.
+	kubeletFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+
 	// largeClusterEndpointsThreshold is the number of endpoints at which
 	// we switch into "large cluster mode" and optimize for iptables
 	// performance over iptables debuggability
@@ -203,8 +208,8 @@ type Proxier struct {
 	// optimize for performance over debuggability.
 	largeClusterMode bool
 
-	// localhostNodePorts indicates whether to generate iptables rules that
-	// disable NodePort services to be accessed via localhost.
+	// localhostNodePorts indicates whether we allow NodePort services to be accessed
+	// via localhost.
 	localhostNodePorts bool
 	// Values are as a parameter to select the interfaces where nodePort works.
 	nodePortAddresses []string
@@ -237,7 +242,10 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
-	if localhostNodePorts && utilproxy.ContainsIPv4Loopback(nodePortAddresses) {
+	if !utilproxy.ContainsIPv4Loopback(nodePortAddresses) {
+		localhostNodePorts = false
+	}
+	if localhostNodePorts {
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
 		// Refer to https://issues.k8s.io/90259
 		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
@@ -363,6 +371,16 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainForward, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
+}
+
+// Duplicates of chains created in pkg/kubelet/kubelet_network_linux.go; we create these
+// on startup but do not delete them in CleanupLeftovers.
+var iptablesKubeletJumpChains = []iptablesJumpChain{
+	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainInput, "", nil},
+	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainOutput, "", nil},
+
+	// Move this to iptablesJumpChains once IPTablesOwnershipCleanup is GA and kubelet
+	// no longer creates this chain,
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
@@ -865,15 +883,16 @@ func (proxier *Proxier) syncProxyRules() {
 		// already exist, so we'll skip this step when doing a partial sync, to
 		// save us from having to invoke /sbin/iptables 20 times on each sync
 		// (which will be very slow on hosts with lots of iptables rules).
-		for _, jump := range iptablesJumpChains {
+		for _, jump := range append(iptablesJumpChains, iptablesKubeletJumpChains...) {
 			if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
 				klog.ErrorS(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
 				return
 			}
-			args := append(jump.extraArgs,
-				"-m", "comment", "--comment", jump.comment,
-				"-j", string(jump.dstChain),
-			)
+			args := jump.extraArgs
+			if jump.comment != "" {
+				args = append(args, "-m", "comment", "--comment", jump.comment)
+			}
+			args = append(args, "-j", string(jump.dstChain))
 			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
 				klog.ErrorS(err, "Failed to ensure chain jumps", "table", jump.table, "srcChain", jump.srcChain, "dstChain", jump.dstChain)
 				return
@@ -932,6 +951,26 @@ func (proxier *Proxier) syncProxyRules() {
 		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
 	)
 
+	isIPv6 := proxier.iptables.IsIPv6()
+	if !isIPv6 && proxier.localhostNodePorts {
+		// Kube-proxy's use of `route_localnet` to enable NodePorts on localhost
+		// creates a security hole (https://issue.k8s.io/90259) which this
+		// iptables rule mitigates.
+		// NB: THIS MUST MATCH the corresponding code in the kubelet. (Actually,
+		// kubelet uses "--dst"/"--src" rather than "-d"/"-s" but that's just a
+		// command-line thing and results in the same rule being created.)
+		proxier.filterChains.Write(utiliptables.MakeChainLine(kubeletFirewallChain))
+		proxier.filterRules.Write(
+			"-A", string(kubeletFirewallChain),
+			"-m", "comment", "--comment", `"block incoming localnet connections"`,
+			"-d", "127.0.0.0/8",
+			"!", "-s", "127.0.0.0/8",
+			"-m", "conntrack",
+			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
+			"-j", "DROP",
+		)
+	}
+
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
@@ -941,8 +980,8 @@ func (proxier *Proxier) syncProxyRules() {
 	// is just for efficiency, not correctness.
 	args := make([]string, 64)
 
-	// Compute total number of endpoint chains across all services to get
-	// a sense of how big the cluster is.
+	// Compute total number of endpoint chains across all services
+	// to get a sense of how big the cluster is.
 	totalEndpoints := 0
 	for svcName := range proxier.svcPortMap {
 		totalEndpoints += len(proxier.endpointsMap[svcName])
@@ -955,7 +994,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
 	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
-	isIPv6 := proxier.iptables.IsIPv6()
 	for addr := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
 			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
@@ -1350,8 +1388,12 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 			// If the packet was able to reach the end of firewall chain,
-			// then it did not get DNATed and will be dropped later by the
+			// then it did not get DNATed, so it will match the
 			// corresponding KUBE-PROXY-FIREWALL rule.
+			proxier.natRules.Write(
+				"-A", string(fwChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"other traffic to %s will be dropped by KUBE-PROXY-FIREWALL"`, svcPortNameString),
+			)
 		}
 
 		// If Cluster policy is in use, create the chain and create rules jumping
