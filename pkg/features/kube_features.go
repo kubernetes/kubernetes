@@ -613,6 +613,7 @@ const (
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
@@ -1002,7 +1003,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
 
-	PodSchedulingReadiness: {Default: false, PreRelease: featuregate.Alpha},
+	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
 
 	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

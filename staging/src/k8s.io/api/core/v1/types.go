@@ -3386,14 +3386,19 @@ type PodSpec struct {
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
-	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
+	// scheduler will not attempt to schedule the pod.
 	//
-	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
-	// +optional
+	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+	//
+	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +featureGate=PodSchedulingReadiness
+	// +optional
 	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
 	// ResourceClaims defines which ResourceClaims must be allocated
 	// and reserved before the Pod is allowed to start. The resources

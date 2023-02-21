@@ -3044,9 +3044,14 @@ type PodSpec struct {
 	OS *PodOS
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
-	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
+	// scheduler will not attempt to schedule the pod.
 	//
-	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+	//
+	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
+	//
+	// +featureGate=PodSchedulingReadiness
 	// +optional
 	SchedulingGates []PodSchedulingGate
 	// ResourceClaims defines which ResourceClaims must be allocated
