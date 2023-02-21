@@ -42,7 +42,7 @@ type Validator interface {
 // NewValidator is in order to find AppArmor FS
 func NewValidator() Validator {
 	if err := validateHost(); err != nil {
-		return nil
+		return &validator{validateHostErr: err}
 	}
 	return &validator{}
 }
