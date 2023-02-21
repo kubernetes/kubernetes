@@ -1086,7 +1086,7 @@ func (a byPVCSize) Less(i, j int) bool {
 func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		return true
 	case csiplugins.GCEPDInTreePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 	case csiplugins.AzureDiskInTreePluginName:
