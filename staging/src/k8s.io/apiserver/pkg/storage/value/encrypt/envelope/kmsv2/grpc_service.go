@@ -31,7 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
 	"k8s.io/klog/v2"
 	kmsapi "k8s.io/kms/apis/v2alpha1"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (

@@ -30,7 +30,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (
