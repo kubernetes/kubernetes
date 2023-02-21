@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
@@ -35,6 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	netutils "k8s.io/utils/net"
+)
+
+const (
+	os_windows = string(core.Windows)
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
@@ -142,7 +147,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 	podSandboxConfig.Linux = lc
 
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == os_windows {
 		wc, err := m.generatePodSandboxWindowsConfig(pod)
 		if err != nil {
 			return nil, err
@@ -190,10 +195,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
-		if sc.RunAsUser != nil && runtime.GOOS != "windows" {
+		if sc.RunAsUser != nil && runtime.GOOS != os_windows {
 			lc.SecurityContext.RunAsUser = &runtimeapi.Int64Value{Value: int64(*sc.RunAsUser)}
 		}
-		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
+		if sc.RunAsGroup != nil && runtime.GOOS != os_windows {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
 		namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper)
@@ -202,7 +207,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		}
 		lc.SecurityContext.NamespaceOptions = namespaceOptions
 
-		if sc.FSGroup != nil && runtime.GOOS != "windows" {
+		if sc.FSGroup != nil && runtime.GOOS != os_windows {
 			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))
 		}
 		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
@@ -213,7 +218,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 				lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(sg))
 			}
 		}
-		if sc.SELinuxOptions != nil && runtime.GOOS != "windows" {
+		if sc.SELinuxOptions != nil && runtime.GOOS != os_windows {
 			lc.SecurityContext.SelinuxOptions = &runtimeapi.SELinuxOption{
 				User:  sc.SELinuxOptions.User,
 				Role:  sc.SELinuxOptions.Role,
