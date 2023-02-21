@@ -133,6 +133,10 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 
 			// use the json field name, which must be stable
 			dataString := strings.Split(field.Tag.Get("json"), ",")[0]
+			if dataString == "-" {
+				// unserialized field, no need to fill it
+				continue
+			}
 			if len(dataString) == 0 {
 				// fall back to the struct field name if there is no json field name
 				dataString = "<no json tag> " + field.Name
