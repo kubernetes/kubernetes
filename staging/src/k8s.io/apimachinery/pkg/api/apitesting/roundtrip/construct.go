@@ -110,7 +110,11 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 		// populate with a single-item slice
 		v.Set(reflect.MakeSlice(t, 1, 1))
 		// recurse to populate the item, preserving the data context
-		fill(dataString, dataInt, t.Elem(), v.Index(0), fillFuncs, filledTypes)
+		if t.Elem().Kind() == reflect.Pointer {
+			fill(dataString, dataInt, t.Elem(), v.Index(0), fillFuncs, filledTypes)
+		} else {
+			fill(dataString, dataInt, reflect.PointerTo(t.Elem()), v.Index(0).Addr(), fillFuncs, filledTypes)
+		}
 
 	case reflect.Map:
 		// construct the key, which must be a string type, possibly converted to a type alias of string
