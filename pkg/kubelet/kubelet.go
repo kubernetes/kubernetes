@@ -2713,7 +2713,7 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		Memory:  kl.containerManager,
 	}
 
-	server.ListenAndServePodResources(socket, providers)
+	server.ListenAndServePodResources(socket, providers, kl.kubeletConfiguration.PodresourcesLimits)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.

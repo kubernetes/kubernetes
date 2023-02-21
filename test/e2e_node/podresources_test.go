@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -861,7 +863,59 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(ctx, getPodResourcesMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
+	})
 
+	ginkgo.Context("with the rate limit values configured", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			// we intentionally set very low limits to be reasonnably sure to hit them during the tests
+			initialConfig.PodresourcesLimits = kubeletconfig.RateLimitConfiguration{
+				MaxFrequency: 0.1,
+				MaxBurst:     1,
+			}
+		})
+
+		ginkgo.It("should hit throttling when calling podresources List in a tight loop", func(ctx context.Context) {
+			// ensure APIs have been called at least once
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Connecting to the kubelet endpoint")
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			tries := 10 // "high enough" random value but still easy to inspect at glance
+			errs := []error{}
+
+			ginkgo.By(fmt.Sprintf("Issuing %d List() calls in a tight loop", tries))
+			startTime := time.Now()
+			for try := 0; try < tries; try++ {
+				_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+				errs = append(errs, err)
+			}
+			elapsed := time.Since(startTime)
+
+			ginkgo.By(fmt.Sprintf("Checking return codes for %d List() calls in %v", tries, elapsed))
+
+			framework.ExpectNoError(errs[0], "the first List() call unexpectedly failed with %v", errs[0])
+			// we are very defensive here because of the harsh conditions of CI. What we expect is, over
+			// N tries, the first try to succeed and the next N-1 tries to fail for limit exceeded.
+			// But there are a bunch of timing assumptions hidden here, for example about the machine
+			// running the test to have enouch CPU to run kubelet and the test code in parallel, and
+			// the test code to actually hit the kubelet N times back to back hitting the rate limit.
+			// We can't really this will be true in CI, and we try hard to avoid hard-to-debug flakes.
+			// Hence we resort to try "a bunch" of times in a row and check we got at least 1 rate limit
+			// exceeded error in the bunch. The more the better, but the test outcome is binary anyway.
+			errLimitExceededCount := 0
+			for _, err := range errs[1:] {
+				if errors.Is(err, podresourcesgrpc.ErrorLimitExceeded) {
+					errLimitExceededCount++
+				}
+			}
+			gomega.Expect(errLimitExceededCount).ToNot(gomega.BeZero(), "never hit the rate limit trying %d calls in %v", tries, elapsed)
+
+			framework.Logf("got %d/%d rate limit errors, at least one needed, the more the better (goal=%d)", errLimitExceededCount, tries, tries-1)
+		})
 	})
 })
 

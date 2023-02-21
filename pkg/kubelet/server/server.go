@@ -32,6 +32,8 @@ import (
 	"strings"
 	"time"
 
+	gotimerate "golang.org/x/time/rate"
+
 	"github.com/emicklei/go-restful/v3"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -75,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -217,8 +220,15 @@ type PodResourcesProviders struct {
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, providers PodResourcesProviders) {
-	server := grpc.NewServer()
+func ListenAndServePodResources(socket string, providers PodResourcesProviders, ratelimit kubeletconfiginternal.RateLimitConfiguration) {
+	maxCallsLimit := gotimerate.Inf
+	maxCallsBurst := 0
+	if ratelimit.MaxFrequency > 0 {
+		maxCallsLimit = gotimerate.Limit(ratelimit.MaxFrequency)
+		maxCallsBurst = int(ratelimit.MaxBurst)
+		klog.InfoS("Setting rate limiting for podresources endpoint", "frequency", maxCallsLimit, "burst", maxCallsBurst)
+	}
+	server := grpc.NewServer(grpc.UnaryInterceptor(podresourcesgrpc.LimiterUnaryServerInterceptor(gotimerate.NewLimiter(maxCallsLimit, maxCallsBurst))))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers.Pods, providers.Devices))
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers.Pods, providers.Devices, providers.Cpus, providers.Memory))
