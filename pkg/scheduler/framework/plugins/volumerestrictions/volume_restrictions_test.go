@@ -359,29 +359,6 @@ func TestAccessModeConflicts(t *testing.T) {
 	}
 }
 
-func BenchmarkHaveOverlap(b *testing.B) {
-	tests := []struct {
-		a1        []string
-		a2        []string
-		isOverlap bool
-	}{
-		{
-			a1:        []string{"ab", "ac", "abc", "abcd", "abcde", "abcd", "ab", "abcdef", "abcdefg", "1", "2", "3", "4", "5", "6"},
-			a2:        []string{"bc", "helloworld", "bcd", "bcdef", "bcde", "12", "23", "34", "45", "56", "67", "78", "89"},
-			isOverlap: false,
-		},
-	}
-	testError := false
-	for n := 0; n < b.N; n++ {
-		for _, test := range tests {
-			if !testError && haveOverlap(test.a1, test.a2) != test.isOverlap {
-				testError = true
-				b.Errorf("test haveOverlap wrong, test case is: %v", test)
-			}
-		}
-	}
-}
-
 func newPlugin(ctx context.Context, t *testing.T) framework.Plugin {
 	return newPluginWithListers(ctx, t, nil, nil, nil, true)
 }
