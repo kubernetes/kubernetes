@@ -117,6 +117,11 @@ func EndpointsUseHostNetwork(config *NetworkingTestConfig) {
 	config.EndpointsHostNetwork = true
 }
 
+// PreferExternalAddresses prefer node External Addresses for the tests
+func PreferExternalAddresses(config *NetworkingTestConfig) {
+	config.PreferExternalAddresses = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *framework.Framework, setters ...Option) *NetworkingTestConfig {
 	// default options
@@ -205,6 +210,8 @@ type NetworkingTestConfig struct {
 	// The kubernetes namespace within which all resources for this
 	// config are created
 	Namespace string
+	// Whether to prefer node External Addresses for the tests
+	PreferExternalAddresses bool
 }
 
 // NetexecDialResponse represents the response returned by the `netexec` subcommand of `agnhost`
@@ -817,13 +824,17 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		family = v1.IPv6Protocol
 		secondaryFamily = v1.IPv4Protocol
 	}
-	// Get Node IPs from the cluster, ExternalIPs take precedence
-	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	if config.PreferExternalAddresses {
+		// Get Node IPs from the cluster, ExternalIPs take precedence
+		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	}
 	if config.NodeIP == "" {
 		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
 	}
 	if config.DualStackEnabled {
-		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if config.PreferExternalAddresses {
+			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		}
 		if config.SecondaryNodeIP == "" {
 			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
 		}
