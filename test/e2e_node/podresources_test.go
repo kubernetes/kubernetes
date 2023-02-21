@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -861,7 +863,47 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(ctx, getPodResourcesMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
+	})
 
+	ginkgo.Context("with the builtin rate limit values", func() {
+		ginkgo.It("should hit throttling when calling podresources List in a tight loop", func(ctx context.Context) {
+			// ensure APIs have been called at least once
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Connecting to the kubelet endpoint")
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			tries := podresourcesgrpc.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens
+			errs := []error{}
+
+			ginkgo.By(fmt.Sprintf("Issuing %d List() calls in a tight loop", tries))
+			startTime := time.Now()
+			for try := 0; try < tries; try++ {
+				_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+				errs = append(errs, err)
+			}
+			elapsed := time.Since(startTime)
+
+			ginkgo.By(fmt.Sprintf("Checking return codes for %d List() calls in %v", tries, elapsed))
+
+			framework.ExpectNoError(errs[0], "the first List() call unexpectedly failed with %v", errs[0])
+			// we would expect (burst) successes and then (tries-burst) errors on a clean test environment running with
+			// enough CPU power. CI is usually harsher. So we relax constraints, expecting at least _a_ failure, while
+			// we are likely to get much more. But we can't predict yet how more we should expect, so we prefer to relax
+			// constraints than to risk flakes at this stage.
+			errLimitExceededCount := 0
+			for _, err := range errs[1:] {
+				if errors.Is(err, podresourcesgrpc.ErrorLimitExceeded) {
+					errLimitExceededCount++
+				}
+			}
+			gomega.Expect(errLimitExceededCount).ToNot(gomega.BeZero(), "never hit the rate limit trying %d calls in %v", tries, elapsed)
+
+			framework.Logf("got %d/%d rate limit errors, at least one needed, the more the better", errLimitExceededCount, tries)
+		})
 	})
 })
 
