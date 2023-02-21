@@ -42,25 +42,37 @@ func objectString(object runtime.Object, includeObject bool) string {
 	)
 }
 
-func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	if f.Events != nil {
-		f.Events <- fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject))
+func annotationString(annotations map[string]string, includeAnnotations bool) string {
+	if !includeAnnotations {
+		return ""
 	}
+	return " " + fmt.Sprint(annotations)
+}
+
+func (f *FakeRecorder) writeEvent(event string) {
+	if f.Events != nil {
+		f.Events <- event
+	}
+}
+
+func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	f.writeEvent(fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject)))
+
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	if f.Events != nil {
-		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) + objectString(object, f.IncludeObject)
-	}
+	f.writeEvent(
+		fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) +
+			objectString(object, f.IncludeObject),
+	)
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	if f.IncludeAnnotations {
-		args = append(args, fmt.Sprint(annotations))
-		f.Eventf(object, eventtype, reason, messageFmt+" %s", args...)
-	} else {
-		f.Eventf(object, eventtype, reason, messageFmt, args...)
-	}
+	f.writeEvent(
+		fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) +
+			objectString(object, f.IncludeObject) +
+			annotationString(annotations, f.IncludeAnnotations),
+	)
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with
