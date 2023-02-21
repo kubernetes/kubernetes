@@ -43,9 +43,6 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Job",
-		},
 		Spec: batchv1.JobSpec{
 			ActiveDeadlineSeconds: activeDeadlineSeconds,
 			Parallelism:           &parallelism,

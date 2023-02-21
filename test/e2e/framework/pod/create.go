@@ -133,10 +133,6 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podSpec := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-tester-",
 			Namespace:    ns,
@@ -177,10 +173,6 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 		}(1000)
 	}
 	podSpec := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: podConfig.NS,

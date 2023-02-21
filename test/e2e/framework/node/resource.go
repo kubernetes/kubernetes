@@ -394,10 +394,6 @@ func isNodeUntainted(node *v1.Node) bool {
 // but allows for taints in the list of non-blocking taints.
 func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
 	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-not-scheduled",
 			Namespace: "fake-not-scheduled",

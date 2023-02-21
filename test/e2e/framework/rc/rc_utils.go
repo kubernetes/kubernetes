@@ -45,10 +45,6 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 		gracePeriod = &zeroGracePeriod
 	}
 	return &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicationController",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

@@ -575,10 +575,6 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 		},
 	}
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: config.Namespace,
@@ -645,10 +641,6 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 
 func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
 			Namespace: config.Namespace,

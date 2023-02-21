@@ -298,10 +298,6 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		restartPolicy = v1.RestartPolicyNever
 	}
 	serverPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: serverPodName,
 			Labels: map[string]string{
@@ -392,10 +388,6 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Prefix + "-" + podSuffix,
 			Labels: map[string]string{
