@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -121,6 +122,10 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
