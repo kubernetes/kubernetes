@@ -80,6 +80,7 @@ kube::golang::server_targets() {
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
     cmd/watch-termination
+    openshift-hack/cmd/k8s-tests
   )
   echo "${targets[@]}"
 }
@@ -438,7 +439,7 @@ kube::golang::set_platform_envs() {
 
   # if CC is defined for platform then always enable it
   ccenv=$(echo "$platform" | awk -F/ '{print "KUBE_" toupper($1) "_" toupper($2) "_CC"}')
-  if [ -n "${!ccenv-}" ]; then 
+  if [ -n "${!ccenv-}" ]; then
     export CGO_ENABLED=1
     export CC="${!ccenv}"
   fi

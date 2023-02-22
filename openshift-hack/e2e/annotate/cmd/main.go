@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	annotate.Run()
+	annotate.Run(annotate.TestMaps, func(name string) bool { return false })
 }
