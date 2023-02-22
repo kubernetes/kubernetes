@@ -50,7 +50,7 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 
 	staticSpec     *spec.Swagger
-	openAPIService *handler.OpenAPIService
+	openAPIService OpenAPIServiceInterface
 
 	// specs per version and per CRD name
 	lock     sync.Mutex
@@ -76,8 +76,12 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 	return c
 }
 
+type OpenAPIServiceInterface interface {
+	UpdateSpec(*spec.Swagger) error
+}
+
 // Run sets openAPIAggregationManager and starts workers
-func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService OpenAPIServiceInterface, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down OpenAPI controller")
@@ -174,6 +178,7 @@ func (c *Controller) sync(name string) error {
 	}
 
 	// compute CRD spec and see whether it changed
+
 	oldSpecs, updated := c.crdSpecs[crd.Name]
 	newSpecs, changed, err := buildVersionSpecs(crd, oldSpecs)
 	if err != nil {
