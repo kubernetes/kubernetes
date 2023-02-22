@@ -2814,6 +2814,20 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+func validateInitContainerRestartPolicy(restartPolicy *core.RestartPolicy, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+
+	switch *restartPolicy {
+	case core.RestartPolicyAlways:
+		break
+	default:
+		validValues := []string{string(core.RestartPolicyAlways)}
+		allErrors = append(allErrors, field.NotSupported(fldPath, *restartPolicy, validValues))
+	}
+
+	return allErrors
+}
+
 type commonHandler struct {
 	Exec      *core.ExecAction
 	HTTPGet   *core.HTTPGetAction
@@ -3144,6 +3158,15 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		// Apply the validation common to all container types
 		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts)...)
 
+		// Apply the validation specific to init containers
+		if ctr.RestartPolicy != nil {
+			if opts.AllowSidecarContainers {
+				allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
+			} else {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("restartPolicy"), "may not be set for init containers without the SidecarContainers feature"))
+			}
+		}
+
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
 		// will be detected by validateEphemeralContainers().
 		if allNames.Has(ctr.Name) {
@@ -3307,6 +3330,11 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
 		if ctr.StartupProbe != nil && ctr.StartupProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(path.Child("startupProbe", "successThreshold"), ctr.StartupProbe.SuccessThreshold, "must be 1"))
+		}
+
+		// These fields are disallowed for regular containers
+		if ctr.RestartPolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(path.Child("restartPolicy"), "cannot be set for a regular container"))
 		}
 	}
 
@@ -3665,6 +3693,8 @@ type PodValidationOptions struct {
 	AllowExpandedDNSConfig bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
+	// Allow sidecar containers
+	AllowSidecarContainers bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
