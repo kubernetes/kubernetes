@@ -542,6 +542,7 @@
               "policy": "policyValue"
             }
           ],
+          "restartPolicy": "restartPolicyValue",
           "volumeMounts": [
             {
               "name": "nameValue",
@@ -825,6 +826,7 @@
               "policy": "policyValue"
             }
           ],
+          "restartPolicy": "restartPolicyValue",
           "volumeMounts": [
             {
               "name": "nameValue",
@@ -1108,6 +1110,7 @@
               "policy": "policyValue"
             }
           ],
+          "restartPolicy": "restartPolicyValue",
           "volumeMounts": [
             {
               "name": "nameValue",
