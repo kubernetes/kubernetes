@@ -172,7 +172,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		filterRules:           utilproxy.LineBuffer{},
 		netlinkHandle:         netlinkHandle,
 		ipsetList:             ipsetList,
-		nodePortAddresses:     make([]string, 0),
+		nodePortAddresses:     utilproxy.NewNodePortAddresses(nil),
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		ipFamily:              ipFamily,
@@ -963,7 +963,7 @@ func TestNodePortIPv4(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv4Protocol)
-			fp.nodePortAddresses = test.nodePortAddresses
+			fp.nodePortAddresses = utilproxy.NewNodePortAddresses(test.nodePortAddresses)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1308,7 +1308,7 @@ func TestNodePortIPv6(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv6Protocol)
-			fp.nodePortAddresses = test.nodePortAddresses
+			fp.nodePortAddresses = utilproxy.NewNodePortAddresses(test.nodePortAddresses)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -2071,7 +2071,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{"100.101.102.0/24"}
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses([]string{"100.101.102.0/24"})
 
 	fp.syncProxyRules()
 
@@ -2159,7 +2159,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{"100.101.102.0/24"}
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses([]string{"100.101.102.0/24"})
 
 	fp.syncProxyRules()
 
