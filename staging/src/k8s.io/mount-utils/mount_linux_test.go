@@ -27,8 +27,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
-	"unsafe"
 
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
@@ -614,14 +612,11 @@ func TestDetectSafeNotMountedBehavior(t *testing.T) {
 func TestCheckUmountError(t *testing.T) {
 	target := "/test/path"
 	withSafeNotMountedBehavior := true
+	command := exec.Command("uname", "-r") // dummy command return status 0
 
-	pState := &os.ProcessState{}
-	var ref_pState reflect.Value = reflect.ValueOf(pState).Elem()
-	var ref_status reflect.Value = ref_pState.FieldByName("status")
-	status := (*uint32)(unsafe.Pointer(ref_status.UnsafeAddr()))
-	*status = 0
-
-	command := &exec.Cmd{ProcessState: pState} // dummy command return status 0
+	if err := command.Run(); err != nil {
+		t.Errorf("Faild to exec dummy command. err: %s", err)
+	}
 
 	testcases := []struct {
 		output   []byte
@@ -655,90 +650,7 @@ func TestCheckUmountError(t *testing.T) {
 	}
 }
 
-func TestFormat(t *testing.T) {
-	const (
-		formatCount    = 5
-		fstype         = "ext4"
-		output         = "complete"
-		cmdDuration    = 1 * time.Millisecond
-		defaultTimeout = 1 * time.Minute
-	)
-
-	tests := []struct {
-		desc           string
-		max            int
-		timeout        time.Duration
-		wantConcurrent int
-	}{
-		{
-			max:            0,
-			wantConcurrent: formatCount,
-		},
-		{
-			max:            -1,
-			wantConcurrent: formatCount,
-		},
-		{
-			max:            1,
-			wantConcurrent: 1,
-		},
-		{
-			max:            3,
-			wantConcurrent: 3,
-		},
-		{
-			max:            3,
-			timeout:        1 * time.Nanosecond,
-			wantConcurrent: formatCount,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(fmt.Sprintf("max=%d,timeout=%s", tc.max, tc.timeout.String()), func(t *testing.T) {
-			if tc.timeout == 0 {
-				tc.timeout = defaultTimeout
-			}
-
-			var concurrent, maxConcurrent int
-			var mu sync.Mutex
-
-			exec := &testexec.FakeExec{}
-			for i := 0; i < formatCount; i++ {
-				exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
-					mu.Lock()
-					concurrent++
-					if concurrent > maxConcurrent {
-						maxConcurrent = concurrent
-					}
-					mu.Unlock()
-
-					time.Sleep(cmdDuration)
-
-					mu.Lock()
-					concurrent--
-					mu.Unlock()
-				}))
-			}
-			mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(tc.max, tc.timeout))
-
-			var wg sync.WaitGroup
-			for i := 0; i < formatCount; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					mounter.format(fstype, nil)
-				}()
-			}
-			wg.Wait()
-
-			if maxConcurrent != tc.wantConcurrent {
-				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", maxConcurrent, tc.wantConcurrent)
-			}
-		})
-	}
-}
-
-func makeFakeCommandAction(stdout string, err error, cmdFn func()) testexec.FakeCommandAction {
+func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction {
 	c := testexec.FakeCmd{
 		CombinedOutputScript: []testexec.FakeAction{
 			func() ([]byte, []byte, error) {
