@@ -136,9 +136,11 @@ func logPodResources(podIdx int, pr *kubeletpodresourcesv1.PodResources) {
 
 type podResMap map[string]map[string]kubeletpodresourcesv1.ContainerResources
 
-func getPodResources(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient) podResMap {
+func getPodResourcesValues(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient) (podResMap, error) {
 	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-	framework.ExpectNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	res := make(map[string]map[string]kubeletpodresourcesv1.ContainerResources)
 	for idx, podResource := range resp.GetPodResources() {
@@ -151,7 +153,7 @@ func getPodResources(ctx context.Context, cli kubeletpodresourcesv1.PodResources
 		}
 		res[podResource.GetName()] = cnts
 	}
-	return res
+	return res, nil
 }
 
 type testPodData struct {
@@ -252,7 +254,10 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 
 func expectPodResources(ctx context.Context, offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc) {
 	gomega.EventuallyWithOffset(1+offset, ctx, func(ctx context.Context) error {
-		found := getPodResources(ctx, cli)
+		found, err := getPodResourcesValues(ctx, cli)
+		if err != nil {
+			return err
+		}
 		return matchPodDescWithResources(expected, found)
 	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
 }
@@ -280,8 +285,10 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 		expectedBasePods = 1 // sriovdp
 	}
 
+	var err error
 	ginkgo.By("checking the output when no pods are present")
-	found = getPodResources(ctx, cli)
+	found, err = getPodResourcesValues(ctx, cli)
+	framework.ExpectNoError(err)
 	gomega.ExpectWithOffset(1, found).To(gomega.HaveLen(expectedBasePods), "base pod expectation mismatch")
 
 	tpd = newTestPodData()
