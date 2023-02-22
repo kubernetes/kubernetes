@@ -371,6 +371,13 @@ type Status struct {
 	Message string
 	// CPU and memory resources for this container
 	Resources *ContainerResources
+	// Specifies whether the container has passed its readiness probe.
+	Ready bool
+	// Specifies whether the container has passed its startup probe.
+	// Initialized as false, becomes true after startupProbe is considered successful.
+	// Resets to false when the container is restarted, or if kubelet loses state temporarily.
+	// Is always true when no startupProbe is defined.
+	Started bool
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

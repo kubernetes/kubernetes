@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // FakeManager simulates a prober.Manager for testing.
@@ -43,7 +44,7 @@ func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 func (FakeManager) Start() {}
 
 // UpdatePodStatus simulates updating the Pod Status.
-func (FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
+func (FakeManager) UpdatePodStatus(_ types.UID, podStatus *kubecontainer.PodStatus, _ sets.Set[string]) {
 	for i := range podStatus.ContainerStatuses {
 		podStatus.ContainerStatuses[i].Ready = true
 	}
