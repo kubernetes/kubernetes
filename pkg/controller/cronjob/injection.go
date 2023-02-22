@@ -187,11 +187,3 @@ func (f *fakeJobControl) DeleteJob(namespace string, name string) error {
 	f.DeleteJobName = append(f.DeleteJobName, name)
 	return nil
 }
-
-func (f *fakeJobControl) Clear() {
-	f.Lock()
-	defer f.Unlock()
-	f.DeleteJobName = []string{}
-	f.Jobs = []batchv1.Job{}
-	f.Err = nil
-}
