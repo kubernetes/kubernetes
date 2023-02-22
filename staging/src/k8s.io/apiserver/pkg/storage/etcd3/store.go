@@ -23,20 +23,23 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	goruntime "runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/sync/errgroup"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -44,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -712,12 +716,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var hasMore bool
 	var getResp *clientv3.GetResponse
 	var numFetched int
-	var numEvald int
+	var numEvald atomic.Int32
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
+		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, int(numEvald.Load()), numReturn)
 	}()
 	for {
 		startTime := time.Now()
@@ -730,46 +734,142 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
-		numFetched += len(getResp.Kvs)
+		kvCount := len(getResp.Kvs)
+		numFetched += kvCount
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
 		hasMore = getResp.More
 
-		if len(getResp.Kvs) == 0 && getResp.More {
+		if kvCount == 0 && getResp.More {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
 		if pred.Empty() {
-			growSlice(v, len(getResp.Kvs))
+			growSlice(v, kvCount)
 		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
+			growSlice(v, 2048, kvCount)
 		}
 
-		// take items from the response until the bucket is full, filtering as we go
+		workers := 1 << 5 // somewhat arbitrary choice
+		if kvCount < workers {
+			workers = kvCount
+		}
+		g := &errgroup.Group{}
+		g.SetLimit(workers)
+		workChan := make(chan decodeWork, v.Cap())
+		workCtx, workCtxCancel := context.WithCancel(ctx)
+		workDone := func() {
+			workCtxCancel()
+			_ = g.Wait() // error is always nil
+		}
+		defer workDone()
+
+		_ = workqueue.ParallelizeUntil // TODO look into over errgroup
+
+		var workLock sync.Mutex
+		var workIdx int
+		commitWork := func(work decodeWork) bool {
+			workLock.Lock()
+			defer workLock.Unlock()
+
+			if workIdx == work.idx {
+				workIdx++
+				workChan <- work
+
+				if workIdx == kvCount {
+					workDone()
+				}
+
+				return true
+			}
+
+			return false
+		}
+
+		// take items from the response until the bucket is full, filtering as we go  // TODO fix
 		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= pred.Limit {
-				hasMore = true
-				break
-			}
-			lastKey = kv.Key
+			i, kv := i, kv
 
-			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key)) // TODO fix
-			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
-			}
+			workFunc := func() {
+				work := decodeWork{idx: i, key: kv.Key}
+				defer func() {
+					// the number of these go routines is unbounded but they are
+					// just trying to send on a channel in a specific order.
+					// TODO maybe just block this worker instead?
+					go func() {
+						for done := commitWork(work); !done; {
+							select {
+							case <-workCtx.Done():
+								return
+							default:
+								goruntime.Gosched()
+							}
+						}
+					}()
+				}()
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
-				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				// check before decryption
+				select {
+				case <-workCtx.Done():
+					work.err = workCtx.Err()
+					return
+				default:
+				}
+
+				data, _, err := s.transformer.TransformFromStorage(workCtx, kv.Value, authenticatedDataString(kv.Key))
+				if err != nil {
+					work.err = storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+					return
+				}
+
+				// check before decoding
+				select {
+				case <-workCtx.Done():
+					work.err = workCtx.Err()
+					return
+				default:
+				}
+
+				work.obj, work.err = shouldAppendListItem(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
+				if work.err != nil {
+					recordDecodeError(s.groupResourceString, string(kv.Key))
+					return
+				}
+
+				numEvald.Add(1)
 			}
-			numEvald++
+			g.Go(func() error {
+				workFunc()
+				return nil // never error here
+			})
 
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
 		}
+
+		for workItem := range workChan {
+			if paging && int64(v.Len()) >= pred.Limit {
+				hasMore = true
+				break
+			}
+
+			lastKey = workItem.key
+
+			if err := workItem.err; err != nil {
+				return err
+			}
+
+			if workItem.obj == nil {
+				continue // predicate filtered the item out
+			}
+
+			v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
+		}
+
+		workDone()
 
 		// indicate to the client which resource version was returned
 		if returnedRV == 0 {
@@ -828,6 +928,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	// no continuation
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+}
+
+type decodeWork struct {
+	idx int
+	key []byte
+	err error
+	obj runtime.Object // nil if filtered out by the predicate
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -1025,20 +1132,20 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-// appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+// shouldAppendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.  // TODO fix
+func shouldAppendListItem(data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) (runtime.Object, error) {
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// being unable to set the version does not prevent the object from being extracted
 	if err := versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}
 	if matched, err := pred.Matches(obj); err == nil && matched {
-		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+		return obj, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // recordDecodeError record decode error split by object type.
