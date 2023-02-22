@@ -195,7 +195,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	isBlockSupported := dInfo.Capabilities[storageframework.CapBlock]
 	switch pattern.VolType {
 	case storageframework.PreprovisionedPV:
-		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
+		if pattern.VolMode == v1.PersistentVolumeBlock && isBlockSupported {
 			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func(ctx context.Context) {
 				manualInit(ctx)
 				ginkgo.DeferCleanup(cleanup)
@@ -256,7 +256,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		}
 
 	case storageframework.DynamicPV:
-		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
+		if pattern.VolMode == v1.PersistentVolumeBlock && isBlockSupported {
 			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func(ctx context.Context) {
 				manualInit(ctx)
 				ginkgo.DeferCleanup(cleanup)
