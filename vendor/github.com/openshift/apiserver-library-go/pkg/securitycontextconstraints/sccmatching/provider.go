@@ -2,6 +2,7 @@ package sccmatching
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -99,7 +100,7 @@ func NewSimpleProvider(scc *securityv1.SecurityContextConstraints) (SecurityCont
 // on the PodSecurityContext it will not be changed.  Validate should be used after the context
 // is created to ensure it complies with the required restrictions.
 func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
-	sc := securitycontext.NewPodSecurityContextMutator(pod.Spec.SecurityContext)
+	sc := NewPodSecurityContextMutator(pod.Spec.SecurityContext)
 
 	annotationsCopy := maps.CopySS(pod.Annotations)
 
@@ -138,6 +139,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 			annotationsCopy = map[string]string{}
 		}
 		annotationsCopy[api.SeccompPodAnnotationKey] = seccompProfile
+		sc.SetSeccompProfile(seccompFieldForAnnotation(seccompProfile))
 	}
 
 	return sc.PodSecurityContext(), annotationsCopy, nil
@@ -147,9 +149,9 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 // container's security context then it will not be changed.  Validation should be used after
 // the context is created to ensure it complies with the required restrictions.
 func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, error) {
-	sc := securitycontext.NewEffectiveContainerSecurityContextMutator(
-		securitycontext.NewPodSecurityContextAccessor(pod.Spec.SecurityContext),
-		securitycontext.NewContainerSecurityContextMutator(container.SecurityContext),
+	sc := NewEffectiveContainerSecurityContextMutator(
+		NewPodSecurityContextAccessor(pod.Spec.SecurityContext),
+		NewContainerSecurityContextMutator(container.SecurityContext),
 	)
 	if sc.RunAsUser() == nil {
 		uid, err := s.runAsUserStrategy.Generate(pod, container)
@@ -212,6 +214,11 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 				break
 			}
 		}
+	}
+
+	containerSeccomp, ok := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+container.Name]
+	if ok {
+		sc.SetSeccompProfile(seccompFieldForAnnotation(containerSeccomp))
 	}
 
 	// if the SCC sets DefaultAllowPrivilegeEscalation and the container security context
@@ -496,4 +503,35 @@ func allowsVolumeType(allowedVolumes sets.String, fsType securityv1.FSType, volu
 	return allowedVolumes.Has(string(securityv1.FSTypeSecret)) &&
 		fsType == securityv1.FSProjected &&
 		sccutil.IsOnlyServiceAccountTokenSources(volumeSource.Projected)
+}
+
+// seccompFieldForAnnotation takes a pod annotation and returns the converted
+// seccomp profile field.
+// SeccompAnnotations removal is planned for Kube 1.27, remove this logic afterwards
+func seccompFieldForAnnotation(annotation string) *api.SeccompProfile {
+	// If only seccomp annotations are specified, copy the values into the
+	// corresponding fields. This ensures that existing applications continue
+	// to enforce seccomp, and prevents the kubelet from needing to resolve
+	// annotations & fields.
+	if annotation == corev1.SeccompProfileNameUnconfined {
+		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
+	}
+
+	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
+		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, corev1.SeccompLocalhostProfileNamePrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, corev1.SeccompLocalhostProfileNamePrefix)
+		if localhostProfile != "" {
+			return &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
 }
