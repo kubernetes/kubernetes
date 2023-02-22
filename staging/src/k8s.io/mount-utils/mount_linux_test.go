@@ -30,7 +30,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"unsafe"
 
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
@@ -612,14 +611,11 @@ func TestDetectSafeNotMountedBehavior(t *testing.T) {
 func TestCheckUmountError(t *testing.T) {
 	target := "/test/path"
 	withSafeNotMountedBehavior := true
+	command := exec.Command("uname", "-r") // dummy command return status 0
 
-	pState := &os.ProcessState{}
-	var ref_pState reflect.Value = reflect.ValueOf(pState).Elem()
-	var ref_status reflect.Value = ref_pState.FieldByName("status")
-	status := (*uint32)(unsafe.Pointer(ref_status.UnsafeAddr()))
-	*status = 0
-
-	command := &exec.Cmd{ProcessState: pState} // dummy command return status 0
+	if err := command.Run(); err != nil {
+		t.Errorf("Faild to exec dummy command. err: %s", err)
+	}
 
 	testcases := []struct {
 		output   []byte
