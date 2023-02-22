@@ -4515,6 +4515,9 @@ const (
 	// LoadBalancerPortsError represents the condition of the requested ports
 	// on the cloud load balancer instance.
 	LoadBalancerPortsError = "LoadBalancerPortsError"
+	// LoadBalancerPortsErrorReason reason in ServiceStatus condition LoadBalancerPortsError
+	// means the LoadBalancer was not able to be configured correctly.
+	LoadBalancerPortsErrorReason = "LoadBalancerMixedProtocolNotSupported"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -6872,10 +6875,9 @@ const (
 	PortForwardRequestIDHeader = "requestID"
 )
 
-// These are the built-in errors for PortStatus.
 const (
 	// MixedProtocolNotSupported error in PortStatus means that the cloud provider
-	// can't ensure the port on the load balancer because mixed values of protocols
+	// can't publish the port on the load balancer because mixed values of protocols
 	// on the same LoadBalancer type of Service are not supported by the cloud provider.
 	MixedProtocolNotSupported = "MixedProtocolNotSupported"
 )
