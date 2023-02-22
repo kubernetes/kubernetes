@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 	testingclock "k8s.io/utils/clock/testing"
 )
 

@@ -40,7 +40,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (

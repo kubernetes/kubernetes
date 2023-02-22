@@ -27,7 +27,7 @@ import (
 	kmsapi "k8s.io/kms/apis/v2alpha1"
 )
 
-// GRPCService is a gprc server that runs the kms v2 alpha 1 API.
+// GRPCService is a grpc server that runs the kms v2 alpha1 API.
 type GRPCService struct {
 	addr    string
 	timeout time.Duration
@@ -74,8 +74,8 @@ func (s *GRPCService) ListenAndServe() error {
 	return gs.Serve(ln)
 }
 
-// Shutdown performs a grafecul shutdown. Doesn't accept new connections and
-// blocks until all pending  RPCs are finished.
+// Shutdown performs a graceful shutdown. Doesn't accept new connections and
+// blocks until all pending RPCs are finished.
 func (s *GRPCService) Shutdown() {
 	klog.V(4).InfoS("kms plugin shutdown", "address", s.addr)
 	if s.server != nil {

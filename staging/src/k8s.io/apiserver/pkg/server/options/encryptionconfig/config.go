@@ -51,7 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (

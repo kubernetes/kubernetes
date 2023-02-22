@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package encryption
+package hierarchy
 
 import (
 	"bytes"
@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	aestransformer "k8s.io/kms/pkg/encrypt/aes"
+	"k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/value"
-	"k8s.io/kms/service"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/lru"
 )
