@@ -20,6 +20,7 @@ issues:
 linters:
   disable-all: true
   enable: # please keep this alphabetized
+    - ginkgolinter
     - gocritic
     - ineffassign
     - logcheck
