@@ -374,6 +374,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:
@@ -580,6 +581,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:
@@ -788,6 +790,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:
