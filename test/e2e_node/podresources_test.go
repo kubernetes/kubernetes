@@ -806,23 +806,13 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 					expectPodResources(ctx, 1, cli, []podDesc{desc})
 
-					restartTime := time.Now()
 					ginkgo.By("Restarting Kubelet")
 					restartKubelet(true)
 
 					// we need to wait for the node to be reported ready before we can safely query
 					// the podresources endpoint again. Otherwise we will have false negatives.
 					ginkgo.By("Wait for node to be ready")
-					gomega.Eventually(ctx, func() bool {
-						node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
-						framework.ExpectNoError(err)
-						for _, cond := range node.Status.Conditions {
-							if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
-								return true
-							}
-						}
-						return false
-					}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+					waitForTopologyUnawareResources(ctx, f)
 
 					expectPodResources(ctx, 1, cli, []podDesc{desc})
 					tpd.deletePodsForTest(ctx, f)
