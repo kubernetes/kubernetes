@@ -396,6 +396,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
+		AllowSidecarContainers:                            utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 	}
 
 	if oldPodSpec != nil {
