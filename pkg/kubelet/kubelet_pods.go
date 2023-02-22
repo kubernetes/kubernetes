@@ -1458,6 +1458,14 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 // internal pod status. This method should only be called from within sync*Pod methods.
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 	klog.V(3).InfoS("Generating pod status", "pod", klog.KObj(pod))
+
+	// ensure the probe managers have up-to-date status for containers
+	initContainerIDs := sets.New[string]() // FIXME find a better way to recognize an initContainer
+	for _, is := range pod.Status.InitContainerStatuses {
+		initContainerIDs.Insert(is.ContainerID)
+	}
+	kl.probeManager.UpdatePodStatus(pod.UID, podStatus, initContainerIDs)
+
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
@@ -1513,9 +1521,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Phase = pod.Status.Phase
 		}
 	}
-
-	// ensure the probe managers have up to date status for containers
-	kl.probeManager.UpdatePodStatus(pod.UID, s)
 
 	// preserve all conditions not owned by the kubelet
 	s.Conditions = make([]v1.PodCondition, 0, len(pod.Status.Conditions)+1)
@@ -1669,6 +1674,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Image:        cs.Image,
 			ImageID:      cs.ImageID,
 			ContainerID:  cid,
+			Ready:        cs.Ready,
+			Started:      &cs.Started,
 		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
