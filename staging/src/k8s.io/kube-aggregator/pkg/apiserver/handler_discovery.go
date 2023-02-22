@@ -292,9 +292,9 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 			lastUpdated: now,
 		}
 
-		// Save the resolve, because it is still useful in case other services
-		// are already marked dirty. THey can use it without making http request
-		dm.setCacheEntryForService(info.service, cached)
+		// Do not save the resolve as the legacy fallback only fetches
+		// one group version and an API Service may serve multiple
+		// group versions.
 		return &cached, nil
 
 	case http.StatusOK:
