@@ -53,6 +53,14 @@ const (
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
 
+var (
+	alwaysRestartPolicy    = core.RestartPolicyAlways
+	onFailureRestartPolicy = core.RestartPolicyOnFailure
+	neverRestartPolicy     = core.RestartPolicyNever
+	invalidRestartPolicy   = core.RestartPolicy("invalid")
+	emptyRestartPolicy     = core.RestartPolicy("")
+)
+
 func line() string {
 	_, _, line, ok := runtime.Caller(1)
 	var s string
@@ -7183,6 +7191,86 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resizePolicy"}},
 		},
+		{
+			title: "Forbidden RestartPolicy: Always",
+			line:  line(),
+			ephemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "foo",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						RestartPolicy:            &alwaysRestartPolicy,
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: OnFailure",
+			line:  line(),
+			ephemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "foo",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						RestartPolicy:            &onFailureRestartPolicy,
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: Never",
+			line:  line(),
+			ephemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "foo",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						RestartPolicy:            &neverRestartPolicy,
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: invalid",
+			line:  line(),
+			ephemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "foo",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						RestartPolicy:            &invalidRestartPolicy,
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: empty",
+			line:  line(),
+			ephemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "foo",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						RestartPolicy:            &emptyRestartPolicy,
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -8097,6 +8185,76 @@ func TestValidateContainers(t *testing.T) {
 			},
 			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].envFrom[0].configMapRef.name"}},
 		},
+		{
+			title: "Forbidden RestartPolicy: Always",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &alwaysRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: OnFailure",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &onFailureRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: Never",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &neverRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: invalid",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &invalidRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+		},
+		{
+			title: "Forbidden RestartPolicy: empty",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &emptyRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+		},
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
@@ -8128,30 +8286,79 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 	}
 
-	successCase := []core.Container{
+	successCases := []struct {
+		title, line    string
+		initContainers []core.Container
+		opts           PodValidationOptions
+	}{
 		{
-			Name:  "container-1-same-host-port-different-protocol",
-			Image: "image",
-			Ports: []core.ContainerPort{
-				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
-				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+			title: "success case without AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:  "container-1-same-host-port-different-protocol",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+						{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "container-2-same-host-port-different-protocol",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+						{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
 			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
 		},
 		{
-			Name:  "container-2-same-host-port-different-protocol",
-			Image: "image",
-			Ports: []core.ContainerPort{
-				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
-				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+			title: "success case with AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:  "container-1-same-host-port-different-protocol",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+						{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "container-2-same-host-port-different-protocol",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+						{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:                     "container-3-sidecar",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &alwaysRestartPolicy,
+				},
 			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
+			opts: PodValidationOptions{AllowSidecarContainers: true},
 		},
 	}
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
+
+	for _, tc := range successCases {
+		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
+			if errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("field"), tc.opts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -8160,12 +8367,13 @@ func TestValidateInitContainers(t *testing.T) {
 	errorCases := []struct {
 		title, line    string
 		initContainers []core.Container
+		opts           PodValidationOptions
 		expectedErrors field.ErrorList
 	}{
 		{
-			"empty name",
-			line(),
-			[]core.Container{
+			title: "empty name",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "",
 					Image:                    "image",
@@ -8173,12 +8381,12 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].name", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].name", BadValue: ""}},
 		},
 		{
-			"name collision with regular container",
-			line(),
-			[]core.Container{
+			title: "name collision with regular container",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "app",
 					Image:                    "image",
@@ -8186,12 +8394,12 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].name", BadValue: "app"}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].name", BadValue: "app"}},
 		},
 		{
-			"invalid termination message policy",
-			line(),
-			[]core.Container{
+			title: "invalid termination message policy",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "init",
 					Image:                    "image",
@@ -8199,12 +8407,12 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "Unknown",
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].terminationMessagePolicy", BadValue: core.TerminationMessagePolicy("Unknown")}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].terminationMessagePolicy", BadValue: core.TerminationMessagePolicy("Unknown")}},
 		},
 		{
-			"duplicate names",
-			line(),
-			[]core.Container{
+			title: "duplicate names",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "init",
 					Image:                    "image",
@@ -8218,12 +8426,12 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name", BadValue: "init"}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name", BadValue: "init"}},
 		},
 		{
-			"duplicate ports",
-			line(),
-			[]core.Container{
+			title: "duplicate ports",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:  "abc",
 					Image: "image",
@@ -8239,12 +8447,12 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].ports[1].hostPort", BadValue: "TCP//8080"}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].ports[1].hostPort", BadValue: "TCP//8080"}},
 		},
 		{
-			"uses disallowed field: Lifecycle",
-			line(),
-			[]core.Container{
+			title: "uses disallowed field: Lifecycle",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "debug",
 					Image:                    "image",
@@ -8257,12 +8465,12 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].lifecycle", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].lifecycle", BadValue: ""}},
 		},
 		{
-			"uses disallowed field: LivenessProbe",
-			line(),
-			[]core.Container{
+			title: "uses disallowed field: LivenessProbe",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "debug",
 					Image:                    "image",
@@ -8276,12 +8484,12 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].livenessProbe", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].livenessProbe", BadValue: ""}},
 		},
 		{
-			"uses disallowed field: ReadinessProbe",
-			line(),
-			[]core.Container{
+			title: "uses disallowed field: ReadinessProbe",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "debug",
 					Image:                    "image",
@@ -8294,12 +8502,12 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].readinessProbe", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].readinessProbe", BadValue: ""}},
 		},
 		{
-			"Container uses disallowed field: StartupProbe",
-			line(),
-			[]core.Container{
+			title: "Container uses disallowed field: StartupProbe",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "debug",
 					Image:                    "image",
@@ -8313,12 +8521,12 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
 		},
 		{
-			"Disallowed field with other errors should only return a single Forbidden",
-			line(),
-			[]core.Container{
+			title: "Disallowed field with other errors should only return a single Forbidden",
+			line:  line(),
+			initContainers: []core.Container{
 				{
 					Name:                     "debug",
 					Image:                    "image",
@@ -8337,12 +8545,86 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
+		},
+		{
+			title: "Cannot use RestartPolicy: Always, without AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &alwaysRestartPolicy,
+				},
+			},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].restartPolicy", BadValue: ""}},
+		},
+		{
+			title: "Not supported RestartPolicy: OnFailure, even if AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &onFailureRestartPolicy,
+				},
+			},
+			opts:           PodValidationOptions{AllowSidecarContainers: true},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: core.RestartPolicyOnFailure}},
+		},
+		{
+			title: "Not supported RestartPolicy: Never, even if AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &neverRestartPolicy,
+				},
+			},
+			opts:           PodValidationOptions{AllowSidecarContainers: true},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: core.RestartPolicyNever}},
+		},
+		{
+			title: "Not supported RestartPolicy: invalid, even if AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &invalidRestartPolicy,
+				},
+			},
+			opts:           PodValidationOptions{AllowSidecarContainers: true},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: core.RestartPolicy("invalid")}},
+		},
+		{
+			title: "Not supported RestartPolicy: empty, even if AllowSidecarContainers",
+			line:  line(),
+			initContainers: []core.Container{
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					RestartPolicy:            &emptyRestartPolicy,
+				},
+			},
+			opts:           PodValidationOptions{AllowSidecarContainers: true},
+			expectedErrors: field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: core.RestartPolicy("")}},
 		},
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), PodValidationOptions{})
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), tc.opts)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
