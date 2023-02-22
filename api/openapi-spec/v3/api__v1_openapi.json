@@ -1179,6 +1179,10 @@
             "default": {},
             "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
           },
+          "restartPolicy": {
+            "description": "Restart policy for the container. Always is the only supported value. It MUST be set only for init containers.",
+            "type": "string"
+          },
           "securityContext": {
             "allOf": [
               {
@@ -2028,6 +2032,10 @@
             ],
             "default": {},
             "description": "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod."
+          },
+          "restartPolicy": {
+            "description": "Restart policy for the container. Always is the only supported value. It MUST be set only for init containers.",
+            "type": "string"
           },
           "securityContext": {
             "allOf": [

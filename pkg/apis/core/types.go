@@ -2277,6 +2277,10 @@ type Container struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
+	// Restart policy for the container.
+	// +featureGate=SidecarContainers
+	// +optional
+	RestartPolicy *RestartPolicy
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
@@ -3503,6 +3507,10 @@ type EphemeralContainerCommon struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
+	// Restart policy for the container.
+	// +featureGate=SidecarContainers
+	// +optional
+	RestartPolicy *RestartPolicy
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// +optional
 	VolumeMounts []VolumeMount

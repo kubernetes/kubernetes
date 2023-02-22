@@ -2444,6 +2444,12 @@ type Container struct {
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
+	// Restart policy for the container.
+	// Always is the only supported value.
+	// It MUST be set only for init containers.
+	// +featureGate=SidecarContainers
+	// +optional
+	RestartPolicy *RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
 	// Pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
 	// +optional
@@ -3970,6 +3976,12 @@ type EphemeralContainerCommon struct {
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
+	// Restart policy for the container.
+	// Always is the only supported value.
+	// It MUST be set only for init containers.
+	// +featureGate=SidecarContainers
+	// +optional
+	RestartPolicy *RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// Cannot be updated.
 	// +optional
