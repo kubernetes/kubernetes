@@ -77,7 +77,7 @@ func (t *dnsTestCommon) init(ctx context.Context) {
 	namespace := "kube-system"
 	pods, err := t.f.ClientSet.CoreV1().Pods(namespace).List(ctx, options)
 	framework.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
-	gomega.Expect(len(pods.Items)).Should(gomega.BeNumerically(">=", 1))
+	gomega.Expect(pods.Items).ToNot(gomega.BeEmpty())
 
 	t.dnsPod = &pods.Items[0]
 	framework.Logf("Using DNS pod: %v", t.dnsPod.Name)
