@@ -96,8 +96,8 @@ var (
 			Help:           "KMS operation duration with gRPC error code status total.",
 			StabilityLevel: metrics.ALPHA,
 			// Use custom buckets to avoid the default buckets which are too small for KMS operations.
-			// Ranges from 1ms to 2m11s
-			Buckets: metrics.ExponentialBuckets(0.001, 2, 18),
+			// Start 0.1ms with the last bucket being [~52s, +Inf)
+			Buckets: metrics.ExponentialBuckets(0.0001, 2, 20),
 		},
 		[]string{"provider_name", "method_name", "grpc_status_code"},
 	)
