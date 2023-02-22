@@ -761,9 +761,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		g.SetLimit(workers)
 		workChan := make(chan decodeWork, v.Cap())
 		workCtx, workCtxCancel := context.WithCancel(ctx)
+		var workDoneOnce sync.Once
 		workDone := func() {
-			workCtxCancel()
-			_ = g.Wait() // error is always nil
+			workDoneOnce.Do(func() {
+				workCtxCancel()
+				_ = g.Wait() // error is always nil
+				close(workChan)
+			})
 		}
 		defer workDone()
 
@@ -811,10 +815,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					}()
 				}()
 
-				// check before decryption
 				select {
 				case <-workCtx.Done():
-					work.err = workCtx.Err()
+					work.err = fmt.Errorf("canceled before decryption: %w", workCtx.Err())
 					return
 				default:
 				}
@@ -825,10 +828,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					return
 				}
 
-				// check before decoding
 				select {
 				case <-workCtx.Done():
-					work.err = workCtx.Err()
+					work.err = fmt.Errorf("canceled before decoding: %w", workCtx.Err())
 					return
 				default:
 				}
