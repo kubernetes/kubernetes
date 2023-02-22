@@ -966,9 +966,8 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 func ExistsInDiscovery(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient crdclientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
-		// Ignore 404 & 403 errors
-		// As they're not ignored by `ServerResourcesForGroupVersion` because passed version is not equal to `v1`
-		if version == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+		// Ignore 404 errors as it means the resources doesn't exist
+		if errors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
