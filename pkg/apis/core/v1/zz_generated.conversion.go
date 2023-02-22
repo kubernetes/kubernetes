@@ -2986,6 +2986,7 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 		return err
 	}
 	out.ResizePolicy = *(*[]core.ContainerResizePolicy)(unsafe.Pointer(&in.ResizePolicy))
+	out.RestartPolicy = (*core.RestartPolicy)(unsafe.Pointer(in.RestartPolicy))
 	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
@@ -3020,6 +3021,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 		return err
 	}
 	out.ResizePolicy = *(*[]v1.ContainerResizePolicy)(unsafe.Pointer(&in.ResizePolicy))
+	out.RestartPolicy = (*v1.RestartPolicy)(unsafe.Pointer(in.RestartPolicy))
 	out.VolumeMounts = *(*[]v1.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
@@ -3602,6 +3604,7 @@ func autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in
 		return err
 	}
 	out.ResizePolicy = *(*[]core.ContainerResizePolicy)(unsafe.Pointer(&in.ResizePolicy))
+	out.RestartPolicy = (*core.RestartPolicy)(unsafe.Pointer(in.RestartPolicy))
 	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
@@ -3636,6 +3639,7 @@ func autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in
 		return err
 	}
 	out.ResizePolicy = *(*[]v1.ContainerResizePolicy)(unsafe.Pointer(&in.ResizePolicy))
+	out.RestartPolicy = (*v1.RestartPolicy)(unsafe.Pointer(in.RestartPolicy))
 	out.VolumeMounts = *(*[]v1.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
