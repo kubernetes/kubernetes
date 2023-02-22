@@ -1563,7 +1563,7 @@ func countValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.Str
 		uid := string(p.UID)
 		// Pods that don't have a completion finalizer are in the uncounted set or
 		// have already been accounted for in the Job status.
-		if uncounted != nil && (!hasJobTrackingFinalizer(p) || uncounted.Has(uid) || expectedRmFinalizers.Has(uid)) {
+		if !hasJobTrackingFinalizer(p) || uncounted.Has(uid) || expectedRmFinalizers.Has(uid) {
 			continue
 		}
 		if isIndexedJob(job) {
