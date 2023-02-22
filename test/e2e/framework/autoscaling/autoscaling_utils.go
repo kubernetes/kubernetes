@@ -29,6 +29,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -965,6 +966,11 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 func ExistsInDiscovery(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient crdclientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
+		// Ignore 404 & 403 errors
+		// As they're not ignored by `ServerResourcesForGroupVersion` because passed version is not equal to `v1`
+		if version == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+			return false, nil
+		}
 		return false, err
 	}
 	for _, g := range groupResource.APIResources {
