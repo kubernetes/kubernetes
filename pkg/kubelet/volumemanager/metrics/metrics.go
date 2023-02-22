@@ -30,9 +30,11 @@ const (
 	pluginNameNotAvailable = "N/A"
 
 	// Metric keys for Volume Manager.
-	volumeManagerTotalVolumes       = "volume_manager_total_volumes"
-	reconstructedVolumesTotal       = "reconstructed_volumes_total"
-	reconstructedVolumesErrorsTotal = "reconstructed_volumes_errors_total"
+	volumeManagerTotalVolumes                     = "volume_manager_total_volumes"
+	reconstructVolumeOperationsTotal              = "reconstruct_volume_operations_total"
+	reconstructVolumeOperationsErrorsTotal        = "reconstruct_volume_operations_errors_total"
+	forceCleanedFailedVolumeOperationsTotal       = "force_cleaned_failed_volume_operations_total"
+	forceCleanedFailedVolumeOperationsErrorsTotal = "force_cleaned_failed_volume_operation_errors_total"
 )
 
 var (
@@ -46,17 +48,32 @@ var (
 		metrics.ALPHA, "",
 	)
 
-	ReconstructedVolumesTotal = metrics.NewCounter(
+	ReconstructVolumeOperationsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           reconstructedVolumesTotal,
+			Name:           reconstructVolumeOperationsTotal,
 			Help:           "The number of volumes that were attempted to be reconstructed from the operating system during kubelet startup. This includes both successful and failed reconstruction.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	ReconstructedVolumesErrorsTotal = metrics.NewCounter(
+	ReconstructVolumeOperationsErrorsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           reconstructedVolumesErrorsTotal,
+			Name:           reconstructVolumeOperationsErrorsTotal,
 			Help:           "The number of volumes that failed reconstruction from the operating system during kubelet startup.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	ForceCleanedFailedVolumeOperationsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           forceCleanedFailedVolumeOperationsTotal,
+			Help:           "The number of volumes that were force cleaned after their reconstruction failed during kubelet startup. This includes both successful and failed cleanups.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	ForceCleanedFailedVolumeOperationsErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           forceCleanedFailedVolumeOperationsErrorsTotal,
+			Help:           "The number of volumes that failed force cleanup after their reconstruction failed during kubelet startup.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -78,8 +95,10 @@ func (v volumeCount) add(state, plugin string) {
 func Register(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, pluginMgr *volume.VolumePluginMgr) {
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(&totalVolumesCollector{asw: asw, dsw: dsw, pluginMgr: pluginMgr})
-		legacyregistry.MustRegister(ReconstructedVolumesTotal)
-		legacyregistry.MustRegister(ReconstructedVolumesErrorsTotal)
+		legacyregistry.MustRegister(ReconstructVolumeOperationsTotal)
+		legacyregistry.MustRegister(ReconstructVolumeOperationsErrorsTotal)
+		legacyregistry.MustRegister(ForceCleanedFailedVolumeOperationsTotal)
+		legacyregistry.MustRegister(ForceCleanedFailedVolumeOperationsErrorsTotal)
 	})
 }
 

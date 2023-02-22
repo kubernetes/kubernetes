@@ -95,10 +95,12 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 		PluginName:          volume.pluginName,
 		PodUID:              types.UID(volume.podName),
 	}
+	metrics.ForceCleanedFailedVolumeOperationsTotal.Inc()
 	// TODO: Currently cleanupMounts only includes UnmountVolume operation. In the next PR, we will add
 	// to unmount both volume and device in the same routine.
 	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
+		metrics.ForceCleanedFailedVolumeOperationsErrorsTotal.Inc()
 		klog.ErrorS(err, mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
 		return
 	}
@@ -179,10 +181,10 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 
 // Reconstruct volume data structure by reading the pod's volume directories
 func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
-	metrics.ReconstructedVolumesTotal.Inc()
+	metrics.ReconstructVolumeOperationsTotal.Inc()
 	defer func() {
 		if rerr != nil {
-			metrics.ReconstructedVolumesErrorsTotal.Inc()
+			metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
 		}
 	}()
 
