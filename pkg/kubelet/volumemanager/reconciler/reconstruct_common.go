@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -177,7 +178,14 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 }
 
 // Reconstruct volume data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume, error) {
+func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
+	metrics.ReconstructedVolumesTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.ReconstructedVolumesErrorsTotal.Inc()
+		}
+	}()
+
 	// plugin initializations
 	plugin, err := rc.volumePluginMgr.FindPluginByName(volume.pluginName)
 	if err != nil {

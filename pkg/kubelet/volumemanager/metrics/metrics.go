@@ -30,7 +30,9 @@ const (
 	pluginNameNotAvailable = "N/A"
 
 	// Metric keys for Volume Manager.
-	volumeManagerTotalVolumes = "volume_manager_total_volumes"
+	volumeManagerTotalVolumes       = "volume_manager_total_volumes"
+	reconstructedVolumesTotal       = "reconstructed_volumes_total"
+	reconstructedVolumesErrorsTotal = "reconstructed_volumes_errors_total"
 )
 
 var (
@@ -42,6 +44,21 @@ var (
 		[]string{"plugin_name", "state"},
 		nil,
 		metrics.ALPHA, "",
+	)
+
+	ReconstructedVolumesTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           reconstructedVolumesTotal,
+			Help:           "The number of volumes that were attempted to be reconstructed from the operating system during kubelet startup. This includes both successful and failed reconstruction.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	ReconstructedVolumesErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           reconstructedVolumesErrorsTotal,
+			Help:           "The number of volumes that failed reconstruction from the operating system during kubelet startup.",
+			StabilityLevel: metrics.ALPHA,
+		},
 	)
 )
 
@@ -61,6 +78,8 @@ func (v volumeCount) add(state, plugin string) {
 func Register(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, pluginMgr *volume.VolumePluginMgr) {
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(&totalVolumesCollector{asw: asw, dsw: dsw, pluginMgr: pluginMgr})
+		legacyregistry.MustRegister(ReconstructedVolumesTotal)
+		legacyregistry.MustRegister(ReconstructedVolumesErrorsTotal)
 	})
 }
 
