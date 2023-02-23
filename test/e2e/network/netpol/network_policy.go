@@ -114,16 +114,17 @@ var _ = common.SIGDescribe("Netpol", func() {
 	f.SkipNamespaceCreation = true // we create our own 3 test namespaces, we don't need the default one
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	// TODO would need an atomic solution when NOT parallelizing tests, or can restrict to only using this for serial runs
-	var hasAnyTestCaseFailed bool
+	// TODO make boolean thread safe
+	hasAnyTestCaseFailed := false
 	ginkgo.BeforeEach(func() {
 		if hasAnyTestCaseFailed {
 			// TODO add feature gate
 			e2eskipper.Skipf("skipping test because previous test failed")
 		}
+	})
 
-		// temporarily mark the test as failed until it has passed
-		hasAnyTestCaseFailed = true
+	ginkgo.AfterEach(func() {
+		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -141,7 +142,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -157,7 +157,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsX}, &Peer{}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -181,7 +180,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsX, "b"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow ingress traffic for a target [Feature:NetworkPolicy] ", func(ctx context.Context) {
@@ -207,7 +205,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectAllIngress(NewPodString(nsX, "c"), false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow ingress traffic from pods in all namespaces [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -222,7 +219,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -241,7 +237,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -267,7 +262,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsX, "b"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -293,7 +287,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -323,7 +316,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsX, "c"), NewPodString(nsX, "a"), false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -354,7 +346,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsZ, "b"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on Multiple PodSelectors and NamespaceSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -388,7 +379,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsZ, "a"), NewPodString(nsX, "a"), false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on any PodSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -411,7 +401,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsX, "c"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -439,7 +428,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsY, "a"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -465,7 +453,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -508,7 +495,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			ginkgo.By("Verifying that we can add a policy to unblock port 80")
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityALLOW})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should support allow-all policy [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -524,7 +510,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should allow ingress access on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -546,7 +531,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityPort80 := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityPort80.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort80})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should allow ingress access from namespace on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -577,7 +561,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityFAIL := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityFAIL.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityFAIL})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should allow egress access on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -599,7 +582,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityPort81 := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityPort81.ExpectPeer(&Peer{Namespace: nsX}, &Peer{}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce updated policy [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -622,7 +604,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityDeny := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityDeny.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityDeny})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should allow ingress access from updated namespace [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -654,7 +635,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityWithLabel.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			reachabilityWithLabel.ExpectPeer(&Peer{Namespace: nsY}, &Peer{}, true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityWithLabel})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should allow ingress access from updated pod [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -684,7 +664,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityWithLabel.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			reachabilityWithLabel.Expect(NewPodString(nsX, "b"), NewPodString(nsX, "a"), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityWithLabel})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should deny ingress from pods on other namespaces [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -702,7 +681,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should deny ingress access to updated pod [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -725,7 +703,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityIsolated := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityIsolated.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityIsolated})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should deny egress from pods based on PodSelector [Feature:NetworkPolicy] ", func(ctx context.Context) {
@@ -740,7 +717,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should deny egress from all pods in a namespace [Feature:NetworkPolicy] ", func(ctx context.Context) {
@@ -755,7 +731,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsX}, &Peer{}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should work with Ingress, Egress specified together [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -794,7 +769,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityPort81.ExpectAllEgress(NewPodString(nsX, "a"), false)
 			reachabilityPort81.Expect(NewPodString(nsX, "b"), NewPodString(nsX, "a"), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -891,7 +865,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsY, Pod: "b"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -918,7 +891,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
 			reachability.Expect(NewPodString(nsX, "a"), NewPodString(nsY, "a"), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP]", func(ctx context.Context) {
@@ -937,7 +909,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityUDP := NewReachability(k8s.AllPodStrings(), true)
 			reachabilityUDP.ExpectPeer(&Peer{}, &Peer{Namespace: nsX, Pod: "a"}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachabilityUDP})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -963,7 +934,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			reachabilityAll := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityAll})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -989,7 +959,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			reachabilityAll := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityAll})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should stop enforcing policies after they are deleted [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1016,7 +985,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			// Now the policy is deleted, we expect all connectivity to work again.
 			reachabilityAll := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityAll})
-			hasAnyTestCaseFailed = false
 		})
 
 		// TODO, figure out how the next 3 tests should work with dual stack : do we need a different abstraction then just "podIP"?
@@ -1046,7 +1014,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
 			reachability.Expect(NewPodString(nsX, "a"), NewPodString(nsY, "b"), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1081,7 +1048,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.Expect(NewPodString(nsX, "a"), NewPodString(nsX, "b"), false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1131,7 +1097,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachabilityAllow.Expect(NewPodString(nsX, "a"), NewPodString(nsX, "b"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityAllow})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1166,7 +1131,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			denyIngressToXReachability := NewReachability(k8s.AllPodStrings(), true)
 			denyIngressToXReachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: denyIngressToXReachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		// This test *does* apply to plugins that do not implement SCTP. It is a
@@ -1193,7 +1157,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		// This test *does* apply to plugins that do not implement SCTP. It is a
@@ -1214,7 +1177,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1233,7 +1195,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		// Note that this default ns functionality is maintained by the APIMachinery group, but we test it here anyways because its an important feature.
@@ -1257,7 +1218,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		// Note that this default ns functionality is maintained by the APIMachinery group, but we test it here anyways because its an important feature.
@@ -1281,7 +1241,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 	})
 })
@@ -1292,8 +1251,8 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 
-	// TODO would need an atomic solution when NOT parallelizing tests, or can restrict to only using this for serial runs
-	var hasAnyTestCaseFailed bool
+	// TODO make boolean thread safe
+	hasAnyTestCaseFailed := false
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -1302,9 +1261,10 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			// TODO add feature gate
 			e2eskipper.Skipf("skipping test because previous test failed")
 		}
+	})
 
-		// temporarily mark the test as failed until it has passed
-		hasAnyTestCaseFailed = true
+	ginkgo.AfterEach(func() {
+		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
@@ -1321,7 +1281,6 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1347,7 +1306,6 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolUDP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1375,7 +1333,6 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			reachability.Expect(NewPodString(nsY, "a"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 	})
 })
@@ -1386,8 +1343,8 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 
-	// TODO would need an atomic solution when NOT parallelizing tests, or can restrict to only using this for serial runs
-	var hasAnyTestCaseFailed bool
+	// TODO make boolean thread safe
+	hasAnyTestCaseFailed := false
 	ginkgo.BeforeEach(func() {
 		// Windows does not support SCTP for NetworkPolicy.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -1396,9 +1353,10 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 			// TODO add feature gate
 			e2eskipper.Skipf("skipping test because previous test failed")
 		}
+	})
 
-		// temporarily mark the test as failed until it has passed
-		hasAnyTestCaseFailed = true
+	ginkgo.AfterEach(func() {
+		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using SCTP", func() {
@@ -1415,7 +1373,6 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1440,7 +1397,6 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolSCTP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 
 		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
@@ -1468,7 +1424,6 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 			reachability.Expect(NewPodString(nsY, "a"), NewPodString(nsX, "a"), true)
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
-			hasAnyTestCaseFailed = false
 		})
 	})
 })
