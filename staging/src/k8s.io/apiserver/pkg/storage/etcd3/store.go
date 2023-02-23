@@ -754,7 +754,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		// needs to be large enough to give value in terms of parallelizing work
 		// but also needs to be small enough to not waste too much work on early exit
-		const chunkSize = 1 << 5
+		chunkSize := 1 << 5
+		if limit > 0 && int64(chunkSize) > limit {
+			chunkSize = int(limit)
+		}
 
 		// take items from the response until the bucket is full, filtering as we go
 	splitChunk:
