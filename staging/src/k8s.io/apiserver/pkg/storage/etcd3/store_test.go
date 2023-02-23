@@ -199,6 +199,8 @@ func TestListWithoutPaging(t *testing.T) {
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
 	return func(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
+		t.Helper()
+
 		if reads := transformer.GetReadsAndReset(); reads != estimatedProcessedObjects {
 			t.Errorf("unexpected reads: %d, expected: %d", reads, estimatedProcessedObjects)
 		}

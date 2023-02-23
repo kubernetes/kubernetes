@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1580,7 +1581,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	}
 
 	// the first list call should try to get 2 items from etcd (and only those items should be returned)
-	// the field selector should result in it reading 3 items via the transformer
+	// the field selector combined with parallel decoding should result in it reading 4 items via the transformer
 	// the chunking should result in 2 etcd Gets
 	// there should be a continueValue because there is more data
 	out := &example.PodList{}
@@ -1609,7 +1610,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	}
 	ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
 	if validation != nil {
-		validation(t, 2, 3)
+		validation(t, 2, 4)
 	}
 
 	// the rest of the test does not make sense if the previous call failed
