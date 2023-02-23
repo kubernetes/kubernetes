@@ -426,6 +426,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&TestContext.timeouts.SystemPodsStartup, "system-pods-startup-timeout", TestContext.timeouts.SystemPodsStartup, "Timeout for waiting for all system pods to be running before starting tests.")
 	flags.DurationVar(&TestContext.timeouts.NodeSchedulable, "node-schedulable-timeout", TestContext.timeouts.NodeSchedulable, "Timeout for waiting for all nodes to be schedulable.")
 	flags.DurationVar(&TestContext.timeouts.SystemDaemonsetStartup, "system-daemonsets-startup-timeout", TestContext.timeouts.SystemDaemonsetStartup, "Timeout for waiting for all system daemonsets to be ready.")
+	flags.DurationVar(&TestContext.timeouts.NetPolSleepBeforeProbing, "netpol-sleep-before-probing", TestContext.timeouts.NetPolSleepBeforeProbing, "Time to wait before the first attempt probing Pod connectivity when validating a NetworkPolicy.")
 	flags.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")

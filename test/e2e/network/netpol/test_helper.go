@@ -115,11 +115,12 @@ func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 	// network-congested, as is common in some GH actions or other heavily oversubscribed CI systems.
 	ginkgo.By("Validating reachability matrix... (FIRST TRY)")
 
-	// TODO use feature gate and configured timeout
-	sleepDuration := 90 * time.Second
-	framework.Logf("Sleeping %+v before first attempt probing pod to pod connectivity...", sleepDuration)
-	time.Sleep(sleepDuration)
-	framework.Logf("Finished sleeping. Starting to probe pod to pod connectivity...")
+	sleepDuration := k8s.framework.Timeouts.NetPolSleepBeforeProbing
+	if sleepDuration != 0 {
+		framework.Logf("Sleeping %+v before first attempt probing pod to pod connectivity...", sleepDuration)
+		time.Sleep(sleepDuration)
+		framework.Logf("Finished sleeping. Starting to probe pod to pod connectivity...")
+	}
 
 	ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)
 

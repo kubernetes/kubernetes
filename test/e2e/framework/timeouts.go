@@ -28,6 +28,7 @@ var defaultTimeouts = TimeoutContext{
 	ClaimProvisionShort:       1 * time.Minute,
 	DataSourceProvision:       5 * time.Minute,
 	ClaimBound:                3 * time.Minute,
+	NetPolSleepBeforeProbing:  0 * time.Second,
 	PVReclaim:                 3 * time.Minute,
 	PVBound:                   3 * time.Minute,
 	PVCreate:                  3 * time.Minute,
@@ -73,6 +74,9 @@ type TimeoutContext struct {
 
 	// ClaimBound is how long claims have to become bound.
 	ClaimBound time.Duration
+
+	// NetPolSleepBeforeProbing is how long to wait before probing when validating NetworkPolicy e2e tests.
+	NetPolSleepBeforeProbing time.Duration
 
 	// PVReclaim is how long PVs have to become reclaimed.
 	PVReclaim time.Duration
