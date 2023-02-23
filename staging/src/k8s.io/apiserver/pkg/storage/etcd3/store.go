@@ -754,6 +754,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		if err := func() error {
+			if kvCount == 0 {
+				return nil
+			}
+
 			workers := 1 << 5 // somewhat arbitrary choice
 			if kvCount < workers {
 				workers = kvCount
@@ -789,7 +793,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					workChan <- work
 
 					if workIdx == kvCount {
-						workDone()
+						go workDone()
 					}
 
 					return true
