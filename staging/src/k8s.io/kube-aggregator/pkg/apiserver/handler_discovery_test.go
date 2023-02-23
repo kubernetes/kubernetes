@@ -265,6 +265,7 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 		"v1beta1":  generateVersionResource("v1beta1"),
 		"v1alpha1": generateVersionResource("v1alpha1"),
 	}
+	sortedVersionOrder := []string{"v1", "v1beta1", "v1alpha1"}
 
 	legacyResourceHandlerV1 := discovery.NewAPIVersionHandler(scheme.Codecs, schema.GroupVersion{
 		Group:   "stable.example.com",
@@ -361,11 +362,11 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 	_, _, doc := fetchPath(aggregatedResourceManager, "")
 
 	aggregatedVersions := []apidiscoveryv2beta1.APIVersionDiscovery{}
-	for _, resource := range resources {
-		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resource})
+	for _, version := range sortedVersionOrder {
+		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resources[version]})
 		require.NoError(t, err)
 		aggregatedVersions = append(aggregatedVersions, apidiscoveryv2beta1.APIVersionDiscovery{
-			Version:   resource.Version,
+			Version:   resources[version].Version,
 			Resources: converted,
 			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
 		})
