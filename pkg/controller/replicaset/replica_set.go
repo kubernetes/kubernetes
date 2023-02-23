@@ -631,7 +631,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 					podKey := controller.PodKey(targetPod)
 					rsc.expectations.DeletionObserved(rsKey, podKey)
 					if !apierrors.IsNotFound(err) {
-						klog.FromContext(ctx).V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "namespace", rs.Namespace, "name", rs.Name)
+						klog.FromContext(ctx).V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
 						errCh <- err
 					}
 				}
