@@ -768,7 +768,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		idx := 0
 		// take items from the response until the bucket is full, filtering as we go
 	splitChunk:
-		for chunk := range splitChunks(getResp.Kvs, chunkSize) {
+		for chunk := range splitChunks(ctx, getResp.Kvs, chunkSize) {
 			for j, kv := range chunk {
 				j, kv := j, kv
 
@@ -829,6 +829,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
 			}
 			idx++
+		}
+		// always error if chunking of the KV list could have terminated early due to context cancellation
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 
 		// indicate to the client which resource version was returned
@@ -891,7 +895,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 }
 
 // TODO unit test
-func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) chan []*mvccpb.KeyValue {
+func splitChunks(ctx context.Context, kvs []*mvccpb.KeyValue, chunkSize int) chan []*mvccpb.KeyValue {
 	kvCount := len(kvs)
 
 	chunks := kvCount / chunkSize
@@ -908,7 +912,13 @@ func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) chan []*mvccpb.KeyValue 
 			if end > kvCount {
 				end = kvCount
 			}
-			ch <- kvs[start:end]
+
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- kvs[start:end]:
+			}
+
 			start += chunkSize
 			end += chunkSize
 		}
