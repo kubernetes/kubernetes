@@ -452,7 +452,15 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 			LabelSelectorParam(o.Selector).
 			Flatten().
 			Do()
+
 		o.objects, err = r.Infos()
+
+		if o.ApplySet != nil {
+			if err := o.ApplySet.addLabels(o.objects); err != nil {
+				return nil, err
+			}
+		}
+
 		o.objectsCached = true
 	}
 	return o.objects, err
