@@ -74,6 +74,12 @@ func (a ApplySet) ID() string {
 	return "placeholder-todo"
 }
 
+func (a *ApplySet) LabelsForMember() map[string]string {
+	return map[string]string{
+		"applyset.k8s.io/part-of": a.ID(),
+	}
+}
+
 func (p *ApplySetParentRef) IsNamespaced() bool {
 	return p.RESTMapping.Scope.Name() == meta.RESTScopeNameNamespace
 }

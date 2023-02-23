@@ -434,16 +434,21 @@ func isIncompatibleServerError(err error) bool {
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	var err error = nil
 	if !o.objectsCached {
-		r := o.Builder.
+		b := o.Builder.
 			Unstructured().
 			Schema(o.Validator).
 			ContinueOnError().
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 			LabelSelectorParam(o.Selector).
-			Flatten().
-			Do()
-		o.objects, err = r.Infos()
+			Flatten()
+
+		if o.ApplySet != nil {
+			b = b.RequireLabels(o.ApplySet.LabelsForMember())
+		}
+
+		o.objects, err = b.Do().Infos()
+
 		o.objectsCached = true
 	}
 	return o.objects, err

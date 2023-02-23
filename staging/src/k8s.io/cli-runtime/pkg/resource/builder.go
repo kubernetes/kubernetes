@@ -97,6 +97,10 @@ type Builder struct {
 	defaultNamespace bool
 	requireNamespace bool
 
+	// requiredLabels sets the given labels on objects.
+	// By using a slice, we defer conflicts to execution time.
+	requiredLabels []label
+
 	flatten bool
 	latest  bool
 
@@ -111,6 +115,12 @@ type Builder struct {
 
 	// fakeClientFn is used for testing
 	fakeClientFn FakeClientFunc
+}
+
+// label tracks a label operation.
+type label struct {
+	Key   string
+	Value string
 }
 
 var missingResourceError = fmt.Errorf(`You must provide one or more resources by argument or filename.
@@ -537,6 +547,15 @@ func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 		b.namespace = metav1.NamespaceAll
 	}
 	b.allNamespace = allNamespace
+	return b
+}
+
+// RequireLabels instructs the builder to add the labels to all objects found.
+// If an object has a label with the same key but a different value, an error will be returned.
+func (b *Builder) RequireLabels(requiredLabels map[string]string) *Builder {
+	for k, v := range requiredLabels {
+		b.requiredLabels = append(b.requiredLabels, label{Key: k, Value: v})
+	}
 	return b
 }
 
@@ -1170,6 +1189,9 @@ func (b *Builder) Do() *Result {
 	}
 	if b.requireNamespace {
 		helpers = append(helpers, RequireNamespace(b.namespace))
+	}
+	if len(b.requiredLabels) != 0 {
+		helpers = append(helpers, RequireLabels(b.requiredLabels))
 	}
 	helpers = append(helpers, FilterNamespace)
 	if b.requireObject {

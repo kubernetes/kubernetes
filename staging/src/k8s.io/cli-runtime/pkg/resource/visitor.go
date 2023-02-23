@@ -630,6 +630,39 @@ func SetNamespace(namespace string) VisitorFunc {
 	}
 }
 
+// RequireLabels will add the labels to each object.
+// If a label with the same key but a different value is found,
+// an error will be returned.
+func RequireLabels(addLabels []label) VisitorFunc {
+	return func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		accessor, err := meta.Accessor(info.Object)
+		if err != nil {
+			return fmt.Errorf("getting accessor: %w", err)
+		}
+		labels := accessor.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		for _, addLabel := range addLabels {
+			v, found := labels[addLabel.Key]
+			if found && v != addLabel.Value {
+				return fmt.Errorf("the label %q=%q from the provided object %q does not match the value %q.", addLabel.Key, v, info.Name, addLabel.Value)
+
+			}
+			labels[addLabel.Key] = addLabel.Value
+		}
+
+		accessor.SetLabels(labels)
+
+		return nil
+	}
+}
+
 // RequireNamespace will either set a namespace if none is provided on the
 // Info object, or if the namespace is set and does not match the provided
 // value, returns an error. This is intended to guard against administrators
