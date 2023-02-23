@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -241,6 +242,42 @@ func TestListPaginationRareObject(t *testing.T) {
 	validation := checkStorageCallsInvariants(
 		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
 	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
+}
+
+func TestListSlowReadTransformer(t *testing.T) {
+	ctx, store, etcdClient := testSetup(t, withRecorder())
+	validation := checkStorageCallsInvariants(
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
+
+	// fail the test if it runs for too long
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	t.Cleanup(cancel)
+
+	// simulate a transformer that takes some time to perform decryption
+	store.transformer = &slowReadTransformer{sleep: 50 * time.Millisecond, transformer: store.transformer}
+
+	// this transforms 1000 objects which takes ~50 seconds without parallelism
+	// with our hardcoded parallelism of 4, it takes ~12.5 seconds which is enough for the test to complete in time
+	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
+}
+
+var _ value.Transformer = &slowReadTransformer{}
+
+type slowReadTransformer struct {
+	sleep       time.Duration
+	transformer value.Transformer
+}
+
+func (s *slowReadTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err // simulate network request cancellation
+	}
+	time.Sleep(s.sleep)
+	return s.transformer.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func (s *slowReadTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, err error) {
+	return s.transformer.TransformToStorage(ctx, data, dataCtx)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {

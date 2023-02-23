@@ -790,7 +790,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 						wg.Done()
 					}()
 
-					// TODO integration test with slow transformer
 					data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 					if err != nil {
 						work.err = storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
