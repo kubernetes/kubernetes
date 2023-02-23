@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func BenchmarkNoWarnings(b *testing.B) {
@@ -487,6 +488,18 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{
 				`spec.volumes[0].ephemeral.volumeClaimTemplate.spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "terminationGracePeriodSeconds is negative",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+				},
+			},
+			expected: []string{
+				`spec.terminationGracePeriodSeconds: must be >= 0; negative values are invalid and will be treated as 1`,
 			},
 		},
 	}

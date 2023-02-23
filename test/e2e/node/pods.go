@@ -44,6 +44,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -338,6 +339,76 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Failf("error waiting for pod to be evicted: %v", err)
 			}
 
+		})
+	})
+
+	ginkgo.Describe("Pod TerminationGracePeriodSeconds is negative", func() {
+		var podClient *e2epod.PodClient
+		ginkgo.BeforeEach(func() {
+			podClient = e2epod.NewPodClient(f)
+		})
+
+		ginkgo.It("pod with negative grace period", func(ctx context.Context) {
+			name := "pod-negative-grace-period" + string(uuid.NewUUID())
+			image := imageutils.GetE2EImage(imageutils.BusyBox)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Containers: []v1.Container{
+						{
+							Name:  "foo",
+							Image: image,
+							Command: []string{
+								"/bin/sh", "-c", "sleep 10000",
+							},
+						},
+					},
+					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+
+			if pod.Spec.TerminationGracePeriodSeconds == nil {
+				framework.Failf("pod spec TerminationGracePeriodSeconds is nil")
+			}
+
+			if *pod.Spec.TerminationGracePeriodSeconds != 1 {
+				framework.Failf("pod spec TerminationGracePeriodSeconds is not 1: %d", *pod.Spec.TerminationGracePeriodSeconds)
+			}
+
+			time.Sleep(5 * time.Second)
+
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+
+			ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
+			pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
+			_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "failed to update pod")
+
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+
+			if pod.Spec.TerminationGracePeriodSeconds == nil {
+				framework.Failf("pod spec TerminationGracePeriodSeconds is nil")
+			}
+
+			if *pod.Spec.TerminationGracePeriodSeconds != 1 {
+				framework.Failf("pod spec TerminationGracePeriodSeconds is not 1: %d", *pod.Spec.TerminationGracePeriodSeconds)
+			}
+
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
 		})
 	})
 
