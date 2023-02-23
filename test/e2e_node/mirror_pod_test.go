@@ -213,7 +213,7 @@ spec:
   containers:
   - name: test
     image: %s
-    restartPolicy: %s
+  restartPolicy: %s
 `
 	file := staticPodPath(dir, name, namespace)
 	podYaml := fmt.Sprintf(template, name, namespace, image, string(restart))
