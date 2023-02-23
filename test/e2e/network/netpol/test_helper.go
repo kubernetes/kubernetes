@@ -117,7 +117,7 @@ func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 
 	// TODO use feature gate and configured timeout
 	sleepDuration := 90 * time.Second
-	framework.Logf("Sleeping %+v before probing pod to pod connectivity...", sleepDuration)
+	framework.Logf("Sleeping %+v before first attempt probing pod to pod connectivity...", sleepDuration)
 	time.Sleep(sleepDuration)
 	framework.Logf("Finished sleeping. Starting to probe pod to pod connectivity...")
 
@@ -127,11 +127,6 @@ func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 	//  this step, let's investigate removing this massive secondary polling of the matrix some day.
 	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
 		framework.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
-
-		// TODO use feature gate and configured timeout
-		framework.Logf("Sleeping %+v before probing pod to pod connectivity...", sleepDuration)
-		time.Sleep(sleepDuration)
-		framework.Logf("Finished sleeping. Starting to probe pod to pod connectivity...")
 
 		ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)
 	}
