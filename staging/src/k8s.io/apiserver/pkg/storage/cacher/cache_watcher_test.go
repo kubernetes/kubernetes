@@ -252,7 +252,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
