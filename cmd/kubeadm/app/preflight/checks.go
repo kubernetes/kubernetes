@@ -893,15 +893,11 @@ func (MemCheck) Name() string {
 	return "Mem"
 }
 
-// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
-// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
-// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
-// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
+func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -922,13 +918,36 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
 		HTTPProxyCheck{Proto: "https", Host: cfg.LocalAPIEndpoint.AdvertiseAddress},
 	}
+
+	// File content check for IPV4 and IPV6 are needed if it is:
+	// (dual stack)  `--service-cidr` or `--pod-network-cidr` is set with an IPV4 and IPV6 CIDR, `--apiserver-advertise-address` is optional as it can be auto detected.
+	// (single stack) which is decided by the `--apiserver-advertise-address`.
+	// Note that for the case of dual stack, user might only give IPV6 CIDR for `--service-cidr` and leave the `--apiserver-advertise-address` a default value which will be
+	// auto detected and properly bound to an IPV4 address, this will make the cluster non-functional eventually. The case like this should be avoided by the validation instead,
+	// i.e. We don't care whether the input values for those parameters are set correctly here but if it's an IPV4 scoped CIDR or address we will add the file content check for IPV4,
+	// as does the IPV6.
+	IPV4Check := false
+	IPV6Check := false
 	cidrs := strings.Split(cfg.Networking.ServiceSubnet, ",")
 	for _, cidr := range cidrs {
 		checks = append(checks, HTTPProxyCIDRCheck{Proto: "https", CIDR: cidr})
+		if !IPV4Check && netutils.IsIPv4CIDRString(cidr) {
+			IPV4Check = true
+		}
+		if !IPV6Check && netutils.IsIPv6CIDRString(cidr) {
+			IPV6Check = true
+		}
+
 	}
 	cidrs = strings.Split(cfg.Networking.PodSubnet, ",")
 	for _, cidr := range cidrs {
 		checks = append(checks, HTTPProxyCIDRCheck{Proto: "https", CIDR: cidr})
+		if !IPV4Check && netutils.IsIPv4CIDRString(cidr) {
+			IPV4Check = true
+		}
+		if !IPV6Check && netutils.IsIPv6CIDRString(cidr) {
+			IPV6Check = true
+		}
 	}
 
 	if !isSecondaryControlPlane {
@@ -936,9 +955,19 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if netutils.IsIPv6(ip) {
-				checks = addIPv6Checks(checks)
+			if !IPV4Check && netutils.IsIPv4(ip) {
+				IPV4Check = true
 			}
+			if !IPV6Check && netutils.IsIPv6(ip) {
+				IPV6Check = true
+			}
+		}
+
+		if IPV4Check {
+			checks = addIPv4Checks(checks)
+		}
+		if IPV6Check {
+			checks = addIPv6Checks(checks)
 		}
 
 		// if using an external etcd
@@ -969,15 +998,25 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
 	}
+	return checks, nil
+}
 
+// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
+// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
+// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
+	checks, err := InitNodeChecks(execer, cfg, ignorePreflightErrors, isSecondaryControlPlane, downloadCerts)
+	if err != nil {
+		return err
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
+func JoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) ([]Checker, error) {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-		return err
+		return nil, err
 	}
 
 	checks := []Checker{
@@ -996,13 +1035,24 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
 			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
+				if netutils.IsIPv4(ip) {
+					checks = addIPv4Checks(checks)
+				}
 				if netutils.IsIPv6(ip) {
 					checks = addIPv6Checks(checks)
 				}
 			}
 		}
 	}
+	return checks, nil
+}
 
+// RunJoinNodeChecks executes all individual, applicable to node checks.
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
+	checks, err := JoinNodeChecks(execer, cfg, ignorePreflightErrors)
+	if err != nil {
+		return err
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
@@ -1017,7 +1067,6 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	}
 
 	// non-windows checks
-	checks = addIPv4Checks(checks)
 	checks = addSwapCheck(checks)
 	checks = addExecChecks(checks, execer)
 	checks = append(checks,
