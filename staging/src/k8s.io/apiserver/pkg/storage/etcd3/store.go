@@ -786,8 +786,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 						getResp.Kvs[idx*chunkSize+j] = nil
 						chunk[j] = nil
 
-						// TODO increment a metric to indicate how many transforms were performed
-
 						wg.Done()
 					}()
 
