@@ -919,7 +919,23 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.ManualSelector = pointer.BoolPtr(true)
 			},
 		},
-		"immutable completion": {
+		"immutable completions for non-indexed jobs": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(1)
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.completions",
+			},
+		},
+		"immutable completions for indexed job when AllowElasticIndexedJobs is false": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
@@ -1281,6 +1297,128 @@ func TestValidateJobUpdate(t *testing.T) {
 			},
 			opts: JobValidationOptions{
 				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"update completions and parallelism to same value is valid": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = pointer.Int32Ptr(2)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
+		},
+		"previous parallelism != previous completions, new parallelism == new completions": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(2),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(3)
+				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
+		},
+		"indexed job updating completions and parallelism to different values is invalid": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.completions",
+			},
+		},
+		"indexed job with completions set updated to nil does not panic": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = nil
+				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeRequired,
+				Field: "spec.completions",
+			},
+		},
+		"indexed job with completions unchanged, parallelism reduced to less than completions": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(2),
+					Parallelism:    pointer.Int32Ptr(2),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = pointer.Int32Ptr(1)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
+		},
+		"indexed job with completions unchanged, parallelism increased higher than completions": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					Completions:    pointer.Int32Ptr(2),
+					Parallelism:    pointer.Int32Ptr(2),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
 			},
 		},
 	}

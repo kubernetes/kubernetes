@@ -25,6 +25,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -375,7 +376,7 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
+	allErrs = append(allErrs, validateCompletions(spec, oldSpec, fldPath.Child("completions"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
@@ -565,10 +566,41 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 	return allErrs
 }
 
+func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
+	if !opts.AllowElasticIndexedJobs {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	// Completions is immutable for non-indexed jobs.
+	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
+	// fall back to validating that spec.Completions is always immutable.
+	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
+	if !isIndexedJob {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	var allErrs field.ErrorList
+	if apiequality.Semantic.DeepEqual(spec.Completions, oldSpec.Completions) {
+		return allErrs
+	}
+	// Indexed Jobs cannot set completions to nil. The nil check
+	// is already performed in validateJobSpec, no need to add another error.
+	if spec.Completions == nil {
+		return allErrs
+	}
+
+	if *spec.Completions != *spec.Parallelism {
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Completions, fmt.Sprintf("can only be modified in tandem with %s", fldPath.Root().Child("parallelism").String())))
+	}
+	return allErrs
+}
+
 type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
 	// Allow Job to have the annotation batch.kubernetes.io/job-tracking
 	AllowTrackingAnnotation bool
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
+	// Allow elastic indexed jobs
+	AllowElasticIndexedJobs bool
 }
