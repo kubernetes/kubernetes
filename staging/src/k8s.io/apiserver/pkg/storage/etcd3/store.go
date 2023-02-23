@@ -764,10 +764,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		var wg sync.WaitGroup
 		workChunks := make([]decodeWork, chunkSize)
+		idx := 0
 		// take items from the response until the bucket is full, filtering as we go
 	splitChunk:
-		for i, chunk := range splitChunks(getResp.Kvs, chunkSize) {
-			i := i
+		for chunk := range splitChunks(getResp.Kvs, chunkSize) {
 			for j, kv := range chunk {
 				j, kv := j, kv
 
@@ -783,7 +783,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 						// free kv early. Long lists can take O(seconds) to decode.
 						// this is safe even without a lock because each go routine only modifies its own index
-						getResp.Kvs[i*chunkSize+j] = nil
+						getResp.Kvs[idx*chunkSize+j] = nil
 						chunk[j] = nil
 
 						// TODO increment a metric to indicate how many transforms were performed
@@ -824,6 +824,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 				v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
 			}
+			idx++
 		}
 
 		// indicate to the client which resource version was returned
@@ -885,34 +886,29 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
-func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) [][]*mvccpb.KeyValue {
+func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) chan []*mvccpb.KeyValue {
 	kvCount := len(kvs)
-
-	if kvCount == 0 {
-		return nil
-	}
-
-	if kvCount <= chunkSize {
-		return [][]*mvccpb.KeyValue{kvs}
-	}
 
 	chunks := kvCount / chunkSize
 	if kvCount%chunkSize != 0 {
 		chunks++
 	}
 
-	// TODO remove this allocation by making an iterator struct
-	out := make([][]*mvccpb.KeyValue, chunks)
-	start, end := 0, chunkSize
-	for i := 0; i < chunks; i++ {
-		out[i] = kvs[start:end]
-		start += chunkSize
-		end += chunkSize
-		if end > kvCount {
-			end = kvCount
+	ch := make(chan []*mvccpb.KeyValue)
+	go func() {
+		defer close(ch)
+
+		start, end := 0, chunkSize
+		for i := 0; i < chunks; i++ {
+			if end > kvCount {
+				end = kvCount
+			}
+			ch <- kvs[start:end]
+			start += chunkSize
+			end += chunkSize
 		}
-	}
-	return out
+	}()
+	return ch
 }
 
 type decodeWork struct {
