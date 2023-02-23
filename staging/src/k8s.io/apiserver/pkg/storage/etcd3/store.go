@@ -715,12 +715,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var hasMore bool
 	var getResp *clientv3.GetResponse
 	var numFetched int
+	var numUsed int
 	var numEvald atomic.Int32
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, int(numEvald.Load()), numReturn)
+		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, int(numEvald.Load()), numReturn, numUsed)
 	}()
 	for {
 		startTime := time.Now()
@@ -808,8 +809,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			for _, workItem := range workChunks[:len(chunk)] {
 				if paging && int64(v.Len()) >= pred.Limit {
 					hasMore = true
-					break splitChunk // TODO increment a metric to indicate how many transforms were wasted
+					break splitChunk
 				}
+
+				numUsed++ // the delta between numUsed and numEvald is the amount of wasted transforms
+
 				lastKey = workItem.key
 
 				if err := workItem.err; err != nil {

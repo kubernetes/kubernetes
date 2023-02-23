@@ -113,6 +113,14 @@ var (
 		},
 		[]string{"resource"},
 	)
+	listStorageNumUsed = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_used_objects_total",
+			Help:           "Number of objects used for a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 	decodeErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      "apiserver",
@@ -186,9 +194,10 @@ func UpdateLeaseObjectCount(count int64) {
 }
 
 // RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
-func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned int) {
+func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned, numUsed int) {
 	listStorageCount.WithLabelValues(resource).Inc()
 	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
+	listStorageNumUsed.WithLabelValues(resource).Add(float64(numUsed))
 }
