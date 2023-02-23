@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/csaupgrade"
+	"k8s.io/kubectl/pkg/cmd/apply/fakekube"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -234,6 +234,7 @@ func TestApplyFlagValidation(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			t.Logf("args: %v", test.args)
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
 			f.Client = &fake.RESTClient{}
@@ -2206,7 +2207,7 @@ func TestApplySetParentValidation(t *testing.T) {
 	}
 }
 
-func TestLoadObjects(t *testing.T) {
+func TestLoadObjectsWithPruneV2(t *testing.T) {
 	f := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer f.Cleanup()
 	f.Client = &fake.RESTClient{}
@@ -2273,143 +2274,18 @@ func TestApplySetParentManagement(t *testing.T) {
 	})
 	defer cmdutil.DefaultBehaviorOnFatal()
 
-	nameRC, rc := readReplicationController(t, filenameRC)
-	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	nameParentSecret := "mySet"
-	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
 
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	serverSideData := map[string][]byte{
-		pathRC: rc,
-	}
-
-	scheme := runtime.NewScheme()
-
-	listMapping := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "services"}:               "ServiceList",
-		{Group: "", Version: "v1", Resource: "replicationcontrollers"}: "ReplicationControllerList",
-	}
-
-	fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
-	tf.FakeDynamicClient = fakeDynamicClient
+	k := fakekube.NewFakeKube(t)
+	tf := cmdutil.NewFactory(k.AsRESTClientGetter())
 
 	failDeletes := false
-	fakeDynamicClient.PrependReactor("delete", "*", func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
+	k.AddBeforeDeleteHook(func(req *fakekube.DeleteRequest) *http.Response {
 		if failDeletes {
-			return true, nil, fmt.Errorf("an error on the server (\"\") has prevented the request from succeeding")
+			return &http.Response{StatusCode: http.StatusInternalServerError}
 		}
-		return false, nil, nil
+		return nil
 	})
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-
-			if req.URL.Path == "/namespaces/test/secrets/mySet" {
-				switch req.Method {
-				case "GET":
-					data, ok := serverSideData[req.URL.Path]
-					if !ok {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
-					}
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
-				case "PATCH":
-					if got := req.Header.Get("Content-Type"); got == string(types.ApplyPatchType) {
-						// crudely save the patch data as the new object and return it
-						serverSideData[req.URL.Path], _ = io.ReadAll(req.Body)
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(serverSideData[req.URL.Path]))}, nil
-					} else {
-						t.Fatalf("unexpected content-type: %s\n", got)
-						return nil, nil
-					}
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}
-
-			method := req.Method
-
-			tokens := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && method == "GET" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: tokens[2]}
-				obj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-					}
-					t.Fatalf("error getting object: %v", err)
-				}
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
-			}
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && method == "PATCH" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: tokens[2]}
-				var existing *unstructured.Unstructured
-				existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if !apierrors.IsNotFound(err) {
-						t.Fatalf("error getting object: %v", err)
-					}
-				} else {
-					existing = existingObj.(*unstructured.Unstructured)
-				}
-
-				data, err := io.ReadAll(req.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				patch := &unstructured.Unstructured{}
-				if err := runtime.DecodeInto(codec, data, patch); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				var returnData []byte
-				if existing == nil {
-					uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-					patch.SetUID(uid)
-
-					if err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace); err != nil {
-						t.Fatalf("error creating object: %v", err)
-					}
-
-					b, err := json.Marshal(patch)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				} else {
-					uid := existing.GetUID()
-
-					patch.DeepCopyInto(existing)
-					existing.SetUID(uid)
-
-					if err := fakeDynamicClient.Tracker().Update(gvr, existing, namespace); err != nil {
-						t.Fatalf("error updating object: %v", err)
-					}
-
-					b, err := json.Marshal(existing)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				}
-
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
-			}
-
-			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-			return nil, nil
-		}),
-	}
 
 	// Initially, the rc 'exists' server side but the svc and applyset secret do not
 	// This should 'update' the rc and create the secret
@@ -2420,11 +2296,13 @@ func TestApplySetParentManagement(t *testing.T) {
 		cmd.Flags().Set("server-side", "true")
 		cmd.Flags().Set("applyset", nameParentSecret)
 		cmd.Flags().Set("prune", "true")
+		cmd.Flags().Set("validate", "false")
 		cmd.Run(cmd, []string{})
 	})
 	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	createdSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+
+	parent, err := k.ReadObject(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "test", "mySet")
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2438,7 +2316,8 @@ metadata:
     applyset.k8s.io/id: placeholder-todo
   name: mySet
   namespace: test
-`, string(createdSecret))
+  uid: "1"
+`, MustYAML(t, parent))
 
 	// Next, do an apply that creates a second resource, the svc, and updates the applyset secret
 	outbuff.Reset()
@@ -2450,11 +2329,12 @@ metadata:
 		cmd.Flags().Set("server-side", "true")
 		cmd.Flags().Set("applyset", nameParentSecret)
 		cmd.Flags().Set("prune", "true")
+		cmd.Flags().Set("validate", "false")
 		cmd.Run(cmd, []string{})
 	})
 	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\nservice/test-service serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+	parent, err = k.ReadObject(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "test", "mySet")
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2468,7 +2348,8 @@ metadata:
     applyset.k8s.io/id: placeholder-todo
   name: mySet
   namespace: test
-`, string(updatedSecret))
+  uid: "1"
+`, MustYAML(t, parent))
 
 	// Next, do an apply that attempts to remove the rc from the set, but pruning fails
 	// Both types remain in the ApplySet
@@ -2481,11 +2362,12 @@ metadata:
 		cmd.Flags().Set("server-side", "true")
 		cmd.Flags().Set("applyset", nameParentSecret)
 		cmd.Flags().Set("prune", "true")
+		cmd.Flags().Set("validate", "false")
 		cmd.Run(cmd, []string{})
 	})
 	assert.Equal(t, "service/test-service serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err = yaml.JSONToYAML(serverSideData[pathSecret])
+	parent, err = k.ReadObject(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "test", "mySet")
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2499,11 +2381,11 @@ metadata:
     applyset.k8s.io/id: placeholder-todo
   name: mySet
   namespace: test
-`, string(updatedSecret))
+  uid: "1"
+`, MustYAML(t, parent))
 
 	// Finally, do an apply that successfully removes the rc and updates the set
 	failDeletes = false
-
 	outbuff.Reset()
 	errbuff.Reset()
 	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
@@ -2512,11 +2394,12 @@ metadata:
 		cmd.Flags().Set("server-side", "true")
 		cmd.Flags().Set("applyset", nameParentSecret)
 		cmd.Flags().Set("prune", "true")
+		cmd.Flags().Set("validate", "false")
 		cmd.Run(cmd, []string{})
 	})
 	assert.Equal(t, "service/test-service serverside-applied\nreplicationcontroller/test-rc pruned\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err = yaml.JSONToYAML(serverSideData[pathSecret])
+	parent, err = k.ReadObject(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "test", "mySet")
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2530,7 +2413,16 @@ metadata:
     applyset.k8s.io/id: placeholder-todo
   name: mySet
   namespace: test
-`, string(updatedSecret))
+  uid: "1"
+`, MustYAML(t, parent))
+}
+
+func MustYAML(t *testing.T, obj interface{}) string {
+	b, err := yaml.Marshal(obj)
+	if err != nil {
+		t.Fatalf("error from yaml.Marshal: %v", err)
+	}
+	return string(b)
 }
 
 func TestApplySetInvalidLiveParent(t *testing.T) {
@@ -2651,157 +2543,12 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 	}
 }
 
-func TestApplyWithPruneV2(t *testing.T) {
+func TestApplyObjectsWithPruneV2(t *testing.T) {
 	testdirs := []string{"testdata/prune/simple"}
 	for _, testdir := range testdirs {
 		t.Run(testdir, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-			scheme := runtime.NewScheme()
-
-			listMapping := map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "namespaces"}: "NamespaceList",
-			}
-
-			fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
-			tf.FakeDynamicClient = fakeDynamicClient
-
-			tf.UnstructuredClient = &fake.RESTClient{
-				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					method := req.Method
-
-					tokens := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
-
-					if len(tokens) == 2 && tokens[0] == "namespaces" && method == "GET" {
-						name := tokens[1]
-						gvr := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
-						ns, err := fakeDynamicClient.Tracker().Get(gvr, "", name)
-						if err != nil {
-							if apierrors.IsNotFound(err) {
-								return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-							}
-							t.Fatalf("error getting object: %v", err)
-						}
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, ns)}, nil
-					}
-
-					if len(tokens) == 4 && tokens[0] == "namespaces" && tokens[2] == "secrets" && method == "GET" {
-						namespace := tokens[1]
-						name := tokens[3]
-						gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-						obj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-						if err != nil {
-							if apierrors.IsNotFound(err) {
-								return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-							}
-							t.Fatalf("error getting object: %v", err)
-						}
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
-					}
-
-					if len(tokens) == 4 && tokens[0] == "namespaces" && tokens[2] == "secrets" && method == "PATCH" {
-						namespace := tokens[1]
-						name := tokens[3]
-						gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-						var existing *unstructured.Unstructured
-						existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-						if err != nil {
-							if !apierrors.IsNotFound(err) {
-								t.Fatalf("error getting object: %v", err)
-							}
-						} else {
-							existing = existingObj.(*unstructured.Unstructured)
-						}
-
-						data, err := io.ReadAll(req.Body)
-						if err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-
-						patch := &unstructured.Unstructured{}
-						if err := runtime.DecodeInto(codec, data, patch); err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-
-						var returnData []byte
-						if existing == nil {
-							uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-							patch.SetUID(uid)
-
-							if err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace); err != nil {
-								t.Fatalf("error creating object: %v", err)
-							}
-
-							b, err := json.Marshal(patch)
-							if err != nil {
-								t.Fatalf("error marshalling response: %v", err)
-							}
-							returnData = b
-						} else {
-							patch.DeepCopyInto(existing)
-							if err := fakeDynamicClient.Tracker().Update(gvr, existing, namespace); err != nil {
-								t.Fatalf("error updating object: %v", err)
-							}
-							b, err := json.Marshal(existing)
-							if err != nil {
-								t.Fatalf("error marshalling response: %v", err)
-							}
-							returnData = b
-						}
-
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
-					}
-
-					if len(tokens) == 1 && tokens[0] == "namespaces" && method == "POST" {
-						data, err := io.ReadAll(req.Body)
-						if err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-
-						u := &unstructured.Unstructured{}
-						if err := runtime.DecodeInto(codec, data, u); err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-
-						name := u.GetName()
-						ns := u.GetNamespace()
-						gvr := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
-
-						existing, err := fakeDynamicClient.Tracker().Get(gvr, ns, name)
-						if err != nil {
-							if apierrors.IsNotFound(err) {
-								existing = nil
-							} else {
-								t.Fatalf("error fetching object: %v", err)
-							}
-						}
-
-						if existing != nil {
-							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader()}, nil
-						}
-
-						uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-						u.SetUID(uid)
-
-						if err := fakeDynamicClient.Tracker().Create(gvr, u, ns); err != nil {
-							t.Fatalf("error creating object: %v", err)
-						}
-
-						body := cmdtesting.ObjBody(codec, u)
-
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-					}
-
-					t.Fatalf("unexpected request: %v %v\n%#v", req.Method, req.URL, req)
-					return nil, nil
-				}),
-			}
-
-			tf.Client = tf.UnstructuredClient
+			k := fakekube.NewFakeKube(t)
+			tf := cmdutil.NewFactory(k.AsRESTClientGetter())
 
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				manifests := []string{"manifest1", "manifest2"}
@@ -2919,171 +2666,19 @@ metadata:
 }
 
 func TestApplyWithPruneV2Fail(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-	scheme := runtime.NewScheme()
-
-	listMapping := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "namespaces"}: "NamespaceList",
-	}
-
-	fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
-	tf.FakeDynamicClient = fakeDynamicClient
-
-	failDelete := false
-	fakeDynamicClient.PrependReactor("delete", "*", func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
-		if failDelete {
-			return true, nil, fmt.Errorf("an error on the server (\"\") has prevented the request from succeeding")
-		}
-		return false, nil, nil
-	})
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			method := req.Method
-
-			tokens := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
-
-			if len(tokens) == 2 && tokens[0] == "namespaces" && method == "GET" {
-				name := tokens[1]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
-				ns, err := fakeDynamicClient.Tracker().Get(gvr, "", name)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-					}
-					t.Fatalf("error getting object: %v", err)
-				}
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, ns)}, nil
-			}
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && tokens[2] == "secrets" && method == "GET" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-				obj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-					}
-					t.Fatalf("error getting object: %v", err)
-				}
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
-			}
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && tokens[2] == "secrets" && method == "PATCH" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-				var existing *unstructured.Unstructured
-				existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if !apierrors.IsNotFound(err) {
-						t.Fatalf("error getting object: %v", err)
-					}
-				} else {
-					existing = existingObj.(*unstructured.Unstructured)
-				}
-
-				data, err := io.ReadAll(req.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				patch := &unstructured.Unstructured{}
-				if err := runtime.DecodeInto(codec, data, patch); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				var returnData []byte
-				if existing == nil {
-					uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-					patch.SetUID(uid)
-
-					if err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace); err != nil {
-						t.Fatalf("error creating object: %v", err)
-					}
-
-					b, err := json.Marshal(patch)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				} else {
-					patch.DeepCopyInto(existing)
-					if err := fakeDynamicClient.Tracker().Update(gvr, existing, namespace); err != nil {
-						t.Fatalf("error updating object: %v", err)
-					}
-					b, err := json.Marshal(existing)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				}
-
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
-			}
-
-			if len(tokens) == 1 && tokens[0] == "namespaces" && method == "POST" {
-				data, err := io.ReadAll(req.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				u := &unstructured.Unstructured{}
-				if err := runtime.DecodeInto(codec, data, u); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				name := u.GetName()
-				ns := u.GetNamespace()
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
-
-				existing, err := fakeDynamicClient.Tracker().Get(gvr, ns, name)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						existing = nil
-					} else {
-						t.Fatalf("error fetching object: %v", err)
-					}
-				}
-
-				if existing != nil {
-					return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader()}, nil
-				}
-
-				uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-				u.SetUID(uid)
-
-				if err := fakeDynamicClient.Tracker().Create(gvr, u, ns); err != nil {
-					t.Fatalf("error creating object: %v", err)
-				}
-
-				body := cmdtesting.ObjBody(codec, u)
-
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-			}
-
-			t.Fatalf("unexpected request: %v %v\n%#v", req.Method, req.URL, req)
-			return nil, nil
-		}),
-	}
-
-	tf.Client = tf.UnstructuredClient
-
 	testdirs := []string{"testdata/prune/simple"}
 	for _, testdir := range testdirs {
 		t.Run(testdir, func(t *testing.T) {
+			k := fakekube.NewFakeKube(t)
+			tf := cmdutil.NewFactory(k.AsRESTClientGetter())
+
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				manifests := []string{"manifest1", "manifest2"}
 				for i, manifest := range manifests {
 					if i != 0 {
-						t.Logf("will inject failures into future delete operations")
-						failDelete = true
+						k.AddBeforeDeleteHook(func(req *fakekube.DeleteRequest) *http.Response {
+							return &http.Response{StatusCode: http.StatusInternalServerError}
+						})
 					}
 					t.Logf("applying manifest %v", manifest)
 

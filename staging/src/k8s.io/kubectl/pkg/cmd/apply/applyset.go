@@ -232,6 +232,7 @@ func (a *ApplySet) FetchParent() error {
 	}
 	return nil
 }
+
 func (a *ApplySet) LabelSelectorForMembers() string {
 	return metav1.FormatLabelSelector(&metav1.LabelSelector{
 		MatchLabels: a.LabelsForMember(),
