@@ -185,6 +185,8 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		opts.AllowMutableSchedulingDirectives = utilfeature.DefaultFeatureGate.Enabled(features.JobMutableNodeSchedulingDirectives) &&
 			suspended && notStarted
 
+		// Elastic indexed jobs (mutable completions iff updated parallelism == updated completions)
+		opts.AllowElasticIndexedJobs = utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob)
 	}
 
 	return opts

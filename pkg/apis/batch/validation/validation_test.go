@@ -1298,6 +1298,9 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32Ptr(2)
 				job.Spec.Parallelism = pointer.Int32Ptr(2)
 			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
 		},
 		"previous parallelism != previous completions, new parallelism == new completions": {
 			old: batch.Job{
@@ -1314,9 +1317,8 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32Ptr(3)
 				job.Spec.Parallelism = pointer.Int32Ptr(3)
 			},
-			err: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "spec.completions",
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
 			},
 		},
 		"indexed job updating completions and parallelism to different values is invalid": {
@@ -1333,6 +1335,9 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Completions = pointer.Int32Ptr(2)
 				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -1354,6 +1359,9 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = nil
 				job.Spec.Parallelism = pointer.Int32Ptr(3)
 			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
 			err: &field.Error{
 				Type:  field.ErrorTypeRequired,
 				Field: "spec.completions",
@@ -1374,6 +1382,9 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32Ptr(2)
 				job.Spec.Parallelism = pointer.Int32Ptr(1)
 			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
+			},
 		},
 		"indexed job with completions unchanged, parallelism increased higher than completions": {
 			old: batch.Job{
@@ -1389,6 +1400,9 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Completions = pointer.Int32Ptr(2)
 				job.Spec.Parallelism = pointer.Int32Ptr(3)
+			},
+			opts: JobValidationOptions{
+				AllowElasticIndexedJobs: true,
 			},
 		},
 	}
