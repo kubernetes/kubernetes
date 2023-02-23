@@ -753,125 +753,135 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			growSlice(v, 2048, kvCount)
 		}
 
-		workers := 1 << 5 // somewhat arbitrary choice
-		if kvCount < workers {
-			workers = kvCount
-		}
-		g := &errgroup.Group{}
-		g.SetLimit(workers)
-		workChan := make(chan decodeWork, v.Cap())
-		workCtx, workCtxCancel := context.WithCancel(ctx)
-		var workDoneOnce sync.Once
-		workDone := func() {
-			workDoneOnce.Do(func() {
-				workCtxCancel()
-				_ = g.Wait() // error is always nil
-				close(workChan)
-			})
-		}
-		defer workDone()
+		if err := func() error {
+			workers := 1 << 5 // somewhat arbitrary choice
+			if kvCount < workers {
+				workers = kvCount
+			}
+			g := &errgroup.Group{}
+			g.SetLimit(workers)
+			workChan := make(chan decodeWork, v.Cap())
+			workCtx, workCtxCancel := context.WithCancel(ctx)
+			var workDoneOnce sync.Once
+			workDone := func() {
+				workDoneOnce.Do(func() {
+					workCtxCancel()
+					_ = g.Wait() // error is always nil
+					close(workChan)
+				})
+			}
+			defer workDone()
+			go func() {
+				<-workCtx.Done()
+				workDone()
+			}()
 
-		_ = workqueue.ParallelizeUntil // TODO look into over errgroup
+			_ = workqueue.ParallelizeUntil // TODO look into over errgroup
 
-		var workLock sync.Mutex
-		var workIdx int
-		commitWork := func(work decodeWork) bool {
-			workLock.Lock()
-			defer workLock.Unlock()
+			var workLock sync.Mutex
+			var workIdx int
+			commitWork := func(work decodeWork) bool {
+				workLock.Lock()
+				defer workLock.Unlock()
 
-			if workIdx == work.idx {
-				workIdx++
-				workChan <- work
+				if workIdx == work.idx {
+					workIdx++
+					workChan <- work
 
-				if workIdx == kvCount {
-					workDone()
+					if workIdx == kvCount {
+						workDone()
+					}
+
+					return true
 				}
 
-				return true
+				return false
 			}
 
-			return false
-		}
+			// take items from the response until the bucket is full, filtering as we go  // TODO fix
+			for i, kv := range getResp.Kvs {
+				i, kv := i, kv
 
-		// take items from the response until the bucket is full, filtering as we go  // TODO fix
-		for i, kv := range getResp.Kvs {
-			i, kv := i, kv
-
-			workFunc := func() {
-				work := decodeWork{idx: i, key: kv.Key}
-				defer func() {
-					// the number of these go routines is unbounded but they are
-					// just trying to send on a channel in a specific order.
-					// TODO maybe just block this worker instead?
-					go func() {
-						for done := commitWork(work); !done; {
-							select {
-							case <-workCtx.Done():
-								return
-							default:
-								goruntime.Gosched()
+				workFunc := func() {
+					work := decodeWork{idx: i, key: kv.Key}
+					defer func() {
+						// the number of these go routines is unbounded but they are
+						// just trying to send on a channel in a specific order.
+						// TODO maybe just block this worker instead?
+						go func() {
+							for done := commitWork(work); !done; {
+								select {
+								case <-workCtx.Done():
+									return
+								default:
+									goruntime.Gosched()
+								}
 							}
-						}
+						}()
 					}()
-				}()
 
-				select {
-				case <-workCtx.Done():
-					work.err = fmt.Errorf("canceled before decryption: %w", workCtx.Err())
-					return
-				default:
+					select {
+					case <-workCtx.Done():
+						work.err = fmt.Errorf("canceled before decryption: %w", workCtx.Err())
+						return
+					default:
+					}
+
+					data, _, err := s.transformer.TransformFromStorage(workCtx, kv.Value, authenticatedDataString(kv.Key))
+					if err != nil {
+						work.err = storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+						return
+					}
+
+					select {
+					case <-workCtx.Done():
+						work.err = fmt.Errorf("canceled before decoding: %w", workCtx.Err())
+						return
+					default:
+					}
+
+					work.obj, work.err = shouldAppendListItem(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
+					if work.err != nil {
+						recordDecodeError(s.groupResourceString, string(kv.Key))
+						return
+					}
+
+					numEvald.Add(1)
 				}
+				g.Go(func() error {
+					workFunc()
+					return nil // never error here
+				})
 
-				data, _, err := s.transformer.TransformFromStorage(workCtx, kv.Value, authenticatedDataString(kv.Key))
-				if err != nil {
-					work.err = storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
-					return
-				}
-
-				select {
-				case <-workCtx.Done():
-					work.err = fmt.Errorf("canceled before decoding: %w", workCtx.Err())
-					return
-				default:
-				}
-
-				work.obj, work.err = shouldAppendListItem(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
-				if work.err != nil {
-					recordDecodeError(s.groupResourceString, string(kv.Key))
-					return
-				}
-
-				numEvald.Add(1)
+				// free kv early. Long lists can take O(seconds) to decode.
+				getResp.Kvs[i] = nil
 			}
-			g.Go(func() error {
-				workFunc()
-				return nil // never error here
-			})
 
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+			for workItem := range workChan {
+				if paging && int64(v.Len()) >= pred.Limit {
+					hasMore = true
+					break
+				}
+
+				lastKey = workItem.key
+
+				if err := workItem.err; err != nil {
+					return err
+				}
+
+				if workItem.obj == nil {
+					continue // predicate filtered the item out
+				}
+
+				v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
+			}
+
+			workDone()
+
+			return nil
+		}(); err != nil {
+			return err
 		}
-
-		for workItem := range workChan {
-			if paging && int64(v.Len()) >= pred.Limit {
-				hasMore = true
-				break
-			}
-
-			lastKey = workItem.key
-
-			if err := workItem.err; err != nil {
-				return err
-			}
-
-			if workItem.obj == nil {
-				continue // predicate filtered the item out
-			}
-
-			v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
-		}
-
-		workDone()
 
 		// indicate to the client which resource version was returned
 		if returnedRV == 0 {
