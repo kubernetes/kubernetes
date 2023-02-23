@@ -874,8 +874,33 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
-func splitChunks(kvs []*mvccpb.KeyValue, chunk int) [][]*mvccpb.KeyValue {
+func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) [][]*mvccpb.KeyValue {
+	kvCount := len(kvs)
 
+	if kvCount == 0 {
+		return nil
+	}
+
+	if kvCount <= chunkSize {
+		return [][]*mvccpb.KeyValue{kvs}
+	}
+
+	chunks := kvCount / chunkSize
+	if kvCount%chunkSize != 0 {
+		chunks++
+	}
+
+	out := make([][]*mvccpb.KeyValue, chunks)
+	start, end := 0, chunkSize
+	for i := 0; i < chunks; i++ {
+		out[i] = kvs[start:end]
+		start += chunkSize
+		end += chunkSize
+		if end >= kvCount {
+			end = kvCount - 1
+		}
+	}
+	return out
 }
 
 type decodeWork struct {
