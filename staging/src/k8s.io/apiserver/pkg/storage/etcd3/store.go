@@ -794,7 +794,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 						return
 					}
 
-					work.obj, work.err = shouldAppendListItem(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
+					work.obj, work.err = decodeAndFilter(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
 					if work.err != nil {
 						recordDecodeError(s.groupResourceString, string(kv.Key))
 						return
@@ -1113,8 +1113,9 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-// shouldAppendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.  // TODO fix
-func shouldAppendListItem(data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) (runtime.Object, error) {
+// decodeAndFilter decodes and returns the object if it passes the provided filter.
+// otherwise it returns a nil object to indicate that the object should be ignored.
+func decodeAndFilter(data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) (runtime.Object, error) {
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
 		return nil, err
