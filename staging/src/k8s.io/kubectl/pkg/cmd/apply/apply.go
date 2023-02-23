@@ -1011,6 +1011,7 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 		return err
 	}
 	o.VisitedUids.Insert(metadata.GetUID())
+
 	return nil
 }
 
@@ -1029,7 +1030,10 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 		if o.Prune {
 			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
-				pruner := newApplySetPruner(o)
+				pruner, err := newApplySetPruner(o)
+				if err != nil {
+					return err
+				}
 				if err := pruner.pruneAll(ctx, o.ApplySet); err != nil {
 					// Do not update the ApplySet. If pruning failed, we want to keep the superset
 					// of the previous and current resources in the ApplySet, so that the pruning

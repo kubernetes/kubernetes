@@ -232,6 +232,31 @@ func (a *ApplySet) FetchParent() error {
 	}
 	return nil
 }
+func (a *ApplySet) LabelSelectorForMembers() string {
+	return metav1.FormatLabelSelector(&metav1.LabelSelector{
+		MatchLabels: a.LabelsForMember(),
+	})
+}
+
+// AllPrunableResources returns the list of all resources that should be considered for pruning.
+// This is potentially a superset of the resources types that actually contain resources.
+func (a *ApplySet) AllPrunableResources() []*meta.RESTMapping {
+	var ret []*meta.RESTMapping
+	for _, m := range a.currentResources {
+		ret = append(ret, m)
+	}
+	return ret
+}
+
+// AllPrunableNamespaces returns the list of all namespaces that should be considered for pruning.
+// This is potentially a superset of the namespaces that actually contain resources.
+func (a *ApplySet) AllPrunableNamespaces() []string {
+	var ret []string
+	for ns := range a.currentNamespaces {
+		ret = append(ret, ns)
+	}
+	return ret
+}
 
 func getLabelsAndAnnotations(obj runtime.Object) (map[string]string, map[string]string, error) {
 	accessor, err := meta.Accessor(obj)
@@ -275,6 +300,10 @@ func parseResourcesAnnotation(annotations map[string]string, mapper meta.RESTMap
 func parseNamespacesAnnotation(annotations map[string]string) sets.Set[string] {
 	annotation, ok := annotations[ApplySetAdditionalNamespacesAnnotation]
 	if !ok { // this annotation is completely optional
+		return sets.Set[string]{}
+	}
+	// Don't include an empty namespace
+	if annotation == "" {
 		return sets.Set[string]{}
 	}
 	return sets.New(strings.Split(annotation, ",")...)
