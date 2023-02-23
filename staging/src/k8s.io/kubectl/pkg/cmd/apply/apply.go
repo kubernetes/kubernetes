@@ -981,7 +981,7 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 		}
 
 		if o.Prune {
-			if cmdutil.AlphaEnabled(cmdutil.ApplySetEnv) && o.ApplySet != nil {
+			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
 				p := newApplySetPruner(o)
 				return p.pruneAll()
 			} else {

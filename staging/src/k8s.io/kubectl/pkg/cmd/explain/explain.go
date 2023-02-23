@@ -81,7 +81,7 @@ func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *Expl
 	return &ExplainOptions{
 		IOStreams:       streams,
 		CmdParent:       parent,
-		EnableOpenAPIV3: cmdutil.AlphaEnabled(cmdutil.ExplainOpenapiV3Env),
+		EnableOpenAPIV3: cmdutil.ExplainOpenapiV3.IsEnabled(),
 		OutputFormat:    "plaintext",
 	}
 }

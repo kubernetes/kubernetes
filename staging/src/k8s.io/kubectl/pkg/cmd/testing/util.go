@@ -181,12 +181,17 @@ func InitTestErrorHandler(t *testing.T) {
 	})
 }
 
-func WithAlphaEnv(key string, t *testing.T, f func(*testing.T)) {
-	if key != "" {
-		oldValue := os.Getenv(key)
-		err := os.Setenv(key, "true")
-		require.NoError(t, err, "unexpected error setting alpha env")
-		defer os.Setenv(key, oldValue)
+// WithAlphaEnvs calls func f with the given env-var-based feature gates enabled,
+// and then restores the original values of those variables.
+func WithAlphaEnvs(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+	for _, feature := range features {
+		key := string(feature)
+		if key != "" {
+			oldValue := os.Getenv(key)
+			err := os.Setenv(key, "true")
+			require.NoError(t, err, "unexpected error setting alpha env")
+			defer os.Setenv(key, oldValue)
+		}
 	}
 	f(t)
 }

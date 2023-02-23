@@ -92,23 +92,23 @@ func TestApplyExtraArgsFail(t *testing.T) {
 }
 
 func TestAlphaEnablement(t *testing.T) {
-	alphas := map[string]string{
-		cmdutil.ApplySetEnv: "applyset",
+	alphas := map[cmdutil.FeatureGate]string{
+		cmdutil.ApplySet: "applyset",
 	}
-	for env, flag := range alphas {
+	for feature, flag := range alphas {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
 		cmd := &cobra.Command{}
 		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 		flags.AddFlags(cmd)
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q alpha env var set", flag, env)
+		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
 
-		cmdtesting.WithAlphaEnv(env, t, func(t *testing.T) {
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 			flags.AddFlags(cmd)
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q alpha env var set", flag, env)
+			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
 		})
 	}
 }
@@ -118,9 +118,9 @@ func TestApplyFlagValidation(t *testing.T) {
 	defer f.Cleanup()
 
 	tests := []struct {
-		args        [][]string
-		enableAlpha string
-		expectedErr string
+		args         [][]string
+		enableAlphas []cmdutil.FeatureGate
+		expectedErr  string
 	}{
 		{
 			args: [][]string{
@@ -170,8 +170,8 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"force", "true"},
 				{"applyset", "mySecret"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--force cannot be used with --prune",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--force cannot be used with --prune",
 		},
 		{
 			args: [][]string{
@@ -192,8 +192,8 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"prune", "false"},
 				{"applyset", "mySecret"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--applyset requires --prune",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--applyset requires --prune",
 		},
 		{
 			args: [][]string{
@@ -201,8 +201,8 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"applyset", "mySecret"},
 				{"selector", "foo=bar"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--selector is incompatible with --applyset",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--selector is incompatible with --applyset",
 		},
 		{
 			args: [][]string{
@@ -210,8 +210,8 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"applyset", "mySecret"},
 				{"all", "true"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--all is incompatible with --applyset",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--all is incompatible with --applyset",
 		},
 		{
 			args: [][]string{
@@ -219,22 +219,22 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"applyset", "mySecret"},
 				{"prune-allowlist", "core/v1/ConfigMap"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--prune-allowlist is incompatible with --applyset",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--prune-allowlist is incompatible with --applyset",
 		},
 		{
 			args: [][]string{
 				{"prune", "true"},
 				{"applyset", "foo"},
 			},
-			enableAlpha: cmdutil.ApplySetEnv,
-			expectedErr: "--applyset is not yet supported",
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			expectedErr:  "--applyset is not yet supported",
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			cmdtesting.WithAlphaEnv(test.enableAlpha, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)

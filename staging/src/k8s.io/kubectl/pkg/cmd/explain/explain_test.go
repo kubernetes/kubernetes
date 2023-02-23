@@ -154,19 +154,19 @@ func TestExplain(t *testing.T) {
 }
 
 func TestAlphaEnablement(t *testing.T) {
-	alphas := map[string]string{
-		cmdutil.ExplainOpenapiV3Env: "output",
+	alphas := map[cmdutil.FeatureGate]string{
+		cmdutil.ExplainOpenapiV3: "output",
 	}
-	for env, flag := range alphas {
+	for feature, flag := range alphas {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
 		cmd := NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q alpha env var set", flag, env)
+		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
 
-		cmdtesting.WithAlphaEnv(env, t, func(t *testing.T) {
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
 			cmd := NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q alpha env var set", flag, env)
+			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
 		})
 	}
 }

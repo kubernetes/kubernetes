@@ -422,14 +422,15 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	return timeout, nil
 }
 
-// Environment variables used to enable alpha features
+type FeatureGate string
+
 const (
-	ApplySetEnv         = "KUBECTL_APPLYSET"
-	ExplainOpenapiV3Env = "KUBECTL_EXPLAIN_OPENAPIV3"
+	ApplySet         FeatureGate = "KUBECTL_APPLYSET"
+	ExplainOpenapiV3 FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
 )
 
-func AlphaEnabled(enablementEnv string) bool {
-	return os.Getenv(enablementEnv) == "true"
+func (f FeatureGate) IsEnabled() bool {
+	return os.Getenv(string(f)) == "true"
 }
 
 func AddValidateFlags(cmd *cobra.Command) {
@@ -517,7 +518,7 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
 
 	// Flags associated with the new ApplySet-based alpha
-	if AlphaEnabled(ApplySetEnv) {
+	if ApplySet.IsEnabled() {
 		cmd.Flags().StringVar(applySetRef, "applyset", *applySetRef, "[alpha] The name of the ApplySet that tracks which resources are being managed, for the purposes of determining what to prune. Live resources that are part of the ApplySet but have been removed from the provided configs will be deleted. Format: [RESOURCE][.GROUP]/NAME. A Secret will be used if no resource or group is specified.")
 		cmd.Flags().BoolVar(prune, "prune", *prune, "Automatically delete previously applied resource objects that do not appear in the provided configs. For alpha1, use with either -l or --all. For alpha2, use with --applyset.")
 	} else {

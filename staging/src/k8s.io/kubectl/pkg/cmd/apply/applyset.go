@@ -24,8 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const defaultApplySetParentResource = "secrets"
-const defaultApplySetParentVersion = "v1"
+var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
 
 // ApplySet tracks the information about an applyset apply/prune
 type ApplySet struct {
@@ -46,19 +45,17 @@ type ApplySetParentRef struct {
 	RESTMapping *meta.RESTMapping
 }
 
-const invalidParentRefFmt = "invalid parent reference %q: %w"
-
 // NewApplySet creates a new ApplySet object from a parent reference in the format [RESOURCE][.GROUP]/NAME
 func NewApplySet(parentRefStr string, namespace string, mapper meta.RESTMapper) (*ApplySet, error) {
 	var parent *ApplySetParentRef
 	var err error
 
 	if parent, err = parentRefFromStr(parentRefStr, mapper); err != nil {
-		return nil, fmt.Errorf(invalidParentRefFmt, parentRefStr, err)
+		return nil, fmt.Errorf("invalid parent reference %q: %w", parentRefStr, err)
 	}
 	parent.Namespace = namespace
 	if err := parent.Validate(); err != nil {
-		return nil, fmt.Errorf(invalidParentRefFmt, parentRefStr, err)
+		return nil, fmt.Errorf("invalid parent reference %q: %w", parentRefStr, err)
 	}
 
 	return &ApplySet{
@@ -99,7 +96,7 @@ func parentRefFromStr(parentRefStr string, mapper meta.RESTMapper) (*ApplySetPar
 		gvr = schema.ParseGroupResource(groupRes).WithVersion("")
 	} else {
 		name = parentRefStr
-		gvr = schema.GroupVersionResource{Version: defaultApplySetParentVersion, Resource: defaultApplySetParentResource}
+		gvr = defaultApplySetParentGVR
 	}
 
 	gvk, err := mapper.KindFor(gvr)
