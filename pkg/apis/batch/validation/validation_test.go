@@ -935,6 +935,22 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completions",
 			},
 		},
+		"immutable completions for indexed job when AllowElasticIndexedJobs is false": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(1)
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.completions",
+			},
+		},
 		"immutable selector": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
