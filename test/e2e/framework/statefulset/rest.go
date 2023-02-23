@@ -148,7 +148,7 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 	ns := ss.Namespace
 
 	framework.Logf("Scaling statefulset %s to %d", name, count)
-	ss = update(ctx, c, ns, name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = count })
+	ss = update(ctx, c, ns, name, count)
 
 	var statefulPodList *v1.PodList
 	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
@@ -173,7 +173,7 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 
 // UpdateReplicas updates the replicas of ss to count.
 func UpdateReplicas(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, count int32) {
-	update(ctx, c, ss.Namespace, ss.Name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = count })
+	update(ctx, c, ss.Namespace, ss.Name, count)
 }
 
 // Restart scales ss to 0 and then back to its previous number of replicas.
@@ -185,7 +185,7 @@ func Restart(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet)
 	// This way we know the controller has observed all Pod deletions
 	// before we scale it back up.
 	WaitForStatusReplicas(ctx, c, ss, 0)
-	update(ctx, c, ss.Namespace, ss.Name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = oldReplicas })
+	update(ctx, c, ss.Namespace, ss.Name, oldReplicas)
 }
 
 // CheckHostname verifies that all Pods in ss have the correct Hostname. If the returned error is not nil than verification failed.
@@ -247,13 +247,13 @@ func ExecInStatefulPods(ctx context.Context, c clientset.Interface, ss *appsv1.S
 }
 
 // update updates a statefulset, and it is only used within rest.go
-func update(ctx context.Context, c clientset.Interface, ns, name string, update func(ss *appsv1.StatefulSet)) *appsv1.StatefulSet {
+func update(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) *appsv1.StatefulSet {
 	for i := 0; i < 3; i++ {
 		ss, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get statefulset %q: %v", name, err)
 		}
-		update(ss)
+		*(ss.Spec.Replicas) = replicas
 		ss, err = c.AppsV1().StatefulSets(ns).Update(ctx, ss, metav1.UpdateOptions{})
 		if err == nil {
 			return ss
