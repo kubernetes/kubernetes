@@ -86,15 +86,15 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 		allErrs = append(allErrs, validateV1EventSeries(newEvent)...)
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.InvolvedObject, oldEvent.InvolvedObject, field.NewPath("involvedObject"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Message, oldEvent.Message, field.NewPath("message"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Source, oldEvent.Source, field.NewPath("source"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.FirstTimestamp, oldEvent.FirstTimestamp, field.NewPath("firstTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.LastTimestamp, oldEvent.LastTimestamp, field.NewPath("lastTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.InvolvedObject, oldEvent.InvolvedObject, field.NewPath("involvedObject"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Message, oldEvent.Message, field.NewPath("message"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Source, oldEvent.Source, field.NewPath("source"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.FirstTimestamp, oldEvent.FirstTimestamp, field.NewPath("firstTimestamp"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.LastTimestamp, oldEvent.LastTimestamp, field.NewPath("lastTimestamp"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
 
 	// Disallow changes to eventTime greater than microsecond-level precision.
 	// Tolerating sub-microsecond changes is required to tolerate updates
@@ -104,13 +104,13 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 	newTruncated := newEvent.EventTime.Truncate(time.Microsecond).UTC()
 	oldTruncated := oldEvent.EventTime.Truncate(time.Microsecond).UTC()
 	if newTruncated != oldTruncated {
-		allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Action, oldEvent.Action, field.NewPath("action"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Related, oldEvent.Related, field.NewPath("related"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingController, oldEvent.ReportingController, field.NewPath("reportingController"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingInstance, oldEvent.ReportingInstance, field.NewPath("reportingInstance"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Action, oldEvent.Action, field.NewPath("action"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.Related, oldEvent.Related, field.NewPath("related"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.ReportingController, oldEvent.ReportingController, field.NewPath("reportingController"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEvent.ReportingInstance, oldEvent.ReportingInstance, field.NewPath("reportingInstance"))...)
 
 	return allErrs
 }

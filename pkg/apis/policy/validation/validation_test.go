@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -676,7 +677,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		if errs[0].Type != v.errorType {
 			t.Errorf("[%s] received an unexpected error type.  Expected: '%s' got: '%s'", k, v.errorType, errs[0].Type)
 		}
-		if errs[0].Detail != v.errorDetail {
+		if !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] received an unexpected error detail.  Expected '%s' got: '%s'", k, v.errorDetail, errs[0].Detail)
 		}
 	}

@@ -283,7 +283,7 @@ func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRev
 
 	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
 	errs = append(errs, ValidateControllerRevision(newHistory)...)
-	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	errs = append(errs, apimachineryvalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
 	return errs
 }
 

@@ -1729,7 +1729,7 @@ func TestValidateIngressClassUpdate(t *testing.T) {
 			}
 
 			for i, err := range errs {
-				if err.Error() != testCase.expectedErrs[i].Error() {
+				if !strings.Contains(err.Error(), testCase.expectedErrs[i].Error()) {
 					t.Fatalf("Expected error: %v, got %v", testCase.expectedErrs[i].Error(), err.Error())
 				}
 			}
