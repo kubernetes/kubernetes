@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -370,14 +371,27 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
 		})
 	}
+	sort.Sort(byVersion(aggregatedVersions))
 	aggregatedDiscovery := []apidiscoveryv2beta1.APIGroupDiscovery{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resources["v1"].Group,
 		},
 		Versions: aggregatedVersions,
 	}}
-	require.Equal(t, aggregatedDiscovery, doc.Items)
+	require.Equal(t, doc.Items, aggregatedDiscovery)
 }
+
+type byVersion []apidiscoveryv2beta1.APIVersionDiscovery
+
+var versionMap = map[string]int{
+	"v1":       1,
+	"v1beta1":  2,
+	"v1alpha1": 3,
+}
+
+func (a byVersion) Len() int           { return len(a) }
+func (a byVersion) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byVersion) Less(i, j int) bool { return versionMap[a[i].Version] < versionMap[a[j].Version] }
 
 func TestLegacyFallback(t *testing.T) {
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
