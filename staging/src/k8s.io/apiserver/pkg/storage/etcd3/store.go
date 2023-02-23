@@ -756,6 +756,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		// this conservative value means that at most 3 transforms/decodes will be
 		// wasted.  the expensive transformers rely heavily on caching so this is
 		// unlikely to be purely wasted effort.
+		// TODO consider having a rate limiter per store to allow bursts of higher parallelism
 		chunkSize := 4
 		if limit > 0 && int64(chunkSize) > limit {
 			chunkSize = int(limit)
