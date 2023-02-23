@@ -758,11 +758,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		// take items from the response until the bucket is full, filtering as we go
 	splitChunk:
-		for _, chunk := range splitChunks(getResp.Kvs, chunkSize) {
+		for i, chunk := range splitChunks(getResp.Kvs, chunkSize) {
+			i := i
 			var wg sync.WaitGroup
 			workChunks := make([]decodeWork, len(chunk))
-			for i, kv := range chunk {
-				i, kv := i, kv
+			for j, kv := range chunk {
+				j, kv := j, kv
 
 				wg.Add(1)
 				go func() {
@@ -772,7 +773,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 					defer func() {
 						// this is safe even without a lock because each go routine only modifies its own index
-						workChunks[i] = work
+						workChunks[j] = work
 						wg.Done()
 					}()
 
@@ -789,9 +790,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					}
 					numEvald.Add(1)
 
-					// TODO fix
 					// free kv early. Long lists can take O(seconds) to decode.
-					// getResp.Kvs[i] = nil
+					// this is safe even without a lock because each go routine only modifies its own index
+					getResp.Kvs[i] = nil
+					chunk[j] = nil
 				}()
 			}
 			wg.Wait()
