@@ -792,7 +792,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 					// free kv early. Long lists can take O(seconds) to decode.
 					// this is safe even without a lock because each go routine only modifies its own index
-					getResp.Kvs[i+j] = nil
+					getResp.Kvs[i*len(workChunks)+j] = nil
 					chunk[j] = nil
 				}()
 			}
