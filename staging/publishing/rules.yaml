@@ -300,6 +300,10 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - name: release-1.26
     go: 1.19.6
     source:
