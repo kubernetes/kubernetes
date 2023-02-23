@@ -344,8 +344,8 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWb
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/onsi/gomega v1.23.0 h1:/oxKu9c2HVap+F3PfKort2Hw5DEU+HGlW8n+tguWsys=
-github.com/openshift/api v0.0.0-20230201213816-61d971884921 h1:19XfhG/rG4oxNOQ1PNtHIjW23z2+QNHC6lH1VZWhSWY=
-github.com/openshift/api v0.0.0-20230201213816-61d971884921/go.mod h1:ctXNyWanKEjGj8sss1KjjHQ3ENKFm33FFnS5BKaIPh4=
+github.com/openshift/api v0.0.0-20230208193339-068b2ae5534f h1:+GaTEfR8gYzh64fdlRKLYZLwt5p4wQd2mdnvkhFDa8k=
+github.com/openshift/api v0.0.0-20230208193339-068b2ae5534f/go.mod h1:ctXNyWanKEjGj8sss1KjjHQ3ENKFm33FFnS5BKaIPh4=
 github.com/openshift/library-go v0.0.0-20230127195720-edf819b079cf h1:bxbHqv+K1KU82z4JurFlaCpbK9qwn4L4MXMrZdEm0q8=
 github.com/openshift/library-go v0.0.0-20230127195720-edf819b079cf/go.mod h1:xO4nAf0qa56dgvEJWVD1WuwSJ8JWPU1TYLBQrlutWnE=
 github.com/openshift/onsi-ginkgo/v2 v2.4.1-0.20221214150008-e73634cb3870 h1:YH3Z3ZWCDWjkAGdZpK5rCm5pRZ4wt0uEx1GwvCiO3+I=

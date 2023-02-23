@@ -101,6 +101,19 @@ type InfrastructureStatus struct {
 	// +kubebuilder:default=HighlyAvailable
 	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
 	InfrastructureTopology TopologyMode `json:"infrastructureTopology"`
+
+	// cpuPartitioning expresses if CPU partitioning is a currently enabled feature in the cluster.
+	// CPU Partitioning means that this cluster can support partitioning workloads to specific CPU Sets.
+	// Valid values are "None" and "AllNodes". When omitted, the default value is "None".
+	// The default value of "None" indicates that no nodes will be setup with CPU partitioning.
+	// The "AllNodes" value indicates that all nodes have been setup with CPU partitioning,
+	// and can then be further configured via the PerformanceProfile API.
+	// +kubebuilder:default=None
+	// +default="None"
+	// +kubebuilder:validation:Enum=None;AllNodes
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	CPUPartitioning CPUPartitioningMode `json:"cpuPartitioning,omitempty"`
 }
 
 // TopologyMode defines the topology mode of the control/infra nodes.
@@ -121,6 +134,28 @@ const (
 	// that any of the control plane components such as kubernetes API server or etcd are visible within
 	// the cluster.
 	ExternalTopologyMode TopologyMode = "External"
+)
+
+// CPUPartitioningMode defines the mode for CPU partitioning
+type CPUPartitioningMode string
+
+const (
+	// CPUPartitioningNone means that no CPU Partitioning is on in this cluster infrastructure
+	CPUPartitioningNone CPUPartitioningMode = "None"
+
+	// CPUPartitioningAllNodes means that all nodes are configured with CPU Partitioning in this cluster
+	CPUPartitioningAllNodes CPUPartitioningMode = "AllNodes"
+)
+
+// PlatformLoadBalancerType defines the type of load balancer used by the cluster.
+type PlatformLoadBalancerType string
+
+const (
+	// LoadBalancerTypeUserManaged is a load balancer with control-plane VIPs managed outside of the cluster by the customer.
+	LoadBalancerTypeUserManaged PlatformLoadBalancerType = "UserManaged"
+
+	// LoadBalancerTypeOpenShiftManagedDefault is the default load balancer with control-plane VIPs managed by the OpenShift cluster.
+	LoadBalancerTypeOpenShiftManagedDefault PlatformLoadBalancerType = "OpenShiftManagedDefault"
 )
 
 // PlatformType is a specific supported infrastructure provider.
@@ -460,6 +495,7 @@ type AWSResourceTag struct {
 type AzurePlatformSpec struct{}
 
 // AzurePlatformStatus holds the current status of the Azure infrastructure provider.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)",message="resourceTags may only be configured during installation"
 type AzurePlatformStatus struct {
 	// resourceGroupName is the Resource Group for new Azure resources created for the cluster.
 	ResourceGroupName string `json:"resourceGroupName"`
@@ -478,6 +514,34 @@ type AzurePlatformStatus struct {
 	// armEndpoint specifies a URL to use for resource management in non-soverign clouds such as Azure Stack.
 	// +optional
 	ARMEndpoint string `json:"armEndpoint,omitempty"`
+
+	// resourceTags is a list of additional tags to apply to Azure resources created for the cluster.
+	// See https://docs.microsoft.com/en-us/rest/api/resources/tags for information on tagging Azure resources.
+	// Due to limitations on Automation, Content Delivery Network, DNS Azure resources, a maximum of 15 tags
+	// may be applied. OpenShift reserves 5 tags for internal use, allowing 10 tags for user configuration.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:XValidation:rule="self.all(x, x in oldSelf) && oldSelf.all(x, x in self)",message="resourceTags are immutable and may only be configured during installation"
+	// +optional
+	ResourceTags []AzureResourceTag `json:"resourceTags,omitempty"`
+}
+
+// AzureResourceTag is a tag to apply to Azure resources created for the cluster.
+type AzureResourceTag struct {
+	// key is the key part of the tag. A tag key can have a maximum of 128 characters and cannot be empty. Key
+	// must begin with a letter, end with a letter, number or underscore, and must contain only alphanumeric
+	// characters and the following special characters `_ . -`.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z]([0-9A-Za-z_.-]*[0-9A-Za-z_])?$`
+	Key string `json:"key"`
+	// value is the value part of the tag. A tag value can have a maximum of 256 characters and cannot be empty. Value
+	// must contain only alphanumeric characters and the following special characters `_ + , - . / : ; < = > ? @`.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern=`^[0-9A-Za-z_.=+-@]+$`
+	Value string `json:"value"`
 }
 
 // AzureCloudEnvironment is the name of the Azure cloud environment
@@ -512,6 +576,27 @@ type GCPPlatformStatus struct {
 
 	// region holds the region for new GCP resources created for the cluster.
 	Region string `json:"region"`
+}
+
+// BareMetalPlatformLoadBalancer defines the load balancer used by the cluster on BareMetal platform.
+// +union
+type BareMetalPlatformLoadBalancer struct {
+	// type defines the type of load balancer used by the cluster on BareMetal platform
+	// which can be a user-managed or openshift-managed load balancer
+	// that is to be used for the OpenShift API and Ingress endpoints.
+	// When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing
+	// defined in the machine config operator will be deployed.
+	// When set to UserManaged these static pods will not be deployed and it is expected that
+	// the load balancer is configured out of band by the deployer.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default.
+	// The default value is OpenShiftManagedDefault.
+	// +default="OpenShiftManagedDefault"
+	// +kubebuilder:default:="OpenShiftManagedDefault"
+	// +kubebuilder:validation:Enum:="OpenShiftManagedDefault";"UserManaged"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="type is immutable once set"
+	// +optional
+	// +unionDiscriminator
+	Type PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
 // BareMetalPlatformSpec holds the desired state of the BareMetal infrastructure provider.
@@ -562,6 +647,34 @@ type BareMetalPlatformStatus struct {
 	// datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames
 	// to the nodes in the cluster.
 	NodeDNSIP string `json:"nodeDNSIP,omitempty"`
+
+	// loadBalancer defines how the load balancer used by the cluster is configured.
+	// +default={"type": "OpenShiftManagedDefault"}
+	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	LoadBalancer *BareMetalPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+}
+
+// OpenStackPlatformLoadBalancer defines the load balancer used by the cluster on OpenStack platform.
+// +union
+type OpenStackPlatformLoadBalancer struct {
+	// type defines the type of load balancer used by the cluster on OpenStack platform
+	// which can be a user-managed or openshift-managed load balancer
+	// that is to be used for the OpenShift API and Ingress endpoints.
+	// When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing
+	// defined in the machine config operator will be deployed.
+	// When set to UserManaged these static pods will not be deployed and it is expected that
+	// the load balancer is configured out of band by the deployer.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default.
+	// The default value is OpenShiftManagedDefault.
+	// +default="OpenShiftManagedDefault"
+	// +kubebuilder:default:="OpenShiftManagedDefault"
+	// +kubebuilder:validation:Enum:="OpenShiftManagedDefault";"UserManaged"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="type is immutable once set"
+	// +optional
+	// +unionDiscriminator
+	Type PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
 // OpenStackPlatformSpec holds the desired state of the OpenStack infrastructure provider.
@@ -614,6 +727,34 @@ type OpenStackPlatformStatus struct {
 	// datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames
 	// to the nodes in the cluster.
 	NodeDNSIP string `json:"nodeDNSIP,omitempty"`
+
+	// loadBalancer defines how the load balancer used by the cluster is configured.
+	// +default={"type": "OpenShiftManagedDefault"}
+	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	LoadBalancer *OpenStackPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+}
+
+// OvirtPlatformLoadBalancer defines the load balancer used by the cluster on Ovirt platform.
+// +union
+type OvirtPlatformLoadBalancer struct {
+	// type defines the type of load balancer used by the cluster on Ovirt platform
+	// which can be a user-managed or openshift-managed load balancer
+	// that is to be used for the OpenShift API and Ingress endpoints.
+	// When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing
+	// defined in the machine config operator will be deployed.
+	// When set to UserManaged these static pods will not be deployed and it is expected that
+	// the load balancer is configured out of band by the deployer.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default.
+	// The default value is OpenShiftManagedDefault.
+	// +default="OpenShiftManagedDefault"
+	// +kubebuilder:default:="OpenShiftManagedDefault"
+	// +kubebuilder:validation:Enum:="OpenShiftManagedDefault";"UserManaged"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="type is immutable once set"
+	// +optional
+	// +unionDiscriminator
+	Type PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
 // OvirtPlatformSpec holds the desired state of the oVirt infrastructure provider.
@@ -657,6 +798,34 @@ type OvirtPlatformStatus struct {
 
 	// deprecated: as of 4.6, this field is no longer set or honored.  It will be removed in a future release.
 	NodeDNSIP string `json:"nodeDNSIP,omitempty"`
+
+	// loadBalancer defines how the load balancer used by the cluster is configured.
+	// +default={"type": "OpenShiftManagedDefault"}
+	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	LoadBalancer *OvirtPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+}
+
+// VSpherePlatformLoadBalancer defines the load balancer used by the cluster on VSphere platform.
+// +union
+type VSpherePlatformLoadBalancer struct {
+	// type defines the type of load balancer used by the cluster on VSphere platform
+	// which can be a user-managed or openshift-managed load balancer
+	// that is to be used for the OpenShift API and Ingress endpoints.
+	// When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing
+	// defined in the machine config operator will be deployed.
+	// When set to UserManaged these static pods will not be deployed and it is expected that
+	// the load balancer is configured out of band by the deployer.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default.
+	// The default value is OpenShiftManagedDefault.
+	// +default="OpenShiftManagedDefault"
+	// +kubebuilder:default:="OpenShiftManagedDefault"
+	// +kubebuilder:validation:Enum:="OpenShiftManagedDefault";"UserManaged"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="type is immutable once set"
+	// +optional
+	// +unionDiscriminator
+	Type PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
 // VSpherePlatformFailureDomainSpec holds the region and zone failure domain and
@@ -895,6 +1064,13 @@ type VSpherePlatformStatus struct {
 	// datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames
 	// to the nodes in the cluster.
 	NodeDNSIP string `json:"nodeDNSIP,omitempty"`
+
+	// loadBalancer defines how the load balancer used by the cluster is configured.
+	// +default={"type": "OpenShiftManagedDefault"}
+	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	LoadBalancer *VSpherePlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
 
 // IBMCloudPlatformSpec holds the desired state of the IBMCloud infrastructure provider.
@@ -1052,6 +1228,27 @@ type AlibabaCloudResourceTag struct {
 	Value string `json:"value"`
 }
 
+// NutanixPlatformLoadBalancer defines the load balancer used by the cluster on Nutanix platform.
+// +union
+type NutanixPlatformLoadBalancer struct {
+	// type defines the type of load balancer used by the cluster on Nutanix platform
+	// which can be a user-managed or openshift-managed load balancer
+	// that is to be used for the OpenShift API and Ingress endpoints.
+	// When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing
+	// defined in the machine config operator will be deployed.
+	// When set to UserManaged these static pods will not be deployed and it is expected that
+	// the load balancer is configured out of band by the deployer.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default.
+	// The default value is OpenShiftManagedDefault.
+	// +default="OpenShiftManagedDefault"
+	// +kubebuilder:default:="OpenShiftManagedDefault"
+	// +kubebuilder:validation:Enum:="OpenShiftManagedDefault";"UserManaged"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="type is immutable once set"
+	// +optional
+	// +unionDiscriminator
+	Type PlatformLoadBalancerType `json:"type,omitempty"`
+}
+
 // NutanixPlatformSpec holds the desired state of the Nutanix infrastructure provider.
 // This only includes fields that can be modified in the cluster.
 type NutanixPlatformSpec struct {
@@ -1137,6 +1334,13 @@ type NutanixPlatformStatus struct {
 	// +kubebuilder:validation:Format=ip
 	// +kubebuilder:validation:MaxItems=2
 	IngressIPs []string `json:"ingressIPs"`
+
+	// loadBalancer defines how the load balancer used by the cluster is configured.
+	// +default={"type": "OpenShiftManagedDefault"}
+	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	LoadBalancer *NutanixPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

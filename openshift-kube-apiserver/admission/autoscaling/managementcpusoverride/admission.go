@@ -179,6 +179,16 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return admission.NewForbidden(attr, fmt.Errorf("%s node or namespace or infra config cache not synchronized", PluginName))
 	}
 
+	nodes, err := a.nodeLister.List(labels.Everything())
+	if err != nil {
+		return admission.NewForbidden(attr, err) // can happen due to informer latency
+	}
+
+	// we still need to have nodes under the cluster to decide if the management resource enabled or not
+	if len(nodes) == 0 {
+		return admission.NewForbidden(attr, fmt.Errorf("%s the cluster does not have any nodes", PluginName))
+	}
+
 	clusterInfra, err := a.infraConfigLister.Get(infraClusterName)
 	if err != nil {
 		return admission.NewForbidden(attr, err) // can happen due to informer latency
@@ -196,26 +206,8 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return nil
 	}
 
-	// not the SNO cluster, skip mutation
-	// TODO: currently we supports only SNO use case because we have not yet worked out the best approach to determining whether the feature
-	// should be on or off in a multi-node cluster, and computing that state incorrectly could lead to breaking running clusters.
-	if clusterInfra.Status.InfrastructureTopology != configv1.SingleReplicaTopologyMode ||
-		clusterInfra.Status.ControlPlaneTopology != configv1.SingleReplicaTopologyMode {
-		return nil
-	}
-
-	nodes, err := a.nodeLister.List(labels.Everything())
-	if err != nil {
-		return admission.NewForbidden(attr, err) // can happen due to informer latency
-	}
-
-	// we still need to have nodes under the cluster to decide if the management resource enabled or not
-	if len(nodes) == 0 {
-		return admission.NewForbidden(attr, fmt.Errorf("%s the cluster does not have any nodes", PluginName))
-	}
-
-	// probably the workload feature disabled, because some cluster nodes do not have workload resource
-	if err := isManagementResourceAvailableForAllNodes(nodes, workloadType); err != nil {
+	// Check if we are in CPU Partitioning mode for AllNodes
+	if !isCPUPartitioning(clusterInfra.Status, nodes, workloadType) {
 		return nil
 	}
 
@@ -284,6 +276,21 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 	return nil
 }
 
+func isCPUPartitioning(infraStatus configv1.InfrastructureStatus, nodes []*corev1.Node, workloadType string) bool {
+	// If status is not for CPU partitioning and we're single node we also check nodes to support upgrade event
+	// TODO: This should not be needed after 4.13 as all clusters after should have this feature on at install time, or updated by migration in NTO.
+	if infraStatus.CPUPartitioning != configv1.CPUPartitioningAllNodes && infraStatus.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
+		managedResource := fmt.Sprintf("%s.%s", workloadType, containerWorkloadResourceSuffix)
+		for _, node := range nodes {
+			// We only expect a single node to exist, so we return on first hit
+			if _, ok := node.Status.Allocatable[corev1.ResourceName(managedResource)]; ok {
+				return true
+			}
+		}
+	}
+	return infraStatus.CPUPartitioning == configv1.CPUPartitioningAllNodes
+}
+
 func (a *managementCPUsOverride) getPodNamespace(attr admission.Attributes) (*corev1.Namespace, error) {
 	ns, err := a.nsLister.Get(attr.GetNamespace())
 	if err == nil {
@@ -312,7 +319,7 @@ func (a *managementCPUsOverride) waitForSyncedStore(timeout <-chan time.Time) bo
 		select {
 		case <-time.After(100 * time.Millisecond):
 		case <-timeout:
-			return a.nsListerSynced() && a.nodeListSynced()
+			return a.nsListerSynced() && a.nodeListSynced() && a.infraConfigListSynced()
 		}
 	}
 
@@ -440,17 +447,6 @@ func podHasBothCPULimitAndRequest(containers []coreapi.Container) bool {
 	}
 
 	return false
-}
-
-func isManagementResourceAvailableForAllNodes(nodes []*corev1.Node, workloadType string) error {
-	managedResource := fmt.Sprintf("%s.%s", workloadType, containerWorkloadResourceSuffix)
-	for _, node := range nodes {
-		if v, ok := node.Status.Allocatable[corev1.ResourceName(managedResource)]; !ok || v.IsZero() {
-			return fmt.Errorf("the node %q does not have resource %q", node.Name, managedResource)
-		}
-	}
-
-	return nil
 }
 
 func doesNamespaceAllowWorkloadType(annotations map[string]string, workloadType string) bool {
