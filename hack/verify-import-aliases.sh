@@ -30,7 +30,7 @@ kube::golang::verify_go_version
 cd "${KUBE_ROOT}"
 
 ret=0
-go run cmd/preferredimports/preferredimports.go "$@" || ret=$?
+GO111MODULE=on GOPROXY=off go run cmd/preferredimports/preferredimports.go "$@" || ret=$?
 if [[ $ret -ne 0 ]]; then
   echo "!!! Please see hack/.import-aliases for the preferred aliases for imports." >&2
   exit 1

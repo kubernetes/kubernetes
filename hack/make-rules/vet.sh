@@ -38,7 +38,7 @@ if [[ ${#targets[@]} -eq 0 ]]; then
   # Do not run on third_party directories or generated client code or build tools.
   while IFS='' read -r line; do
     targets+=("${line}")
-  done < <(go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
+  done < <(GO111MODULE=on GOPROXY=off go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
 fi
 
-go vet "${goflags[@]:+${goflags[@]}}" "${targets[@]}"
+GO111MODULE=on GOPROXY=off go vet "${goflags[@]:+${goflags[@]}}" "${targets[@]}"
