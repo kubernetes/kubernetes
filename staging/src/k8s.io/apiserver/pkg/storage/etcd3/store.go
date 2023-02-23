@@ -805,6 +805,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					numEvald.Add(1)
 				}()
 			}
+			// we are as slow as the slowest transformer in the chunk but we have to retain the order of the KV list so
+			// this ends up being a straightforward way to increase parallelism without needing significant bookkeeping
 			wg.Wait()
 
 			for _, workItem := range workChunks[:len(chunk)] {
