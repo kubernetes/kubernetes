@@ -196,7 +196,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
-		logger.Error(err, "unable to process a request with an unknown content type", "content type", contentType)
+		logger.Error(err, "unable to process a request with an unknown content type", "type", contentType)
 		http.Error(w, "unable to process a request with a non-json content type", http.StatusBadRequest)
 		return
 	}
