@@ -557,3 +557,51 @@ func TestReattachMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestAttachOptions_GetContainerName(t *testing.T) {
+	tests := []struct {
+		name    string
+		pod     *corev1.Pod
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "has container",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:    []corev1.Container{{Name: "bar"}},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			want:    "bar",
+			wantErr: false,
+		},
+		{
+			name: "no container",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &AttachOptions{Pod: tt.pod}
+			got, err := o.GetContainerName(tt.pod)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AttachOptions.GetContainerName() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("AttachOptions.GetContainerName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
