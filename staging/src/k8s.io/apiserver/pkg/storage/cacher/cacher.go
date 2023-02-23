@@ -461,7 +461,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(ctx); err != nil {
 		return nil, errors.NewServiceUnavailable(err.Error())
 	}
 
@@ -565,7 +565,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(ctx); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
 
@@ -703,7 +703,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(ctx); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
 	trace.Step("Ready")
@@ -1101,7 +1101,7 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(context.Background()); err != nil {
 		return 0, errors.NewServiceUnavailable(err.Error())
 	}
 

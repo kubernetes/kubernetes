@@ -17,7 +17,9 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"testing"
+	"time"
 )
 
 func Test_newReady(t *testing.T) {
@@ -27,13 +29,73 @@ func Test_newReady(t *testing.T) {
 	// create 10 goroutines waiting for ready
 	for i := 0; i < 10; i++ {
 		go func() {
-			errCh <- ready.wait()
+			errCh <- ready.wait(context.Background())
 		}()
+	}
+	select {
+	case <-time.After(1 * time.Second):
+	case <-errCh:
+		t.Errorf("ready should be blocking")
 	}
 	ready.set(true)
 	for i := 0; i < 10; i++ {
 		if err := <-errCh; err != nil {
 			t.Errorf("unexpected error on channel %d", i)
+		}
+	}
+}
+
+func Test_newReadySetIdempotent(t *testing.T) {
+	errCh := make(chan error, 10)
+	ready := newReady()
+	ready.set(false)
+	ready.set(false)
+	ready.set(false)
+	ready.set(true)
+	ready.set(true)
+	ready.set(true)
+	ready.set(false)
+	// create 10 goroutines waiting for ready and stop
+	for i := 0; i < 10; i++ {
+		go func() {
+			errCh <- ready.wait(context.Background())
+		}()
+	}
+	select {
+	case <-time.After(1 * time.Second):
+	case <-errCh:
+		t.Errorf("ready should be blocking")
+	}
+	ready.set(true)
+	for i := 0; i < 10; i++ {
+		if err := <-errCh; err != nil {
+			t.Errorf("unexpected error on channel %d", i)
+		}
+	}
+}
+
+// Test_newReadyRacy executes all the possible transitions randomly.
+// It must run with the race detector enabled.
+func Test_newReadyRacy(t *testing.T) {
+	concurrency := 1000
+	errCh := make(chan error, concurrency)
+	ready := newReady()
+	ready.set(false)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			errCh <- ready.wait(context.Background())
+		}()
+		go func() {
+			ready.set(false)
+		}()
+		go func() {
+			ready.set(true)
+		}()
+	}
+	ready.set(true)
+	for i := 0; i < concurrency; i++ {
+		if err := <-errCh; err != nil {
+			t.Errorf("unexpected error %v on channel %d", err, i)
 		}
 	}
 }
@@ -45,8 +107,13 @@ func Test_newReadyStop(t *testing.T) {
 	// create 10 goroutines waiting for ready and stop
 	for i := 0; i < 10; i++ {
 		go func() {
-			errCh <- ready.wait()
+			errCh <- ready.wait(context.Background())
 		}()
+	}
+	select {
+	case <-time.After(1 * time.Second):
+	case <-errCh:
+		t.Errorf("ready should be blocking")
 	}
 	ready.stop()
 	for i := 0; i < 10; i++ {
@@ -76,8 +143,32 @@ func Test_newReadyCheck(t *testing.T) {
 	if ready.check() {
 		t.Errorf("unexpected ready state %v", ready.check())
 	}
-	err := ready.wait()
+	err := ready.wait(context.Background())
 	if err == nil {
 		t.Errorf("expected error waiting on a stopped state")
+	}
+}
+
+func Test_newReadyCancelPending(t *testing.T) {
+	errCh := make(chan error, 10)
+	ready := newReady()
+	ready.set(false)
+	ctx, cancel := context.WithCancel(context.Background())
+	// create 10 goroutines stuck on pending
+	for i := 0; i < 10; i++ {
+		go func() {
+			errCh <- ready.wait(ctx)
+		}()
+	}
+	select {
+	case <-time.After(1 * time.Second):
+	case <-errCh:
+		t.Errorf("ready should be blocking")
+	}
+	cancel()
+	for i := 0; i < 10; i++ {
+		if err := <-errCh; err == nil {
+			t.Errorf("unexpected success on channel %d", i)
+		}
 	}
 }
