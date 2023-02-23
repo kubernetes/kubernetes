@@ -894,7 +894,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
-// TODO unit test
 func splitChunks(ctx context.Context, kvs []*mvccpb.KeyValue, chunkSize int) chan []*mvccpb.KeyValue {
 	kvCount := len(kvs)
 

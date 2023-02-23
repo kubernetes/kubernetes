@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
@@ -660,4 +662,119 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
 	_, countErr := store.Count(invalidKey)
 	expectInvalidKey("Count", countErr)
+}
+
+func TestSplitChunks(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	var (
+		kv1 = &mvccpb.KeyValue{Key: []byte("one")}
+		kv2 = &mvccpb.KeyValue{Key: []byte("two")}
+		kv3 = &mvccpb.KeyValue{Key: []byte("three")}
+		kv4 = &mvccpb.KeyValue{Key: []byte("four")}
+		kv5 = &mvccpb.KeyValue{Key: []byte("five")}
+	)
+
+	testCases := []struct {
+		name      string
+		kvs       []*mvccpb.KeyValue
+		chunkSize int
+		want      [][]*mvccpb.KeyValue
+	}{
+		{
+			name:      "nil input results in nil - can't split an nil slice",
+			kvs:       nil,
+			chunkSize: 4,
+			want:      nil,
+		},
+		{
+			name:      "empty input results in nil - can't split an empty slice",
+			kvs:       []*mvccpb.KeyValue{},
+			chunkSize: 4,
+			want:      nil,
+		},
+		{
+			name:      "input slice on len one",
+			kvs:       []*mvccpb.KeyValue{kv1},
+			chunkSize: 4,
+			want:      [][]*mvccpb.KeyValue{{kv1}},
+		},
+		{
+			name:      "input slice of len two",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2},
+			chunkSize: 4,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2}},
+		},
+		{
+			name:      "input slice on len three",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3},
+			chunkSize: 4,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3}},
+		},
+		{
+			name:      "input slice on len four",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4},
+			chunkSize: 4,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3, kv4}},
+		},
+		{
+			name:      "input slice on len five with chunk 1",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 1,
+			want:      [][]*mvccpb.KeyValue{{kv1}, {kv2}, {kv3}, {kv4}, {kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 2",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 2,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2}, {kv3, kv4}, {kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 3",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 3,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3}, {kv4, kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 4",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 4,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3, kv4}, {kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 5",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 5,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3, kv4, kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 6",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 6,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3, kv4, kv5}},
+		},
+		{
+			name:      "input slice on len five with chunk 7",
+			kvs:       []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			chunkSize: 7,
+			want:      [][]*mvccpb.KeyValue{{kv1, kv2, kv3, kv4, kv5}},
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitChunks(ctx, tt.kvs, tt.chunkSize)
+			if diff := cmp.Diff(tt.want, kvChanToList(got)); len(diff) != 0 {
+				t.Errorf("incorrect chunks (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func kvChanToList(ch chan []*mvccpb.KeyValue) [][]*mvccpb.KeyValue {
+	var out [][]*mvccpb.KeyValue
+	for kv := range ch {
+		out = append(out, kv)
+	}
+	return out
 }
