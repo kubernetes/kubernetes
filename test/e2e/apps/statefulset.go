@@ -54,6 +54,7 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -322,10 +323,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: func() *int32 {
-							i := int32(3)
-							return &i
-						}()}
+						Partition: pointer.Int32(3),
+					}
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
@@ -377,10 +376,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: func() *int32 {
-							i := int32(2)
-							return &i
-						}()}
+						Partition: pointer.Int32(2),
+					}
 				}(),
 			}
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -388,10 +385,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Type: appsv1.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 						return &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: func() *int32 {
-								i := int32(2)
-								return &i
-							}()}
+							Partition: pointer.Int32(2),
+						}
 					}(),
 				}
 			})

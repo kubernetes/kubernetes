@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -1992,7 +1993,7 @@ func newTestReplicationControllerForQuota(name, image string, replicas int32) *v
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Replicas: pointer.Int32(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
