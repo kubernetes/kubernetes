@@ -752,8 +752,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// needs to be large enough to give value in terms of parallelizing work
-		// but also needs to be small enough to not waste too much work on early exit
-		chunkSize := 1 << 5
+		// but also needs to be small enough to not waste too much work on early exit.
+		// this conservative value means that at most 3 transforms/decodes will be
+		// wasted.  the expensive transformers rely heavily on caching so this is
+		// unlikely to be purely wasted effort.
+		chunkSize := 4
 		if limit > 0 && int64(chunkSize) > limit {
 			chunkSize = int(limit)
 		}
