@@ -23,15 +23,14 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/otel/attribute"
-	"golang.org/x/sync/errgroup"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -47,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -753,95 +752,34 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			growSlice(v, 2048, kvCount)
 		}
 
-		if err := func() error {
-			if kvCount == 0 {
-				return nil
-			}
+		// needs to be large enough to give value in terms of parallelizing work
+		// but also needs to be small enough to not waste too much work on early exit
+		const chunkSize = 1 << 5
 
-			workers := 1 << 5 // somewhat arbitrary choice
-			if kvCount < workers {
-				workers = kvCount
-			}
-			g := &errgroup.Group{}
-			g.SetLimit(workers)
-			workChan := make(chan decodeWork, v.Cap())
-			workCtx, workCtxCancel := context.WithCancel(ctx)
-			var workDoneOnce sync.Once
-			workDone := func() {
-				workDoneOnce.Do(func() {
-					workCtxCancel()
-					_ = g.Wait() // error is always nil
-					close(workChan)
-				})
-			}
-			defer workDone()
-			go func() {
-				<-workCtx.Done()
-				workDone()
-			}()
-
-			_ = workqueue.ParallelizeUntil // TODO look into over errgroup
-
-			var workLock sync.Mutex
-			var workIdx int
-			commitWork := func(work decodeWork) bool {
-				workLock.Lock()
-				defer workLock.Unlock()
-
-				if workIdx == work.idx {
-					workIdx++
-					workChan <- work
-
-					if workIdx == kvCount {
-						go workDone()
-					}
-
-					return true
-				}
-
-				return false
-			}
-
-			// take items from the response until the bucket is full, filtering as we go  // TODO fix
-			for i, kv := range getResp.Kvs {
+		// take items from the response until the bucket is full, filtering as we go
+	splitChunk:
+		for _, chunk := range splitChunks(getResp.Kvs, chunkSize) {
+			var wg sync.WaitGroup
+			workChunks := make([]decodeWork, len(chunk))
+			for i, kv := range chunk {
 				i, kv := i, kv
 
-				workFunc := func() {
-					work := decodeWork{idx: i, key: kv.Key}
+				wg.Add(1)
+				go func() {
+					defer utilruntime.HandleCrash()
+
+					work := decodeWork{key: kv.Key}
+
 					defer func() {
-						// the number of these go routines is unbounded but they are
-						// just trying to send on a channel in a specific order.
-						// TODO maybe just block this worker instead?
-						go func() {
-							for done := commitWork(work); !done; {
-								select {
-								case <-workCtx.Done():
-									return
-								default:
-									goruntime.Gosched()
-								}
-							}
-						}()
+						// this is safe even without a lock because each go routine only modifies its own index
+						workChunks[i] = work
+						wg.Done()
 					}()
 
-					select {
-					case <-workCtx.Done():
-						work.err = fmt.Errorf("canceled before decryption: %w", workCtx.Err())
-						return
-					default:
-					}
-
-					data, _, err := s.transformer.TransformFromStorage(workCtx, kv.Value, authenticatedDataString(kv.Key))
+					data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 					if err != nil {
 						work.err = storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 						return
-					}
-
-					select {
-					case <-workCtx.Done():
-						work.err = fmt.Errorf("canceled before decoding: %w", workCtx.Err())
-						return
-					default:
 					}
 
 					work.obj, work.err = shouldAppendListItem(data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc)
@@ -849,24 +787,20 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 						recordDecodeError(s.groupResourceString, string(kv.Key))
 						return
 					}
-
 					numEvald.Add(1)
-				}
-				g.Go(func() error {
-					workFunc()
-					return nil // never error here
-				})
 
-				// free kv early. Long lists can take O(seconds) to decode.
-				getResp.Kvs[i] = nil
+					// TODO fix
+					// free kv early. Long lists can take O(seconds) to decode.
+					// getResp.Kvs[i] = nil
+				}()
 			}
+			wg.Wait()
 
-			for workItem := range workChan {
+			for _, workItem := range workChunks {
 				if paging && int64(v.Len()) >= pred.Limit {
 					hasMore = true
-					break
+					break splitChunk
 				}
-
 				lastKey = workItem.key
 
 				if err := workItem.err; err != nil {
@@ -879,12 +813,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 				v.Set(reflect.Append(v, reflect.ValueOf(workItem.obj).Elem()))
 			}
-
-			workDone()
-
-			return nil
-		}(); err != nil {
-			return err
 		}
 
 		// indicate to the client which resource version was returned
@@ -946,8 +874,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
+func splitChunks(kvs []*mvccpb.KeyValue, chunk int) [][]*mvccpb.KeyValue {
+
+}
+
 type decodeWork struct {
-	idx int
 	key []byte
 	err error
 	obj runtime.Object // nil if filtered out by the predicate
