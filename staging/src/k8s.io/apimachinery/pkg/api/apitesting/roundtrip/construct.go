@@ -173,6 +173,10 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 		// use Convert to set into int alias types and different int widths correctly
 		v.Set(reflect.ValueOf(dataInt).Convert(t))
 
+	case reflect.Float32, reflect.Float64:
+		// use Convert to set into float types
+		v.Set(reflect.ValueOf(float32(dataInt) + 0.5).Convert(t))
+
 	default:
 		panic(fmt.Errorf("unhandled type %v in field %s", t, dataString))
 	}
