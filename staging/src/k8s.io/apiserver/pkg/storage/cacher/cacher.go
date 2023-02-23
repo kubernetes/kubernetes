@@ -461,7 +461,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return nil, errors.NewServiceUnavailable(err.Error())
+	}
 
 	triggerValue, triggerSupported := "", false
 	if c.indexedTrigger != nil {
@@ -563,7 +565,9 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
 	if err != nil {
@@ -634,7 +638,9 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 	trace.Step("Ready")
 
 	// List elements with at least 'listRV' from cache.
@@ -699,7 +705,9 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 	trace.Step("Ready")
 
 	// List elements with at least 'listRV' from cache.
@@ -1094,7 +1102,9 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
-	c.ready.wait()
+	if err := c.ready.wait(context.Background()); err != nil {
+		return 0, errors.NewServiceUnavailable(err.Error())
+	}
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
@@ -1452,35 +1462,116 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	}
 }
 
+type status int
+
+const (
+	Pending status = iota
+	Ready
+	Stopped
+)
+
+// ready is a three state condition variable that blocks until is Ready if is not Stopped.
+// Its initial state is Pending and its state machine diagram is as follow.
+//
+// Pending <------> Ready -----> Stopped
+//
+//	|                           ^
+//	└---------------------------┘
 type ready struct {
-	ok bool
-	c  *sync.Cond
+	state       status        // represent the state of the variable
+	lock        sync.RWMutex  // protect the state variable
+	restartLock sync.Mutex    // protect the transition from ready to pending where the channel is recreated
+	waitCh      chan struct{} // blocks until is ready or stopped
 }
 
 func newReady() *ready {
-	return &ready{c: sync.NewCond(&sync.RWMutex{})}
-}
-
-func (r *ready) wait() {
-	r.c.L.Lock()
-	for !r.ok {
-		r.c.Wait()
+	return &ready{
+		waitCh: make(chan struct{}),
+		state:  Pending,
 	}
-	r.c.L.Unlock()
 }
 
-// TODO: Make check() function more sophisticated, in particular
-// allow it to behave as "waitWithTimeout".
+// done close the channel once the state is Ready or Stopped
+func (r *ready) done() chan struct{} {
+	r.restartLock.Lock()
+	defer r.restartLock.Unlock()
+	return r.waitCh
+}
+
+// wait blocks until it is Ready or Stopped, it returns an error if is Stopped.
+func (r *ready) wait(ctx context.Context) error {
+	// r.done() only blocks if state is Pending
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-r.done():
+	}
+
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	switch r.state {
+	case Pending:
+		// since we allow to switch between the states Pending and Ready
+		// if there is a quick transition from Pending -> Ready -> Pending
+		// a process that was waiting can get unblocked and see a Pending state.
+		// If the state is Pending don't return  an error because it can only happen
+		// here after the r.done() channel is closed because the state moved from
+		// Pending to Ready.
+		return nil
+	case Ready:
+		return nil
+	case Stopped:
+		return fmt.Errorf("apiserver cacher is stopped")
+	default:
+		return fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+	}
+}
+
+// check returns true only if it is Ready.
 func (r *ready) check() bool {
-	rwMutex := r.c.L.(*sync.RWMutex)
-	rwMutex.RLock()
-	defer rwMutex.RUnlock()
-	return r.ok
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.state == Ready
 }
 
+// set the state to Pending (false) or Ready (true), it does not have effect if the state is Stopped.
 func (r *ready) set(ok bool) {
-	r.c.L.Lock()
-	defer r.c.L.Unlock()
-	r.ok = ok
-	r.c.Broadcast()
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.state == Stopped {
+		return
+	}
+	if ok && r.state == Pending {
+		r.state = Ready
+		select {
+		case <-r.waitCh:
+		default:
+			close(r.waitCh)
+		}
+	} else if !ok && r.state == Ready {
+		// creating the waitCh can be racy if
+		// something enter the wait() method
+		select {
+		case <-r.waitCh:
+			r.restartLock.Lock()
+			r.waitCh = make(chan struct{})
+			r.restartLock.Unlock()
+		default:
+		}
+		r.state = Pending
+	}
+}
+
+// stop the condition variable and set it as Stopped. This state is irreversible.
+func (r *ready) stop() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.state != Stopped {
+		r.state = Stopped
+	}
+	select {
+	case <-r.waitCh:
+	default:
+		close(r.waitCh)
+	}
 }
