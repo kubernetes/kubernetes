@@ -785,6 +785,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 						getResp.Kvs[i*chunkSize+j] = nil
 						chunk[j] = nil
 
+						// TODO increment a metric to indicate how many transforms were performed
+
 						wg.Done()
 					}()
 
@@ -807,7 +809,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			for _, workItem := range workChunks[:len(chunk)] {
 				if paging && int64(v.Len()) >= pred.Limit {
 					hasMore = true
-					break splitChunk
+					break splitChunk // TODO increment a metric to indicate how many transforms were wasted
 				}
 				lastKey = workItem.key
 
