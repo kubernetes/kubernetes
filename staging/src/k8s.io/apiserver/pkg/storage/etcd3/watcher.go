@@ -25,8 +25,6 @@ import (
 	"strings"
 	"sync"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,6 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog/v2"
 )
 
@@ -208,7 +208,7 @@ func (wc *watchChan) sync() error {
 	}
 	wc.initialRev = getResp.Header.Revision
 	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv)) // TODO fix
+		wc.sendEvent(parseKV(kv))
 	}
 	return nil
 }
@@ -411,7 +411,6 @@ func (wc *watchChan) sendEvent(e *event) {
 	}
 }
 
-// TODO fix
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if e.isProgressNotify {
 		// progressNotify events doesn't contain neither current nor previous object version,

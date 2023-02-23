@@ -733,23 +733,22 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
-		kvCount := len(getResp.Kvs)
-		numFetched += kvCount
+		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
 		hasMore = getResp.More
 
-		if kvCount == 0 && getResp.More {
+		if len(getResp.Kvs) == 0 && getResp.More {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
 		if pred.Empty() {
-			growSlice(v, kvCount)
+			growSlice(v, len(getResp.Kvs))
 		} else {
-			growSlice(v, 2048, kvCount)
+			growSlice(v, 2048, len(getResp.Kvs))
 		}
 
 		// needs to be large enough to give value in terms of parallelizing work
