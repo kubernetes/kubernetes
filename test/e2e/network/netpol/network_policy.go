@@ -114,19 +114,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 	f.SkipNamespaceCreation = true // we create our own 3 test namespaces, we don't need the default one
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	// TODO make boolean thread safe
-	hasAnyTestCaseFailed := false
-	ginkgo.BeforeEach(func() {
-		if hasAnyTestCaseFailed {
-			// TODO add feature gate
-			e2eskipper.Skipf("skipping test because previous test failed")
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
-	})
-
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		var k8s *kubeManager
 
@@ -1250,21 +1237,9 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
-
-	// TODO make boolean thread safe
-	hasAnyTestCaseFailed := false
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		if hasAnyTestCaseFailed {
-			// TODO add feature gate
-			e2eskipper.Skipf("skipping test because previous test failed")
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
@@ -1342,21 +1317,9 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func(
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
-
-	// TODO make boolean thread safe
-	hasAnyTestCaseFailed := false
 	ginkgo.BeforeEach(func() {
-		// Windows does not support SCTP for NetworkPolicy.
+		// Windows does not support network policies.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		if hasAnyTestCaseFailed {
-			// TODO add feature gate
-			e2eskipper.Skipf("skipping test because previous test failed")
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		hasAnyTestCaseFailed = hasAnyTestCaseFailed || ginkgo.CurrentSpecReport().Failed()
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using SCTP", func() {
