@@ -890,6 +890,7 @@ func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) [][]*mvccpb.KeyValue {
 		chunks++
 	}
 
+	// TODO remove this allocation by making an iterator struct
 	out := make([][]*mvccpb.KeyValue, chunks)
 	start, end := 0, chunkSize
 	for i := 0; i < chunks; i++ {
