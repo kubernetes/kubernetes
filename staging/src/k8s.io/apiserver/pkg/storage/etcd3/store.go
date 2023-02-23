@@ -905,6 +905,7 @@ func splitChunks(ctx context.Context, kvs []*mvccpb.KeyValue, chunkSize int) cha
 
 	ch := make(chan []*mvccpb.KeyValue)
 	go func() {
+		defer utilruntime.HandleCrash()
 		defer close(ch)
 
 		start, end := 0, chunkSize
