@@ -899,8 +899,8 @@ func splitChunks(kvs []*mvccpb.KeyValue, chunkSize int) [][]*mvccpb.KeyValue {
 		out[i] = kvs[start:end]
 		start += chunkSize
 		end += chunkSize
-		if end >= kvCount {
-			end = kvCount - 1
+		if end > kvCount {
+			end = kvCount
 		}
 	}
 	return out
