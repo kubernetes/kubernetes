@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: base64-kms-provider
+  namespace: kube-system
+  labels:
+    tier: control-plane
+    component: base64-kms-provider
+spec:
+  hostNetwork: true
+  containers:
+    - name: base64-kms-provider
+      image: localhost:5000/base64:e2e
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - name: sock
+          mountPath: /tmp
+  volumes:
+    - name: sock
+      hostPath:
+        path: /tmp
