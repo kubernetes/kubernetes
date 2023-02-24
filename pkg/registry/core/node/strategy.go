@@ -123,7 +123,7 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+	return fieldIsDeprecatedWarnings(obj)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -138,7 +138,7 @@ func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object)
 
 // WarningsOnUpdate returns warnings for the given update.
 func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+	return fieldIsDeprecatedWarnings(obj)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -267,13 +267,15 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
 }
 
-func dynamicKubeletConfigIsDeprecatedWarning(obj runtime.Object) []string {
+func fieldIsDeprecatedWarnings(obj runtime.Object) []string {
 	newNode := obj.(*api.Node)
+	var warnings []string
 	if newNode.Spec.ConfigSource != nil {
-		var warnings []string
 		// KEP https://github.com/kubernetes/enhancements/issues/281
 		warnings = append(warnings, "spec.configSource: the feature is removed")
-		return warnings
 	}
-	return nil
+	if len(newNode.Spec.DoNotUseExternalID) > 0 {
+		warnings = append(warnings, "spec.externalID: this field is deprecated, and is unused by Kubernetes")
+	}
+	return warnings
 }
