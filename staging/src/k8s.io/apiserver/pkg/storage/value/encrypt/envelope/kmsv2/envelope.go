@@ -20,18 +20,19 @@ package kmsv2
 import (
 	"context"
 	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/value"
+	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
@@ -71,8 +72,6 @@ type envelopeTransformer struct {
 	keyIDGetter       KeyIDGetterFunc
 	probeHealthzCheck ProbeHealthzCheckFunc
 
-	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
-	baseTransformerFunc func(cipher.Block) value.Transformer
 	// cache is a thread-safe expiring lru cache which caches decrypted DEKs indexed by their encrypted form.
 	cache *simpleCache
 }
@@ -80,18 +79,17 @@ type envelopeTransformer struct {
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt.
-func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
-	return newEnvelopeTransformerWithClock(envelopeService, providerName, keyIDGetter, probeHealthzCheck, baseTransformerFunc, cacheTTL, clock.RealClock{})
+func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc) value.Transformer {
+	return newEnvelopeTransformerWithClock(envelopeService, providerName, keyIDGetter, probeHealthzCheck, cacheTTL, clock.RealClock{})
 }
 
-func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
+func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
-		envelopeService:     envelopeService,
-		providerName:        providerName,
-		keyIDGetter:         keyIDGetter,
-		probeHealthzCheck:   probeHealthzCheck,
-		cache:               newSimpleCache(clock, cacheTTL),
-		baseTransformerFunc: baseTransformerFunc,
+		envelopeService:   envelopeService,
+		providerName:      providerName,
+		keyIDGetter:       keyIDGetter,
+		probeHealthzCheck: probeHealthzCheck,
+		cache:             newSimpleCache(clock, cacheTTL),
 	}
 }
 
@@ -206,7 +204,7 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 	if err != nil {
 		return nil, err
 	}
-	transformer := t.baseTransformerFunc(block)
+	transformer := aestransformer.NewGCMTransformer(block)
 	// TODO(aramase): Add metrics for cache fill percentage with custom cache implementation.
 	t.cache.set(encKey, transformer)
 	return transformer, nil
