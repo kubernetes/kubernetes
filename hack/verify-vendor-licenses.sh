@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # create a nice clean place to put our new licenses
 mkdir -p "${KUBE_ROOT}/_tmp"
-_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-licenses.XXXXXX")"
+_tmpdir="$(kube::realpath "$(mktemp -d "${KUBE_ROOT}/_tmp/$(basename "$0").XXXXXX")")"
 #echo "Created workspace: ${_tmpdir}"
 function cleanup {
   #echo "Removing workspace: ${_tmpdir}"

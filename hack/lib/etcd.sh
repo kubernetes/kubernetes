@@ -16,13 +16,13 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.5.7}
-ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-2379}
+ETCD_VERSION="${ETCD_VERSION:-3.5.7}"
+ETCD_HOST="${ETCD_HOST:-127.0.0.1}"
+ETCD_PORT="${ETCD_PORT:-2379}"
 # This is intentionally not called ETCD_LOG_LEVEL:
 # etcd checks that and compains when it is set in addition
 # to the command line argument, even when both have the same value.
-ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-warn}
+ETCD_LOGLEVEL="${ETCD_LOGLEVEL:-warn}"
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 
 kube::etcd::validate() {
@@ -78,7 +78,7 @@ kube::etcd::start() {
   kube::etcd::validate
 
   # Start etcd
-  ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
+  ETCD_DIR="${ETCD_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}"
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
@@ -97,7 +97,7 @@ kube::etcd::start_scraping() {
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_SCRAPE_DIR="${ARTIFACTS}/etcd-scrapes"
   else
-    ETCD_SCRAPE_DIR=$(mktemp -d -t test.XXXXXX)/etcd-scrapes
+    ETCD_SCRAPE_DIR="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")/etcd-scrapes"
   fi
   kube::log::info "Periodically scraping etcd to ${ETCD_SCRAPE_DIR} ."
   mkdir -p "${ETCD_SCRAPE_DIR}"

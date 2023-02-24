@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
 if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
@@ -123,7 +123,7 @@ function is-explicitly-chosen {
 function run-cmd {
   local filename="${2##*/verify-}"
   local testname="${filename%%.*}"
-  local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
+  local output="${KUBE_JUNIT_REPORT_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")/junit-results}"
   local tr
 
   if ${SILENT}; then

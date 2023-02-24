@@ -25,6 +25,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 declare -r REPO_ROOT
 cd "${REPO_ROOT}"
@@ -160,16 +164,18 @@ EOF
 git checkout -b "${NEWBRANCHUNIQ}" "${BRANCH}"
 cleanbranch="${NEWBRANCHUNIQ}"
 
+kube::util::ensure-temp-dir
+
 gitamcleanup=true
 for pull in "${PULLS[@]}"; do
-  echo "+++ Downloading patch to /tmp/${pull}.patch (in case you need to do this again)"
+  echo "+++ Downloading patch to ${KUBE_TEMP}/${pull}.patch (in case you need to do this again)"
 
-  curl -o "/tmp/${pull}.patch" -sSL "https://github.com/${MAIN_REPO_ORG}/${MAIN_REPO_NAME}/pull/${pull}.patch"
+  curl -o "${KUBE_TEMP}/${pull}.patch" -sSL "https://github.com/${MAIN_REPO_ORG}/${MAIN_REPO_NAME}/pull/${pull}.patch"
   echo
   echo "+++ About to attempt cherry pick of PR. To reattempt:"
-  echo "  $ git am -3 /tmp/${pull}.patch"
+  echo "  $ git am -3 ${KUBE_TEMP}/${pull}.patch"
   echo
-  git am -3 "/tmp/${pull}.patch" || {
+  git am -3 "${KUBE_TEMP}/${pull}.patch" || {
     conflicts=false
     while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
       || [[ -e "${REBASEMAGIC}" ]]; do
@@ -195,11 +201,11 @@ for pull in "${PULLS[@]}"; do
   }
 
   # set the subject
-  subject=$(grep -m 1 "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
+  subject=$(grep -m 1 "^Subject" "${KUBE_TEMP}/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
   SUBJECTS+=("#${pull}: ${subject}")
 
-  # remove the patch file from /tmp
-  rm -f "/tmp/${pull}.patch"
+  # remove the patch file from $KUBE_TEMP
+  rm -f "${KUBE_TEMP}/${pull}.patch"
 done
 gitamcleanup=false
 

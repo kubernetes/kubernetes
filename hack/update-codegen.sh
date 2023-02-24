@@ -207,7 +207,7 @@ function gen_types_swagger_doc() {
     local group_version="$1"
     local gv_dir="$2"
     local tmpfile
-    tmpfile="${TMPDIR:-/tmp}/types_swagger_doc_generated.$(date +%s).go"
+    tmpfile="${TMPDIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}/types_swagger_doc_generated.$(date +%s).go"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running ${swagger_bin} for ${group_version} at ${gv_dir}"

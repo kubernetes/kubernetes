@@ -275,7 +275,7 @@ runTests() {
 
   # Create coverage report directories.
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+    cover_report_dir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")/k8s_coverage/$(kube::util::sortable_date)"
   else
     cover_report_dir="${KUBE_COVER_REPORT_DIR}"
   fi

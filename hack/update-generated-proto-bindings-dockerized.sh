@@ -24,7 +24,6 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 if [ "$#" == 0 ]; then
     echo "usage: $0 <api_dir>..."

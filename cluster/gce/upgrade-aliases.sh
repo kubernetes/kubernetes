@@ -27,7 +27,7 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Print the number of routes used for K8s cluster node connectivity.

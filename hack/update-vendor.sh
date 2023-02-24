@@ -40,7 +40,7 @@ fi
 kube::golang::verify_go_version
 kube::util::require-jq
 
-TMP_DIR="${TMP_DIR:-$(mktemp -d /tmp/update-vendor.XXXX)}"
+TMP_DIR="${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}"
 LOG_FILE="${LOG_FILE:-${TMP_DIR}/update-vendor.log}"
 kube::log::status "logfile at ${LOG_FILE}"
 
@@ -65,7 +65,7 @@ fi
 # - adds explicit 'replace' directives for all require directives (existing 'replace' directives take precedence)
 function ensure_require_replace_directives_for_all_dependencies() {
   local local_tmp_dir
-  local_tmp_dir=$(mktemp -d "${TMP_DIR}/pin_replace.XXXX")
+  local_tmp_dir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 
   # collect 'require' directives that actually specify a version
   local require_filter='(.Version != null) and (.Version != "v0.0.0") and (.Version != "v0.0.0-00010101000000-000000000000")'
@@ -109,7 +109,7 @@ function print_go_mod_section() {
 
 function group_directives() {
   local local_tmp_dir
-  local_tmp_dir=$(mktemp -d "${TMP_DIR}/group_replace.XXXX")
+  local_tmp_dir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
   local go_mod_require_direct="${local_tmp_dir}/go.mod.require_direct.tmp"
   local go_mod_require_indirect="${local_tmp_dir}/go.mod.require_indirect.tmp"
   local go_mod_replace="${local_tmp_dir}/go.mod.replace.tmp"
@@ -149,7 +149,7 @@ function group_directives() {
 
 function add_generated_comments() {
   local local_tmp_dir
-  local_tmp_dir=$(mktemp -d "${TMP_DIR}/add_generated_comments.XXXX")
+  local_tmp_dir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
   local go_mod_nocomments="${local_tmp_dir}/go.mod.nocomments.tmp"
 
   # drop comments before the module directive

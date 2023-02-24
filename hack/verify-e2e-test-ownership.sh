@@ -41,7 +41,7 @@ fi
 pushd "${KUBE_ROOT}" > /dev/null
 
 # Setup a tmpdir to hold generated scripts and results
-tmpdir=$(mktemp -d -t verify-e2e-test-ownership.XXXX)
+tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 readonly tmpdir
 trap 'rm -rf ${tmpdir}' EXIT
 

@@ -36,7 +36,7 @@ skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
 parallelism=${PARALLELISM:-8}
-artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
+artifacts="${ARTIFACTS:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")/_artifacts/$(date +%y%m%dT%H%M%S)}"
 remote=${REMOTE:-"false"}
 remote_mode=${REMOTE_MODE:-"gce"}
 container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}

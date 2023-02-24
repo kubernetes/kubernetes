@@ -103,7 +103,7 @@ function setup() {
     echo 'LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances'
     exit 1
   fi
-  source "${KUBE_ROOT}/hack/lib/util.sh"
+  source "${KUBE_ROOT}/hack/lib/init.sh"
 }
 
 function log-dump-ssh() {

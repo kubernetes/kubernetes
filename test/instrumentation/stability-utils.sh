@@ -20,7 +20,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 stability_check_setup() {
   kube::golang::verify_go_version

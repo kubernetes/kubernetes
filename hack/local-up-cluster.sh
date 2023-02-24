@@ -216,9 +216,9 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 KUBELET_READ_ONLY_PORT=${KUBELET_READ_ONLY_PORT:-0}
 LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
-LOG_SPEC=${LOG_SPEC:-""}
-LOG_DIR=${LOG_DIR:-"/tmp"}
-TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
+LOG_SPEC="${LOG_SPEC:-""}"
+LOG_DIR="${LOG_DIR:-"/tmp"}"
+TMP_DIR="${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}"
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}

@@ -34,7 +34,7 @@ fi
 
 port_num="$1"
 scrapes_dir="$2"
-response_file="/tmp/$(cd /tmp && mktemp  response.XXXXXX)"
+response_file="$(kube::realpath "$(mktemp -t "$(basename "$0").XXXXXX")")"
 
 cleanup_serve() {
     rm -rf "$response_file"

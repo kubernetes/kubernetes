@@ -49,8 +49,8 @@ fi
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
-CONFIG="/tmp/$(cd /tmp && mktemp config.XXXXXX)"
-UNPACKDIR="/tmp/$(cd /tmp && mktemp -d unpack.XXXXXX)"
+CONFIG="$(kube::realpath "$(mktemp -t "$(basename "$0").XXXXXX")")"
+UNPACKDIR="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 SERVER_PID=""
 
 cleanup_prom() {

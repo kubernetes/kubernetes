@@ -23,7 +23,6 @@ readonly GCE_MAX_LOCAL_SSD=8
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
@@ -47,14 +46,16 @@ if [[ ${NODE_LOCAL_SSDS:-} -ge 1 ]] && [[ -n ${NODE_LOCAL_SSDS_EXT:-} ]] ; then
 fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
-    DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]]; then
-        DEFAULT_GCI_PROJECT=cos-cloud
-    fi
-    export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    # If the master image is not set, we use the latest GCI image.
-    # Otherwise, we respect whatever is set by the user.
-    export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
+  : "${GCI_VERSION?= required}"
+
+  DEFAULT_GCI_PROJECT=google-containers
+  if [[ "${GCI_VERSION}" == "cos"* ]]; then
+      DEFAULT_GCI_PROJECT=cos-cloud
+  fi
+  export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+  # If the master image is not set, we use the latest GCI image.
+  # Otherwise, we respect whatever is set by the user.
+  export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only

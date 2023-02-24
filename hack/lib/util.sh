@@ -132,8 +132,8 @@ kube::util::cleanup-temp-dir() {
 # Vars set:
 #   KUBE_TEMP
 kube::util::ensure-temp-dir() {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
+  if [[ -z "${KUBE_TEMP-}" ]]; then
+    KUBE_TEMP="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
     kube::util::trap_add kube::util::cleanup-temp-dir EXIT
   fi
 }

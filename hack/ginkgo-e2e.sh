@@ -23,7 +23,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Find the ginkgo binary build as part of the release.
 ginkgo=$(kube::util::find-binary "ginkgo")

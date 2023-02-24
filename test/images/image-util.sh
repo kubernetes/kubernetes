@@ -30,8 +30,7 @@ export DOCKER_CLI_EXPERIMENTAL="enabled"
 DOCKER_CERT_BASE_PATH="${DOCKER_CERT_BASE_PATH:-${HOME}}"
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-source "${KUBE_ROOT}/hack/lib/logging.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
@@ -259,6 +258,8 @@ build_and_push() {
 
 # This function is for building the go code
 bin() {
+  : "${TARGET?= required}"
+
   local arch_prefix=""
   if [[ "${ARCH:-}" == "arm" ]]; then
     arch_prefix="GOARM=${GOARM:-7}"

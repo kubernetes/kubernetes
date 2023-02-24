@@ -30,7 +30,7 @@ if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
   source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Run kubectl and retry upon failure.

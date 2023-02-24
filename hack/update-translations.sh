@@ -19,7 +19,7 @@
 # Usage: `update-translations.sh`.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 TRANSLATIONS="staging/src/k8s.io/kubectl/pkg/util/i18n/translations"
 KUBECTL_FILES=()
