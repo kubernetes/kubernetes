@@ -442,15 +442,15 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
 	}
 
-	if mt.Value != nil && mt.Value.Sign() != 1 {
+	if mt.Type == autoscaling.ValueMetricType && mt.Value != nil && mt.Value.Sign() != 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be positive"))
 	}
 
-	if mt.AverageValue != nil && mt.AverageValue.Sign() != 1 {
+	if mt.Type == autoscaling.AverageValueMetricType && mt.AverageValue != nil && mt.AverageValue.Sign() != 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be positive"))
 	}
 
-	if mt.AverageUtilization != nil && *mt.AverageUtilization < 1 {
+	if mt.Type == autoscaling.UtilizationMetricType && mt.AverageUtilization != nil && *mt.AverageUtilization < 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageUtilization"), mt.AverageUtilization, "must be greater than 0"))
 	}
 

@@ -24,10 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateScale(t *testing.T) {
@@ -558,6 +559,38 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					},
 				},
 			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "myautoscaler",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32Ptr(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ObjectMetricSourceType,
+					Object: &autoscaling.ObjectMetricSource{
+						DescribedObject: autoscaling.CrossVersionObjectReference{
+							Kind: "ReplicationController",
+							Name: "myrc",
+						},
+						Metric: autoscaling.MetricIdentifier{
+							Name: "somemetric",
+						},
+						Target: autoscaling.MetricTarget{
+							Type:         autoscaling.AverageValueMetricType,
+							Value:        resource.NewMilliQuantity(0, resource.DecimalSI),
+							AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+						},
+					},
+				},
+			},
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
@@ -1262,7 +1295,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Selector: metricLabelSelector,
 							},
 							Target: autoscaling.MetricTarget{
-								Type:         autoscaling.ValueMetricType,
+								Type:         autoscaling.AverageValueMetricType,
 								AverageValue: resource.NewMilliQuantity(-300, resource.DecimalSI),
 							},
 						},
