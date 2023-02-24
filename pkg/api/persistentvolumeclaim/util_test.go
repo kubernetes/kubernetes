@@ -263,6 +263,9 @@ func TestDataSourceFilter(t *testing.T) {
 			anyEnabled: true,
 			wantRef:    xnsVolumeDataSourceRef, // existing field isn't dropped.
 		},
+		"clear Resources.Claims": {
+			spec: core.PersistentVolumeClaimSpec{Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "dra"}}}},
+		},
 	}
 
 	for testName, test := range tests {
@@ -277,6 +280,9 @@ func TestDataSourceFilter(t *testing.T) {
 			if test.spec.DataSourceRef != test.wantRef {
 				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSourceRef: %+v",
 					testName, test.anyEnabled, test.xnsEnabled, test.spec, test.wantRef)
+			}
+			if test.spec.Resources.Claims != nil {
+				t.Errorf("expected Resources.Claims to be cleared")
 			}
 		})
 	}
