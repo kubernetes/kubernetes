@@ -1299,6 +1299,37 @@ func TestValidateJobUpdate(t *testing.T) {
 				AllowMutableSchedulingDirectives: true,
 			},
 		},
+		"immutable schedulingGates": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.SchedulingGates = append(job.Spec.Template.Spec.SchedulingGates, api.PodSchedulingGate{Name: "gate"})
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"mutable schedulingGates": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.SchedulingGates = append(job.Spec.Template.Spec.SchedulingGates, api.PodSchedulingGate{Name: "gate"})
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
 		"update completions and parallelism to same value is valid": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},

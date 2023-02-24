@@ -404,10 +404,11 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 			// allow the NodeAffinity field to skip immutability checking
 			oldTemplate.Spec.Affinity.NodeAffinity = template.Spec.Affinity.NodeAffinity // +k8s:verify-mutation:reason=clone
 		}
-		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector // +k8s:verify-mutation:reason=clone
-		oldTemplate.Spec.Tolerations = template.Spec.Tolerations   // +k8s:verify-mutation:reason=clone
-		oldTemplate.Annotations = template.Annotations             // +k8s:verify-mutation:reason=clone
-		oldTemplate.Labels = template.Labels                       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.Tolerations = template.Spec.Tolerations         // +k8s:verify-mutation:reason=clone
+		oldTemplate.Annotations = template.Annotations                   // +k8s:verify-mutation:reason=clone
+		oldTemplate.Labels = template.Labels                             // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.SchedulingGates = template.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
 	return allErrs
