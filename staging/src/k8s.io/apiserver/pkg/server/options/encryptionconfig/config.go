@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
@@ -88,7 +89,7 @@ type kmsPluginProbe struct {
 }
 
 type kmsv2PluginProbe struct {
-	keyID        atomic.Pointer[string]
+	state        atomic.Pointer[envelopekmsv2.State]
 	name         string
 	ttl          time.Duration
 	service      kmsservice.Service
@@ -267,7 +268,7 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	if (time.Since(h.lastResponse.received)) < h.ttl {
+	if time.Since(h.lastResponse.received) < h.ttl {
 		return h.lastResponse.err
 	}
 
@@ -277,12 +278,11 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 		h.ttl = kmsPluginHealthzNegativeTTL
 		return fmt.Errorf("failed to perform status section of the healthz check for KMS Provider %s, error: %w", h.name, err)
 	}
-	// we coast on the last valid key ID that we have observed
-	if errCode, err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
-		h.keyID.Store(&p.KeyID)
-		metrics.RecordKeyIDFromStatus(h.name, p.KeyID)
-	} else {
-		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
+
+	if err := h.attemptToRotateDEK(ctx, p.KeyID); err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		h.ttl = kmsPluginHealthzNegativeTTL
+		return err
 	}
 
 	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
@@ -296,13 +296,94 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 	return nil
 }
 
-// getCurrentKeyID returns the latest keyID from the last Status() call or err if keyID is empty
-func (h *kmsv2PluginProbe) getCurrentKeyID(ctx context.Context) (string, error) {
-	keyID := *h.keyID.Load()
-	if len(keyID) == 0 {
-		return "", fmt.Errorf("got unexpected empty keyID")
+// attemptToRotateDEK tries to rotate to a new DEK.  On success, the new DEK and keyID overwrite the existing state.
+// On any failure (including mismatch between status and encrypt calls), the current state is preserved.
+// If the current state is still valid, no error is returned - that is, we do not report unhealthy while we have
+// a pre-existing DEK that is considered valid.  This means that any transient encryption failure or mismatch
+// between status and encrypt only results in log statements - the system attempts to coasts otherwise.
+// In practice this means that reads will coast indefinitely on the last valid state whereas writes will coast
+// until the DEK is considered to be expired.
+func (h *kmsv2PluginProbe) attemptToRotateDEK(ctx context.Context, statusKeyID string) error {
+	errCode, err := envelopekmsv2.ValidateKeyID(statusKeyID)
+	if err != nil {
+		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
+		return nil // let isKMSv2ProviderHealthy handle this error
 	}
-	return keyID, nil
+
+	metrics.RecordKeyIDFromStatus(h.name, statusKeyID)
+
+	// allow reads indefinitely but writes for only up to an hour
+	expirationTimestamp := time.Now().Add(time.Hour) // start the timer before we make the network calls
+
+	uid := string(uuid.NewUUID())
+
+	transformer, resp, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service)
+
+	if resp == nil {
+		resp = &kmsservice.EncryptResponse{} // avoid nil panics
+	}
+
+	// happy path, should be the common case
+	// TODO maybe add success metrics?
+	if errGen == nil && resp.KeyID == statusKeyID {
+		h.state.Store(&envelopekmsv2.State{
+			Transformer:         transformer,
+			EncryptedDEK:        resp.Ciphertext,
+			KeyID:               resp.KeyID,
+			Annotations:         resp.Annotations,
+			UID:                 uid,
+			ExpirationTimestamp: expirationTimestamp,
+		})
+		return nil
+	}
+
+	// determine if our current state is valid
+	state, errState := h.getCurrentState()
+	if errState == nil {
+		errState = state.ValidateEncryptCapability()
+	}
+
+	// TODO maybe add metrics for time until this starts failing?
+	if errState == nil {
+		klog.InfoS("unable to rotate DEK, coasting on previous valid state",
+			"uid", uid,
+			"errGen", errGen,
+			"statusKeyID", statusKeyID,
+			"encryptKeyID", resp.KeyID,
+			"stateKeyID", state.KeyID,
+			"expirationTimestamp", state.ExpirationTimestamp.Format(time.RFC3339),
+		)
+		return nil // we can coast because the current state is valid
+	}
+
+	// our current state is not valid and we cannot seem to generate a new DEK
+	return fmt.Errorf("failed to rotate DEK uid=%q, errState=%v, errGen=%v, statusKeyID=%q, encryptKeyID=%q, stateKeyID=%q, expirationTimestamp=%s",
+		uid, errState, errGen, statusKeyID, resp.KeyID, state.KeyID, state.ExpirationTimestamp.Format(time.RFC3339))
+}
+
+// getCurrentState returns the latest state from the last status and encrypt calls.
+// If the returned error is nil, the state is considered valid indefinitely for read requests.
+// For write requests, the caller must also check that state.ValidateEncryptCapability does not error.
+func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
+	state := *h.state.Load()
+
+	if state.Transformer == nil {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
+	}
+
+	if len(state.EncryptedDEK) == 0 {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty EDEK")
+	}
+
+	if len(state.KeyID) == 0 {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty keyID")
+	}
+
+	if state.ExpirationTimestamp.IsZero() {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected zero expirationTimestamp")
+	}
+
+	return state, nil
 }
 
 // isKMSv2ProviderHealthy checks if the KMSv2-Plugin is healthy.
@@ -582,9 +663,8 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 			l:            &sync.Mutex{},
 			lastResponse: &kmsPluginHealthzResponse{},
 		}
-		// initialize keyID so that Load always works
-		keyID := ""
-		probe.keyID.Store(&keyID)
+		// initialize state so that Load always works
+		probe.state.Store(&envelopekmsv2.State{})
 
 		// prime keyID by running the check inline once (this prevents unit tests from flaking)
 		// ignore the error here since we want to support the plugin starting up async with the API server
@@ -602,7 +682,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 
 		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := value.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentKeyID, probe.check),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentState),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 

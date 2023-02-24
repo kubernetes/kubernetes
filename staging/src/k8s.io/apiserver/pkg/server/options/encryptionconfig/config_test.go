@@ -529,7 +529,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 		ttl:  3 * time.Second,
 	}
 	keyID := "1"
-	kmsv2Probe.keyID.Store(&keyID)
+	kmsv2Probe.state.Store(&envelopekmsv2.State{KeyID: keyID})
 
 	testCases := []struct {
 		desc    string
@@ -619,7 +619,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 					p.service = nil
 					p.l = nil
 					p.lastResponse = nil
-					p.keyID = kmsv2Probe.keyID
+					p.state = kmsv2Probe.state
 				default:
 					t.Fatalf("unexpected probe type %T", p)
 				}
