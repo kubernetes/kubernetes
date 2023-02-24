@@ -148,6 +148,8 @@ type testCase struct {
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
+
+	containerResourceMetricsEnabled bool
 }
 
 // Needs to be called under a lock.
@@ -738,6 +740,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		tc.containerResourceMetricsEnabled,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -826,9 +829,41 @@ func TestScaleUpContainer(t *testing.T) {
 				Container: "container1",
 			},
 		}},
+		reportedLevels:                  []uint64{300, 500, 700},
+		reportedCPURequests:             []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:                   true,
+		containerResourceMetricsEnabled: true,
+	}
+	tc.runTest(t)
+}
+
+func TestIgnoreContainerMetric(t *testing.T) {
+	// when the container metric feature isn't enabled, it's ignored and HPA keeps the current replica.
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		metricsTarget: []autoscalingv2.MetricSpec{{
+			Type: autoscalingv2.ContainerResourceMetricSourceType,
+			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
+				Name: v1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{
+					Type:               autoscalingv2.UtilizationMetricType,
+					AverageUtilization: pointer.Int32(30),
+				},
+				Container: "container1",
+			},
+		}},
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
 	}
 	tc.runTest(t)
 }
@@ -1359,8 +1394,9 @@ func TestScaleDownContainerResource(t *testing.T) {
 				},
 			},
 		}},
-		useMetricsAPI:   true,
-		recommendations: []timestampedRecommendation{},
+		useMetricsAPI:                   true,
+		recommendations:                 []timestampedRecommendation{},
+		containerResourceMetricsEnabled: true,
 	}
 	tc.runTest(t)
 }
@@ -4536,6 +4572,7 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		false,
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
