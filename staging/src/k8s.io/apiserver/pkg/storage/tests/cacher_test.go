@@ -201,23 +201,16 @@ func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType
 	}
 }
 
-type injectListError struct {
-	errors int
-	storage.Interface
-}
-
-func (self *injectListError) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	if self.errors > 0 {
-		self.errors--
-		return fmt.Errorf("injected error")
-	}
-	return self.Interface.GetList(ctx, key, opts, listObj)
-}
-
 func TestWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatch(ctx, t, cacher)
+}
+
+// TODO(wojtek-t): We should extend the generic RunTestWatch test to cover the
+// scenarios that are not yet covered by it and get rid of this test.
+func TestWatchDeprecated(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	// Inject one list error to make sure we test the relist case.
-	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	cacher, _, err := newTestCacherWithClock(etcdStorage, fakeClock)
@@ -787,8 +780,14 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 	}
 
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	// Inject one list error to make sure we test the relist case.
+	wrappedStorage := &storagetesting.StorageInjectingListErrors{
+		Interface: etcdStorage,
+		Errors:    1,
+	}
+
 	config := cacherstorage.Config{
-		Storage:        etcdStorage,
+		Storage:        wrappedStorage,
 		Versioner:      storage.APIObjectVersioner{},
 		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: setupOpts.resourcePrefix,
@@ -807,6 +806,12 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 	terminate := func() {
 		cacher.Stop()
 		server.Terminate(t)
+	}
+
+	// Since some tests depend on the fact that GetList shouldn't fail,
+	// we wait until the error from the underlying storage is consumed.
+	if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
+		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
 	return ctx, cacher, terminate
