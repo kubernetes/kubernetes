@@ -36,7 +36,7 @@ type ActualCostEstimator interface {
 
 // CostObserver provides an observer that tracks runtime cost.
 func CostObserver(tracker *CostTracker) EvalObserver {
-	observer := func(id int64, programStep interface{}, val ref.Val) {
+	observer := func(id int64, programStep any, val ref.Val) {
 		switch t := programStep.(type) {
 		case ConstantQualifier:
 			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them

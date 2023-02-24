@@ -34,17 +34,17 @@ type CELVisitor interface {
 	// Visit a parse tree produced by CELParser#Negate.
 	VisitNegate(ctx *NegateContext) interface{}
 
-	// Visit a parse tree produced by CELParser#SelectOrCall.
-	VisitSelectOrCall(ctx *SelectOrCallContext) interface{}
+	// Visit a parse tree produced by CELParser#MemberCall.
+	VisitMemberCall(ctx *MemberCallContext) interface{}
+
+	// Visit a parse tree produced by CELParser#Select.
+	VisitSelect(ctx *SelectContext) interface{}
 
 	// Visit a parse tree produced by CELParser#PrimaryExpr.
 	VisitPrimaryExpr(ctx *PrimaryExprContext) interface{}
 
 	// Visit a parse tree produced by CELParser#Index.
 	VisitIndex(ctx *IndexContext) interface{}
-
-	// Visit a parse tree produced by CELParser#CreateMessage.
-	VisitCreateMessage(ctx *CreateMessageContext) interface{}
 
 	// Visit a parse tree produced by CELParser#IdentOrGlobalCall.
 	VisitIdentOrGlobalCall(ctx *IdentOrGlobalCallContext) interface{}
@@ -58,17 +58,29 @@ type CELVisitor interface {
 	// Visit a parse tree produced by CELParser#CreateStruct.
 	VisitCreateStruct(ctx *CreateStructContext) interface{}
 
+	// Visit a parse tree produced by CELParser#CreateMessage.
+	VisitCreateMessage(ctx *CreateMessageContext) interface{}
+
 	// Visit a parse tree produced by CELParser#ConstantLiteral.
 	VisitConstantLiteral(ctx *ConstantLiteralContext) interface{}
 
 	// Visit a parse tree produced by CELParser#exprList.
 	VisitExprList(ctx *ExprListContext) interface{}
 
+	// Visit a parse tree produced by CELParser#listInit.
+	VisitListInit(ctx *ListInitContext) interface{}
+
 	// Visit a parse tree produced by CELParser#fieldInitializerList.
 	VisitFieldInitializerList(ctx *FieldInitializerListContext) interface{}
 
+	// Visit a parse tree produced by CELParser#optField.
+	VisitOptField(ctx *OptFieldContext) interface{}
+
 	// Visit a parse tree produced by CELParser#mapInitializerList.
 	VisitMapInitializerList(ctx *MapInitializerListContext) interface{}
+
+	// Visit a parse tree produced by CELParser#optExpr.
+	VisitOptExpr(ctx *OptExprContext) interface{}
 
 	// Visit a parse tree produced by CELParser#Int.
 	VisitInt(ctx *IntContext) interface{}

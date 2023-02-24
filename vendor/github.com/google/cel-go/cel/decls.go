@@ -139,7 +139,7 @@ var (
 		kind:        TypeKind,
 		runtimeType: types.TypeType,
 	}
-	//UintType represents a uint type.
+	// UintType represents a uint type.
 	UintType = &Type{
 		kind:        UintKind,
 		runtimeType: types.UintType,
@@ -222,7 +222,8 @@ func (t *Type) equals(other *Type) bool {
 // - The from types are the same instance
 // - The target type is dynamic
 // - The fromType has the same kind and type name as the target type, and all parameters of the target type
-//	 are IsAssignableType() from the parameters of the fromType.
+//
+//	are IsAssignableType() from the parameters of the fromType.
 func (t *Type) defaultIsAssignableType(fromType *Type) bool {
 	if t == fromType || t.isDyn() {
 		return true
@@ -312,6 +313,11 @@ func NullableType(wrapped *Type) *Type {
 	}
 }
 
+// OptionalType creates an abstract parameterized type instance corresponding to CEL's notion of optional.
+func OptionalType(param *Type) *Type {
+	return OpaqueType("optional", param)
+}
+
 // OpaqueType creates an abstract parameterized type with a given name.
 func OpaqueType(name string, params ...*Type) *Type {
 	return &Type{
@@ -365,7 +371,9 @@ func Variable(name string, t *Type) EnvOption {
 //
 // - Overloads are searched in the order they are declared
 // - Dynamic dispatch for lists and maps is limited by inspection of the list and map contents
-//   at runtime. Empty lists and maps will result in a 'default dispatch'
+//
+//	at runtime. Empty lists and maps will result in a 'default dispatch'
+//
 // - In the event that a default dispatch occurs, the first overload provided is the one invoked
 //
 // If you intend to use overloads which differentiate based on the key or element type of a list or
@@ -431,7 +439,17 @@ func SingletonUnaryBinding(fn functions.UnaryOp, traits ...int) FunctionOpt {
 //
 // Note, this approach works well if operand is expected to have a specific trait which it implements,
 // e.g. traits.ContainerType. Otherwise, prefer per-overload function bindings.
+//
+// Deprecated: use SingletonBinaryBinding
 func SingletonBinaryImpl(fn functions.BinaryOp, traits ...int) FunctionOpt {
+	return SingletonBinaryBinding(fn, traits...)
+}
+
+// SingletonBinaryBinding creates a singleton function definition to be used with all function overloads.
+//
+// Note, this approach works well if operand is expected to have a specific trait which it implements,
+// e.g. traits.ContainerType. Otherwise, prefer per-overload function bindings.
+func SingletonBinaryBinding(fn functions.BinaryOp, traits ...int) FunctionOpt {
 	trait := 0
 	for _, t := range traits {
 		trait = trait | t
@@ -453,7 +471,17 @@ func SingletonBinaryImpl(fn functions.BinaryOp, traits ...int) FunctionOpt {
 //
 // Note, this approach works well if operand is expected to have a specific trait which it implements,
 // e.g. traits.ContainerType. Otherwise, prefer per-overload function bindings.
+//
+// Deprecated: use SingletonFunctionBinding
 func SingletonFunctionImpl(fn functions.FunctionOp, traits ...int) FunctionOpt {
+	return SingletonFunctionBinding(fn, traits...)
+}
+
+// SingletonFunctionBinding creates a singleton function definition to be used with all function overloads.
+//
+// Note, this approach works well if operand is expected to have a specific trait which it implements,
+// e.g. traits.ContainerType. Otherwise, prefer per-overload function bindings.
+func SingletonFunctionBinding(fn functions.FunctionOp, traits ...int) FunctionOpt {
 	trait := 0
 	for _, t := range traits {
 		trait = trait | t
@@ -720,9 +748,8 @@ func (f *functionDecl) addOverload(overload *overloadDecl) error {
 				// Allow redefinition of an overload implementation so long as the signatures match.
 				f.overloads[index] = overload
 				return nil
-			} else {
-				return fmt.Errorf("overload redefinition in function. %s: %s has multiple definitions", f.name, o.id)
 			}
+			return fmt.Errorf("overload redefinition in function. %s: %s has multiple definitions", f.name, o.id)
 		}
 	}
 	f.overloads = append(f.overloads, overload)

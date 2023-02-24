@@ -7,7 +7,7 @@
 //
 // This package is DEPRECATED. Users should instead use,
 //
-//     service, err := NewService(..., option.WithAPIKey(...))
+//	service, err := NewService(..., option.WithAPIKey(...))
 package transport
 
 import (

@@ -26,7 +26,7 @@ type Coster interface {
 }
 
 // estimateCost returns the heuristic cost interval for the program.
-func estimateCost(i interface{}) (min, max int64) {
+func estimateCost(i any) (min, max int64) {
 	c, ok := i.(Coster)
 	if !ok {
 		return 0, math.MaxInt64

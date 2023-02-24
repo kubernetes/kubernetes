@@ -72,7 +72,7 @@ func (s String) Compare(other ref.Val) ref.Val {
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (s String) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (s String) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.String:
 		if reflect.TypeOf(s).AssignableTo(typeDesc) {
@@ -154,6 +154,11 @@ func (s String) Equal(other ref.Val) ref.Val {
 	return Bool(ok && s == otherString)
 }
 
+// IsZeroValue returns true if the string is empty.
+func (s String) IsZeroValue() bool {
+	return len(s) == 0
+}
+
 // Match implements traits.Matcher.Match.
 func (s String) Match(pattern ref.Val) ref.Val {
 	pat, ok := pattern.(String)
@@ -189,7 +194,7 @@ func (s String) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (s String) Value() interface{} {
+func (s String) Value() any {
 	return string(s)
 }
 

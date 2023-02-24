@@ -26,6 +26,7 @@ import (
 
 type astPruner struct {
 	expr       *exprpb.Expr
+	macroCalls map[int64]*exprpb.Expr
 	state      EvalState
 	nextExprID int64
 }
@@ -65,13 +66,17 @@ type astPruner struct {
 // compiled and constant folded expressions, but is not willing to constant
 // fold(and thus cache results of) some external calls, then they can prepare
 // the overloads accordingly.
-func PruneAst(expr *exprpb.Expr, state EvalState) *exprpb.Expr {
+func PruneAst(expr *exprpb.Expr, macroCalls map[int64]*exprpb.Expr, state EvalState) *exprpb.ParsedExpr {
 	pruner := &astPruner{
 		expr:       expr,
+		macroCalls: macroCalls,
 		state:      state,
 		nextExprID: 1}
-	newExpr, _ := pruner.prune(expr)
-	return newExpr
+	newExpr, _ := pruner.maybePrune(expr)
+	return &exprpb.ParsedExpr{
+		Expr:       newExpr,
+		SourceInfo: &exprpb.SourceInfo{MacroCalls: pruner.macroCalls},
+	}
 }
 
 func (p *astPruner) createLiteral(id int64, val *exprpb.Constant) *exprpb.Expr {
@@ -223,6 +228,14 @@ func (p *astPruner) maybePruneFunction(node *exprpb.Expr) (*exprpb.Expr, bool) {
 	return nil, false
 }
 
+func (p *astPruner) maybePrune(node *exprpb.Expr) (*exprpb.Expr, bool) {
+	out, pruned := p.prune(node)
+	if pruned {
+		delete(p.macroCalls, node.GetId())
+	}
+	return out, pruned
+}
+
 func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 	if node == nil {
 		return node, false
@@ -240,7 +253,7 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 
 	switch node.GetExprKind().(type) {
 	case *exprpb.Expr_SelectExpr:
-		if operand, pruned := p.prune(node.GetSelectExpr().GetOperand()); pruned {
+		if operand, pruned := p.maybePrune(node.GetSelectExpr().GetOperand()); pruned {
 			return &exprpb.Expr{
 				Id: node.GetId(),
 				ExprKind: &exprpb.Expr_SelectExpr{
@@ -254,7 +267,7 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		}
 	case *exprpb.Expr_CallExpr:
 		if newExpr, pruned := p.maybePruneFunction(node); pruned {
-			newExpr, _ = p.prune(newExpr)
+			newExpr, _ = p.maybePrune(newExpr)
 			return newExpr, true
 		}
 		var prunedCall bool
@@ -268,12 +281,12 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		}
 		for i, arg := range args {
 			newArgs[i] = arg
-			if newArg, prunedArg := p.prune(arg); prunedArg {
+			if newArg, prunedArg := p.maybePrune(arg); prunedArg {
 				prunedCall = true
 				newArgs[i] = newArg
 			}
 		}
-		if newTarget, prunedTarget := p.prune(call.GetTarget()); prunedTarget {
+		if newTarget, prunedTarget := p.maybePrune(call.GetTarget()); prunedTarget {
 			prunedCall = true
 			newCall.Target = newTarget
 		}
@@ -291,7 +304,7 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		var prunedList bool
 		for i, elem := range elems {
 			newElems[i] = elem
-			if newElem, prunedElem := p.prune(elem); prunedElem {
+			if newElem, prunedElem := p.maybePrune(elem); prunedElem {
 				newElems[i] = newElem
 				prunedList = true
 			}
@@ -313,8 +326,8 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		newEntries := make([]*exprpb.Expr_CreateStruct_Entry, len(entries))
 		for i, entry := range entries {
 			newEntries[i] = entry
-			newKey, prunedKey := p.prune(entry.GetMapKey())
-			newValue, prunedValue := p.prune(entry.GetValue())
+			newKey, prunedKey := p.maybePrune(entry.GetMapKey())
+			newValue, prunedValue := p.maybePrune(entry.GetValue())
 			if !prunedKey && !prunedValue {
 				continue
 			}
@@ -349,7 +362,7 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		// Only the range of the comprehension is pruned since the state tracking only records
 		// the last iteration of the comprehension and not each step in the evaluation which
 		// means that the any residuals computed in between might be inaccurate.
-		if newRange, pruned := p.prune(compre.GetIterRange()); pruned {
+		if newRange, pruned := p.maybePrune(compre.GetIterRange()); pruned {
 			return &exprpb.Expr{
 				Id: node.GetId(),
 				ExprKind: &exprpb.Expr_ComprehensionExpr{

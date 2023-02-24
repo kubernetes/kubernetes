@@ -18,10 +18,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/google/cel-go/common/types/pb"
-	"github.com/google/cel-go/common/types/ref"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/google/cel-go/common/types/pb"
+	"github.com/google/cel-go/common/types/ref"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -52,7 +53,7 @@ func NewObject(adapter ref.TypeAdapter,
 		typeValue:   typeValue}
 }
 
-func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	srcPB := o.value
 	if reflect.TypeOf(srcPB).AssignableTo(typeDesc) {
 		return srcPB, nil
@@ -133,6 +134,11 @@ func (o *protoObj) IsSet(field ref.Val) ref.Val {
 	return False
 }
 
+// IsZeroValue returns true if the protobuf object is empty.
+func (o *protoObj) IsZeroValue() bool {
+	return proto.Equal(o.value, o.typeDesc.Zero())
+}
+
 func (o *protoObj) Get(index ref.Val) ref.Val {
 	protoFieldName, ok := index.(String)
 	if !ok {
@@ -154,6 +160,6 @@ func (o *protoObj) Type() ref.Type {
 	return o.typeValue
 }
 
-func (o *protoObj) Value() interface{} {
+func (o *protoObj) Value() any {
 	return o.value
 }

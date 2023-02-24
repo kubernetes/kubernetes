@@ -20,18 +20,18 @@ import (
 	"math"
 	"sync"
 
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Program is an evaluable view of an Ast.
 type Program interface {
 	// Eval returns the result of an evaluation of the Ast and environment against the input vars.
 	//
-	// The vars value may either be an `interpreter.Activation` or a `map[string]interface{}`.
+	// The vars value may either be an `interpreter.Activation` or a `map[string]any`.
 	//
 	// If the `OptTrackState`, `OptTrackCost` or `OptExhaustiveEval` flags are used, the `details` response will
 	// be non-nil. Given this caveat on `details`, the return state from evaluation will be:
@@ -43,16 +43,16 @@ type Program interface {
 	// An unsuccessful evaluation is typically the result of a series of incompatible `EnvOption`
 	// or `ProgramOption` values used in the creation of the evaluation environment or executable
 	// program.
-	Eval(interface{}) (ref.Val, *EvalDetails, error)
+	Eval(any) (ref.Val, *EvalDetails, error)
 
 	// ContextEval evaluates the program with a set of input variables and a context object in order
 	// to support cancellation and timeouts. This method must be used in conjunction with the
 	// InterruptCheckFrequency() option for cancellation interrupts to be impact evaluation.
 	//
-	// The vars value may either be an `interpreter.Activation` or `map[string]interface{}`.
+	// The vars value may either be an `interpreter.Activation` or `map[string]any`.
 	//
 	// The output contract for `ContextEval` is otherwise identical to the `Eval` method.
-	ContextEval(context.Context, interface{}) (ref.Val, *EvalDetails, error)
+	ContextEval(context.Context, any) (ref.Val, *EvalDetails, error)
 }
 
 // NoVars returns an empty Activation.
@@ -65,7 +65,7 @@ func NoVars() interpreter.Activation {
 //
 // The `vars` value may either be an interpreter.Activation or any valid input to the
 // interpreter.NewActivation call.
-func PartialVars(vars interface{},
+func PartialVars(vars any,
 	unknowns ...*interpreter.AttributePattern) (interpreter.PartialActivation, error) {
 	return interpreter.NewPartialActivation(vars, unknowns...)
 }
@@ -268,7 +268,7 @@ func (p *prog) initInterpretable(ast *Ast, decs []interpreter.InterpretableDecor
 }
 
 // Eval implements the Program interface method.
-func (p *prog) Eval(input interface{}) (v ref.Val, det *EvalDetails, err error) {
+func (p *prog) Eval(input any) (v ref.Val, det *EvalDetails, err error) {
 	// Configure error recovery for unexpected panics during evaluation. Note, the use of named
 	// return values makes it possible to modify the error response during the recovery
 	// function.
@@ -287,11 +287,11 @@ func (p *prog) Eval(input interface{}) (v ref.Val, det *EvalDetails, err error) 
 	switch v := input.(type) {
 	case interpreter.Activation:
 		vars = v
-	case map[string]interface{}:
+	case map[string]any:
 		vars = activationPool.Setup(v)
 		defer activationPool.Put(vars)
 	default:
-		return nil, nil, fmt.Errorf("invalid input, wanted Activation or map[string]interface{}, got: (%T)%v", input, input)
+		return nil, nil, fmt.Errorf("invalid input, wanted Activation or map[string]any, got: (%T)%v", input, input)
 	}
 	if p.defaultVars != nil {
 		vars = interpreter.NewHierarchicalActivation(p.defaultVars, vars)
@@ -307,7 +307,7 @@ func (p *prog) Eval(input interface{}) (v ref.Val, det *EvalDetails, err error) 
 }
 
 // ContextEval implements the Program interface.
-func (p *prog) ContextEval(ctx context.Context, input interface{}) (ref.Val, *EvalDetails, error) {
+func (p *prog) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetails, error) {
 	if ctx == nil {
 		return nil, nil, fmt.Errorf("context can not be nil")
 	}
@@ -318,13 +318,13 @@ func (p *prog) ContextEval(ctx context.Context, input interface{}) (ref.Val, *Ev
 	case interpreter.Activation:
 		vars = ctxActivationPool.Setup(v, ctx.Done(), p.interruptCheckFrequency)
 		defer ctxActivationPool.Put(vars)
-	case map[string]interface{}:
+	case map[string]any:
 		rawVars := activationPool.Setup(v)
 		defer activationPool.Put(rawVars)
 		vars = ctxActivationPool.Setup(rawVars, ctx.Done(), p.interruptCheckFrequency)
 		defer ctxActivationPool.Put(vars)
 	default:
-		return nil, nil, fmt.Errorf("invalid input, wanted Activation or map[string]interface{}, got: (%T)%v", input, input)
+		return nil, nil, fmt.Errorf("invalid input, wanted Activation or map[string]any, got: (%T)%v", input, input)
 	}
 	return p.Eval(vars)
 }
@@ -354,7 +354,7 @@ func newProgGen(factory progFactory) (Program, error) {
 }
 
 // Eval implements the Program interface method.
-func (gen *progGen) Eval(input interface{}) (ref.Val, *EvalDetails, error) {
+func (gen *progGen) Eval(input any) (ref.Val, *EvalDetails, error) {
 	// The factory based Eval() differs from the standard evaluation model in that it generates a
 	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
 	// results.
@@ -379,7 +379,7 @@ func (gen *progGen) Eval(input interface{}) (ref.Val, *EvalDetails, error) {
 }
 
 // ContextEval implements the Program interface method.
-func (gen *progGen) ContextEval(ctx context.Context, input interface{}) (ref.Val, *EvalDetails, error) {
+func (gen *progGen) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetails, error) {
 	if ctx == nil {
 		return nil, nil, fmt.Errorf("context can not be nil")
 	}
@@ -421,7 +421,7 @@ func EstimateCost(p Program) (min, max int64) {
 	return estimateCost(p)
 }
 
-func estimateCost(i interface{}) (min, max int64) {
+func estimateCost(i any) (min, max int64) {
 	c, ok := i.(interpreter.Coster)
 	if !ok {
 		return 0, math.MaxInt64
@@ -438,7 +438,7 @@ type ctxEvalActivation struct {
 
 // ResolveName implements the Activation interface method, but adds a special #interrupted variable
 // which is capable of testing whether a 'done' signal is provided from a context.Context channel.
-func (a *ctxEvalActivation) ResolveName(name string) (interface{}, bool) {
+func (a *ctxEvalActivation) ResolveName(name string) (any, bool) {
 	if name == "#interrupted" {
 		a.interruptCheckCount++
 		if a.interruptCheckCount%a.interruptCheckFrequency == 0 {
@@ -461,7 +461,7 @@ func (a *ctxEvalActivation) Parent() interpreter.Activation {
 func newCtxEvalActivationPool() *ctxEvalActivationPool {
 	return &ctxEvalActivationPool{
 		Pool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return &ctxEvalActivation{}
 			},
 		},
@@ -483,21 +483,21 @@ func (p *ctxEvalActivationPool) Setup(vars interpreter.Activation, done <-chan s
 }
 
 type evalActivation struct {
-	vars     map[string]interface{}
-	lazyVars map[string]interface{}
+	vars     map[string]any
+	lazyVars map[string]any
 }
 
 // ResolveName looks up the value of the input variable name, if found.
 //
 // Lazy bindings may be supplied within the map-based input in either of the following forms:
-// - func() interface{}
+// - func() any
 // - func() ref.Val
 //
 // The lazy binding will only be invoked once per evaluation.
 //
 // Values which are not represented as ref.Val types on input may be adapted to a ref.Val using
 // the ref.TypeAdapter configured in the environment.
-func (a *evalActivation) ResolveName(name string) (interface{}, bool) {
+func (a *evalActivation) ResolveName(name string) (any, bool) {
 	v, found := a.vars[name]
 	if !found {
 		return nil, false
@@ -510,7 +510,7 @@ func (a *evalActivation) ResolveName(name string) (interface{}, bool) {
 		lazy := obj()
 		a.lazyVars[name] = lazy
 		return lazy, true
-	case func() interface{}:
+	case func() any:
 		if resolved, found := a.lazyVars[name]; found {
 			return resolved, true
 		}
@@ -530,8 +530,8 @@ func (a *evalActivation) Parent() interpreter.Activation {
 func newEvalActivationPool() *evalActivationPool {
 	return &evalActivationPool{
 		Pool: sync.Pool{
-			New: func() interface{} {
-				return &evalActivation{lazyVars: make(map[string]interface{})}
+			New: func() any {
+				return &evalActivation{lazyVars: make(map[string]any)}
 			},
 		},
 	}
@@ -542,13 +542,13 @@ type evalActivationPool struct {
 }
 
 // Setup initializes a pooled Activation object with the map input.
-func (p *evalActivationPool) Setup(vars map[string]interface{}) *evalActivation {
+func (p *evalActivationPool) Setup(vars map[string]any) *evalActivation {
 	a := p.Pool.Get().(*evalActivation)
 	a.vars = vars
 	return a
 }
 
-func (p *evalActivationPool) Put(value interface{}) {
+func (p *evalActivationPool) Put(value any) {
 	a := value.(*evalActivation)
 	for k := range a.lazyVars {
 		delete(a.lazyVars, k)
@@ -559,7 +559,7 @@ func (p *evalActivationPool) Put(value interface{}) {
 var (
 	emptyEvalState = interpreter.NewEvalState()
 
-	// activationPool is an internally managed pool of Activation values that wrap map[string]interface{} inputs
+	// activationPool is an internally managed pool of Activation values that wrap map[string]any inputs
 	activationPool = newEvalActivationPool()
 
 	// ctxActivationPool is an internally managed pool of Activation values that expose a special #interrupted variable

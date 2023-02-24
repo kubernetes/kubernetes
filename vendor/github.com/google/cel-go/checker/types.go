@@ -90,6 +90,14 @@ func FormatCheckedType(t *exprpb.Type) string {
 		return "!error!"
 	case kindTypeParam:
 		return t.GetTypeParam()
+	case kindAbstract:
+		at := t.GetAbstractType()
+		params := at.GetParameterTypes()
+		paramStrs := make([]string, len(params))
+		for i, p := range params {
+			paramStrs[i] = FormatCheckedType(p)
+		}
+		return fmt.Sprintf("%s(%s)", at.GetName(), strings.Join(paramStrs, ", "))
 	}
 	return t.String()
 }
@@ -110,12 +118,39 @@ func isDyn(t *exprpb.Type) bool {
 
 // isDynOrError returns true if the input is either an Error, DYN, or well-known ANY message.
 func isDynOrError(t *exprpb.Type) bool {
-	switch kindOf(t) {
-	case kindError:
-		return true
-	default:
-		return isDyn(t)
+	return isError(t) || isDyn(t)
+}
+
+func isError(t *exprpb.Type) bool {
+	return kindOf(t) == kindError
+}
+
+func isOptional(t *exprpb.Type) bool {
+	if kindOf(t) == kindAbstract {
+		at := t.GetAbstractType()
+		return at.GetName() == "optional"
 	}
+	return false
+}
+
+func maybeUnwrapOptional(t *exprpb.Type) (*exprpb.Type, bool) {
+	if isOptional(t) {
+		at := t.GetAbstractType()
+		return at.GetParameterTypes()[0], true
+	}
+	return t, false
+}
+
+func maybeUnwrapString(e *exprpb.Expr) (string, bool) {
+	switch e.GetExprKind().(type) {
+	case *exprpb.Expr_ConstExpr:
+		literal := e.GetConstExpr()
+		switch literal.GetConstantKind().(type) {
+		case *exprpb.Constant_StringValue:
+			return literal.GetStringValue(), true
+		}
+	}
+	return "", false
 }
 
 // isEqualOrLessSpecific checks whether one type is equal or less specific than the other one.

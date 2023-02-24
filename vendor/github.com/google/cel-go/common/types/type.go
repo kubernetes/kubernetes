@@ -53,7 +53,7 @@ func NewObjectTypeValue(name string) *TypeValue {
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (t *TypeValue) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (t *TypeValue) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// TODO: replace the internal type representation with a proto-value.
 	return nil, fmt.Errorf("type conversion not supported for 'type'")
 }
@@ -97,6 +97,6 @@ func (t *TypeValue) TypeName() string {
 }
 
 // Value implements ref.Val.Value.
-func (t *TypeValue) Value() interface{} {
+func (t *TypeValue) Value() any {
 	return t.name
 }

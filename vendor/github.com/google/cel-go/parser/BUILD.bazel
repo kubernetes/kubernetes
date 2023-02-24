@@ -34,6 +34,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
+        "helper_test.go",
         "parser_test.go",
         "unescape_test.go",
         "unparser_test.go",
@@ -47,5 +48,6 @@ go_test(
         "//test:go_default_library",
         "@com_github_antlr_antlr4_runtime_go_antlr//:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
+        "@org_golang_google_protobuf//testing/protocmp:go_default_library",
     ],
 )

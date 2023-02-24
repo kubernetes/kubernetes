@@ -17,6 +17,7 @@ package cel
 import (
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/parser"
+
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -26,8 +27,11 @@ import (
 // a Macro should be created per arg-count or as a var arg macro.
 type Macro = parser.Macro
 
-// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree, or an error
-// if the input arguments are not suitable for the expansion requirements for the macro in question.
+// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree.
+//
+// If the MacroExpander determines within the implementation that an expansion is not needed it may return
+// a nil Expr value to indicate a non-match. However, if an expansion is to be performed, but the arguments
+// are not well-formed, the result of the expansion will be an error.
 //
 // The MacroExpander accepts as arguments a MacroExprHelper as well as the arguments used in the function call
 // and produces as output an Expr ast node.
@@ -81,8 +85,10 @@ func ExistsOneMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*ex
 // input to produce an output list.
 //
 // There are two call patterns supported by map:
-//   <iterRange>.map(<iterVar>, <transform>)
-//   <iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
+//	<iterRange>.map(<iterVar>, <transform>)
+//	<iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
 // In the second form only iterVar values which return true when provided to the predicate expression
 // are transformed.
 func MapMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {

@@ -63,7 +63,7 @@ func (b Bytes) Compare(other ref.Val) ref.Val {
 }
 
 // ConvertToNative implements the ref.Val interface method.
-func (b Bytes) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (b Bytes) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.Array, reflect.Slice:
 		return reflect.ValueOf(b).Convert(typeDesc).Interface(), nil
@@ -116,6 +116,11 @@ func (b Bytes) Equal(other ref.Val) ref.Val {
 	return Bool(ok && bytes.Equal(b, otherBytes))
 }
 
+// IsZeroValue returns true if the byte array is empty.
+func (b Bytes) IsZeroValue() bool {
+	return len(b) == 0
+}
+
 // Size implements the traits.Sizer interface method.
 func (b Bytes) Size() ref.Val {
 	return Int(len(b))
@@ -127,6 +132,6 @@ func (b Bytes) Type() ref.Type {
 }
 
 // Value implements the ref.Val interface method.
-func (b Bytes) Value() interface{} {
+func (b Bytes) Value() any {
 	return []byte(b)
 }

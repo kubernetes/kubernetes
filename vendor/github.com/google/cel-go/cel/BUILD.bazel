@@ -23,6 +23,7 @@ go_library(
         "//checker/decls:go_default_library",
         "//common:go_default_library",
         "//common/containers:go_default_library",
+        "//common/operators:go_default_library",
         "//common/overloads:go_default_library",
         "//common/types:go_default_library",
         "//common/types/pb:go_default_library",
