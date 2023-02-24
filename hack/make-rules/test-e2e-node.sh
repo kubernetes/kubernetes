@@ -177,6 +177,68 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
+elif [ "${remote}" = true ] && [ "${remote_mode}" = aws ] ; then
+  metadata=${INSTANCE_METADATA:-""}
+  hosts=${HOSTS:-""}
+  images=${IMAGES:-""}
+  image_config_file=${IMAGE_CONFIG_FILE:-""}
+  image_config_dir=${IMAGE_CONFIG_DIR:-""}
+  runtime_config=${RUNTIME_CONFIG:-""}
+  gubernator=${GUBERNATOR:-"false"}
+  instance_prefix=${INSTANCE_PREFIX:-"test"}
+  cleanup=${CLEANUP:-"true"}
+  delete_instances=${DELETE_INSTANCES:-"false"}
+  preemptible_instances=${PREEMPTIBLE_INSTANCES:-"false"}
+  test_suite=${TEST_SUITE:-"default"}
+  if [[ -n "${TIMEOUT:-}" ]] ; then
+    timeout_arg="--test-timeout=${TIMEOUT}"
+  fi
+
+  # get the account ID
+  account=$(aws sts get-caller-identity --query Account --output text)
+  if [[ ${account} == "" ]]; then
+    echo "Could not find AWS account ID"
+    exit 1
+  fi
+
+  # Use cluster.local as default dns-domain
+  test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
+  test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
+
+  region=${AWS_REGION:-${AWS_DEFAULT_REGION:-""}}
+  if [[ ${region} == "" ]]; then
+      echo "Could not find AWS region specified"
+      exit 1
+  fi
+
+  # TODO: lookup and re-use instances
+
+  # Output the configuration we will try to run
+  echo "Running tests remotely using"
+  echo "Account: ${account}"
+  echo "Region: ${region}"
+  echo "Images: ${images}"
+  echo "Hosts: ${hosts}"
+  echo "Ginkgo Flags: ${ginkgoflags}"
+  echo "Instance Metadata: ${metadata}"
+  echo "Image Config File: ${image_config_file}"
+  echo "Kubelet Config File: ${kubelet_config_file}"
+
+  # Invoke the runner
+  go run test/e2e_node/runner/remote/run_remote.go  --mode="aws" --vmodule=*=4 \
+    --ssh-env="aws" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
+    --gubernator="${gubernator}" \
+    --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
+    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
+    --instance-name-prefix="${instance_prefix}" \
+    --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
+    --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
+    --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
+    --image-config-dir="${image_config_dir}" \
+    --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
+    "${timeout_arg}" \
+    2>&1 | tee -i "${artifacts}/build-log.txt"
+
 elif [ "${remote}" = true ] && [ "${remote_mode}" = ssh ] ; then
   hosts=${HOSTS:-""}
   test_suite=${TEST_SUITE:-"default"}
