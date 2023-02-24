@@ -24,7 +24,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
 )
 
@@ -39,22 +38,24 @@ var apiGroupsGVR = schema.GroupVersionResource{
 func TestExplainErrors(t *testing.T) {
 	var buf bytes.Buffer
 
-	// Validate error when "Paths()" returns error.
-	err := PrintModelDescription(nil, &buf, &forceErrorClient{}, apiGroupsGVR, false, "unknown-format")
-	require.ErrorContains(t, err, "failed to fetch list of groupVersions")
-
 	// Validate error when GVR is not found in returned paths map.
-	emptyClient := &emptyPathsClient{}
-	err = PrintModelDescription(nil, &buf, emptyClient, schema.GroupVersionResource{
+	fakeClient := openapitest.NewFakeClient()
+	err := PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test0.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
 	}, false, "unknown-format")
 	require.ErrorContains(t, err, "could not locate schema")
 
+	// Validate error when openapi client returns error.
+	fakeClient.ForcedErr = fmt.Errorf("Always fails")
+	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, "unknown-format")
+	require.ErrorContains(t, err, "failed to fetch list of groupVersions")
+
 	// Validate error when GroupVersion "Schema()" call returns error.
-	fakeClient := &fakeOpenAPIClient{values: make(map[string]openapi.GroupVersion)}
-	fakeClient.values["apis/test1.example.com/v1"] = &forceErrorGV{}
+	fakeClient = openapitest.NewFakeClient()
+	forceErrorGV := openapitest.FakeGroupVersion{ForcedErr: fmt.Errorf("Always fails")}
+	fakeClient.PathsMap["apis/test1.example.com/v1"] = &forceErrorGV
 	err = PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test1.example.com",
 		Version:  "v1",
@@ -63,7 +64,8 @@ func TestExplainErrors(t *testing.T) {
 	require.ErrorContains(t, err, "failed to fetch openapi schema ")
 
 	// Validate error when returned bytes from GroupVersion "Schema" are invalid.
-	fakeClient.values["apis/test2.example.com/v1"] = &parseErrorGV{}
+	parseErrorGV := openapitest.FakeGroupVersion{GVSpec: []byte(`<some invalid json!>`)}
+	fakeClient.PathsMap["apis/test2.example.com/v1"] = &parseErrorGV
 	err = PrintModelDescription(nil, &buf, fakeClient, schema.GroupVersionResource{
 		Group:    "test2.example.com",
 		Version:  "v1",
@@ -112,41 +114,4 @@ func TestExplainOpenAPIClient(t *testing.T) {
 	err = json.Unmarshal(buf.Bytes(), &actualContext)
 	require.NoError(t, err)
 	require.Equal(t, expectedContext, actualContext)
-}
-
-// forceErrorClient always returns an error for "Paths()".
-type forceErrorClient struct{}
-
-func (f *forceErrorClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return nil, fmt.Errorf("Always fails")
-}
-
-// emptyPathsClient returns an empty map for "Paths()".
-type emptyPathsClient struct{}
-
-func (f *emptyPathsClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return map[string]openapi.GroupVersion{}, nil
-}
-
-// fakeOpenAPIClient returns hard-coded map for "Paths()".
-type fakeOpenAPIClient struct {
-	values map[string]openapi.GroupVersion
-}
-
-func (f *fakeOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return f.values, nil
-}
-
-// forceErrorGV always returns an error for "Schema()".
-type forceErrorGV struct{}
-
-func (f *forceErrorGV) Schema(contentType string) ([]byte, error) {
-	return nil, fmt.Errorf("Always fails")
-}
-
-// parseErrorGV always returns invalid JSON for "Schema()".
-type parseErrorGV struct{}
-
-func (f *parseErrorGV) Schema(contentType string) ([]byte, error) {
-	return []byte(`<some invalid json!>`), nil
 }
