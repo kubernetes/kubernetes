@@ -255,10 +255,10 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
-func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *kubecontainer.PodStatus, initContainerIDs sets.Set[string]) {
+func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *kubecontainer.PodStatus, initContainerNames sets.Set[string]) {
 	for i, c := range podStatus.ContainerStatuses {
 		// FIXME refactor with sidecar KEP
-		if initContainerIDs.Has(c.ID.String()) {
+		if initContainerNames.Has(c.Name) {
 			continue
 		}
 		var started bool
@@ -299,7 +299,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *kubecontainer.Pod
 	// succeeded.
 	for i, c := range podStatus.ContainerStatuses {
 		// FIXME refactor with sidecar KEP
-		if !initContainerIDs.Has(c.ID.String()) {
+		if !initContainerNames.Has(c.Name) {
 			continue
 		}
 		var ready bool
