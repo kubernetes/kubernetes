@@ -66,6 +66,7 @@ var (
 	keyIDHashStatusLastTimestampSecondsMetricLabels *lru.Cache
 	cacheSize                                       int = 10
 
+	// This metric is only used for KMS v1 API.
 	dekCacheFillPercent = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Namespace:      namespace,
@@ -75,8 +76,9 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// These metrics are made public to be used by unit tests.
-	DekCacheInterArrivals = metrics.NewHistogramVec(
+
+	// This metric is only used for KMS v1 API.
+	dekCacheInterArrivals = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
@@ -88,6 +90,7 @@ var (
 		[]string{"transformation_type"},
 	)
 
+	// These metrics are made public to be used by unit tests.
 	KMSOperationsLatencyMetric = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace:      namespace,
@@ -193,7 +196,7 @@ func RegisterMetrics() {
 			},
 		}
 		legacyregistry.MustRegister(dekCacheFillPercent)
-		legacyregistry.MustRegister(DekCacheInterArrivals)
+		legacyregistry.MustRegister(dekCacheInterArrivals)
 		legacyregistry.MustRegister(KeyIDHashTotal)
 		legacyregistry.MustRegister(KeyIDHashLastTimestampSeconds)
 		legacyregistry.MustRegister(KeyIDHashStatusLastTimestampSeconds)
@@ -234,7 +237,7 @@ func RecordArrival(transformationType string, start time.Time) {
 		if lastFromStorage.IsZero() {
 			lastFromStorage = start
 		}
-		DekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastFromStorage).Seconds())
+		dekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastFromStorage).Seconds())
 		lastFromStorage = start
 	case ToStorageLabel:
 		lockLastToStorage.Lock()
@@ -243,7 +246,7 @@ func RecordArrival(transformationType string, start time.Time) {
 		if lastToStorage.IsZero() {
 			lastToStorage = start
 		}
-		DekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastToStorage).Seconds())
+		dekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastToStorage).Seconds())
 		lastToStorage = start
 	}
 }

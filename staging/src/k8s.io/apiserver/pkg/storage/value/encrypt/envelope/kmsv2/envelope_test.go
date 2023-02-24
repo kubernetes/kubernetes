@@ -638,13 +638,11 @@ func TestEnvelopeMetrics(t *testing.T) {
 		},
 	}
 
-	metrics.DekCacheInterArrivals.Reset()
 	metrics.KeyIDHashTotal.Reset()
 	metrics.InvalidKeyIDFromStatusTotal.Reset()
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			defer metrics.DekCacheInterArrivals.Reset()
 			defer metrics.KeyIDHashTotal.Reset()
 			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
 			ctx := testContext(t)
