@@ -1,7 +1,6 @@
 {
   "spec": {
     "unwantedModules": {
-      "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
