@@ -75,16 +75,6 @@ func (CronJobStatus) SwaggerDoc() map[string]string {
 	return map_CronJobStatus
 }
 
-var map_JobTemplate = map[string]string{
-	"":         "JobTemplate describes a template for creating copies of a predefined pod.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"template": "Defines jobs that will be created from this template. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-}
-
-func (JobTemplate) SwaggerDoc() map[string]string {
-	return map_JobTemplate
-}
-
 var map_JobTemplateSpec = map[string]string{
 	"":         "JobTemplateSpec describes the data a Job should have when created from a template",
 	"metadata": "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
