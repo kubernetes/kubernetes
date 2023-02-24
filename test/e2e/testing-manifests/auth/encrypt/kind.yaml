@@ -12,7 +12,7 @@ nodes:
     readOnly: true
     propagation: None
   - containerPath: /etc/kubernetes/manifests/kubernetes-kms.yaml
-    hostPath: staging/src/k8s.io/kms/internal/plugins/base64/kms.yaml
+    hostPath: staging/src/k8s.io/kms/internal/plugins/mock/kms.yaml
     readOnly: true
     propagation: None
   kubeadmConfigPatches:

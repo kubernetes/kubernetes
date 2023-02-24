@@ -6,7 +6,7 @@ you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
-	
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,19 +18,17 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kms/internal"
 	"k8s.io/kms/pkg/hierarchy"
 	"k8s.io/kms/pkg/service"
+	"k8s.io/kms/pkg/util"
 )
 
 var (
@@ -38,26 +36,23 @@ var (
 	timeout    = flag.Duration("timeout", 5*time.Second, "gRPC timeout")
 )
 
-type remoteService struct {
-	keyID string
-}
-
 func main() {
 	flag.Parse()
 
-	addr, err := parseEndpoint(*listenAddr)
+	addr, err := util.ParseEndpoint(*listenAddr)
 	if err != nil {
 		klog.ErrorS(err, "failed to parse endpoint")
 		os.Exit(1)
 	}
 
+	remoteKMSService, err := internal.NewMockAESService("somerandomstring", "aes-key-id")
+	if err != nil {
+		klog.ErrorS(err, "failed to create remote service")
+		os.Exit(1)
+	}
+
 	ctx := withShutdownSignal(context.Background())
-	localKEKService := hierarchy.NewLocalKEKService(
-		ctx,
-		&remoteService{
-			keyID: "base64-key-id",
-		},
-	)
+	localKEKService := hierarchy.NewLocalKEKService(ctx, remoteKMSService)
 	grpcService := service.NewGRPCService(addr, *timeout, localKEKService)
 
 	klog.InfoS("starting server", "listen-addr", *listenAddr)
@@ -65,46 +60,6 @@ func main() {
 		klog.ErrorS(err, "failed to serve")
 		os.Exit(1)
 	}
-}
-
-func (s *remoteService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*service.EncryptResponse, error) {
-	return &service.EncryptResponse{
-		KeyID:      s.keyID,
-		Ciphertext: []byte(base64.StdEncoding.EncodeToString(plaintext)),
-		Annotations: map[string][]byte{
-			"version.encryption.remote.io": []byte("1"),
-		},
-	}, nil
-}
-
-func (s *remoteService) Decrypt(ctx context.Context, uid string, req *service.DecryptRequest) ([]byte, error) {
-	if len(req.Annotations) != 1 {
-		return nil, errors.New("invalid annotations")
-	}
-
-	if v, ok := req.Annotations["version.encryption.remote.io"]; !ok || string(v) != "1" {
-		return nil, errors.New("invalid version in annotations")
-	}
-
-	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
-}
-
-func (s *remoteService) Status(ctx context.Context) (*service.StatusResponse, error) {
-	return &service.StatusResponse{
-		Version: "v2alpha1",
-		Healthz: "ok",
-		KeyID:   s.keyID,
-	}, nil
-}
-
-func parseEndpoint(endpoint string) (string, error) {
-	if strings.HasPrefix(strings.ToLower(endpoint), "unix://") {
-		s := strings.SplitN(endpoint, "://", 2)
-		if s[1] != "" {
-			return s[1], nil
-		}
-	}
-	return "", fmt.Errorf("invalid endpoint: %v", endpoint)
 }
 
 // withShutdownSignal returns a copy of the parent context that will close if

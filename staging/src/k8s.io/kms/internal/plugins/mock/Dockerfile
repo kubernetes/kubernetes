@@ -18,8 +18,9 @@ WORKDIR /workspace
 
 # Copy the source
 COPY apimachinery/ apimachinery/
+COPY client-go/ client-go/
 COPY kms/ kms/
-WORKDIR /workspace/kms/internal/plugins/base64
+WORKDIR /workspace/kms/internal/plugins/mock
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -30,6 +31,6 @@ RUN chmod +x base64-plugin
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM --platform=${TARGETPLATFORM:-linux/amd64} gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/kms/internal/plugins/base64/base64-plugin .
+COPY --from=builder /workspace/kms/internal/plugins/mock/base64-plugin .
 
 ENTRYPOINT [ "/base64-plugin" ]
