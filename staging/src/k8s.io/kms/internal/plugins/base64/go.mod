@@ -23,6 +23,6 @@ require (
 )
 
 replace (
-	k8s.io/apimachinery => ../../../apimachinery
-	k8s.io/kms => ../../../kms
+	k8s.io/apimachinery => ../../../../apimachinery
+	k8s.io/kms => ../../../../kms
 )

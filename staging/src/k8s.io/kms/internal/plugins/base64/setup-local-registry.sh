@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 
+# Copyright 2023 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 # input and default values
-PLUGIN_NAME="${1:-base64}"
 REGISTRY_NAME="${2:-kind-registry}"
 REGISTRY_PORT="${3:-5000}"
 ARCH="${4:-amd64}"
@@ -25,7 +38,6 @@ export OUTPUT_TYPE=type=docker
 
 # push build image to local registry
 echo "Build and push image to local registry"
-echo "Building ${PLUGIN_NAME} image"
-make ${PLUGIN_NAME}-docker-build
+make base64-docker-build
 echo "Pushing image to local registry"
-docker push "${REGISTRY}/${PLUGIN_NAME}:e2e"
+docker push "${REGISTRY}/base64:e2e"

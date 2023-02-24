@@ -4,7 +4,7 @@ resources:
   - resources:
     - secrets
     providers:
-    - secretbox:
-        keys:
-        - name: key1
-          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - kms:
+        apiVersion: v2
+        name: kmsprovider
+        endpoint: unix:///tmp/kms.socket

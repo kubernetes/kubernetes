@@ -1,3 +1,19 @@
+/*
+Copyright 2023 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+	
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package main
 
 import (
@@ -9,7 +25,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -24,7 +39,6 @@ var (
 )
 
 type remoteService struct {
-	mu    sync.Mutex
 	keyID string
 }
 
@@ -54,9 +68,6 @@ func main() {
 }
 
 func (s *remoteService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*service.EncryptResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	return &service.EncryptResponse{
 		KeyID:      s.keyID,
 		Ciphertext: []byte(base64.StdEncoding.EncodeToString(plaintext)),
@@ -67,9 +78,6 @@ func (s *remoteService) Encrypt(ctx context.Context, uid string, plaintext []byt
 }
 
 func (s *remoteService) Decrypt(ctx context.Context, uid string, req *service.DecryptRequest) ([]byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if len(req.Annotations) != 1 {
 		return nil, errors.New("invalid annotations")
 	}
@@ -82,9 +90,6 @@ func (s *remoteService) Decrypt(ctx context.Context, uid string, req *service.De
 }
 
 func (s *remoteService) Status(ctx context.Context) (*service.StatusResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	return &service.StatusResponse{
 		Version: "v2alpha1",
 		Healthz: "ok",
