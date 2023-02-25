@@ -289,9 +289,9 @@ func main() {
 		fmt.Printf("%s\n", tr.output)
 		if tr.err != nil {
 			errCount++
-			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
+			fmt.Printf("Failure Finished Test Suite on Host %s. Refer to artifacts directory for ginkgo log for this host.\n%v\n", host, tr.err)
 		} else {
-			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
+			fmt.Printf("Success Finished Test Suite on Host %s. Refer to artifacts directory for ginkgo log for this host.\n", host)
 		}
 		exitOk = exitOk && tr.exitOk
 		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
