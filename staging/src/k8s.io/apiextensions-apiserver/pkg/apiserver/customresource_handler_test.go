@@ -1023,15 +1023,9 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 		},
 	}
 
-	convertedDefs := map[string]*spec.Schema{}
-	for k, v := range staticSpec.Definitions {
-		vCopy := v
-		convertedDefs[k] = &vCopy
-	}
-
 	for i, test := range tests {
 		crd.Spec.Versions[0].Schema = &test
-		models, err := buildOpenAPIModelsForApply(convertedDefs, &crd)
+		models, err := buildOpenAPIModelsForApply(staticSpec, &crd)
 		if err != nil {
 			t.Fatalf("failed to convert to apply model: %v", err)
 		}

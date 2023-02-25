@@ -36,17 +36,11 @@ var testTypeConverter = func() TypeConverter {
 	if err != nil {
 		panic(err)
 	}
-	swag := spec.Swagger{}
-	if err := json.Unmarshal(data, &swag); err != nil {
+	spec := spec.Swagger{}
+	if err := json.Unmarshal(data, &spec); err != nil {
 		panic(err)
 	}
-
-	convertedDefs := map[string]*spec.Schema{}
-	for k, v := range swag.Definitions {
-		vCopy := v
-		convertedDefs[k] = &vCopy
-	}
-	typeConverter, err := NewTypeConverter(convertedDefs, false)
+	typeConverter, err := NewTypeConverter(&spec, false)
 	if err != nil {
 		panic(err)
 	}
