@@ -81,7 +81,11 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	}
 
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
-	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, currentInstalledCoreDNSversion, corefile)
+	targetCoreDNSVersion := strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v")
+	if currentInstalledCoreDNSversion == targetCoreDNSVersion {
+		return nil
+	}
+	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, targetCoreDNSVersion, corefile)
 	if err != nil {
 		return err
 	}
