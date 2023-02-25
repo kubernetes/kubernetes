@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -41,14 +40,13 @@ type Validator interface {
 
 // NewValidator is in order to find AppArmor FS
 func NewValidator() Validator {
-	if err := validateHost(); err != nil {
-		return &validator{validateHostErr: err}
+	return &validator{
+		appArmor: shim{},
 	}
-	return &validator{}
 }
 
 type validator struct {
-	validateHostErr error
+	appArmor Shim
 }
 
 func (v *validator) Validate(pod *v1.Pod) error {
@@ -56,8 +54,8 @@ func (v *validator) Validate(pod *v1.Pod) error {
 		return nil
 	}
 
-	if v.ValidateHost() != nil {
-		return v.validateHostErr
+	if err := v.ValidateHost(); err != nil {
+		return err
 	}
 
 	var retErr error
@@ -82,11 +80,11 @@ func (v *validator) Validate(pod *v1.Pod) error {
 }
 
 func (v *validator) ValidateHost() error {
-	return v.validateHostErr
+	return v.validateHost()
 }
 
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.
-func validateHost() error {
+func (v *validator) validateHost() error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
@@ -98,7 +96,7 @@ func validateHost() error {
 	}
 
 	// Check kernel support.
-	if !apparmor.IsEnabled() {
+	if !v.appArmor.IsEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 

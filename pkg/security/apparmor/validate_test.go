@@ -27,10 +27,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type fakeShim struct {
+	isEnabled bool
+}
+
+func (fs fakeShim) IsEnabled() bool {
+	return fs.isEnabled
+}
+
 func TestValidateBadHost(t *testing.T) {
-	hostErr := errors.New("expected host error")
 	v := &validator{
-		validateHostErr: hostErr,
+		fakeShim{},
 	}
 
 	tests := []struct {
@@ -47,13 +54,17 @@ func TestValidateBadHost(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.Equal(t, hostErr, err, "Pod with profile %q should trigger a host validation error", test.profile)
+			assert.Equal(t, errors.New("AppArmor is not enabled on the host"), err, "Pod with profile %q should trigger a host validation error", test.profile)
 		}
 	}
 }
 
 func TestValidateValidHost(t *testing.T) {
-	v := &validator{}
+	v := &validator{
+		appArmor: fakeShim{
+			isEnabled: true,
+		},
+	}
 
 	tests := []struct {
 		profile     string
