@@ -51,7 +51,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
+	openapibuilder2 "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/handler3"
@@ -87,7 +87,7 @@ type APIGroupInfo struct {
 
 	// StaticOpenAPISpec is the spec derived from the definitions of all resources installed together.
 	// It is set during InstallAPIGroups, InstallAPIGroup, and InstallLegacyAPIGroup.
-	StaticOpenAPISpec map[string]*spec.Schema
+	StaticOpenAPISpec *spec.Swagger
 }
 
 func (a *APIGroupInfo) destroyStorage() {
@@ -666,16 +666,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
-func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels map[string]*spec.Schema) error {
-	var typeConverter fieldmanager.TypeConverter
-
-	if len(openAPIModels) > 0 {
-		var err error
-		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, false)
-		if err != nil {
-			return err
-		}
-	}
+func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels *spec.Swagger) error {
 	var resourceInfos []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
@@ -690,7 +681,16 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
-		apiGroupVersion.TypeConverter = typeConverter
+		apiGroupVersion.OpenAPIModels = openAPIModels
+
+		if openAPIModels != nil {
+			typeConverter, err := fieldmanager.NewTypeConverter(openAPIModels, false)
+			if err != nil {
+				return err
+			}
+			apiGroupVersion.TypeConverter = typeConverter
+		}
+
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
 		discoveryAPIResources, r, err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer)
@@ -881,10 +881,8 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 }
 
 // getOpenAPIModels is a private method for getting the OpenAPI models
-func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (map[string]*spec.Schema, error) {
-	if s.openAPIV3Config == nil {
-		//!TODO: A future work should add a requirement that
-		// OpenAPIV3 config is required. May require some refactoring of tests.
+func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (*spec.Swagger, error) {
+	if s.openAPIConfig == nil {
 		return nil, nil
 	}
 	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
@@ -898,7 +896,7 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	}
 
 	// Build the openapi definitions for those resources and convert it to proto models
-	openAPISpec, err := openapibuilder3.BuildOpenAPIDefinitionsForResources(s.openAPIV3Config, resourceNames...)
+	openAPISpec, err := openapibuilder2.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
 	}
