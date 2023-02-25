@@ -300,8 +300,12 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 
 	var applySet *ApplySet
 	if flags.ApplySetRef != "" {
-		applySet, err = NewApplySet(flags.ApplySetRef, namespace, mapper)
-		if err != nil {
+		var applySetNs string
+		// ApplySet uses the namespace value from the flag, but not from the kubeconfig or defaults
+		if enforceNamespace {
+			applySetNs = namespace
+		}
+		if applySet, err = NewApplySet(flags.ApplySetRef, applySetNs, mapper); err != nil {
 			return nil, err
 		}
 	}
@@ -381,8 +385,13 @@ func (o *ApplyOptions) Validate() error {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 
-	if o.ApplySet != nil && !o.Prune {
-		return fmt.Errorf("--applyset requires --prune")
+	if o.ApplySet != nil {
+		if !o.Prune {
+			return fmt.Errorf("--applyset requires --prune")
+		}
+		if err := o.ApplySet.Validate(); err != nil {
+			return err
+		}
 	}
 	if o.Prune {
 		// Do not force the recreation of an object(s) if we're pruning; this can cause

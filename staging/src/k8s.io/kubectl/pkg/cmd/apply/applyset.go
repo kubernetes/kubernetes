@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
@@ -38,6 +39,11 @@ type ApplySet struct {
 	namespaces map[string]struct{}
 }
 
+var builtinApplySetParentGVRs = map[schema.GroupVersionResource]bool{
+	defaultApplySetParentGVR:                true,
+	{Version: "v1", Resource: "configmaps"}: true,
+}
+
 // ApplySetParentRef stores object and type meta for the parent object that is used to track the applyset.
 type ApplySetParentRef struct {
 	Name        string
@@ -46,18 +52,14 @@ type ApplySetParentRef struct {
 }
 
 // NewApplySet creates a new ApplySet object from a parent reference in the format [RESOURCE][.GROUP]/NAME
-func NewApplySet(parentRefStr string, namespace string, mapper meta.RESTMapper) (*ApplySet, error) {
-	var parent *ApplySetParentRef
-	var err error
-
-	if parent, err = parentRefFromStr(parentRefStr, mapper); err != nil {
+func NewApplySet(parentRefStr string, nsFromFlag string, mapper meta.RESTMapper) (*ApplySet, error) {
+	parent, err := parentRefFromStr(parentRefStr, mapper)
+	if err != nil {
 		return nil, fmt.Errorf("invalid parent reference %q: %w", parentRefStr, err)
 	}
-	parent.Namespace = namespace
-	if err := parent.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid parent reference %q: %w", parentRefStr, err)
+	if parent.IsNamespaced() {
+		parent.Namespace = nsFromFlag
 	}
-
 	return &ApplySet{
 		resources:  make(map[schema.GroupVersionResource]struct{}),
 		namespaces: make(map[string]struct{}),
@@ -71,19 +73,21 @@ func (a ApplySet) ID() string {
 	return "placeholder-todo"
 }
 
-func (p *ApplySetParentRef) IsNamespaced() bool {
-	return p.RESTMapping.Scope.Name() == meta.RESTScopeNameNamespace
+// Validate imposes restrictions on the parent object that is used to track the applyset.
+func (a ApplySet) Validate() error {
+	var errors []error
+	// TODO: permit CRDs that have the annotation required by the ApplySet specification
+	if !builtinApplySetParentGVRs[a.ParentRef.RESTMapping.Resource] {
+		errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.ParentRef.RESTMapping.Resource))
+	}
+	if a.ParentRef.IsNamespaced() && a.ParentRef.Namespace == "" {
+		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet"))
+	}
+	return utilerrors.NewAggregate(errors)
 }
 
-func (p *ApplySetParentRef) Validate() error {
-	if p.Name == "" {
-		return fmt.Errorf("name cannot be blank")
-	}
-	if p.IsNamespaced() && p.Namespace == "" {
-		// TODO: Can this actually happen? We seem to get the value 'default' here when the namespace flag unspecified or even blank. May need KEP update.
-		return fmt.Errorf("namespace is required to use namespace-scoped ApplySet")
-	}
-	return nil
+func (p *ApplySetParentRef) IsNamespaced() bool {
+	return p.RESTMapping.Scope.Name() == meta.RESTScopeNameNamespace
 }
 
 // parentRefFromStr creates a new ApplySetParentRef from a parent reference in the format [RESOURCE][.GROUP]/NAME
@@ -97,6 +101,10 @@ func parentRefFromStr(parentRefStr string, mapper meta.RESTMapper) (*ApplySetPar
 	} else {
 		name = parentRefStr
 		gvr = defaultApplySetParentGVR
+	}
+
+	if name == "" {
+		return nil, fmt.Errorf("name cannot be blank")
 	}
 
 	gvk, err := mapper.KindFor(gvr)

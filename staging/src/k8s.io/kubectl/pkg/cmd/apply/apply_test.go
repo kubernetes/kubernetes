@@ -29,7 +29,10 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -114,9 +117,6 @@ func TestAlphaEnablement(t *testing.T) {
 }
 
 func TestApplyFlagValidation(t *testing.T) {
-	f := cmdtesting.NewTestFactory()
-	defer f.Cleanup()
-
 	tests := []struct {
 		args         [][]string
 		enableAlphas []cmdutil.FeatureGate
@@ -169,6 +169,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"prune", "true"},
 				{"force", "true"},
 				{"applyset", "mySecret"},
+				{"namespace", "myNs"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
 			expectedErr:  "--force cannot be used with --prune",
@@ -191,6 +192,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			args: [][]string{
 				{"prune", "false"},
 				{"applyset", "mySecret"},
+				{"namespace", "myNs"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
 			expectedErr:  "--applyset requires --prune",
@@ -200,6 +202,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"prune", "true"},
 				{"applyset", "mySecret"},
 				{"selector", "foo=bar"},
+				{"namespace", "myNs"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
 			expectedErr:  "--selector is incompatible with --applyset",
@@ -208,6 +211,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			args: [][]string{
 				{"prune", "true"},
 				{"applyset", "mySecret"},
+				{"namespace", "myNs"},
 				{"all", "true"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
@@ -217,6 +221,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			args: [][]string{
 				{"prune", "true"},
 				{"applyset", "mySecret"},
+				{"namespace", "myNs"},
 				{"prune-allowlist", "core/v1/ConfigMap"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
@@ -226,6 +231,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			args: [][]string{
 				{"prune", "true"},
 				{"applyset", "foo"},
+				{"namespace", "myNs"},
 			},
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
 			expectedErr:  "--applyset is not yet supported",
@@ -234,13 +240,19 @@ func TestApplyFlagValidation(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			f := cmdtesting.NewTestFactory()
+			defer f.Cleanup()
 			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
 				cmd.Flags().Set("filename", "unused")
 				for _, arg := range test.args {
-					cmd.Flags().Set(arg[0], arg[1])
+					if arg[0] == "namespace" {
+						f.WithNamespace(arg[1])
+					} else {
+						cmd.Flags().Set(arg[0], arg[1])
+					}
 				}
 				o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
 				if err != nil {
@@ -2068,4 +2080,135 @@ func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 	cmd.Flags().Set("filename", filenamePodGeneratedName)
 	cmd.Flags().Set("dry-run", "client")
 	cmd.Run(cmd, []string{})
+}
+
+func TestApplySetParentValidation(t *testing.T) {
+	tests := map[string]struct {
+		applysetFlag        string
+		namespaceFlag       string
+		setup               func(*testing.T, *cmdtesting.TestFactory)
+		expectParentKind    string
+		expectBlankParentNs bool
+		expectErr           string
+	}{
+		"parent type must be valid": {
+			applysetFlag: "doesnotexist/thename",
+			expectErr:    "invalid parent reference \"doesnotexist/thename\": no matches for /, Resource=doesnotexist",
+		},
+		"parent name must be present": {
+			applysetFlag: "secret/",
+			expectErr:    "invalid parent reference \"secret/\": name cannot be blank",
+		},
+		"configmap parents are valid": {
+			applysetFlag:     "configmap/thename",
+			namespaceFlag:    "mynamespace",
+			expectParentKind: "ConfigMap",
+		},
+		"secret parents are valid": {
+			applysetFlag:     "secret/thename",
+			namespaceFlag:    "mynamespace",
+			expectParentKind: "Secret",
+		},
+		"plural resource works": {
+			applysetFlag:     "secrets/thename",
+			namespaceFlag:    "mynamespace",
+			expectParentKind: "Secret",
+		},
+		"other namespaced builtin parents types are correctly parsed but invalid": {
+			applysetFlag:     "deployments.apps/thename",
+			expectParentKind: "Deployment",
+			expectErr:        "[resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent, namespace is required to use namespace-scoped ApplySet]",
+		},
+		"namespaced builtin parents with multi-segment groups are correctly parsed but invalid": {
+			applysetFlag:     "priorityclasses.scheduling.k8s.io/thename",
+			expectParentKind: "PriorityClass",
+			expectErr:        "resource \"scheduling.k8s.io/v1alpha1, Resource=priorityclasses\" is not permitted as an ApplySet parent",
+		},
+		"non-namespaced builtin types are correctly parsed but invalid": {
+			applysetFlag:        "namespaces/thename",
+			expectParentKind:    "Namespace",
+			namespaceFlag:       "somenamespace",
+			expectBlankParentNs: true,
+			expectErr:           "resource \"/v1, Resource=namespaces\" is not permitted as an ApplySet parent",
+		},
+		"parent namespace should use the value of the namespace flag": {
+			applysetFlag:     "mysecret",
+			namespaceFlag:    "mynamespace",
+			expectParentKind: "Secret",
+		},
+		"parent namespace should not use the default namespace from ClientConfig": {
+			applysetFlag: "mysecret",
+			setup: func(t *testing.T, f *cmdtesting.TestFactory) {
+				// by default, the value "default" is used for the namespace
+				// make sure this assumption still holds
+				ns, overridden, err := f.ToRawKubeConfigLoader().Namespace()
+				require.NoError(t, err)
+				require.Falsef(t, overridden, "namespace unexpectedly overridden")
+				require.Equal(t, "default", ns)
+			},
+			expectBlankParentNs: true,
+			expectParentKind:    "Secret",
+			expectErr:           "namespace is required to use namespace-scoped ApplySet",
+		},
+		"parent namespace should not use the default namespace from the user's kubeconfig": {
+			applysetFlag: "mysecret",
+			setup: func(t *testing.T, f *cmdtesting.TestFactory) {
+				kubeConfig := clientcmdapi.NewConfig()
+				kubeConfig.CurrentContext = "default"
+				kubeConfig.Contexts["default"] = &clientcmdapi.Context{Namespace: "bar"}
+				clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, &clientcmd.ConfigOverrides{
+					ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}})
+				f.WithClientConfig(clientConfig)
+			},
+			expectBlankParentNs: true,
+			expectParentKind:    "Secret",
+			expectErr:           "namespace is required to use namespace-scoped ApplySet",
+		},
+	}
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		for name, test := range tests {
+			t.Run(name, func(t *testing.T) {
+				cmd := &cobra.Command{}
+				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags.AddFlags(cmd)
+				cmd.Flags().Set("filename", filenameRC)
+				cmd.Flags().Set("applyset", test.applysetFlag)
+				cmd.Flags().Set("prune", "true")
+				f := cmdtesting.NewTestFactory()
+				defer f.Cleanup()
+
+				var expectedParentNs string
+				if test.namespaceFlag != "" {
+					f.WithNamespace(test.namespaceFlag)
+					if !test.expectBlankParentNs {
+						expectedParentNs = test.namespaceFlag
+					}
+				}
+
+				if test.setup != nil {
+					test.setup(t, f)
+				}
+
+				o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
+				if test.expectErr == "" {
+					require.NoError(t, err, "ToOptions error")
+				} else if err != nil {
+					require.EqualError(t, err, test.expectErr)
+					return
+				}
+
+				assert.Equal(t, expectedParentNs, o.ApplySet.ParentRef.Namespace)
+				assert.Equal(t, test.expectParentKind, o.ApplySet.ParentRef.RESTMapping.GroupVersionKind.Kind)
+
+				err = o.Validate()
+				if test.expectErr != "" {
+					require.EqualError(t, err, test.expectErr)
+				} else if err.Error() == "--applyset is not yet supported" {
+					// TODO: remove this when the feature is complete
+				} else {
+					require.NoError(t, err, "Validate error")
+				}
+			})
+		}
+	})
 }
