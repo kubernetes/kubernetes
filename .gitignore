@@ -23,6 +23,7 @@ __*
 /output*/
 /_output*/
 /_output
+Dockerfile.dapper?*
 
 # Emacs save files
 *~
