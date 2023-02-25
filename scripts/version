@@ -4,16 +4,17 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     DIRTY="-dirty"
 fi
 
-COMMIT=$(git rev-parse --short HEAD)
+COMMIT=$(git rev-parse HEAD)
 GIT_TAG=${DRONE_TAG:-$(git tag -l --contains HEAD | head -n 1)}
 
 if [[ -z "$DIRTY" && -n "$GIT_TAG" ]]; then
     VERSION=$GIT_TAG
+    GIT_TREE_STATE=clean
 else
     VERSION="${COMMIT}${DIRTY}"
+    GIT_TREE_STATE=dirty
 fi
 
 if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
-

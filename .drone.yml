@@ -7,6 +7,14 @@ platform:
   arch: amd64
 
 steps:
+- name: fetch
+  image: alpine/git
+  commands:
+  - git fetch origin refs/tags/${DRONE_TAG}:refs/tags/${DRONE_TAG} --no-tags
+  when:
+    event:
+    - tag
+      
 - name: ci
   pull: default
   image: rancher/dapper:1.11.2
