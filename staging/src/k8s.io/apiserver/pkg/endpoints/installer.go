@@ -345,13 +345,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isCreater = true
 	}
 
-	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if a.group.OpenAPIModels != nil {
-		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-			resetFields = resetFieldsStrategy.GetResetFields()
-		}
-	}
-
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
@@ -680,7 +673,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	if a.group.OpenAPIModels != nil {
+
+	// Use TypeConverter's nil-ness as a proxy for whether SSA/OpenAPI is enabled
+	// This should be removed in the future and made unconditional
+	// https://github.com/kubernetes/kubernetes/pull/114998
+	if a.group.TypeConverter != nil {
+		var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
+		}
+
 		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
 			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
@@ -695,6 +697,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
 	}
+
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {

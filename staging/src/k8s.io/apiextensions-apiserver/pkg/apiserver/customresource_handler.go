@@ -76,6 +76,7 @@ import (
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
@@ -120,7 +121,7 @@ type crdHandler struct {
 	// staticOpenAPISpec is used as a base for the schema of CR's for the
 	// purpose of managing fields, it is how CR handlers get the structure
 	// of TypeMeta and ObjectMeta
-	staticOpenAPISpec *spec.Swagger
+	staticOpenAPISpec map[string]*spec.Schema
 
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
@@ -174,7 +175,7 @@ func NewCustomResourceDefinitionHandler(
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
-	staticOpenAPISpec *spec.Swagger,
+	staticOpenAPISpec map[string]*spec.Schema,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
 
 	if converterFactory == nil {
@@ -680,7 +681,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	}
 
 	var typeConverter fieldmanager.TypeConverter = fieldmanager.NewDeducedTypeConverter()
-	if openAPIModels != nil {
+	if len(openAPIModels) > 0 {
 		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
 		if err != nil {
 			return nil, err
@@ -1369,25 +1370,39 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models ifthe static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (*spec.Swagger, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *apiextensionsv1.CustomResourceDefinition) (map[string]*spec.Schema, error) {
 	if staticOpenAPISpec == nil {
 		return nil, nil
 	}
 
-	specs := []*spec.Swagger{}
+	// Convert static spec to V3 format to be able to merge
+	staticSpecV3 := &spec3.OpenAPI{
+		Version: "3.0.0",
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes CRD Swagger",
+				Version: "v0.1.0",
+			},
+		},
+		Components: &spec3.Components{
+			Schemas: staticOpenAPISpec,
+		},
+	}
+
+	specs := []*spec3.OpenAPI{staticSpecV3}
 	for _, v := range crd.Spec.Versions {
 		// Defaults are not pruned here, but before being served.
 		// See flag description in builder.go for flag usage
-		s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
+		s, err := builder.BuildOpenAPIV3(crd, v.Name, builder.Options{})
 		if err != nil {
 			return nil, err
 		}
 		specs = append(specs, s)
 	}
 
-	mergedOpenAPI, err := builder.MergeSpecs(staticOpenAPISpec, specs...)
+	mergedOpenAPI, err := builder.MergeSpecsV3(specs...)
 	if err != nil {
 		return nil, err
 	}
-	return mergedOpenAPI, nil
+	return mergedOpenAPI.Components.Schemas, nil
 }

@@ -42,23 +42,14 @@ type typeConverter struct {
 
 var _ TypeConverter = &typeConverter{}
 
-// NewTypeConverter builds a TypeConverter from a spec.Swagger. This
-// will automatically find the proper version of the object, and the
-// corresponding schema information.
-func NewTypeConverter(openapiSpec *spec.Swagger, preserveUnknownFields bool) (TypeConverter, error) {
-	pointerDefs := map[string]*spec.Schema{}
-	for k, v := range openapiSpec.Definitions {
-		vCopy := v
-		pointerDefs[k] = &vCopy
-	}
-
-	typeSchema, err := schemaconv.ToSchemaFromOpenAPI(pointerDefs, preserveUnknownFields)
+func NewTypeConverter(openapiSpec map[string]*spec.Schema, preserveUnknownFields bool) (TypeConverter, error) {
+	typeSchema, err := schemaconv.ToSchemaFromOpenAPI(openapiSpec, preserveUnknownFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert models to schema: %v", err)
 	}
 
 	typeParser := typed.Parser{Schema: smdschema.Schema{Types: typeSchema.Types}}
-	tr := indexModels(&typeParser, pointerDefs)
+	tr := indexModels(&typeParser, openapiSpec)
 
 	return &typeConverter{parser: tr}, nil
 }
