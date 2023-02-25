@@ -590,7 +590,7 @@ func haveAllNodes(nodeNames []string, nodes []*v1.Node) bool {
 	if len(nodeNames) > haveAllNodesThreshold {
 		m := sets.New(nodeNames...)
 		for _, node := range nodes {
-			if _, ok := m[node.Name]; !ok {
+			if !m.Has(node.Name) {
 				return false
 			}
 		}
