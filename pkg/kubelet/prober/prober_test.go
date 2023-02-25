@@ -333,3 +333,75 @@ func TestNewExecInContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordContainerEventUnknownStatus(t *testing.T) {
+    pod := &v1.Pod{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "test-pod",
+            Namespace: "default",
+            UID:       types.UID("12345"),
+        },
+        Spec: v1.PodSpec{
+            Containers: []v1.Container{
+                {
+                    Name:  "test-container",
+                    Image: "nginx",
+                },
+            },
+        },
+    }
+
+    container := pod.Spec.Containers[0]
+
+    recorder := record.NewFakeRecorder(10)
+
+    pb := &prober{
+        recorder: recorder,
+    }
+
+    output := "probe output"
+
+    testCases := []struct {
+        probeType probe.Type
+        result    probe.Result
+        expected  string
+    }{
+        {
+            probeType: probe.Readiness,
+            result:    probe.Unknown,
+            expected:  "Unknown Readiness probe status: Unknown",
+        },
+        {
+            probeType: probe.Liveness,
+            result:    probe.Unknown,
+            expected:  "Unknown Liveness probe status: Unknown",
+        },
+        {
+            probeType: probe.Startup,
+            result:    probe.Unknown,
+            expected:  "Unknown Startup probe status: Unknown",
+        },
+    }
+
+    for _, tc := range testCases {
+        pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", tc.probeType, output)
+        pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "Unknown %s probe status: %s", tc.probeType, tc.result)
+
+        expectedEvents := []string{
+            fmt.Sprintf("%s probe warning: %s", tc.probeType, output),
+            tc.expected,
+        }
+
+        events := recorder.Events
+        if len(events) != len(expectedEvents) {
+            t.Errorf("unexpected number of events, expected %d got %d", len(expectedEvents), len(events))
+            continue
+        }
+
+        for i, event := range events {
+            if event.Message != expectedEvents[i] {
+                t.Errorf("unexpected event message, expected '%s' got '%s'", expectedEvents[i], event.Message)
+            }
+        }
+    }
+}
