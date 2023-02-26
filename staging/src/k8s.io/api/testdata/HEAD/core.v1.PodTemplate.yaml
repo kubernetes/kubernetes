@@ -105,6 +105,10 @@ template:
                 - valuesValue
               matchLabels:
                 matchLabelsKey: matchLabelsValue
+            matchLabelKeys:
+            - matchLabelKeysValue
+            mismatchLabelKeys:
+            - mismatchLabelKeysValue
             namespaceSelector:
               matchExpressions:
               - key: keyValue
@@ -126,6 +130,10 @@ template:
               - valuesValue
             matchLabels:
               matchLabelsKey: matchLabelsValue
+          matchLabelKeys:
+          - matchLabelKeysValue
+          mismatchLabelKeys:
+          - mismatchLabelKeysValue
           namespaceSelector:
             matchExpressions:
             - key: keyValue
@@ -148,6 +156,10 @@ template:
                 - valuesValue
               matchLabels:
                 matchLabelsKey: matchLabelsValue
+            matchLabelKeys:
+            - matchLabelKeysValue
+            mismatchLabelKeys:
+            - mismatchLabelKeysValue
             namespaceSelector:
               matchExpressions:
               - key: keyValue
@@ -169,6 +181,10 @@ template:
               - valuesValue
             matchLabels:
               matchLabelsKey: matchLabelsValue
+          matchLabelKeys:
+          - matchLabelKeysValue
+          mismatchLabelKeys:
+          - mismatchLabelKeysValue
           namespaceSelector:
             matchExpressions:
             - key: keyValue
