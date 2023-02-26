@@ -2902,6 +2902,7 @@ type WeightedPodAffinityTerm struct {
 // a pod of the set of pods is running.
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
+	// If it's null, this PodAffinityTerm matches with no Pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector
 	// namespaces specifies a static list of namespace names that the term applies to.
@@ -2923,6 +2924,24 @@ type PodAffinityTerm struct {
 	// An empty selector ({}) matches all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
+	// MatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string
+	// MismatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// +listType=atomic
+	// +optional
+	MismatchLabelKeys []string
 }
 
 // NodeAffinity is a group of node affinity scheduling rules.

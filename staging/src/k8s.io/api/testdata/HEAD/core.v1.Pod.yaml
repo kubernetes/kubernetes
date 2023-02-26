@@ -72,6 +72,10 @@ spec:
               - valuesValue
             matchLabels:
               matchLabelsKey: matchLabelsValue
+          matchLabelKeys:
+          - matchLabelKeysValue
+          mismatchLabelKeys:
+          - mismatchLabelKeysValue
           namespaceSelector:
             matchExpressions:
             - key: keyValue
@@ -93,6 +97,10 @@ spec:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+        matchLabelKeys:
+        - matchLabelKeysValue
+        mismatchLabelKeys:
+        - mismatchLabelKeysValue
         namespaceSelector:
           matchExpressions:
           - key: keyValue
@@ -115,6 +123,10 @@ spec:
               - valuesValue
             matchLabels:
               matchLabelsKey: matchLabelsValue
+          matchLabelKeys:
+          - matchLabelKeysValue
+          mismatchLabelKeys:
+          - mismatchLabelKeysValue
           namespaceSelector:
             matchExpressions:
             - key: keyValue
@@ -136,6 +148,10 @@ spec:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+        matchLabelKeys:
+        - matchLabelKeysValue
+        mismatchLabelKeys:
+        - mismatchLabelKeysValue
         namespaceSelector:
           matchExpressions:
           - key: keyValue

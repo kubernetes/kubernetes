@@ -5689,6 +5689,8 @@ func autoConvert_v1_PodAffinityTerm_To_core_PodAffinityTerm(in *v1.PodAffinityTe
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
+	out.MismatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MismatchLabelKeys))
 	return nil
 }
 
@@ -5702,6 +5704,8 @@ func autoConvert_core_PodAffinityTerm_To_v1_PodAffinityTerm(in *core.PodAffinity
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
+	out.MismatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MismatchLabelKeys))
 	return nil
 }
 
