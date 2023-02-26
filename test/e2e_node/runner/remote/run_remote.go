@@ -222,6 +222,10 @@ func main() {
 		return
 	}
 
+	// Append some default ginkgo flags. We use similar defaults here as hack/ginkgo-e2e.sh
+	allGinkgoFlags := fmt.Sprintf("%s --no-color -v", *ginkgoFlags)
+	fmt.Printf("Will use ginkgo flags as: %s", allGinkgoFlags)
+
 	var gceImages *internalImageConfig
 	if *mode == "gce" {
 		if *hosts == "" && *imageConfigFile == "" && *images == "" {
@@ -260,8 +264,9 @@ func main() {
 			imageConfig := gceImages.images[shortName]
 			fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
 			running++
+
 			go func(image *internalGCEImage, junitFileName string) {
-				results <- testImage(image, junitFileName)
+				results <- testImage(image, junitFileName, allGinkgoFlags)
 			}(&imageConfig, shortName)
 		}
 	}
@@ -270,7 +275,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFileName string) {
-				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
+				results <- testHost(host, *cleanup, "", junitFileName, allGinkgoFlags)
 			}(host, host)
 		}
 	}
@@ -532,18 +537,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult {
-	ginkgoFlagsStr := *ginkgoFlags
-	// Check whether the test is for benchmark.
-	if len(imageConfig.tests) > 0 {
-		// Benchmark needs machine type non-empty.
-		if imageConfig.machine == "" {
-			imageConfig.machine = defaultMachine
-		}
-		// Use the Ginkgo focus in benchmark config.
-		ginkgoFlagsStr += (" " + testsToGinkgoFocus(imageConfig.tests))
-	}
-
+func testImage(imageConfig *internalGCEImage, junitFileName string, ginkgoFlagsStr string) *TestResult {
 	host, err := createInstance(imageConfig)
 	if *deleteInstances {
 		defer deleteInstance(host)
