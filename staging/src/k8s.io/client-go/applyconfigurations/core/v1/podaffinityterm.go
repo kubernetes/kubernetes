@@ -29,6 +29,8 @@ type PodAffinityTermApplyConfiguration struct {
 	Namespaces        []string                            `json:"namespaces,omitempty"`
 	TopologyKey       *string                             `json:"topologyKey,omitempty"`
 	NamespaceSelector *v1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
+	MatchLabelKeys    []string                            `json:"matchLabelKeys,omitempty"`
+	MismatchLabelKeys []string                            `json:"mismatchLabelKeys,omitempty"`
 }
 
 // PodAffinityTermApplyConfiguration constructs an declarative configuration of the PodAffinityTerm type for use with
@@ -68,5 +70,25 @@ func (b *PodAffinityTermApplyConfiguration) WithTopologyKey(value string) *PodAf
 // If called multiple times, the NamespaceSelector field is set to the value of the last call.
 func (b *PodAffinityTermApplyConfiguration) WithNamespaceSelector(value *v1.LabelSelectorApplyConfiguration) *PodAffinityTermApplyConfiguration {
 	b.NamespaceSelector = value
+	return b
+}
+
+// WithMatchLabelKeys adds the given value to the MatchLabelKeys field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MatchLabelKeys field.
+func (b *PodAffinityTermApplyConfiguration) WithMatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
+	for i := range values {
+		b.MatchLabelKeys = append(b.MatchLabelKeys, values[i])
+	}
+	return b
+}
+
+// WithMismatchLabelKeys adds the given value to the MismatchLabelKeys field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MismatchLabelKeys field.
+func (b *PodAffinityTermApplyConfiguration) WithMismatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
+	for i := range values {
+		b.MismatchLabelKeys = append(b.MismatchLabelKeys, values[i])
+	}
 	return b
 }
