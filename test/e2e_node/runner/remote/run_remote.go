@@ -223,7 +223,8 @@ func main() {
 	}
 
 	// Append some default ginkgo flags. We use similar defaults here as hack/ginkgo-e2e.sh
-	allGinkgoFlags := fmt.Sprintf("%s --no-color -v --poll-progress-after=300s --poll-progress-interval=20s", *ginkgoFlags)
+	// Note, to provide line numbers in progress reports with --poll-progress.*, --source--root pointing to k8s source is also required and added later.
+	allGinkgoFlags := fmt.Sprintf("%s --no-color -v --poll-progress-after=300s --poll-progress-interval=60s", *ginkgoFlags)
 	fmt.Printf("Will use ginkgo flags as: %s", allGinkgoFlags)
 
 	var gceImages *internalImageConfig

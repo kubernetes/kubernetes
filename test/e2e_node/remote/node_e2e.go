@@ -72,6 +72,19 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		}
 	}
 
+	// Copy the k8s source. We use this for the gingko --source--root feature which provides progress reports if the test gets stuck.
+	// To provide line numbers in the progress report it needs to the source. We use git archive to export the k8s srcs into the tar directory, which will be uploaded to the node.
+	k8sTarDestinationSourcePath := filepath.Join(tardir, "k8s_source_root")
+	err = os.Mkdir(k8sTarDestinationSourcePath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to create k8s source root directory %q: %w", tardir, err)
+	}
+	cmd := fmt.Sprintf("git -C %s archive --format=tar HEAD | tar -x -C %s", rootDir, k8sTarDestinationSourcePath)
+	out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to build git archive tar %v. Output:\n%s", err, out)
+	}
+
 	if systemSpecName != "" {
 		// Copy system spec file
 		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
@@ -198,13 +211,15 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 
 	outputGinkgoFile := filepath.Join(results, fmt.Sprintf("%s-ginkgo.log", host))
 
+	ginkgoSourceRootArgument := fmt.Sprintf("--source-root %s", filepath.Join(workspace, "k8s_source_root"))
+
 	// Run the tests
 	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
 		// Note, we need to have set -o pipefail here to ensure we return the appriorate exit code from ginkgo; not tee
-		fmt.Sprintf("set -o pipefail; timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --runtime-config=%s --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s 2>&1 | tee -i %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, runtimeConfig, host, results, junitFilePrefix, imageDesc, testArgs, outputGinkgoFile),
+		fmt.Sprintf("set -o pipefail; timeout -k 30s %fs ./ginkgo %s %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --runtime-config=%s --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s 2>&1 | tee -i %s",
+			timeout.Seconds(), ginkgoSourceRootArgument, ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, runtimeConfig, host, results, junitFilePrefix, imageDesc, testArgs, outputGinkgoFile),
 	)
 	return SSH(host, "/bin/bash", "-c", cmd)
 }
