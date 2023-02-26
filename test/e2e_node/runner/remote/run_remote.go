@@ -166,8 +166,6 @@ type GCEImage struct {
 	Metadata        string    `json:"metadata"`
 	Machine         string    `json:"machine,omitempty"`
 	Resources       Resources `json:"resources,omitempty"`
-	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
-	Tests []string `json:"tests,omitempty"`
 }
 
 type internalImageConfig struct {
@@ -185,7 +183,6 @@ type internalGCEImage struct {
 	resources       Resources
 	metadata        *compute.Metadata
 	machine         string
-	tests           []string
 }
 
 func main() {
@@ -359,7 +356,6 @@ func prepareGceImages() (*internalImageConfig, error) {
 				metadata:        getImageMetadata(metadata),
 				kernelArguments: imageConfig.KernelArguments,
 				machine:         imageConfig.Machine,
-				tests:           imageConfig.Tests,
 				resources:       imageConfig.Resources,
 			}
 			if gceImage.imageDesc == "" {
@@ -962,17 +958,4 @@ func machineType(machine string) string {
 		machine = defaultMachine
 	}
 	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
-}
-
-// testsToGinkgoFocus converts the test string list to Ginkgo focus
-func testsToGinkgoFocus(tests []string) string {
-	focus := "--focus=\""
-	for i, test := range tests {
-		if i == 0 {
-			focus += test
-		} else {
-			focus += ("|" + test)
-		}
-	}
-	return focus + "\""
 }
