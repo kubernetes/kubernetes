@@ -360,7 +360,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			dp := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: sampleDevicePluginName,
+					Name: SampleDevicePluginName,
 				},
 				Spec: ds.Spec.Template.Spec,
 			}
@@ -384,7 +384,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
-				return ready && numberOfSampleResources(node) > 0
+				return ready && CountSampleDeviceCapacity(node) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 
@@ -394,8 +394,8 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
 				return ready &&
-					numberOfDevicesCapacity(node, resourceName) == devsLen &&
-					numberOfDevicesAllocatable(node, resourceName) == devsLen
+					CountSampleDeviceCapacity(node) == devsLen &&
+					CountSampleDeviceAllocatable(node) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 		})
 
@@ -403,9 +403,9 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			var err error
 			podCMD := "while true; do sleep 1000; done;"
 
-			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, resourceName))
+			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, SampleDeviceResourceName))
 
-			pod := makeBusyboxDeviceRequiringPod(resourceName, podCMD)
+			pod := makeBusyboxDeviceRequiringPod(SampleDeviceResourceName, podCMD)
 			testPod := f.PodClient().CreateSync(pod)
 
 			ginkgo.By("making sure all the pods are ready")
@@ -462,8 +462,8 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
 				return ready &&
-					numberOfDevicesCapacity(node, resourceName) == devsLen &&
-					numberOfDevicesAllocatable(node, resourceName) == devsLen
+					CountSampleDeviceCapacity(node) == int64(0) &&
+					CountSampleDeviceAllocatable(node) == int64(0)
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Checking that pod requesting devices failed to start because of admission error")
@@ -500,7 +500,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
-				return ready && numberOfSampleResources(node) <= 0
+				return ready && CountSampleDeviceCapacity(node) <= 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 		})
 
