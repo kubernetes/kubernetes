@@ -22,7 +22,7 @@ rules:
       dir: staging/src/k8s.io/code-generator
   - name: release-1.26
     go: 1.19.6
-    source: 
+    source:
       branch: release-1.26
       dir: staging/src/k8s.io/code-generator
 - destination: apimachinery
@@ -48,7 +48,7 @@ rules:
       dir: staging/src/k8s.io/apimachinery
   - name: release-1.26
     go: 1.19.6
-    source: 
+    source:
       branch: release-1.26
       dir: staging/src/k8s.io/apimachinery
   library: true
@@ -299,8 +299,6 @@ rules:
       dir: staging/src/k8s.io/kms
     dependencies:
     - repository: apimachinery
-      branch: master
-    - repository: api
       branch: master
     - repository: client-go
       branch: master
