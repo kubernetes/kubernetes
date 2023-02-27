@@ -25,6 +25,7 @@ import (
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -55,7 +56,7 @@ func NewStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Du
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -71,8 +72,11 @@ func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod
 			},
 		},
 		&apiserverinternalv1alpha1.StorageVersion{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod:         resyncPeriod,
+			Indexers:             indexers,
+			GroupVersionResource: schema.GroupVersionResource{Group: "internal.apiserver.k8s.io", Version: "v1alpha1", Resource: "storageversions"},
+		},
 	)
 }
 

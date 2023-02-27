@@ -48,6 +48,17 @@ func (f *genericInformer) Lister() cache.GenericLister {
 	return cache.NewGenericLister(f.Informer().GetIndexer(), f.resource)
 }
 
+// ExistingInformerForResource gives generic access to a shared informer of the matching type if it already exists.
+func (f *sharedInformerFactory) ExistingInformerForResource(resource schema.GroupVersionResource) (GenericInformer, bool, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	informer, exists := f.gvrToInformer[resource]
+	if !exists {
+		return nil, false, nil
+	}
+	return &genericInformer{resource: resource.GroupResource(), informer: informer}, true, nil
+}
+
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {

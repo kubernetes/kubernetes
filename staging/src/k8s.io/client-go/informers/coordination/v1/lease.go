@@ -25,6 +25,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -56,7 +57,7 @@ func NewLeaseInformer(client kubernetes.Interface, namespace string, resyncPerio
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -72,8 +73,11 @@ func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, res
 			},
 		},
 		&coordinationv1.Lease{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod:         resyncPeriod,
+			Indexers:             indexers,
+			GroupVersionResource: schema.GroupVersionResource{Group: "coordination.k8s.io", Version: "v1", Resource: "leases"},
+		},
 	)
 }
 

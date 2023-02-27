@@ -192,7 +192,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					internalVersionOutputDir, internalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
+					genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
 					args.InternalClientSetPackage, args.ListersPackage))
 		} else {
 			targetList = append(targetList,
@@ -200,7 +200,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					externalVersionOutputDir, externalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
+					genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
 					args.VersionedClientSetPackage, args.ListersPackage))
 		}
 	}
