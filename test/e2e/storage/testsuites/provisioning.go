@@ -407,6 +407,11 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 	})
 
 	ginkgo.It("should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
+		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("Test is not valid Windows - skipping")
+		}
+
 		if pattern.VolMode == "Block" {
 			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
 		}
