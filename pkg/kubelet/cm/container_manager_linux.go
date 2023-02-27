@@ -289,20 +289,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		qosContainerManager: qosContainerManager,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		cm.topologyManager, err = topologymanager.NewManager(
-			machineInfo.Topology,
-			nodeConfig.ExperimentalTopologyManagerPolicy,
-			nodeConfig.ExperimentalTopologyManagerScope,
-			nodeConfig.ExperimentalTopologyManagerPolicyOptions,
-		)
+	cm.topologyManager, err = topologymanager.NewManager(
+		machineInfo.Topology,
+		nodeConfig.ExperimentalTopologyManagerPolicy,
+		nodeConfig.ExperimentalTopologyManagerScope,
+		nodeConfig.ExperimentalTopologyManagerPolicyOptions,
+	)
 
-		if err != nil {
-			return nil, err
-		}
-
-	} else {
-		cm.topologyManager = topologymanager.NewFakeManager()
+	if err != nil {
+		return nil, err
 	}
 
 	klog.InfoS("Creating device plugin manager")
