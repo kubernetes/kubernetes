@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -274,6 +275,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
 		objectDescription:               options.ObjectDescription,
+		groupVersionResource:            options.GroupVersionResource,
 		resyncCheckPeriod:               options.ResyncPeriod,
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
@@ -293,6 +295,10 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// GroupVersionResource is the group/version/resource to return from the informer's GroupVersionResource() method.
+	// If empty, this informer will not be able to report the group/version/resource it watches.
+	GroupVersionResource schema.GroupVersionResource
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -370,6 +376,10 @@ type sharedIndexInformer struct {
 
 	// objectDescription is the description of this informer's objects. This typically defaults to
 	objectDescription string
+
+	// GroupVersionResource is the group/version/resource to return from the informer's GroupVersionResource() method.
+	// If empty, this informer will not be able to report the group/version/resource it watches.
+	groupVersionResource schema.GroupVersionResource
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
 	// shouldResync to check if any of our listeners need a resync.
@@ -532,6 +542,12 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 		return ""
 	}
 	return s.controller.LastSyncResourceVersion()
+}
+
+// GroupVersionResource returns the group/version/resource watched by this informer, if known.
+// The returned value may be empty if unknown.
+func (s *sharedIndexInformer) GroupVersionResource() schema.GroupVersionResource {
+	return s.groupVersionResource
 }
 
 func (s *sharedIndexInformer) GetStore() Store {

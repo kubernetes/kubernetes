@@ -192,6 +192,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					internalVersionOutputDir, internalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
+					genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
 					args.InternalClientSetPackage, args.ListersPackage))
 		} else {
 			targetList = append(targetList,
@@ -199,6 +200,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					externalVersionOutputDir, externalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
+					genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
 					args.VersionedClientSetPackage, args.ListersPackage))
 		}
 	}
@@ -326,7 +328,7 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 	}
 }
 
-func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Target {
+func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, pluralExceptions map[string]string, clientSetPackage, listersPackage string) generator.Target {
 	subdir := []string{groupPkgName, strings.ToLower(gv.Version.NonEmpty())}
 	outputDir := filepath.Join(outputDirBase, filepath.Join(subdir...))
 	outputPkg := path.Join(outputPkgBase, path.Join(subdir...))
@@ -357,6 +359,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 					groupVersion:              gv,
 					groupGoName:               groupGoName,
 					typeToGenerate:            t,
+					pluralExceptions:          pluralExceptions,
 					imports:                   generator.NewImportTracker(),
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
