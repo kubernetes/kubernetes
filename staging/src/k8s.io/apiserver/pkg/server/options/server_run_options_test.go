@@ -261,3 +261,52 @@ func TestValidateCorsAllowedOriginList(t *testing.T) {
 		}
 	}
 }
+
+func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
+	tests := []struct {
+		name             string
+		optionsFn        func() *ServerRunOptions
+		errShouldContain string
+	}{
+		{
+			name: "default should be valid",
+			optionsFn: func() *ServerRunOptions {
+				return NewServerRunOptions()
+			},
+		},
+		{
+			name: "negative not allowed",
+			optionsFn: func() *ServerRunOptions {
+				o := NewServerRunOptions()
+				o.ShutdownWatchTerminationGracePeriod = -time.Second
+				return o
+			},
+			errShouldContain: "shutdown-watch-termination-grace-period, if provided, can not be a negative value",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := test.optionsFn()
+			errsGot := options.Validate()
+			switch {
+			case len(test.errShouldContain) == 0:
+				if len(errsGot) != 0 {
+					t.Errorf("expected no error, but got: %v", errsGot)
+				}
+			default:
+				if len(errsGot) == 0 ||
+					!strings.Contains(utilerrors.NewAggregate(errsGot).Error(), test.errShouldContain) {
+					t.Errorf("expected error to contain: %s, but got: %v", test.errShouldContain, errsGot)
+				}
+			}
+		})
+	}
+
+	t.Run("default should be zero", func(t *testing.T) {
+		options := NewServerRunOptions()
+		if options.ShutdownWatchTerminationGracePeriod != time.Duration(0) {
+			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
+		}
+	})
+}

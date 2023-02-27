@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	gpath "path"
@@ -26,6 +27,7 @@ import (
 
 	systemd "github.com/coreos/go-systemd/v22/daemon"
 
+	"golang.org/x/time/rate"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -221,6 +223,10 @@ type GenericAPIServer struct {
 	// handlers associated with non long-running requests
 	// to complete while the server is shuting down.
 	NonLongRunningRequestWaitGroup *utilwaitgroup.SafeWaitGroup
+	// WatchRequestWaitGroup allows us to wait for all chain
+	// handlers associated with active watch requests to
+	// complete while the server is shuting down.
+	WatchRequestWaitGroup *utilwaitgroup.RateLimitedSafeWaitGroup
 
 	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
 	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
@@ -260,6 +266,23 @@ type GenericAPIServer struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
+	// is the maximum duration the apiserver will wait for all active
+	// watch request(s) to drain.
+	// Once this grace period elapses, the apiserver will no longer
+	// wait for any active watch request(s) in flight to drain, it will
+	// proceed to the next step in the graceful server shutdown process.
+	// If set to a positive value, the apiserver will keep track of the
+	// number of active watch request(s) in flight and during shutdown
+	// it will wait, at most, for the specified duration and allow these
+	// active watch requests to drain with some rate limiting in effect.
+	// The default is zero, which implies the apiserver will not keep
+	// track of active watch request(s) in flight and will not wait
+	// for them to drain, this maintains backward compatibility.
+	// This grace period is orthogonal to other grace periods, and
+	// it is not overridden by any other grace period.
+	ShutdownWatchTerminationGracePeriod time.Duration
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -447,23 +470,27 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |               NotAcceptingNewRequest (notAcceptingNewRequestCh)
 // |                                    |
 // |                                    |
-// |           |---------------------------------------------------------|
-// |           |                        |              |                 |
-// |        [without                 [with             |                 |
-// | ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
-// |           |                        |              |                 |
-// |           |                        ---------------|                 |
-// |           |                                       |                 |
-// |           |                (NonLongRunningRequestWaitGroup::Wait)   |
-// |           |                                       |                 |
-// |           |                    InFlightRequestsDrained (drainedCh)  |
-// |           |                                       |                 |
-// |           ----------------------------------------|-----------------|
-// |                                 |                 |
+// |           |----------------------------------------------------------------------------------|
+// |           |                        |              |                                          |
+// |        [without                 [with             |                                          |
+// | ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                                          |
+// |           |                        |              |                                          |
+// |           |                        ---------------|                                          |
+// |           |                                       |                                          |
+// |           |                      |----------------|-----------------------|                  |
+// |           |                      |                                        |                  |
+// |           |         (NonLongRunningRequestWaitGroup::Wait)   (WatchRequestWaitGroup::Wait)   |
+// |           |                      |                                        |                  |
+// |           |                      |------------------|---------------------|                  |
+// |           |                                         |                                        |
+// |           |                         InFlightRequestsDrained (drainedCh)                      |
+// |           |                                         |                                        |
+// |           |-------------------|---------------------|----------------------------------------|
+// |                               |                     |
 // |                       stopHttpServerCh     (AuditBackend::Shutdown())
-// |                                 |
+// |                               |
 // |                       listenerStoppedCh
-// |                                 |
+// |                               |
 // |      HTTPServerStoppedListening (httpServerStoppedListeningCh)
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
@@ -576,9 +603,11 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		<-preShutdownHooksHasStoppedCh.Signaled()
 	}()
 
+	// wait for all in-flight non-long running requests to finish
+	nonLongRunningRequestDrainedCh := make(chan struct{})
 	go func() {
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
-		defer drainedCh.Signal()
+		defer close(nonLongRunningRequestDrainedCh)
+		defer klog.V(1).Info("[graceful-termination] in-flight non long-running request(s) have drained")
 
 		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
 		<-notAcceptingNewRequestCh.Signaled()
@@ -597,6 +626,47 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// have been drained.
 		// TODO: can we consolidate these two modes of graceful termination?
 		s.NonLongRunningRequestWaitGroup.Wait()
+	}()
+
+	// wait for all in-flight watches to finish
+	activeWatchesDrainedCh := make(chan struct{})
+	go func() {
+		defer close(activeWatchesDrainedCh)
+
+		<-notAcceptingNewRequestCh.Signaled()
+		if s.ShutdownWatchTerminationGracePeriod <= time.Duration(0) {
+			klog.V(1).InfoS("[graceful-termination] not going to wait for active watch request(s) to drain")
+			return
+		}
+
+		// Wait for all active watches to finish
+		grace := s.ShutdownWatchTerminationGracePeriod
+		activeBefore, activeAfter, err := s.WatchRequestWaitGroup.Wait(func(count int) (utilwaitgroup.RateLimiter, context.Context, context.CancelFunc) {
+			qps := float64(count) / grace.Seconds()
+			// TODO: we don't want the QPS (max requests drained per second) to
+			//  get below a certain floor value, since we want the server to
+			//  drain the active watch requests as soon as possible.
+			//  For now, it's hard coded to 200, and it is subject to change
+			//  based on the result from the scale testing.
+			if qps < 200 {
+				qps = 200
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), grace)
+			// We don't expect more than one token to be consumed
+			// in a single Wait call, so setting burst to 1.
+			return rate.NewLimiter(rate.Limit(qps), 1), ctx, cancel
+		})
+		klog.V(1).InfoS("[graceful-termination] active watch request(s) have drained",
+			"duration", grace, "activeWatchesBefore", activeBefore, "activeWatchesAfter", activeAfter, "error", err)
+	}()
+
+	go func() {
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer drainedCh.Signal()
+
+		<-nonLongRunningRequestDrainedCh
+		<-activeWatchesDrainedCh
 	}()
 
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")

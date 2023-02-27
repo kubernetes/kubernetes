@@ -161,6 +161,10 @@ type Config struct {
 	// handlers associated with non long-running requests
 	// to complete while the server is shuting down.
 	NonLongRunningRequestWaitGroup *utilwaitgroup.SafeWaitGroup
+	// WatchRequestWaitGroup allows us to wait for all chain
+	// handlers associated with active watch requests to
+	// complete while the server is shuting down.
+	WatchRequestWaitGroup *utilwaitgroup.RateLimitedSafeWaitGroup
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
@@ -272,6 +276,23 @@ type Config struct {
 
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
+
+	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
+	// is the maximum duration the apiserver will wait for all active
+	// watch request(s) to drain.
+	// Once this grace period elapses, the apiserver will no longer
+	// wait for any active watch request(s) in flight to drain, it will
+	// proceed to the next step in the graceful server shutdown process.
+	// If set to a positive value, the apiserver will keep track of the
+	// number of active watch request(s) in flight and during shutdown
+	// it will wait, at most, for the specified duration and allow these
+	// active watch requests to drain with some rate limiting in effect.
+	// The default is zero, which implies the apiserver will not keep
+	// track of active watch request(s) in flight and will not wait
+	// for them to drain, this maintains backward compatibility.
+	// This grace period is orthogonal to other grace periods, and
+	// it is not overridden by any other grace period.
+	ShutdownWatchTerminationGracePeriod time.Duration
 }
 
 type RecommendedConfig struct {
@@ -371,6 +392,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		Serializer:                     codecs,
 		BuildHandlerChainFunc:          DefaultBuildHandlerChain,
 		NonLongRunningRequestWaitGroup: new(utilwaitgroup.SafeWaitGroup),
+		WatchRequestWaitGroup:          &utilwaitgroup.RateLimitedSafeWaitGroup{},
 		LegacyAPIGroupPrefixes:         sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:         sets.NewString(),
 		PostStartHooks:                 map[string]PostStartHookConfigEntry{},
@@ -408,9 +430,10 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:          lifecycleSignals,
-		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
+		LongRunningFunc:                     genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals:                    lifecycleSignals,
+		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
+		ShutdownWatchTerminationGracePeriod: time.Duration(0),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -670,16 +693,18 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		delegationTarget:               delegationTarget,
 		EquivalentResourceRegistry:     c.EquivalentResourceRegistry,
 		NonLongRunningRequestWaitGroup: c.NonLongRunningRequestWaitGroup,
+		WatchRequestWaitGroup:          c.WatchRequestWaitGroup,
 		Handler:                        apiServerHandler,
 		UnprotectedDebugSocket:         debugSocket,
 
 		listedPathProvider: apiServerHandler,
 
-		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
-		ShutdownTimeout:       c.RequestTimeout,
-		ShutdownDelayDuration: c.ShutdownDelayDuration,
-		SecureServingInfo:     c.SecureServing,
-		ExternalAddress:       c.ExternalAddress,
+		minRequestTimeout:                   time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:                     c.RequestTimeout,
+		ShutdownDelayDuration:               c.ShutdownDelayDuration,
+		ShutdownWatchTerminationGracePeriod: c.ShutdownWatchTerminationGracePeriod,
+		SecureServingInfo:                   c.SecureServing,
+		ExternalAddress:                     c.ExternalAddress,
 
 		openAPIConfig:           c.OpenAPIConfig,
 		openAPIV3Config:         c.OpenAPIV3Config,
@@ -907,6 +932,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
+	if c.ShutdownWatchTerminationGracePeriod > 0 {
+		handler = genericfilters.WithWatchTerminationDuringShutdown(handler, c.lifecycleSignals, c.WatchRequestWaitGroup)
+	}
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
