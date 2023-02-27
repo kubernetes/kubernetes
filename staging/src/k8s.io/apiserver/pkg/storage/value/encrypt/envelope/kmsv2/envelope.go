@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/value"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
@@ -107,8 +108,12 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	if transformer == nil {
 		value.RecordCacheMiss()
 
+		requestInfo := getRequestInfoFromContext(ctx)
 		uid := string(uuid.NewUUID())
-		klog.V(6).InfoS("Decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
+		klog.V(6).InfoS("decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()),
+			"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
+			"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
+
 		key, err := t.envelopeService.Decrypt(ctx, uid, &kmsservice.DecryptRequest{
 			Ciphertext:  encryptedObject.EncryptedDEK,
 			KeyID:       encryptedObject.KeyID,
@@ -151,8 +156,11 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 
+	requestInfo := getRequestInfoFromContext(ctx)
 	uid := string(uuid.NewUUID())
-	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
+	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()),
+		"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
+		"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
 	resp, err := t.envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
@@ -300,4 +308,11 @@ func ValidateKeyID(keyID string) (ErrCodeKeyID, error) {
 		return errKeyIDTooLongCode, fmt.Errorf("keyID is %d bytes, which exceeds the max size of %d", len(keyID), KeyIDMaxSize)
 	}
 	return errKeyIDOKCode, nil
+}
+
+func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestInfo {
+	if reqInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return reqInfo
+	}
+	return &genericapirequest.RequestInfo{}
 }
