@@ -361,7 +361,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			dp := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: sampleDevicePluginName,
+					Name: SampleDevicePluginName,
 				},
 				Spec: ds.Spec.Template.Spec,
 			}
@@ -403,9 +403,9 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			var err error
 			podCMD := "while true; do sleep 1000; done;"
 
-			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, resourceName))
+			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, SampleDeviceResourceName))
 
-			pod := makeBusyboxDeviceRequiringPod(resourceName, podCMD)
+			pod := makeBusyboxDeviceRequiringPod(SampleDeviceResourceName, podCMD)
 			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			ginkgo.By("making sure all the pods are ready")
@@ -646,7 +646,7 @@ func isNodeReadyWithSampleResources(ctx context.Context, f *framework.Framework)
 		return false, fmt.Errorf("Expected node to be ready=%t", ready)
 	}
 
-	if numberOfSampleResources(node) <= 0 {
+	if CountSampleDeviceCapacity(node) <= 0 {
 		return false, fmt.Errorf("Expected devices to be advertised")
 	}
 	return true, nil
@@ -679,11 +679,11 @@ func isNodeReadyWithAllocatableSampleResources(ctx context.Context, f *framework
 		return false, fmt.Errorf("Expected node to be ready=%t", ready)
 	}
 
-	if numberOfDevicesCapacity(node, resourceName) != devCount {
+	if CountSampleDeviceCapacity(node) != devCount {
 		return false, fmt.Errorf("Expected devices capacity to be: %d", devCount)
 	}
 
-	if numberOfDevicesAllocatable(node, resourceName) != devCount {
+	if CountSampleDeviceAllocatable(node) != devCount {
 		return false, fmt.Errorf("Expected devices allocatable to be: %d", devCount)
 	}
 	return true, nil
@@ -695,7 +695,7 @@ func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framewo
 		return false, fmt.Errorf("Expected node to be ready=%t", ready)
 	}
 
-	if numberOfSampleResources(node) > 0 {
+	if CountSampleDeviceCapacity(node) > 0 {
 		return false, fmt.Errorf("Expected devices to be not present")
 	}
 	return true, nil
