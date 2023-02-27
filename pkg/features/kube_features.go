@@ -757,9 +757,10 @@ const (
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
 
-	// owner: @lmdaly
+	// owner: @lmdaly, @swatisehgal (for GA graduation)
 	// alpha: v1.16
 	// beta: v1.18
+	// GA: v1.27
 	//
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
@@ -1059,7 +1060,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 
-	TopologyManager: {Default: true, PreRelease: featuregate.Beta},
+	TopologyManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.27; remove in 1.29
 
 	TopologyManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
