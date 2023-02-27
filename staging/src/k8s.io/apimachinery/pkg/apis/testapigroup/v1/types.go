@@ -131,7 +131,7 @@ type CarpSpec struct {
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// NodeSelector is a selector which must be true for the carp to fit on a node.
 	// Selector which must match a node's labels for the carp to be scheduled on that node.
-	// More info: http://kubernetes.io/docs/user-guide/node-selection/README
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 

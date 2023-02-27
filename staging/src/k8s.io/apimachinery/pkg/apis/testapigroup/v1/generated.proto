@@ -116,7 +116,7 @@ message CarpSpec {
 
   // NodeSelector is a selector which must be true for the carp to fit on a node.
   // Selector which must match a node's labels for the carp to be scheduled on that node.
-  // More info: http://kubernetes.io/docs/user-guide/node-selection/README
+  // More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
   // +optional
   map<string, string> nodeSelector = 7;
 

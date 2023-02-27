@@ -91,7 +91,7 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
-// https://kubernetes.io/docs/user-guide/kubeconfig-file/.
+// https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig.
 func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
@@ -243,7 +243,6 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	default:
 		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
 	}
-
 }
 
 // TODO: need to finish the method to get the rules when using webhook mode

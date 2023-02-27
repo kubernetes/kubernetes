@@ -52,12 +52,12 @@ message Pod {
 message PodCondition {
   // Type is the type of the condition.
   // Currently only Ready.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
   optional string type = 1;
 
   // Status is the status of the condition.
   // Can be True, False, Unknown.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
   optional string status = 2;
 
   // Last time we probed the condition.
@@ -85,7 +85,7 @@ message PodList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
-  // More info: http://kubernetes.io/docs/user-guide/pods
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/
   repeated Pod items = 2;
 }
 
@@ -94,7 +94,7 @@ message PodSpec {
   // Restart policy for all containers within the pod.
   // One of Always, OnFailure, Never.
   // Default to Always.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
   // +optional
   optional string restartPolicy = 3;
 
@@ -116,7 +116,7 @@ message PodSpec {
 
   // NodeSelector is a selector which must be true for the pod to fit on a node.
   // Selector which must match a node's labels for the pod to be scheduled on that node.
-  // More info: http://kubernetes.io/docs/user-guide/node-selection/README
+  // More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
   // +optional
   map<string, string> nodeSelector = 7;
 
@@ -176,12 +176,12 @@ message PodSpec {
 // state of a system.
 message PodStatus {
   // Current condition of the pod.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
   // +optional
   optional string phase = 1;
 
   // Current service state of pod.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
   // +optional
   repeated PodCondition conditions = 2;
 

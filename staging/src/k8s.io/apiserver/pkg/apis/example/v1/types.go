@@ -55,11 +55,11 @@ type Pod struct {
 // state of a system.
 type PodStatus struct {
 	// Current condition of the pod.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
 	// +optional
 	Phase PodPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PodPhase"`
 	// Current service state of pod.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 	// +optional
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 	// A human readable message indicating details about why the pod is in this condition.
@@ -87,11 +87,11 @@ type PodStatus struct {
 type PodCondition struct {
 	// Type is the type of the condition.
 	// Currently only Ready.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time we probed the condition.
 	// +optional
@@ -112,7 +112,7 @@ type PodSpec struct {
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -131,7 +131,7 @@ type PodSpec struct {
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
-	// More info: http://kubernetes.io/docs/user-guide/node-selection/README
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
@@ -191,6 +191,6 @@ type PodList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of pods.
-	// More info: http://kubernetes.io/docs/user-guide/pods
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/
 	Items []Pod `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
