@@ -32,6 +32,15 @@ var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceNa
 	corev1.SchemeGroupVersion.WithResource("secrets"):                corev1.ResourceSecrets,
 }
 
+func NeedFullObjectForResource(resource schema.GroupVersionResource) bool {
+	switch resource.GroupResource() {
+	case schema.GroupResource{Resource: "pods"}, schema.GroupResource{Resource: "services"}, schema.GroupResource{Resource: "persistentvolumeclaims"}:
+		return true
+	default:
+		return false
+	}
+}
+
 // NewEvaluators returns the list of static evaluators that manage more than counts
 func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
 	// these evaluators have special logic

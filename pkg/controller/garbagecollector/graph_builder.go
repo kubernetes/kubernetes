@@ -168,7 +168,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			gb.graphChanges.Add(event)
 		},
 	}
-	shared, err := gb.sharedInformers.ForResource(resource)
+	shared, err := gb.sharedInformers.ForResourceMetadata(resource)
 	if err != nil {
 		klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 		return nil, nil, err

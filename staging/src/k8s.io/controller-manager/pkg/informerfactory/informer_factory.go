@@ -25,6 +25,7 @@ import (
 // InformerFactory creates informers for each group version resource.
 type InformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (informers.GenericInformer, error)
+	ForResourceMetadata(resource schema.GroupVersionResource) (informers.GenericInformer, error)
 	Start(stopCh <-chan struct{})
 }
 
@@ -39,6 +40,20 @@ func (i *informerFactory) ForResource(resource schema.GroupVersionResource) (inf
 		return i.metadataInformerFactory.ForResource(resource), nil
 	}
 	return informer, nil
+}
+
+// ForResourceMetadata returns a generic informer for specified group version resource. This method returns a metadata
+// informer if a typed informer hasn't been requested.
+func (i *informerFactory) ForResourceMetadata(resource schema.GroupVersionResource) (informers.GenericInformer, error) {
+	informer, exist, err := i.typedInformerFactory.ExistingInformerForResource(resource)
+	if err != nil {
+		return nil, err
+	}
+	if exist {
+		return informer, nil
+	}
+
+	return i.metadataInformerFactory.ForResource(resource), nil
 }
 
 func (i *informerFactory) Start(stopCh <-chan struct{}) {

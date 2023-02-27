@@ -31,10 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 )
 
 type eventType int
@@ -164,7 +166,15 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 			qm.resourceChanges.Add(event)
 		},
 	}
-	shared, err := qm.informerFactory.ForResource(resource)
+	var (
+		shared informers.GenericInformer
+		err    error
+	)
+	if core.NeedFullObjectForResource(resource) {
+		shared, err = qm.informerFactory.ForResource(resource)
+	} else {
+		shared, err = qm.informerFactory.ForResourceMetadata(resource)
+	}
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
@@ -216,7 +226,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		// check if we need to create an evaluator for this resource (if none previously registered)
 		evaluator := qm.registry.Get(resource.GroupResource())
 		if evaluator == nil {
-			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResource)
+			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResourceMetadata)
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)

@@ -27,8 +27,11 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/controller-manager/pkg/informerfactory"
 )
 
 // TestClientBuilder inherits ClientBuilder and can accept a given fake clientset.
@@ -137,11 +140,14 @@ func TestController_DiscoveryError(t *testing.T) {
 		testClientset := NewFakeClientset(testDiscovery)
 		testClientBuilder := TestClientBuilder{clientset: testClientset}
 		testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
+		metadataClient := metadata.NewForConfigOrDie(testClientBuilder.ConfigOrDie("metadata"))
+		metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, time.Duration(1))
 		ctx := ControllerContext{
 			ClientBuilder:                   testClientBuilder,
 			InformerFactory:                 testInformerFactory,
-			ObjectOrMetadataInformerFactory: testInformerFactory,
+			ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(testInformerFactory, metadataInformers),
 			InformersStarted:                make(chan struct{}),
+			ResyncPeriod:                    func() time.Duration { return time.Duration(1) },
 		}
 		for funcName, controllerInit := range controllerInitFuncMap {
 			_, _, err := controllerInit(context.TODO(), ctx)

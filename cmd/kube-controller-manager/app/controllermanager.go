@@ -414,6 +414,13 @@ var ControllersDisabledByDefault = sets.NewString(
 	"tokencleaner",
 )
 
+// GenericControllers is the set of controllers which watch all resources. Generic controllers are started
+// after others to reuse typed informers initialized by others.
+var GenericControllers = sets.NewString(
+	"resourcequota",
+	"garbagecollector",
+)
+
 const (
 	saTokenControllerName = "serviceaccount-token"
 )
@@ -582,12 +589,16 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 
 	var controllerChecks []healthz.HealthChecker
 
-	for controllerName, initFn := range controllers {
+	startController := func(controllerName string, initFn InitFunc, generic bool) error {
 		if !controllerCtx.IsControllerEnabled(controllerName) {
 			klog.Warningf("%q is disabled", controllerName)
-			continue
+			return nil
 		}
 
+		// Only start controllers as specified
+		if (!generic && GenericControllers.Has(controllerName)) || (generic && !GenericControllers.Has(controllerName)) {
+			return nil
+		}
 		time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		klog.V(1).Infof("Starting %q", controllerName)
@@ -598,7 +609,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 		}
 		if !started {
 			klog.Warningf("Skipping %q", controllerName)
-			continue
+			return nil
 		}
 		check := controllerhealthz.NamedPingChecker(controllerName)
 		if ctrl != nil {
@@ -620,6 +631,19 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 		controllerChecks = append(controllerChecks, check)
 
 		klog.Infof("Started %q", controllerName)
+		return nil
+	}
+
+	for controllerName, initFn := range controllers {
+		if err := startController(controllerName, initFn, false); err != nil {
+			return err
+		}
+	}
+
+	for controllerName, initFn := range controllers {
+		if err := startController(controllerName, initFn, true); err != nil {
+			return err
+		}
 	}
 
 	healthzHandler.AddHealthChecker(controllerChecks...)
