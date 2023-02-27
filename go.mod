@@ -58,7 +58,7 @@ require (
 	github.com/openshift/api v0.0.0-20230208193339-068b2ae5534f
 	github.com/openshift/apiserver-library-go v0.0.0-20230120221150-cefee9e0162b
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
-	github.com/openshift/library-go v0.0.0-20230127195720-edf819b079cf
+	github.com/openshift/library-go v0.0.0-20230222090221-582055a1d5c4
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.14.0
