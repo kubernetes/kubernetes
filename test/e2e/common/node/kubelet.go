@@ -134,7 +134,7 @@ var _ = SIGDescribe("Kubelet", func() {
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func(ctx context.Context) {
 			err := podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+			framework.ExpectNoError(err, "deleting Pod")
 		})
 	})
 	ginkgo.Context("when scheduling an agnhost Pod with hostAliases", func() {

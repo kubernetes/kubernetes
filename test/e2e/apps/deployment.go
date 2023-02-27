@@ -1338,7 +1338,7 @@ func listDeploymentReplicaSets(ctx context.Context, c clientset.Interface, ns st
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(len(rsList.Items)).To(gomega.BeNumerically(">", 0))
+	gomega.Expect(rsList.Items).ToNot(gomega.BeEmpty())
 	return rsList
 }
 

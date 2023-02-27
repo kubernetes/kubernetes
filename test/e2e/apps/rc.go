@@ -369,7 +369,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 			framework.ExpectNoError(err, "failed to list ReplicationController")
-			gomega.Expect(len(rcs.Items)).To(gomega.BeNumerically(">", 0), "Expected to find a ReplicationController but none was found")
+			gomega.Expect(rcs.Items).ToNot(gomega.BeEmpty(), "Expected to find a ReplicationController but none was found")
 
 			ginkgo.By("checking that ReplicationController has expected values")
 			foundRc := false

@@ -1028,7 +1028,7 @@ func listDaemonPods(ctx context.Context, c clientset.Interface, ns string, label
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := c.CoreV1().Pods(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(len(podList.Items)).To(gomega.BeNumerically(">", 0))
+	gomega.Expect(podList.Items).ToNot(gomega.BeEmpty())
 	return podList
 }
 
@@ -1191,7 +1191,7 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 			continue
 		}
 		podHash := pod.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
-		gomega.Expect(len(podHash)).To(gomega.BeNumerically(">", 0))
+		gomega.Expect(podHash).ToNot(gomega.BeEmpty())
 		if len(hash) > 0 {
 			framework.ExpectEqual(podHash, hash, "unexpected hash for pod %s", pod.Name)
 		}
@@ -1221,7 +1221,7 @@ func listDaemonHistories(ctx context.Context, c clientset.Interface, ns string, 
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	historyList, err := c.AppsV1().ControllerRevisions(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(len(historyList.Items)).To(gomega.BeNumerically(">", 0))
+	gomega.Expect(historyList.Items).ToNot(gomega.BeEmpty())
 	return historyList
 }
 
@@ -1231,7 +1231,7 @@ func curHistory(historyList *appsv1.ControllerRevisionList, ds *appsv1.DaemonSet
 	for i := range historyList.Items {
 		history := &historyList.Items[i]
 		// Every history should have the hash label
-		gomega.Expect(len(history.Labels[appsv1.DefaultDaemonSetUniqueLabelKey])).To(gomega.BeNumerically(">", 0))
+		gomega.Expect(history.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]).ToNot(gomega.BeEmpty())
 		match, err := daemon.Match(ds, history)
 		framework.ExpectNoError(err)
 		if match {

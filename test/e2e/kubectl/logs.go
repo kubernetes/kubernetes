@@ -125,7 +125,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 			ginkgo.By("limiting log lines")
 			out := e2ekubectl.RunKubectlOrDie(ns, "logs", podName, containerName, "--tail=1")
 			framework.Logf("got output %q", out)
-			gomega.Expect(len(out)).NotTo(gomega.BeZero())
+			gomega.Expect(out).NotTo(gomega.BeEmpty())
 			framework.ExpectEqual(len(lines(out)), 1)
 
 			ginkgo.By("limiting log bytes")
@@ -191,13 +191,13 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				ginkgo.By("specified container log lines")
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", podName, "-c", "container-1")
 				framework.Logf("got output %q", out)
-				gomega.Expect(len(out)).NotTo(gomega.BeZero())
+				gomega.Expect(out).NotTo(gomega.BeEmpty())
 				framework.ExpectEqual(len(lines(out)), 10)
 
 				ginkgo.By("log all containers log lines")
 				out = e2ekubectl.RunKubectlOrDie(ns, "logs", podName, "--all-containers")
 				framework.Logf("got output %q", out)
-				gomega.Expect(len(out)).NotTo(gomega.BeZero())
+				gomega.Expect(out).NotTo(gomega.BeEmpty())
 				framework.ExpectEqual(len(lines(out)), 30)
 
 				ginkgo.By("default container logs")
