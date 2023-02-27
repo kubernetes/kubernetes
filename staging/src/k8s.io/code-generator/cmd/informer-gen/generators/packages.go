@@ -191,9 +191,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		if internal {
-			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions), customArgs.InternalClientSetPackage, customArgs.ListersPackage))
 		} else {
-			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions), customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
 		}
 	}
 
@@ -303,7 +303,7 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 	}
 }
 
-func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
+func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, pluralExceptions map[string]string, clientSetPackage, listersPackage string) generator.Package {
 	packagePath := filepath.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
 
 	return &generator.DefaultPackage{
@@ -331,6 +331,7 @@ func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.G
 					groupVersion:              gv,
 					groupGoName:               groupGoName,
 					typeToGenerate:            t,
+					pluralExceptions:          pluralExceptions,
 					imports:                   generator.NewImportTracker(),
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,

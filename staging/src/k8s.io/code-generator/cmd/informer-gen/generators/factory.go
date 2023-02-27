@@ -111,6 +111,9 @@ type sharedInformerFactory struct {
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
+	
+	gvrToInformer map[{{.schemaGroupVersionResource|raw}}]{{.cacheSharedIndexInformer|raw}}
+
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[{{.reflectType|raw}}]bool
@@ -167,6 +170,7 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 		namespace:        v1.NamespaceAll,
 		defaultResync:    defaultResync,
 		informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
+		gvrToInformer:    make(map[{{.schemaGroupVersionResource|raw}}]{{.cacheSharedIndexInformer|raw}}),
 		startedInformers: make(map[{{.reflectType|raw}}]bool),
 		customResync:     make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
 	}
@@ -234,6 +238,10 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
        return res
 }
 
+type groupVersionResourceProvider interface {
+	GroupVersionResource() {{.schemaGroupVersionResource|raw}}
+}
+
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
@@ -253,6 +261,14 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
 
   informer = newFunc(f.client, resyncPeriod)
   f.informers[informerType] = informer
+
+  if gvrProvider, isProvider := informer.(groupVersionResourceProvider); isProvider {
+    if gvr := gvrProvider.GroupVersionResource(); len(gvr.Version) > 0 && len(gvr.Resource) > 0 {
+      if _, exists := f.gvrToInformer[gvr]; !exists {
+        f.gvrToInformer[gvr]=informer
+      }
+    }
+  }
 
   return informer
 }
@@ -309,6 +325,9 @@ type SharedInformerFactory interface {
 
 	// ForResource gives generic access to a shared informer of the matching type.
 	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
+
+	// ExistingInformerForResource gives generic access to a shared informer of the matching type if the informer already existed.
+	ExistingInformerForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, bool, error)
 
 	// InternalInformerFor returns the SharedIndexInformer for obj using an internal
 	// client.

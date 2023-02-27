@@ -75,6 +75,14 @@ func (gv GroupVersion) ToAPIVersion() string {
 	}
 }
 
+func (gv GroupVersion) ToAPIGroup() string {
+	if len(gv.Group) > 0 && gv.Group.NonEmpty() != "core" {
+		return gv.Group.String()
+	} else {
+		return ""
+	}
+}
+
 type GroupVersions struct {
 	// The name of the package for this group, e.g. apps.
 	PackageName string
