@@ -27,7 +27,7 @@ const (
 	unixProtocol = "unix"
 )
 
-// Parse the endpoint to extract schema, host or path.
+// ParseEndpoint parses the endpoint to extract schema, host or path.
 func ParseEndpoint(endpoint string) (string, error) {
 	if len(endpoint) == 0 {
 		return "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
