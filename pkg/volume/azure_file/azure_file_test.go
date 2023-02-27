@@ -86,6 +86,7 @@ func TestGetAccessModes(t *testing.T) {
 
 func getAzureTestCloud(t *testing.T) *azure.Cloud {
 	config := `{
+                "tenantId": "--tenant-id--",
                 "aadClientId": "--aad-client-id--",
                 "aadClientSecret": "--aad-client-secret--"
         }`

@@ -50,26 +50,6 @@ var (
 	}
 )
 
-func TestGetServicePrincipalToken(t *testing.T) {
-	config := &AzureAuthConfig{
-		TenantID:        "TenantID",
-		AADClientID:     "AADClientID",
-		AADClientSecret: "AADClientSecret",
-	}
-	env := &azure.PublicCloud
-
-	token, err := GetServicePrincipalToken(config, env)
-	assert.NoError(t, err)
-
-	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, config.TenantID, nil)
-	assert.NoError(t, err)
-
-	spt, err := adal.NewServicePrincipalToken(*oauthConfig, config.AADClientID, config.AADClientSecret, env.ServiceManagementEndpoint)
-	assert.NoError(t, err)
-
-	assert.Equal(t, token, spt)
-}
-
 func TestGetMultiTenantServicePrincipalToken(t *testing.T) {
 	config := &AzureAuthConfig{
 		TenantID:                      "TenantID",

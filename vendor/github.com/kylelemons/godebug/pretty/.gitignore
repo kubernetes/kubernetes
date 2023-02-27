@@ -1,0 +1,5 @@
+*.test
+*.bench
+*.golden
+*.txt
+*.prof

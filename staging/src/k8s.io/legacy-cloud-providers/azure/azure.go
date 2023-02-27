@@ -28,9 +28,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/jongio/azidext/go/azidext"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -400,7 +402,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		return err
 	}
 
-	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
+	credential, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
 	if err == auth.ErrorNoAuth {
 		// Only controller-manager would lazy-initialize from secret, and credentials are required for such case.
 		if fromSecret {
@@ -487,7 +489,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 
 	// No credentials provided, InstanceMetadataService would be used for getting Azure resources.
 	// Note that this only applies to Kubelet, controller-manager should configure credentials for managing Azure resources.
-	if servicePrincipalToken == nil {
+	if credential == nil {
 		return nil
 	}
 
@@ -505,7 +507,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		}
 	}
 
-	az.configAzureClients(servicePrincipalToken, multiTenantServicePrincipalToken, networkResourceServicePrincipalToken)
+	az.configAzureClients(credential, multiTenantServicePrincipalToken, networkResourceServicePrincipalToken)
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
@@ -552,10 +554,10 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 }
 
 func (az *Cloud) configAzureClients(
-	servicePrincipalToken *adal.ServicePrincipalToken,
+	credential azcore.TokenCredential,
 	multiTenantServicePrincipalToken *adal.MultiTenantServicePrincipalToken,
 	networkResourceServicePrincipalToken *adal.ServicePrincipalToken) {
-	azClientConfig := az.getAzureClientConfig(servicePrincipalToken)
+	azClientConfig := az.getAzureClientConfig(credential)
 
 	// Prepare AzureClientConfig for all azure clients
 	interfaceClientConfig := azClientConfig.WithRateLimiter(az.Config.InterfaceRateLimit)
@@ -622,13 +624,19 @@ func (az *Cloud) configAzureClients(
 	az.FileClient = fileclient.New(fileClientConfig)
 }
 
-func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {
+func (az *Cloud) getAzureClientConfig(credential azcore.TokenCredential) *azclients.ClientConfig {
+	scope := az.Environment.TokenAudience
+	if !strings.HasSuffix(scope, "/.default") {
+		scope += "/.default"
+	}
+	authorizer := azidext.NewTokenCredentialAdapter(credential, []string{scope})
+
 	azClientConfig := &azclients.ClientConfig{
 		CloudName:               az.Config.Cloud,
 		Location:                az.Config.Location,
 		SubscriptionID:          az.Config.SubscriptionID,
 		ResourceManagerEndpoint: az.Environment.ResourceManagerEndpoint,
-		Authorizer:              autorest.NewBearerAuthorizer(servicePrincipalToken),
+		Authorizer:              authorizer,
 		Backoff:                 &retry.Backoff{Steps: 1},
 	}
 

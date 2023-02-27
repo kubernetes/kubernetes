@@ -1,0 +1,56 @@
+{
+    "Account": {
+      "uid.utid-login.windows.net-contoso": {
+        "username": "John Doe",
+        "local_account_id": "object1234",
+        "realm": "contoso",
+        "environment": "login.windows.net",
+        "home_account_id": "uid.utid",
+        "authority_type": "MSSTS"
+      }
+    },
+    "RefreshToken": {
+      "uid.utid-login.windows.net-refreshtoken-my_client_id--s2 s1 s3": {
+        "target": "s2 s1 s3",
+        "environment": "login.windows.net",
+        "credential_type": "RefreshToken",
+        "secret": "a refresh token",
+        "client_id": "my_client_id",
+        "home_account_id": "uid.utid"
+      }
+    },
+    "AccessToken": {
+      "an-entry": {
+        "foo": "bar"
+      },
+      "uid.utid-login.windows.net-accesstoken-my_client_id-contoso-s2 s1 s3": {
+        "environment": "login.windows.net",
+        "credential_type": "AccessToken",
+        "secret": "an access token",
+        "realm": "contoso",
+        "target": "s2 s1 s3",
+        "client_id": "my_client_id",
+        "cached_at": "1000",
+        "home_account_id": "uid.utid",
+        "extended_expires_on": "4600",
+        "expires_on": "4600"
+      }
+    },
+    "IdToken": {
+      "uid.utid-login.windows.net-idtoken-my_client_id-contoso-": {
+        "realm": "contoso",
+        "environment": "login.windows.net",
+        "credential_type": "IdToken",
+        "secret": "header.eyJvaWQiOiAib2JqZWN0MTIzNCIsICJwcmVmZXJyZWRfdXNlcm5hbWUiOiAiSm9obiBEb2UiLCAic3ViIjogInN1YiJ9.signature",
+        "client_id": "my_client_id",
+        "home_account_id": "uid.utid"
+      }
+    },
+    "unknownEntity": {"field1":"1","field2":"whats"},
+    "AppMetadata": {
+      "AppMetadata-login.windows.net-my_client_id": {
+        "environment": "login.windows.net",
+        "client_id": "my_client_id"
+      }
+    }
+  }

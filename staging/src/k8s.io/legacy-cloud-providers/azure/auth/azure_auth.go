@@ -23,6 +23,9 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"golang.org/x/crypto/pkcs12"
@@ -82,7 +85,7 @@ type AzureAuthConfig struct {
 // If NetworkResourceTenantID and NetworkResourceSubscriptionID are specified to have different values than TenantID and SubscriptionID, network resources are deployed in different AAD Tenant and Subscription than those for the cluster,
 // than only azure clients except VM/VMSS and network resource ones use this method to fetch Token.
 // For tokens for VM/VMSS and network resource ones, please check GetMultiTenantServicePrincipalToken and GetNetworkResourceServicePrincipalToken.
-func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
+func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (azcore.TokenCredential, error) {
 	var tenantID string
 	if strings.EqualFold(config.IdentitySystem, ADFSIdentitySystem) {
 		tenantID = ADFSIdentitySystem
@@ -90,36 +93,32 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 		tenantID = config.TenantID
 	}
 
+	clientOptions := azcore.ClientOptions{
+		Cloud: getCloudConfig(env),
+	}
+
 	if config.UseManagedIdentityExtension {
 		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
-		msiEndpoint, err := adal.GetMSIVMEndpoint()
-		if err != nil {
-			return nil, fmt.Errorf("Getting the managed service identity endpoint: %v", err)
+		opts := azidentity.ManagedIdentityCredentialOptions{
+			ClientOptions: clientOptions,
 		}
 		if len(config.UserAssignedIdentityID) > 0 {
 			klog.V(4).Info("azure: using User Assigned MSI ID to retrieve access token")
-			return adal.NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint,
-				env.ServiceManagementEndpoint,
-				config.UserAssignedIdentityID)
+			opts.ID = azidentity.ClientID(config.UserAssignedIdentityID)
+			return azidentity.NewManagedIdentityCredential(&opts)
 		}
 		klog.V(4).Info("azure: using System Assigned MSI to retrieve access token")
-		return adal.NewServicePrincipalTokenFromMSI(
-			msiEndpoint,
-			env.ServiceManagementEndpoint)
-	}
-
-	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, tenantID, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating the OAuth config: %v", err)
+		return azidentity.NewManagedIdentityCredential(&opts)
 	}
 
 	if len(config.AADClientSecret) > 0 {
 		klog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token")
-		return adal.NewServicePrincipalToken(
-			*oauthConfig,
+		return azidentity.NewClientSecretCredential(
+			tenantID,
 			config.AADClientID,
 			config.AADClientSecret,
-			env.ServiceManagementEndpoint)
+			&azidentity.ClientSecretCredentialOptions{ClientOptions: clientOptions},
+		)
 	}
 
 	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
@@ -128,16 +127,17 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", config.AADClientCertPath, err)
 		}
-		certificate, privateKey, err := decodePkcs12(certData, config.AADClientCertPassword)
+		certificate, privateKey, err := azidentity.ParseCertificates(certData, []byte(config.AADClientCertPassword))
 		if err != nil {
 			return nil, fmt.Errorf("decoding the client certificate: %v", err)
 		}
-		return adal.NewServicePrincipalTokenFromCertificate(
-			*oauthConfig,
+		return azidentity.NewClientCertificateCredential(
+			tenantID,
 			config.AADClientID,
 			certificate,
 			privateKey,
-			env.ServiceManagementEndpoint)
+			&azidentity.ClientCertificateCredentialOptions{ClientOptions: clientOptions},
+		)
 	}
 
 	return nil, ErrorNoAuth
@@ -287,4 +287,28 @@ func (config *AzureAuthConfig) checkConfigWhenNetworkResourceInDifferentTenant()
 	}
 
 	return nil
+}
+
+// getCloudConfig returns a cloud configuration to be used with the new azidentity auth library
+func getCloudConfig(env *azure.Environment) cloud.Configuration {
+	var config cloud.Configuration
+	switch env.Name {
+	case azure.ChinaCloud.Name:
+		config = cloud.AzureChina
+	case azure.USGovernmentCloud.Name:
+		config = cloud.AzureGovernment
+	case azure.PublicCloud.Name:
+		config = cloud.AzurePublic
+	default:
+		config = cloud.Configuration{
+			ActiveDirectoryAuthorityHost: env.ActiveDirectoryEndpoint,
+			Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+				cloud.ResourceManager: {
+					Audience: env.TokenAudience,
+					Endpoint: env.ResourceManagerEndpoint,
+				},
+			},
+		}
+	}
+	return config
 }

@@ -14,6 +14,32 @@ github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage
 github.com/Azure/azure-sdk-for-go/storage
 github.com/Azure/azure-sdk-for-go/version
+# github.com/Azure/azure-sdk-for-go/sdk/azcore v1.0.0
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/azcore
+github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/exported
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/log
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/async
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/body
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/loc
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/op
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/shared
+github.com/Azure/azure-sdk-for-go/sdk/azcore/log
+github.com/Azure/azure-sdk-for-go/sdk/azcore/policy
+github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime
+github.com/Azure/azure-sdk-for-go/sdk/azcore/streaming
+# github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/azidentity
+# github.com/Azure/azure-sdk-for-go/sdk/internal v1.0.0
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/internal/diag
+github.com/Azure/azure-sdk-for-go/sdk/internal/errorinfo
+github.com/Azure/azure-sdk-for-go/sdk/internal/log
+github.com/Azure/azure-sdk-for-go/sdk/internal/temporal
+github.com/Azure/azure-sdk-for-go/sdk/internal/uuid
 # github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
@@ -37,7 +63,7 @@ github.com/Azure/go-autorest/autorest/mocks
 # github.com/Azure/go-autorest/autorest/to v0.4.0
 ## explicit; go 1.12
 github.com/Azure/go-autorest/autorest/to
-# github.com/Azure/go-autorest/autorest/validation v0.1.0
+# github.com/Azure/go-autorest/autorest/validation v0.3.1
 ## explicit; go 1.12
 github.com/Azure/go-autorest/autorest/validation
 # github.com/Azure/go-autorest/logger v0.2.1
@@ -46,6 +72,29 @@ github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 ## explicit; go 1.12
 github.com/Azure/go-autorest/tracing
+# github.com/AzureAD/microsoft-authentication-library-for-go v0.8.1
+## explicit; go 1.18
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/base
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/base/internal/storage
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/exported
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/json
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/json/types/time
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/local
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/accesstokens
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/authority
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/internal/comm
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/internal/grant
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/wstrust
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/wstrust/defs
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/options
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/shared
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/version
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/public
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
 ## explicit; go 1.13
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
@@ -434,6 +483,9 @@ github.com/ishidawataru/sctp
 # github.com/jonboulle/clockwork v0.2.2
 ## explicit; go 1.13
 github.com/jonboulle/clockwork
+# github.com/jongio/azidext/go/azidext v0.4.0
+## explicit; go 1.18
+github.com/jongio/azidext/go/azidext
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
 github.com/josharian/intern
@@ -443,6 +495,10 @@ github.com/json-iterator/go
 # github.com/karrick/godirwalk v1.17.0
 ## explicit; go 1.13
 github.com/karrick/godirwalk
+# github.com/kylelemons/godebug v1.1.0
+## explicit; go 1.11
+github.com/kylelemons/godebug/diff
+github.com/kylelemons/godebug/pretty
 # github.com/libopenstorage/openstorage v1.0.0
 ## explicit
 github.com/libopenstorage/openstorage/api
@@ -591,6 +647,9 @@ github.com/opencontainers/selinux/pkg/pwalkdir
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
+# github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4
+## explicit; go 1.14
+github.com/pkg/browser
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors

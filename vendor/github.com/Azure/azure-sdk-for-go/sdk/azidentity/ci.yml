@@ -1,0 +1,47 @@
+# NOTE: Please refer to https://aka.ms/azsdk/engsys/ci-yaml before editing this file.
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+      - hotfix/*
+      - release/*
+  paths:
+    include:
+    - sdk/azidentity/
+
+pr:
+  branches:
+    include:
+      - main
+      - feature/*
+      - hotfix/*
+      - release/*
+  paths:
+    include:
+    - sdk/azidentity/
+
+stages:
+- template: /eng/pipelines/templates/jobs/archetype-sdk-client.yml
+  parameters:
+    RunLiveTests: true
+    ServiceDirectory: 'azidentity'
+    PreSteps:
+      - pwsh: |
+          [System.Convert]::FromBase64String($env:PFX_CONTENTS) | Set-Content -Path $(Agent.TempDirectory)/test.pfx -AsByteStream
+          Set-Content -Path $(Agent.TempDirectory)/test.pem -Value $env:PEM_CONTENTS
+          [System.Convert]::FromBase64String($env:SNI_CONTENTS) | Set-Content -Path $(Agent.TempDirectory)/testsni.pfx -AsByteStream
+        env:
+          PFX_CONTENTS: $(net-identity-spcert-pfx)
+          PEM_CONTENTS: $(net-identity-spcert-pem)
+          SNI_CONTENTS: $(net-identity-spcert-sni)
+    EnvVars:
+      AZURE_IDENTITY_TEST_TENANTID: $(net-identity-tenantid)
+      AZURE_IDENTITY_TEST_USERNAME: $(net-identity-username)
+      AZURE_IDENTITY_TEST_PASSWORD: $(net-identity-password)
+      IDENTITY_SP_TENANT_ID: $(net-identity-sp-tenantid)
+      IDENTITY_SP_CLIENT_ID: $(net-identity-sp-clientid)
+      IDENTITY_SP_CLIENT_SECRET: $(net-identity-sp-clientsecret)
+      IDENTITY_SP_CERT_PEM: $(Agent.TempDirectory)/test.pem
+      IDENTITY_SP_CERT_PFX: $(Agent.TempDirectory)/test.pfx
+      IDENTITY_SP_CERT_SNI: $(Agent.TempDirectory)/testsni.pfx

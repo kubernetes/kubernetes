@@ -30,8 +30,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
-	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
 
@@ -99,11 +100,11 @@ func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider 
 }
 
 type acrProvider struct {
-	file                  *string
-	config                *auth.AzureAuthConfig
-	environment           *azure.Environment
-	servicePrincipalToken *adal.ServicePrincipalToken
-	cache                 cache.Store
+	file        *string
+	config      *auth.AzureAuthConfig
+	environment *azure.Environment
+	credential  azcore.TokenCredential
+	cache       cache.Store
 }
 
 // ParseConfig returns a parsed configuration for an Azure cloudprovider config file
@@ -171,7 +172,7 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
-	a.servicePrincipalToken, err = auth.GetServicePrincipalToken(a.config, a.environment)
+	a.credential, err = auth.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		klog.Errorf("Failed to create service principal token: %v", err)
 	}
@@ -285,22 +286,26 @@ func getLoginServer(registry containerregistry.Registry) string {
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
-	if a.servicePrincipalToken == nil {
-		token, err := auth.GetServicePrincipalToken(a.config, a.environment)
+	if a.credential == nil {
+		cred, err := auth.GetServicePrincipalToken(a.config, a.environment)
 		if err != nil {
 			klog.Errorf("Failed to create service principal token: %v", err)
 			return nil, err
 		}
-		a.servicePrincipalToken = token
-	} else {
-		// Run EnsureFresh to make sure the token is valid and does not expire
-		if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
-			klog.Errorf("Failed to ensure fresh service principal token: %v", err)
-			return nil, err
-		}
+		a.credential = cred
 	}
 
-	armAccessToken := a.servicePrincipalToken.OAuthToken()
+	scope := a.environment.ServiceManagementEndpoint
+	if !strings.HasSuffix(scope, "/.default") {
+		scope += "/.default"
+	}
+
+	token, err := a.credential.GetToken(context.TODO(), policy.TokenRequestOptions{Scopes: []string{scope}})
+	if err != nil {
+		klog.Errorf("Failed to ensure fresh service principal token: %v", err)
+		return nil, err
+	}
+	armAccessToken := token.Token
 
 	klog.V(4).Infof("discovering auth redirects for: %s", loginServer)
 	directive, err := receiveChallengeFromLoginServer(loginServer)
