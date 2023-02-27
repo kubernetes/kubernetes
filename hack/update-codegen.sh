@@ -996,7 +996,8 @@ for arg; do
         print_codegens
         exit 1
     fi
-    codegens_to_run+=("${matches[@]}")
+    # The array-syntax abomination is to accommodate older bash.
+    codegens_to_run+=("${matches[@]:+"${matches[@]}"}")
 done
 
 # If no codegens were specified, run them all.
@@ -1005,5 +1006,6 @@ if [[ "${#codegens_to_run[@]}" == 0 ]]; then
 fi
 
 for g in "${codegens_to_run[@]}"; do
-    "codegen::${g}" "${flags_to_pass[@]}"
+    # The array-syntax abomination is to accommodate older bash.
+    "codegen::${g}" "${flags_to_pass[@]:+"${flags_to_pass[@]}"}"
 done
