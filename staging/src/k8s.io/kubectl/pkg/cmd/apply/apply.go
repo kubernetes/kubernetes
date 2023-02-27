@@ -64,6 +64,7 @@ type ApplyFlags struct {
 	Selector       string
 	Prune          bool
 	PruneResources []prune.Resource
+	ApplySetRef    string
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
@@ -130,6 +131,10 @@ type ApplyOptions struct {
 	// Function run after all objects have been applied.
 	// The standard PostProcessorFn is "PrintAndPrunePostProcessor()".
 	PostProcessorFn func() error
+
+	// ApplySet tracks the set of objects that have been applied, for the purposes of pruning.
+	// See git.k8s.io/enhancements/keps/sig-cli/3659-kubectl-apply-prune
+	ApplySet *ApplySet
 }
 
 var (
@@ -223,13 +228,9 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, FieldManagerClientSideApply)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
+	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.PruneWhitelist, &flags.All, &flags.ApplySetRef)
 
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&flags.Prune, "prune", flags.Prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
-	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArrayVar(&flags.PruneAllowlist, "prune-allowlist", flags.PruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
-	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
-	cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 }
 
@@ -297,6 +298,17 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, err
 	}
 
+	var applySet *ApplySet
+	if flags.ApplySetRef != "" {
+		var applySetNs string
+		// ApplySet uses the namespace value from the flag, but not from the kubeconfig or defaults
+		if enforceNamespace {
+			applySetNs = namespace
+		}
+		if applySet, err = NewApplySet(flags.ApplySetRef, applySetNs, mapper); err != nil {
+			return nil, err
+		}
+	}
 	if flags.Prune {
 		pruneAllowlist := slice.ToSet(flags.PruneAllowlist, flags.PruneWhitelist)
 		flags.PruneResources, err = prune.ParseResources(mapper, pruneAllowlist)
@@ -342,6 +354,8 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 
 		VisitedUids:       sets.NewString(),
 		VisitedNamespaces: sets.NewString(),
+
+		ApplySet: applySet,
 	}
 
 	o.PostProcessorFn = o.PrintAndPrunePostProcessor()
@@ -371,19 +385,40 @@ func (o *ApplyOptions) Validate() error {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 
-	if o.Prune && !o.All && o.Selector == "" {
-		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+	if o.ApplySet != nil {
+		if !o.Prune {
+			return fmt.Errorf("--applyset requires --prune")
+		}
+		if err := o.ApplySet.Validate(); err != nil {
+			return err
+		}
 	}
+	if o.Prune {
+		// Do not force the recreation of an object(s) if we're pruning; this can cause
+		// undefined behavior since object UID's change.
+		if o.DeleteOptions.ForceDeletion {
+			return fmt.Errorf("--force cannot be used with --prune")
+		}
 
-	// Do not force the recreation of an object(s) if we're pruning; this can cause
-	// undefined behavior since object UID's change.
-	if o.Prune && o.DeleteOptions.ForceDeletion {
-		return fmt.Errorf("--force cannot be used with --prune")
-	}
-
-	// Currently do not support pruning objects which are server-side applied.
-	if o.Prune && o.ServerSideApply {
-		return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
+		if o.ApplySet != nil {
+			if o.All {
+				return fmt.Errorf("--all is incompatible with --applyset")
+			} else if o.Selector != "" {
+				return fmt.Errorf("--selector is incompatible with --applyset")
+			} else if len(o.PruneResources) > 0 {
+				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
+			} else {
+				// TODO: remove this once ApplySet implementation is complete
+				return fmt.Errorf("--applyset is not yet supported")
+			}
+		} else {
+			if !o.All && o.Selector == "" {
+				return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+			}
+			if o.ServerSideApply {
+				return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
+			}
+		}
 	}
 
 	return nil
@@ -955,8 +990,13 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 		}
 
 		if o.Prune {
-			p := newPruner(o)
-			return p.pruneAll(o)
+			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
+				p := newApplySetPruner(o)
+				return p.pruneAll()
+			} else {
+				p := newPruner(o)
+				return p.pruneAll(o)
+			}
 		}
 
 		return nil
