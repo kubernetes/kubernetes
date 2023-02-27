@@ -68,18 +68,10 @@ func newProber(
 	}
 }
 
-// recordContainerEvent should be used by the prober for all container related events.
-func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, eventType, reason, message string, args ...interface{}) {
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		klog.ErrorS(err, "Can't make a ref to pod and container", "pod", klog.KObj(pod), "containerName", container.Name)
-		return
-	}
-	pb.recorder.Eventf(ref, eventType, reason, message, args...)
-}
-
-// probe probes the container.
-func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+// probe probes the container and emits values on the container for probe failure or errors
+// returns a results.Result which gives the underlying result of the probe, a string containing the output from the probe
+// and an error. An error is only returned if the probe itself errors (not every results.Failure leads to an error).
+func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, string, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -89,12 +81,12 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	case startup:
 		probeSpec = container.StartupProbe
 	default:
-		return results.Failure, fmt.Errorf("unknown probe type: %q", probeType)
+		return results.Failure, "", fmt.Errorf("unknown probe type: %q", probeType)
 	}
 
 	if probeSpec == nil {
 		klog.InfoS("Probe is nil", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
-		return results.Success, nil
+		return results.Success, "", nil
 	}
 
 	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
@@ -102,20 +94,20 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		// Probe failed in one way or another.
 		if err != nil {
 			klog.V(1).ErrorS(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+			RecordContainerEvent(pb.recorder, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 		} else { // result != probe.Success
 			klog.V(1).InfoS("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+			RecordContainerEvent(pb.recorder, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 		}
-		return results.Failure, err
+		return results.Failure, output, err
 	}
 	if result == probe.Warning {
-		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
+		RecordContainerEvent(pb.recorder, pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
 		klog.V(3).InfoS("Probe succeeded with a warning", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
 	} else {
 		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 	}
-	return results.Success, nil
+	return results.Success, output, nil
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result

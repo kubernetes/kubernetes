@@ -23,10 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -207,7 +209,7 @@ func TestFailureThreshold(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		// First probe should succeed.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{probe.Success, "", nil}
 
 		for j := 0; j < 3; j++ {
 			msg := fmt.Sprintf("%d success (%d)", j+1, i)
@@ -216,7 +218,7 @@ func TestFailureThreshold(t *testing.T) {
 		}
 
 		// Prober starts failing :(
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 
 		// Next 2 probes should still be "success".
 		for j := 0; j < 2; j++ {
@@ -259,13 +261,13 @@ func TestSuccessThreshold(t *testing.T) {
 		}
 
 		// Prober flakes :(
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 		msg := fmt.Sprintf("1 failure (%d)", i)
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
 
 		// Back to success.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{probe.Success, "", nil}
 	}
 }
 
@@ -344,7 +346,7 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 		m.statusManager.SetPodStatus(w.pod, status)
 
 		// First probe should fail.
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 		msg := "first probe"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
@@ -353,7 +355,7 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 		}
 		// Set fakeExecProber to return success. However, the result will remain
 		// failure because the worker is on hold and won't probe.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{probe.Success, "", nil}
 		msg = "while on hold"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
@@ -379,7 +381,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{probe.Success, "", nil}
 	msg := "initial probe success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -387,7 +389,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -395,7 +397,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "2nd probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -406,7 +408,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 	// Exceeding FailureThreshold should cause resultRun to
 	// reset to 0 so that the probe on the restarted pod
 	// also gets FailureThreshold attempts to succeed.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "3rd probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -423,7 +425,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 
 	// Below FailureThreshold leaves probe state unchanged
 	// which is failed for startup at first.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg := "probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
@@ -431,7 +433,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "2nd probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
@@ -442,7 +444,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	// Exceeding FailureThreshold should cause resultRun to
 	// reset to 0 so that the probe on the restarted pod
 	// also gets FailureThreshold attempts to succeed.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "3rd probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -457,14 +459,14 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 	// livenessProbe fails, but is disabled
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg := "Not started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
 	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
 	// livenessProbe fails
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "Started, probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -476,19 +478,19 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 	// startupProbe fails < FailureThreshold, stays unknown
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg := "Not started, probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
 	// startupProbe succeeds
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{probe.Success, "", nil}
 	msg = "Started, probe success, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
 	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
 	// startupProbe fails, but is disabled
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -539,4 +541,87 @@ func TestGetPodLabelName(t *testing.T) {
 			t.Errorf("Expected %s, got %s", test.result, ret)
 		}
 	}
+}
+
+func TestChangeInResultToErrorIsReportedByWorker(t *testing.T) {
+	ctx := context.Background()
+
+	m := newTestManager()
+	m.prober.exec = fakeExecProber{probe.Failure, "oh no!", nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	w.lastResult = results.Success
+
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(true))
+
+	recorder := record.NewFakeRecorder(2)
+	m.recorder = recorder
+	w.recorder = recorder
+
+	_ = w.doProbe(ctx)
+
+	require.Len(t, recorder.Events, 1)
+	require.Equal(t, "Warning ContainerProbeResultFailure Liveness probe result changed to Failure: oh no!", <-recorder.Events)
+}
+
+func TestLackOfOutputIsHandledProperly(t *testing.T) {
+	ctx := context.Background()
+
+	m := newTestManager()
+	m.prober.exec = fakeExecProber{probe.Failure, "", nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	w.lastResult = results.Success
+
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(true))
+
+	recorder := record.NewFakeRecorder(2)
+	m.recorder = recorder
+	w.recorder = recorder
+
+	_ = w.doProbe(ctx)
+
+	require.Len(t, recorder.Events, 1)
+	require.Equal(t, "Warning ContainerProbeResultFailure Liveness probe result changed to Failure", <-recorder.Events)
+}
+
+func TestOutputIgnoredForChangeToSuccess(t *testing.T) {
+	ctx := context.Background()
+
+	m := newTestManager()
+	m.prober.exec = fakeExecProber{probe.Success, "foobar", nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	w.lastResult = results.Failure
+
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(true))
+
+	recorder := record.NewFakeRecorder(2)
+	m.recorder = recorder
+	w.recorder = recorder
+
+	_ = w.doProbe(ctx)
+
+	require.Len(t, recorder.Events, 1)
+	require.Equal(t, "Normal ContainerProbeResultSuccess Liveness probe result changed to Success", <-recorder.Events)
+}
+
+func TestNoEventIfResultDoesNotChange(t *testing.T) {
+	ctx := context.Background()
+
+	m := newTestManager()
+	m.prober.exec = fakeExecProber{probe.Success, "foobar", nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	w.lastResult = results.Success
+
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(true))
+
+	recorder := record.NewFakeRecorder(2)
+	m.recorder = recorder
+	w.recorder = recorder
+
+	_ = w.doProbe(ctx)
+
+	require.Len(t, recorder.Events, 0)
 }

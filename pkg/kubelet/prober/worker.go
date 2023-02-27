@@ -19,6 +19,8 @@ package prober
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"math/rand"
 	"strings"
 	"time"
@@ -63,6 +65,9 @@ type worker struct {
 	resultsManager results.Manager
 	probeManager   *manager
 
+	// The event recorder to use for this worker
+	recorder record.EventRecorder
+
 	// The last known container ID for this worker.
 	containerID kubecontainer.ContainerID
 	// The last probe result for this worker.
@@ -87,6 +92,7 @@ type worker struct {
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
+	recorder record.EventRecorder,
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container) *worker {
@@ -98,6 +104,7 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
+		recorder:        recorder,
 	}
 
 	switch probeType {
@@ -286,7 +293,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, output, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -303,6 +310,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		ProberDuration.With(w.proberDurationUnknownMetricLabels).Observe(time.Since(startTime).Seconds())
 	}
 
+	resultChanged := w.lastResult != result
+
 	if w.lastResult == result {
 		w.resultRun++
 	} else {
@@ -314,6 +323,29 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
+	}
+
+	if resultChanged {
+		var eventType string
+		var eventReason string
+		if result == results.Success {
+			eventType = v1.EventTypeNormal
+			eventReason = events.ContainerProbeResultSuccess
+		} else {
+			eventType = v1.EventTypeWarning
+			eventReason = events.ContainerProbeResultFailure
+		}
+		RecordContainerEvent(
+			w.recorder,
+			w.pod,
+			&w.container,
+			eventType,
+			eventReason,
+			"%s probe result changed to %s%s",
+			w.probeType,
+			result,
+			getPrefixedOutputEventString(result, output),
+		)
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
@@ -348,4 +380,14 @@ func getPodLabelName(pod *v1.Pod) string {
 		}
 	}
 	return podName
+}
+
+func getPrefixedOutputEventString(result results.Result, output string) string {
+	if result == results.Success {
+		return ""
+	} else if output == "" {
+		return ""
+	} else {
+		return ": " + output
+	}
 }
