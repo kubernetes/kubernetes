@@ -159,6 +159,11 @@ func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
 }
 
+// RequiresFullObject determines if quota requires full objects to calculate the resource usage.
+func (p *serviceEvaluator) RequiresFullObject() bool {
+	return true
+}
+
 var _ quota.Evaluator = &serviceEvaluator{}
 
 // GetQuotaServiceType returns ServiceType if the service type is eligible to track against a quota, nor return ""

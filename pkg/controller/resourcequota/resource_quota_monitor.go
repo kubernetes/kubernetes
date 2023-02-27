@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
@@ -168,13 +169,24 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 			qm.resourceChanges.Add(event)
 		},
 	}
-	shared, err := qm.informerFactory.ForResource(resource)
+	var (
+		shared       informers.GenericInformer
+		err          error
+		informerType string
+	)
+	if evaluator := qm.registry.Get(resource.GroupResource()); evaluator != nil && evaluator.RequiresFullObject() {
+		shared, err = qm.informerFactory.ForResource(resource)
+		informerType = "ObjectInformer"
+	} else {
+		shared, err = qm.informerFactory.ForResourceMetadata(resource)
+		informerType = "MetadataInformer"
+	}
 	if err == nil {
-		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
+		logger.V(4).Info("QuotaMonitor using a shared informer", "informerType", informerType, "resource", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
+	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "informerType", informerType, "resource", resource.String())
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
@@ -220,7 +232,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		// check if we need to create an evaluator for this resource (if none previously registered)
 		evaluator := qm.registry.Get(resource.GroupResource())
 		if evaluator == nil {
-			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResource)
+			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResourceMetadata)
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)

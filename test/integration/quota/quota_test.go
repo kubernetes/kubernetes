@@ -36,7 +36,10 @@ import (
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -88,6 +91,9 @@ func TestQuota(t *testing.T) {
 	)
 	go rm.Run(ctx, 3)
 
+	metadataClient := metadata.NewForConfigOrDie(kubeConfig)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, controller.NoResyncPeriodFunc())
+	informerFactory := informerfactory.NewInformerFactory(informers, metadataInformers)
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
@@ -96,7 +102,7 @@ func TestQuota(t *testing.T) {
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		InformerFactory:           informers,
+		InformerFactory:           informerFactory,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      qc.IgnoredResources,
@@ -112,7 +118,7 @@ func TestQuota(t *testing.T) {
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
-	informers.Start(ctx.Done())
+	informerFactory.Start(ctx.Done())
 	close(informersStarted)
 
 	startTime := time.Now()
@@ -317,6 +323,9 @@ plugins:
 	)
 	go rm.Run(tCtx, 3)
 
+	metadataClient := metadata.NewForConfigOrDie(kubeConfig)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, controller.NoResyncPeriodFunc())
+	informerFactory := informerfactory.NewInformerFactory(informers, metadataInformers)
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
@@ -325,7 +334,7 @@ plugins:
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		InformerFactory:           informers,
+		InformerFactory:           informerFactory,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      qc.IgnoredResources,
@@ -341,7 +350,7 @@ plugins:
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
 
-	informers.Start(tCtx.Done())
+	informerFactory.Start(tCtx.Done())
 	close(informersStarted)
 
 	// try to create a pod
@@ -443,6 +452,9 @@ plugins:
 	)
 	go rm.Run(tCtx, 3)
 
+	metadataClient := metadata.NewForConfigOrDie(kubeConfig)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, controller.NoResyncPeriodFunc())
+	informerFactory := informerfactory.NewInformerFactory(informers, metadataInformers)
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
@@ -451,7 +463,7 @@ plugins:
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		InformerFactory:           informers,
+		InformerFactory:           informerFactory,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      qc.IgnoredResources,
@@ -467,7 +479,7 @@ plugins:
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
 
-	informers.Start(tCtx.Done())
+	informerFactory.Start(tCtx.Done())
 	close(informersStarted)
 
 	// now create a covering quota

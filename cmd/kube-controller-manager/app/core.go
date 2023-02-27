@@ -537,9 +537,10 @@ func startPodGarbageCollectorController(ctx context.Context, controllerContext C
 
 func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ResourceQuotaController,
-		aliases:  []string{"resourcequota"},
-		initFunc: startResourceQuotaController,
+		name:      names.ResourceQuotaController,
+		aliases:   []string{"resourcequota"},
+		initFunc:  startResourceQuotaController,
+		isGeneric: true,
 	}
 }
 
@@ -657,9 +658,10 @@ func startTTLController(ctx context.Context, controllerContext ControllerContext
 
 func newGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.GarbageCollectorController,
-		aliases:  []string{"garbagecollector"},
-		initFunc: startGarbageCollectorController,
+		name:      names.GarbageCollectorController,
+		aliases:   []string{"garbagecollector"},
+		initFunc:  startGarbageCollectorController,
+		isGeneric: true,
 	}
 }
 

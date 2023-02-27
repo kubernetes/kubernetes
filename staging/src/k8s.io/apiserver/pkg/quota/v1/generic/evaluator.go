@@ -295,6 +295,11 @@ func (o *objectCountEvaluator) UsageStats(options quota.UsageStatsOptions) (quot
 	return CalculateUsageStats(options, o.listFuncByNamespace, MatchesNoScopeFunc, o.Usage)
 }
 
+// RequiresFullObject determines if quota requires full objects to calculate the resource usage.
+func (p *objectCountEvaluator) RequiresFullObject() bool {
+	return false
+}
+
 // Verify implementation of interface at compile time.
 var _ quota.Evaluator = &objectCountEvaluator{}
 

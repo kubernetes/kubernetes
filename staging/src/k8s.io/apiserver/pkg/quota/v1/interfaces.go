@@ -62,6 +62,9 @@ type Evaluator interface {
 	Usage(item runtime.Object) (corev1.ResourceList, error)
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
+	// RequiresFullObject determines if quota requires full objects
+	// to calculate the resource usage. If false, only metadata is required.
+	RequiresFullObject() bool
 }
 
 // Configuration defines how the quota system is configured.
