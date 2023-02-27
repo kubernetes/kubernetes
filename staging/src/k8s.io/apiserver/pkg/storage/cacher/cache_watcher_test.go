@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -291,7 +292,9 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	forget := func(bool) {}
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
-		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
+		w.setBookmarkAfterResourceVersion(0)
+		return w
 	}
 
 	clock := testingclock.NewFakeClock(time.Now())
@@ -410,5 +413,181 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 		return count == 3, nil
 	}); err != nil {
 		t.Fatalf("expected forget() to be called three times, because processInterval should call Stop(): %v", err)
+	}
+}
+
+// TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived verifies if the watcher will be stopped
+// when adding an item times out and the bookmarkAfterResourceVersion hasn't been received
+func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T) {
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	count := 0
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		if drainWatcher == true {
+			t.Fatalf("didn't expect drainWatcher to be set to true")
+		}
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	initEvents := []*watchCacheEvent{
+		{Object: &v1.Pod{}},
+		{Object: &v1.Pod{}},
+	}
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
+	w.setBookmarkAfterResourceVersion(10)
+	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 0)
+	if w.add(&watchCacheEvent{Object: &v1.Pod{}}, time.NewTimer(1*time.Second)) {
+		t.Fatal("expected the add method to fail")
+	}
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 2, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called twice, first call from w.add() and then from w.Stop() called from w.processInterval(): %v", err)
+	}
+
+	if !w.stopped {
+		t.Fatal("expected the watcher to be stopped but it wasn't")
+	}
+}
+
+// TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent checks if the watcher's input
+// channel is drained if the bookmarkAfterResourceVersion was received but not sent
+func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
+	makePod := func(rv uint64) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", rv),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", rv),
+				Annotations:     map[string]string{},
+			},
+		}
+	}
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	watchInitializationSignal := utilflowcontrol.NewInitializationSignal()
+	ctx := utilflowcontrol.WithInitializationSignal(context.Background(), watchInitializationSignal)
+	count := 0
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	initEvents := []*watchCacheEvent{{Object: makePod(1)}, {Object: makePod(2)}}
+	w = newCacheWatcher(2, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
+	w.setBookmarkAfterResourceVersion(10)
+	go w.processInterval(ctx, intervalFromEvents(initEvents), 0)
+	watchInitializationSignal.Wait()
+
+	// note that we can add three events even though the chanSize is two because
+	// one event has been popped off from the input chan
+	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5}, time.NewTimer(1*time.Second)) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	if !w.add(&watchCacheEvent{Object: makePod(15), ResourceVersion: 15}, time.NewTimer(1*time.Second)) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
+		t.Fatal("expected the add method to fail")
+	}
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 1, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called once, just from the w.add() method: %v", err)
+	}
+
+	if !w.stopped {
+		t.Fatal("expected the watcher to be stopped but it wasn't")
+	}
+	verifyEvents(t, w, []watch.Event{
+		{Type: watch.Added, Object: makePod(1)},
+		{Type: watch.Added, Object: makePod(2)},
+		{Type: watch.Added, Object: makePod(5)},
+		{Type: watch.Bookmark, Object: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "10",
+				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+			},
+		}},
+		{Type: watch.Added, Object: makePod(15)},
+	}, true)
+
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 2, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called twice, the second call is from w.Stop() method called from  w.processInterval(): %v", err)
+	}
+}
+
+func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
+	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
+		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set) bool { return true }, func(bool) {}, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, id)
+		w.setBookmarkAfterResourceVersion(10)
+		return w
+	}
+
+	clock := testingclock.NewFakeClock(time.Now())
+	target := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
+	if !target.addWatcher(newWatcher("1", clock.Now().Add(2*time.Minute))) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+
+	// the watcher is immediately expired (it's waiting for bookmark, so it is scheduled immediately)
+	ret := target.popExpiredWatchers()
+	if len(ret) != 1 || len(ret[0]) != 1 {
+		t.Fatalf("expected only one watcher to be expired")
+	}
+	if !target.addWatcher(ret[0][0]) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+
+	// after one second time the watcher is still expired
+	clock.Step(1 * time.Second)
+	ret = target.popExpiredWatchers()
+	if len(ret) != 1 || len(ret[0]) != 1 {
+		t.Fatalf("expected only one watcher to be expired")
+	}
+	if !target.addWatcher(ret[0][0]) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+
+	// after 29 seconds the watcher is still expired
+	clock.Step(29 * time.Second)
+	ret = target.popExpiredWatchers()
+	if len(ret) != 1 || len(ret[0]) != 1 {
+		t.Fatalf("expected only one watcher to be expired")
+	}
+
+	// after confirming the watcher is not expired immediately
+	ret[0][0].markBookmarkAfterRvAsReceived(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{}})
+	if !target.addWatcher(ret[0][0]) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	clock.Step(30 * time.Second)
+	ret = target.popExpiredWatchers()
+	if len(ret) != 0 {
+		t.Fatalf("didn't expect any watchers to be expired")
+	}
+
+	clock.Step(30 * time.Second)
+	ret = target.popExpiredWatchers()
+	if len(ret) != 1 || len(ret[0]) != 1 {
+		t.Fatalf("expected only one watcher to be expired")
 	}
 }
