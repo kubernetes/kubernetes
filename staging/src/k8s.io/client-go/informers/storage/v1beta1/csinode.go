@@ -25,6 +25,7 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -55,7 +56,7 @@ func NewCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration,
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -71,8 +72,11 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 			},
 		},
 		&storagev1beta1.CSINode{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod:         resyncPeriod,
+			Indexers:             indexers,
+			GroupVersionResource: schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csinodes"},
+		},
 	)
 }
 
