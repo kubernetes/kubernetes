@@ -33,11 +33,18 @@ var fakeTypeConverter = func() internal.TypeConverter {
 	if err != nil {
 		panic(err)
 	}
+	convertedDefs := map[string]*spec.Schema{}
 	spec := spec.Swagger{}
 	if err := json.Unmarshal(data, &spec); err != nil {
 		panic(err)
 	}
-	typeConverter, err := internal.NewTypeConverter(&spec, false)
+
+	for k, v := range spec.Definitions {
+		vCopy := v
+		convertedDefs[k] = &vCopy
+	}
+
+	typeConverter, err := internal.NewTypeConverter(convertedDefs, false)
 	if err != nil {
 		panic(err)
 	}
