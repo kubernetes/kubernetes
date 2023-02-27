@@ -104,7 +104,8 @@ func (r *PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Leve
 		strings.HasPrefix(namespace, "openshift-") ||
 		strings.HasPrefix(namespace, "kube-") ||
 		namespace == "default") {
-		namespace = "non-platform"
+		// remove non-OpenShift platform namespace names to prevent cardinality explosion
+		namespace = ""
 	}
 
 	el := evaluationsLabels{
