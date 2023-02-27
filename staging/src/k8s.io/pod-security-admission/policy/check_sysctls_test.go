@@ -37,7 +37,7 @@ func TestSysctls(t *testing.T) {
 					Sysctls: []corev1.Sysctl{{Name: "a"}, {Name: "b"}},
 				},
 			}},
-			allowed: false,
+			allowed:      false,
 			expectReason: `forbidden sysctls`,
 			expectDetail: `a, b`,
 		},
@@ -45,10 +45,10 @@ func TestSysctls(t *testing.T) {
 			name: "new supported sysctls not supported",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				SecurityContext: &corev1.PodSecurityContext{
-					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"},},
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"}},
 				},
 			}},
-			allowed: false,
+			allowed:      false,
 			expectReason: `forbidden sysctls`,
 			expectDetail: `net.ipv4.ip_local_reserved_ports`,
 		},
@@ -91,7 +91,7 @@ func TestSysctls_1_27(t *testing.T) {
 					Sysctls: []corev1.Sysctl{{Name: "a"}, {Name: "b"}},
 				},
 			}},
-			allowed: false,
+			allowed:      false,
 			expectReason: `forbidden sysctls`,
 			expectDetail: `a, b`,
 		},
@@ -99,7 +99,7 @@ func TestSysctls_1_27(t *testing.T) {
 			name: "new supported sysctls",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				SecurityContext: &corev1.PodSecurityContext{
-					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"},},
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"}},
 				},
 			}},
 			allowed: true,
