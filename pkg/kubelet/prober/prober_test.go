@@ -333,3 +333,54 @@ func TestNewExecInContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestProbeUnknownEvent(t *testing.T) {
+	ctx := context.Background()
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
+
+	execProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{},
+		},
+	}
+
+	tests := []struct {
+		probe          *v1.Probe
+		env            []v1.EnvVar
+		execResult     probe.Result
+		expectedResult results.Result
+	}{
+		{ // Probe returns unknown
+			probe:          execProbe,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
+	}
+
+	for i, test := range tests {
+		for _, probeType := range [...]probeType{liveness, readiness, startup} {
+			prober := &prober{
+				recorder: &record.FakeRecorder{},
+				exec:     fakeExecProber{test.execResult, nil},
+			}
+			testID := fmt.Sprintf("%d-%s", i, probeType)
+			testContainer := v1.Container{Env: test.env}
+			switch probeType {
+			case liveness:
+				testContainer.LivenessProbe = test.probe
+			case readiness:
+				testContainer.ReadinessProbe = test.probe
+			case startup:
+				testContainer.StartupProbe = test.probe
+			}
+
+			result, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			if err != nil {
+				t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
+			}
+			if test.expectedResult != result {
+				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
+			}
+		}
+	}
+}
