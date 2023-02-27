@@ -459,7 +459,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for livenessProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
+	framework.ConformanceIt("should override timeoutGracePeriodSeconds when LivenessProbe field is set", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -487,7 +487,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for startupProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
+	framework.ConformanceIt("should override timeoutGracePeriodSeconds when StartupProbe field is set", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
