@@ -65,7 +65,7 @@ type CrossVersionObjectReference struct {
 	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string
 
-	// name is the name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string
 
 	// apiVersion is the API version of the referent
