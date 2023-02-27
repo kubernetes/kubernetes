@@ -32,13 +32,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +49,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	testing2 "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/csaupgrade"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -229,21 +229,13 @@ func TestApplyFlagValidation(t *testing.T) {
 			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
 			expectedErr:  "--prune-allowlist is incompatible with --applyset",
 		},
-		{
-			args: [][]string{
-				{"prune", "true"},
-				{"applyset", "foo"},
-				{"namespace", "myNs"},
-			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
-			expectedErr:  "--applyset is not yet supported",
-		},
 	}
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
+			f.Client = &fake.RESTClient{}
 			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
@@ -341,6 +333,20 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 	}
 
 	return metaAccessor.GetName(), rcBytes
+}
+
+func readService(t *testing.T, filenameSVC string) (string, []byte) {
+	svcObj := readServiceFromFile(t, filenameSVC)
+	metaAccessor, err := meta.Accessor(svcObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svcBytes, err := runtime.Encode(codec, svcObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return metaAccessor.GetName(), svcBytes
 }
 
 func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.ReplicationController {
@@ -2085,7 +2091,7 @@ func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 }
 
 func TestApplySetParentValidation(t *testing.T) {
-	tests := map[string]struct {
+	for name, test := range map[string]struct {
 		applysetFlag        string
 		namespaceFlag       string
 		setup               func(*testing.T, *cmdtesting.TestFactory)
@@ -2166,10 +2172,9 @@ func TestApplySetParentValidation(t *testing.T) {
 			expectParentKind:    "Secret",
 			expectErr:           "namespace is required to use namespace-scoped ApplySet",
 		},
-	}
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
-		for name, test := range tests {
-			t.Run(name, func(t *testing.T) {
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
@@ -2178,6 +2183,7 @@ func TestApplySetParentValidation(t *testing.T) {
 				cmd.Flags().Set("prune", "true")
 				f := cmdtesting.NewTestFactory()
 				defer f.Cleanup()
+				f.Client = &fake.RESTClient{}
 
 				var expectedParentNs string
 				if test.namespaceFlag != "" {
@@ -2199,25 +2205,24 @@ func TestApplySetParentValidation(t *testing.T) {
 					return
 				}
 
-				assert.Equal(t, expectedParentNs, o.ApplySet.ParentRef.Namespace)
-				assert.Equal(t, test.expectParentKind, o.ApplySet.ParentRef.RESTMapping.GroupVersionKind.Kind)
+				assert.Equal(t, expectedParentNs, o.ApplySet.parent.Namespace)
+				assert.Equal(t, test.expectParentKind, o.ApplySet.parent.GroupVersionKind.Kind)
 
 				err = o.Validate()
 				if test.expectErr != "" {
 					require.EqualError(t, err, test.expectErr)
-				} else if err.Error() == "--applyset is not yet supported" {
-					// TODO: remove this when the feature is complete
 				} else {
 					require.NoError(t, err, "Validate error")
 				}
 			})
-		}
-	})
+		})
+	}
 }
 
 func TestLoadObjects(t *testing.T) {
-	f := cmdtesting.NewTestFactory()
+	f := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer f.Cleanup()
+	f.Client = &fake.RESTClient{}
 
 	testdirs := []string{"testdata/prune/simple"}
 	for _, testdir := range testdirs {
@@ -2235,11 +2240,10 @@ func TestLoadObjects(t *testing.T) {
 					t.Fatalf("unexpected error creating apply options: %v", err)
 				}
 
-				// TODO(justinsb): Enable validation once we unblock --applyset
-				// err = o.Validate()
-				// if err != nil {
-				// 	t.Fatalf("unexpected error from validate: %v", err)
-				// }
+				err = o.Validate()
+				if err != nil {
+					t.Fatalf("unexpected error from validate: %v", err)
+				}
 
 				resources, err := o.GetObjects()
 				if err != nil {
@@ -2268,4 +2272,335 @@ func TestLoadObjects(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestApplySetParentManagement(t *testing.T) {
+	// TODO: replace with cmdtesting.InitTestErrorHandler() when the feature is fully implemented
+	cmdutil.BehaviorOnFatal(func(s string, i int) {
+		if s != "error: ApplySet-based pruning is not yet implemented" {
+			t.Fatalf("unexpected exit %d: %s", i, s)
+		}
+	})
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	nameRC, rc := readReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+	nameParentSecret := "mySet"
+	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	serverSideData := map[string][]byte{
+		pathRC: rc,
+	}
+
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				data, ok := serverSideData[req.URL.Path]
+				if !ok {
+					return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+			case "PATCH":
+				if got := req.Header.Get("Content-Type"); got == string(types.ApplyPatchType) {
+					// crudely save the patch data as the new object and return it
+					serverSideData[req.URL.Path], _ = io.ReadAll(req.Body)
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(serverSideData[req.URL.Path]))}, nil
+				} else {
+					t.Fatalf("unexpected content-type: %s\n", got)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	// Initially, the rc 'exists' server side but the svc and applyset secret do not
+	// This should 'update' the rc and create the secret
+	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameRC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", nameParentSecret)
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\n", outbuff.String())
+	assert.Equal(t, "", errbuff.String())
+	createdSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+	require.NoError(t, err)
+	require.Equal(t, `apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    applyset.k8s.io/additional-namespaces: ""
+    applyset.k8s.io/contains-group-resources: replicationcontrollers
+    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+  creationTimestamp: null
+  labels:
+    applyset.k8s.io/id: placeholder-todo
+  name: mySet
+  namespace: test
+`, string(createdSecret))
+
+	// Next, do an apply that creates a second resource, the svc, and updates the applyset secret
+	outbuff.Reset()
+	errbuff.Reset()
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameRC)
+		cmd.Flags().Set("filename", filenameSVC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", nameParentSecret)
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\nservice/test-service serverside-applied\n", outbuff.String())
+	assert.Equal(t, "", errbuff.String())
+	updatedSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+	require.NoError(t, err)
+	require.Equal(t, `apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    applyset.k8s.io/additional-namespaces: ""
+    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
+    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+  creationTimestamp: null
+  labels:
+    applyset.k8s.io/id: placeholder-todo
+  name: mySet
+  namespace: test
+`, string(updatedSecret))
+
+	// Next, do an apply that attempts to remove the rc from the set, but pruning fails
+	// Both types remain in the ApplySet
+	// TODO: this case will need to be updated to fail the deletion request once pruning works
+	outbuff.Reset()
+	errbuff.Reset()
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameSVC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", nameParentSecret)
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	assert.Equal(t, "service/test-service serverside-applied\n", outbuff.String())
+	assert.Equal(t, "", errbuff.String())
+	updatedSecret, err = yaml.JSONToYAML(serverSideData[pathSecret])
+	require.NoError(t, err)
+	require.Equal(t, `apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    applyset.k8s.io/additional-namespaces: ""
+    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
+    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+  creationTimestamp: null
+  labels:
+    applyset.k8s.io/id: placeholder-todo
+  name: mySet
+  namespace: test
+`, string(updatedSecret))
+
+	// Finally, do an apply that successfully removes the rc and updates the set
+	// TODO: add this part once pruning can work
+}
+
+func TestApplySetInvalidLiveParent(t *testing.T) {
+	nameParentSecret := "mySet"
+	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	type testCase struct {
+		grsAnnotation     string
+		toolingAnnotation string
+		idLabel           string
+		expectErr         string
+	}
+	fakeParentGetterForTest := func(t *testing.T, test testCase) *fake.RESTClient {
+		return &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == "GET" && req.URL.Path == pathSecret {
+					obj := &metav1.PartialObjectMetadata{
+						TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        nameParentSecret,
+							Namespace:   "test",
+							Annotations: make(map[string]string),
+							Labels:      make(map[string]string),
+						},
+					}
+					if test.grsAnnotation != "" {
+						obj.ObjectMeta.Annotations[ApplySetGRsAnnotation] = test.grsAnnotation
+					}
+					if test.toolingAnnotation != "" {
+						obj.ObjectMeta.Annotations[ApplySetToolingAnnotation] = test.toolingAnnotation
+					}
+					if test.idLabel != "" {
+						obj.ObjectMeta.Labels[ApplySetParentIDLabel] = test.idLabel
+					}
+					data, err := json.Marshal(obj)
+					require.NoError(t, err)
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+				}
+				t.Fatalf("unexpected request to %s:\n%#v", req.URL.Path, req)
+				return nil, nil
+			}),
+		}
+	}
+	validIDLabel := "placeholder-todo"
+	validToolingAnnotation := "kubectl/v1.27.0"
+	validGrsAnnotation := "deployments.apps,namespaces,secrets"
+
+	for name, test := range map[string]testCase{
+		"group-resources annotation is required": {
+			grsAnnotation:     "",
+			toolingAnnotation: validToolingAnnotation,
+			idLabel:           validIDLabel,
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./mySet\": kubectl requires the \"applyset.k8s.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
+		},
+		"group-resources annotation should not contain invalid resources": {
+			grsAnnotation:     "does-not-exist",
+			toolingAnnotation: validToolingAnnotation,
+			idLabel:           validIDLabel,
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./mySet\": invalid group resource in \"applyset.k8s.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
+		},
+		"tooling annotation is required": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: "",
+			idLabel:           validIDLabel,
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is missing required annotation \"applyset.k8s.io/tooling\"",
+		},
+		"tooling annotation must have kubectl prefix": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: "helm/v3",
+			idLabel:           validIDLabel,
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling helm instead of kubectl",
+		},
+		"tooling annotation with invalid prefix with one segment can be parsed": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: "helm",
+			idLabel:           validIDLabel,
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling helm instead of kubectl",
+		},
+		"tooling annotation with invalid prefix with many segments can be parsed": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: "example.com/tool/why/v1",
+			idLabel:           validIDLabel,
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling example.com/tool/why instead of kubectl",
+		},
+		"ID label is required": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: validToolingAnnotation,
+			idLabel:           "",
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" exists and does not have required label applyset.k8s.io/id",
+		},
+		"ID label must match the ApplySet's real ID": {
+			grsAnnotation:     validGrsAnnotation,
+			toolingAnnotation: validToolingAnnotation,
+			idLabel:           "somethingelse",
+			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./mySet\" exists and has incorrect value for label \"applyset.k8s.io/id\" (got: somethingelse, want: %s)", validIDLabel),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotEmpty(t, test.expectErr, "invalid test case")
+			cmdutil.BehaviorOnFatal(func(s string, i int) {
+				assert.Equal(t, test.expectErr, s)
+			})
+			tf.Client = fakeParentGetterForTest(t, test)
+
+			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+				ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdApply("kubectl", tf, ioStreams)
+				cmd.Flags().Set("filename", filenameSVC)
+				cmd.Flags().Set("server-side", "true")
+				cmd.Flags().Set("applyset", nameParentSecret)
+				cmd.Flags().Set("prune", "true")
+				cmd.Run(cmd, []string{})
+			})
+		})
+	}
+}
+
+func TestApplySetUpdateConflictsAreRetried(t *testing.T) {
+	// TODO: replace with cmdtesting.InitTestErrorHandler() when the feature is fully implemented
+	cmdutil.BehaviorOnFatal(func(s string, i int) {
+		if s != "error: ApplySet-based pruning is not yet implemented" {
+			t.Fatalf("unexpected exit %d: %s", i, s)
+		}
+	})
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	nameParentSecret := "mySet"
+	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
+	secretYaml := `apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    applyset.k8s.io/additional-namespaces: ""
+    applyset.k8s.io/contains-group-resources: replicationcontrollers
+    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+  creationTimestamp: null
+  labels:
+    applyset.k8s.io/id: placeholder-todo
+  name: mySet
+  namespace: test
+`
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	applyReturnedConflict := false
+	appliedWithConflictsForced := false
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.Method == "GET" && req.URL.Path == pathSecret {
+				data, err := yaml.YAMLToJSON([]byte(secretYaml))
+				require.NoError(t, err)
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+			}
+
+			contentType := req.Header.Get("Content-Type")
+			forceConflicts := req.URL.Query().Get("force") == "true"
+			if req.Method == "PATCH" && contentType == string(types.ApplyPatchType) {
+				// make the ApplySet secret SSA request fail unless conflicts are forced
+				if req.URL.Path == pathSecret {
+					if !forceConflicts {
+						applyReturnedConflict = true
+						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader("Apply failed with 1 conflict: conflict with \"other\": .metadata.annotations.applyset.k8s.io/contains-group-resources"))}, nil
+					}
+					appliedWithConflictsForced = true
+				}
+				data, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+			}
+			t.Fatalf("unexpected request to %s\n%#v", req.URL.Path, req)
+			return nil, nil
+		}),
+	}
+
+	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameRC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", nameParentSecret)
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\n", outbuff.String())
+	assert.Equal(t, "", errbuff.String())
+	assert.Truef(t, applyReturnedConflict, "test did not simulate a conflict scenario")
+	assert.Truef(t, appliedWithConflictsForced, "conflicts were never forced")
 }
