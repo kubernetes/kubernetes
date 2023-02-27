@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,22 +23,35 @@ func NewFakeOpenAPIService() *FakeOpenAPIService {
 type FakeOpenAPIService struct {
 	updates         []*spec.Swagger
 	expectedUpdates int
+	lock            sync.RWMutex
 }
 
 func (o *FakeOpenAPIService) UpdateSpec(s *spec.Swagger) error {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.updates = append(o.updates, s)
 	return nil
 }
 
 func (o *FakeOpenAPIService) ExpectUpdate() {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.expectedUpdates += 1
 }
 
 func (o *FakeOpenAPIService) GetLastOpenAPI() *spec.Swagger {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
 	if len(o.updates) == 0 {
 		return nil
 	}
 	return o.updates[len(o.updates)-1]
+}
+
+func (o *FakeOpenAPIService) HasExpectedActions() bool {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+	return len(o.updates) >= o.expectedUpdates
 }
 
 func (o *FakeOpenAPIService) WaitForActions() error {
@@ -45,7 +59,7 @@ func (o *FakeOpenAPIService) WaitForActions() error {
 		100*time.Millisecond,
 		3*time.Second,
 		func() (done bool, err error) {
-			if len(o.updates) >= o.expectedUpdates {
+			if o.HasExpectedActions() {
 				return true, nil
 			}
 			return false, nil
