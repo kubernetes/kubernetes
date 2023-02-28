@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1svc "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -55,6 +56,7 @@ import (
 const (
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+	defaultServiceAccountName       = "default"
 )
 
 var (
@@ -104,6 +106,7 @@ type Framework struct {
 	ScalesGetter scaleclient.ScalesGetter
 
 	SkipNamespaceCreation            bool            // Whether to skip creating a namespace
+	SkipSecretCreation               bool            // Whether to skip creating secret for a test
 	Namespace                        *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete               []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout         time.Duration
@@ -262,6 +265,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 		} else {
 			Logf("Skipping waiting for service account")
 		}
+
 		f.UniqueName = f.Namespace.GetName()
 	} else {
 		// not guaranteed to be unique, but very likely
@@ -455,7 +459,46 @@ func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels
 	// fail to create serviceAccount in it.
 	f.AddNamespacesToDelete(ns)
 
+	if TestContext.E2EDockerConfigFile != "" && !f.SkipSecretCreation {
+		// With the Secret created, the default service account (in the new namespace)
+		// is patched with the secret and can then be referenced by all the pods spawned by E2E process, and repository authentication should be successful.
+		secret, err := f.createSecretFromDockerConfig(ctx, ns.Name)
+		if err != nil {
+			return ns, fmt.Errorf("failed to create secret from docker config file: %v", err)
+		}
+
+		serviceAccountClient := f.ClientSet.CoreV1().ServiceAccounts(ns.Name)
+		serviceAccountConfig := v1svc.ServiceAccount(defaultServiceAccountName, ns.Name)
+		serviceAccountConfig.ImagePullSecrets = append(serviceAccountConfig.ImagePullSecrets, v1svc.LocalObjectReferenceApplyConfiguration{Name: &secret.Name})
+
+		svc, err := serviceAccountClient.Apply(ctx, serviceAccountConfig, metav1.ApplyOptions{FieldManager: "e2e-framework"})
+		if err != nil {
+			return ns, fmt.Errorf("failed to patch imagePullSecret [%s] to service account [%s]: %v", secret.Name, svc.Name, err)
+		}
+
+	}
+
 	return ns, err
+}
+
+// createSecretFromDockerConfig creates a secret using the private image registry credentials.
+// The credentials are provided by --e2e-docker-config-file flag.
+func (f *Framework) createSecretFromDockerConfig(ctx context.Context, namespace string) (*v1.Secret, error) {
+	contents, err := os.ReadFile(TestContext.E2EDockerConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading docker config file: %v", err)
+	}
+
+	secretObject := &v1.Secret{
+		Data: map[string][]byte{v1.DockerConfigJsonKey: contents},
+		Type: v1.SecretTypeDockerConfigJson,
+	}
+	secretObject.GenerateName = "registry-cred"
+	Logf("create image pull secret %s", secretObject.Name)
+
+	secret, err := f.ClientSet.CoreV1().Secrets(namespace).Create(ctx, secretObject, metav1.CreateOptions{})
+
+	return secret, err
 }
 
 // RecordFlakeIfError records flakeness info if error happens.

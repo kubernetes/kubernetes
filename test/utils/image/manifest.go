@@ -68,12 +68,16 @@ func (i *Config) SetVersion(version string) {
 	i.version = version
 }
 
-func initReg() RegistryList {
+func Init(repoList string) {
+	registry, imageConfigs, originalImageConfigs = readRepoList(repoList)
+}
+
+func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageID]Config) {
 	registry := initRegistry
 
-	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
-		return registry
+		imageConfigs, originalImageConfigs := initImageConfigs(registry)
+		return registry, imageConfigs, originalImageConfigs
 	}
 
 	var fileContent []byte
@@ -94,9 +98,13 @@ func initReg() RegistryList {
 
 	err = yaml.Unmarshal(fileContent, &registry)
 	if err != nil {
-		panic(fmt.Errorf("Error unmarshalling '%v' YAML file: %v", repoList, err))
+		panic(fmt.Errorf("error unmarshalling '%v' YAML file: %v", repoList, err))
 	}
-	return registry
+
+	imageConfigs, originalImageConfigs := initImageConfigs(registry)
+
+	return registry, imageConfigs, originalImageConfigs
+
 }
 
 // Essentially curl url | writer
@@ -135,10 +143,7 @@ var (
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
-	registry = initReg()
-
-	// Preconfigured image configs
-	imageConfigs, originalImageConfigs = initImageConfigs(registry)
+	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"))
 )
 
 type ImageID int
