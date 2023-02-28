@@ -58,6 +58,10 @@ func TestDecodeSinglePod(t *testing.T) {
 				TerminationMessagePath:   "/dev/termination-log",
 				TerminationMessagePolicy: v1.TerminationMessageReadFile,
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+					{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+				},
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
 			SchedulerName:      v1.DefaultSchedulerName,
@@ -129,8 +133,11 @@ func TestDecodePodList(t *testing.T) {
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePath:   "/dev/termination-log",
 				TerminationMessagePolicy: v1.TerminationMessageReadFile,
-
-				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+					{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+				},
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
 			SchedulerName:      v1.DefaultSchedulerName,

@@ -190,6 +190,10 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						ImagePullPolicy:          "Always",
 						SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 						TerminationMessagePolicy: v1.TerminationMessageReadFile,
+						ResizePolicy: []v1.ContainerResizePolicy{
+							{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+							{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+						},
 					}},
 					SecurityContext:    &v1.PodSecurityContext{},
 					SchedulerName:      v1.DefaultSchedulerName,

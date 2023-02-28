@@ -87,6 +87,10 @@ func validNewPod() *api.Pod {
 					TerminationMessagePath:   api.TerminationMessagePathDefault,
 					TerminationMessagePolicy: api.TerminationMessageReadFile,
 					SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+					ResizePolicy: []api.ContainerResizePolicy{
+						{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+						{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+					},
 				},
 			},
 			SecurityContext:    &api.PodSecurityContext{},
@@ -1097,6 +1101,10 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 					Name:            "foobar",
 					Image:           "foo:v1",
 					SecurityContext: securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+					ResizePolicy: []api.ContainerResizePolicy{
+						{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+						{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+					},
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
@@ -1125,6 +1133,10 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				TerminationMessagePath:   api.TerminationMessagePathDefault,
 				TerminationMessagePolicy: api.TerminationMessageReadFile,
 				SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+				ResizePolicy: []api.ContainerResizePolicy{
+					{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+					{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+				},
 			}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -1170,6 +1182,10 @@ func TestEtcdUpdateStatus(t *testing.T) {
 				{
 					Image:           "foo:v1",
 					SecurityContext: securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+					ResizePolicy: []api.ContainerResizePolicy{
+						{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+						{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+					},
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},

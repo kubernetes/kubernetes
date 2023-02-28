@@ -89,6 +89,7 @@ func SetDefaults_Container(obj *v1.Container) {
 
 func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {
 	SetDefaults_Container((*v1.Container)(&obj.EphemeralContainerCommon))
+	obj.ResizePolicy = nil
 }
 
 func SetDefaults_Service(obj *v1.Service) {
@@ -156,6 +157,25 @@ func SetDefaults_Pod(obj *v1.Pod) {
 					obj.Spec.Containers[i].Resources.Requests[key] = value.DeepCopy()
 				}
 			}
+		}
+		// For normal containers, set resize restart policy to default value (RestartNotRequired), if not specified.
+		resizePolicySpecified := make(map[v1.ResourceName]bool)
+		for _, p := range obj.Spec.Containers[i].ResizePolicy {
+			resizePolicySpecified[p.ResourceName] = true
+		}
+		if _, found := resizePolicySpecified[v1.ResourceCPU]; !found {
+			obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
+				v1.ContainerResizePolicy{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.RestartNotRequired,
+				})
+		}
+		if _, found := resizePolicySpecified[v1.ResourceMemory]; !found {
+			obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
+				v1.ContainerResizePolicy{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartNotRequired,
+				})
 		}
 	}
 	for i := range obj.Spec.InitContainers {

@@ -222,6 +222,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Containers[0].ReadinessProbe.PeriodSeconds":               `10`,
 		".Spec.Containers[0].ReadinessProbe.SuccessThreshold":            `1`,
 		".Spec.Containers[0].ReadinessProbe.TimeoutSeconds":              `1`,
+		".Spec.Containers[0].ResizePolicy":                               `[{"resourceName":"cpu","restartPolicy":"RestartNotRequired"},{"resourceName":"memory","restartPolicy":"RestartNotRequired"}]`,
 		".Spec.Containers[0].Resources.Requests":                         `{"":"0"}`, // this gets defaulted from the limits field
 		".Spec.Containers[0].StartupProbe.FailureThreshold":              "3",
 		".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,

@@ -305,11 +305,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 			ct.TerminationMessagePolicy = "File"
+			ct.ResizePolicy = []core.ContainerResizePolicy{
+				{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartNotRequired},
+				{ResourceName: core.ResourceMemory, RestartPolicy: core.RestartNotRequired},
+			}
 		},
 		func(ep *core.EphemeralContainer, c fuzz.Continue) {
 			c.FuzzNoCustom(ep)                                                                   // fuzz self without calling this function again
 			ep.EphemeralContainerCommon.TerminationMessagePath = "/" + ep.TerminationMessagePath // Must be non-empty
 			ep.EphemeralContainerCommon.TerminationMessagePolicy = "File"
+			ep.EphemeralContainerCommon.ResizePolicy = nil
 		},
 		func(p *core.Probe, c fuzz.Continue) {
 			c.FuzzNoCustom(p)

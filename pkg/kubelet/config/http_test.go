@@ -180,6 +180,10 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
+							ResizePolicy: []v1.ContainerResizePolicy{
+								{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+								{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+							},
 						}},
 					},
 					Status: v1.PodStatus{
@@ -251,6 +255,10 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
+							ResizePolicy: []v1.ContainerResizePolicy{
+								{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+								{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+							},
 						}},
 					},
 					Status: v1.PodStatus{
@@ -279,6 +287,10 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "IfNotPresent",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
+							ResizePolicy: []v1.ContainerResizePolicy{
+								{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+								{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+							},
 						}},
 					},
 					Status: v1.PodStatus{
