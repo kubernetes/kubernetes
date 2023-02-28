@@ -318,7 +318,7 @@ func waitForServiceAccountInNamespace(ctx context.Context, c clientset.Interface
 // the default service account is what is associated with pods when they do not specify a service account
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(ctx context.Context, c clientset.Interface, namespace string) error {
-	return waitForServiceAccountInNamespace(ctx, c, namespace, "default", ServiceAccountProvisionTimeout)
+	return waitForServiceAccountInNamespace(ctx, c, namespace, defaultServiceAccountName, ServiceAccountProvisionTimeout)
 }
 
 // WaitForKubeRootCAInNamespace waits for the configmap kube-root-ca.crt containing the service account
