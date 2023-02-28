@@ -293,16 +293,24 @@ func (f *FailureError) backtrace() {
 var ErrFailure error = FailureError{}
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
+//
+// Deprecated: use gomega.Expect().To(gomega.BeEqual())
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
 }
 
 // ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
+//
+// Deprecated: use gomega.Expect().ToNot(gomega.BeEqual())
 func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).NotTo(gomega.Equal(extra), explain...)
 }
 
 // ExpectError expects an error happens, otherwise an exception raises
+//
+// Deprecated: use gomega.Expect().To(gomega.HaveOccurred()) or (better!) check
+// specifically for the error that is expected with
+// gomega.Expect().To(gomega.MatchError(gomega.ContainSubstring()))
 func ExpectError(err error, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, err).To(gomega.HaveOccurred(), explain...)
 }
@@ -356,16 +364,22 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 }
 
 // ExpectConsistOf expects actual contains precisely the extra elements.  The ordering of the elements does not matter.
+//
+// Deprecated: use gomega.Expect().To(gomega.ConsistOf()) instead
 func ExpectConsistOf(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.ConsistOf(extra), explain...)
 }
 
 // ExpectHaveKey expects the actual map has the key in the keyset
+//
+// Deprecated: use gomega.Expect().To(gomega.HaveKey()) instead
 func ExpectHaveKey(actual interface{}, key interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.HaveKey(key), explain...)
 }
 
 // ExpectEmpty expects actual is empty
+//
+// Deprecated: use gomega.Expect().To(gomega.BeEmpty()) instead
 func ExpectEmpty(actual interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.BeEmpty(), explain...)
 }
