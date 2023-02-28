@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -321,6 +322,8 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	options.AddKubeletConfigFlags(fs, kc)
 	// Remember original feature gates, so we can merge with flag gates later
 	original := kc.FeatureGates
+	// avoid duplicate printing the flag deprecation warnings during re-parsing
+	fs.SetOutput(io.Discard)
 	// re-parse flags
 	if err := fs.Parse(args); err != nil {
 		return err
