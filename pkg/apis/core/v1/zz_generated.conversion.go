@@ -3093,7 +3093,7 @@ func Convert_core_ContainerPort_To_v1_ContainerPort(in *core.ContainerPort, out 
 
 func autoConvert_v1_ContainerResizePolicy_To_core_ContainerResizePolicy(in *v1.ContainerResizePolicy, out *core.ContainerResizePolicy, s conversion.Scope) error {
 	out.ResourceName = core.ResourceName(in.ResourceName)
-	out.Policy = core.ResourceResizePolicy(in.Policy)
+	out.RestartPolicy = core.ResourceResizeRestartPolicy(in.RestartPolicy)
 	return nil
 }
 
@@ -3104,7 +3104,7 @@ func Convert_v1_ContainerResizePolicy_To_core_ContainerResizePolicy(in *v1.Conta
 
 func autoConvert_core_ContainerResizePolicy_To_v1_ContainerResizePolicy(in *core.ContainerResizePolicy, out *v1.ContainerResizePolicy, s conversion.Scope) error {
 	out.ResourceName = v1.ResourceName(in.ResourceName)
-	out.Policy = v1.ResourceResizePolicy(in.Policy)
+	out.RestartPolicy = v1.ResourceResizeRestartPolicy(in.RestartPolicy)
 	return nil
 }
 
