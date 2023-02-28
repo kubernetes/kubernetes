@@ -147,7 +147,7 @@ type Evaluator struct {
 //     In this case, a non-nil PostFilterResult is returned and result.NominatingMode instructs how to deal with
 //     the nominatedNodeName.
 //
-//   - <non-nil PostFilterResult}, Success>. It's the regular happy path
+//   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
 func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	// 0) Fetch the latest version of <pod>.
