@@ -6872,6 +6872,14 @@ const (
 	PortForwardRequestIDHeader = "requestID"
 )
 
+// These are the built-in errors for PortStatus.
+const (
+	// MixedProtocolNotSupported error in PortStatus means that the cloud provider
+	// can't ensure the port on the load balancer because mixed values of protocols
+	// on the same LoadBalancer type of Service are not supported by the cloud provider.
+	MixedProtocolNotSupported = "MixedProtocolNotSupported"
+)
+
 // PortStatus represents the error condition of a service port
 
 type PortStatus struct {
