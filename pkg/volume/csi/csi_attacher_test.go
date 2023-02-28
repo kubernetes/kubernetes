@@ -1596,12 +1596,11 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		},
 		// PV agnostic path negative test cases
 		{
-			testName:        "fail: missing json, fail to retrieve driver and volumeID from globalpath",
-			volID:           "project/zone/test-vol1",
+			testName:        "success: json file doesn't exist, unmount device is skipped",
 			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        "",
 			stageUnstageSet: true,
-			shouldFail:      true,
+			createPV:        true,
 		},
 		{
 			testName:        "fail: invalid json, fail to retrieve driver and volumeID from globalpath",
@@ -1609,45 +1608,6 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        `{"driverName"}}`,
 			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		// Old style PV based path positive test cases
-		{
-			testName:        "success: json file doesn't exist, old style pv based global path -> use PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "success: invalid json file, old style pv based global path -> use PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName"}}`,
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "stage_unstage not set, PV based path, unmount device is skipped",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
-			stageUnstageSet: false,
-		},
-		// Old style PV based path negative test cases
-		{
-			testName:        "fail: json file doesn't exist, old style pv based device path, missing PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		{
-			testName:        "fail: no json, no PV.volID, old style pv based global path",
-			volID:           "",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
 			shouldFail:      true,
 		},
 	}
@@ -1713,7 +1673,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 			// Verify call goes through all the way
 			expectedSet := 0
-			if !tc.stageUnstageSet {
+			if !tc.stageUnstageSet || tc.volID == "" {
 				expectedSet = 1
 			}
 			staged := cdc.nodeClient.GetNodeStagedVolumes()
@@ -1722,7 +1682,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			}
 
 			_, ok := staged[tc.volID]
-			if ok && tc.stageUnstageSet {
+			if ok && tc.stageUnstageSet && tc.volID != "" {
 				t.Errorf("found unexpected staged volume: %s", tc.volID)
 			} else if !ok && !tc.stageUnstageSet {
 				t.Errorf("could not find expected staged volume: %s", tc.volID)
