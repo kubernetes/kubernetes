@@ -32,9 +32,9 @@ linters-settings: # please keep this alphabetized
   custom:
     logcheck:
       # Installed there by hack/verify-golangci-lint.sh.
-      path: _output/local/bin/logcheck.so
+      path: ../_output/local/bin/logcheck.so
       description: structured logging checker
-      original-url: k8s.io/klog/hack/tools
+      original-url: k8s.io/logtools/logcheck
   gocritic:
     enabled-checks:
       - equalFold
