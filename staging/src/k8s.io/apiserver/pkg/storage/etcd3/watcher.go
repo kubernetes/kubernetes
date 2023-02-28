@@ -256,6 +256,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		}
 
 		for _, e := range wres.Events {
+			metrics.RecordEtcdEvent(wc.watcher.groupResource.String())
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
 				logWatchChannelErr(err)
