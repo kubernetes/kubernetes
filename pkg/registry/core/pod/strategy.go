@@ -97,6 +97,14 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// With support for in-place pod resizing, container resources are now mutable.
+		// If container resources are updated with new resource requests values, a pod resize is
+		// desired. The status of this request is reflected by setting Resize field to "Proposed"
+		// as a signal to the caller that the request is being considered.
+		podutil.MarkPodProposedForResize(oldPod, newPod)
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 

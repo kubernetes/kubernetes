@@ -30,10 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -153,6 +156,9 @@ func (p *podEvaluator) GroupResource() schema.GroupResource {
 func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
 	if op == admission.Create {
+		return true
+	}
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
 		return true
 	}
 	return false
@@ -356,7 +362,14 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	limits := corev1.ResourceList{}
 	// TODO: ideally, we have pod level requests and limits in the future.
 	for i := range pod.Spec.Containers {
-		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
+		containerRequests := pod.Spec.Containers[i].Resources.Requests
+		if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, pod.Spec.Containers[i].Name)
+			if ok && cs.ResourcesAllocated != nil {
+				containerRequests = quota.Max(containerRequests, cs.ResourcesAllocated)
+			}
+		}
+		requests = quota.Add(requests, containerRequests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
 	}
 	// InitContainers are run sequentially before other containers start, so the highest

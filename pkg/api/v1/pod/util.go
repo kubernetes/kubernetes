@@ -257,7 +257,7 @@ func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool
 }
 
 // GetContainerStatus extracts the status of container "name" from "statuses".
-// It also returns if "name" exists.
+// It returns true if "name" exists, else returns false.
 func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {
@@ -272,6 +272,17 @@ func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.Containe
 func GetExistingContainerStatus(statuses []v1.ContainerStatus, name string) v1.ContainerStatus {
 	status, _ := GetContainerStatus(statuses, name)
 	return status
+}
+
+// GetIndexOfContainerStatus gets the index of status of container "name" from "statuses",
+// It returns (index, true) if "name" exists, else returns (0, false).
+func GetIndexOfContainerStatus(statuses []v1.ContainerStatus, name string) (int, bool) {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // IsPodAvailable returns true if a pod is available; false otherwise.

@@ -48,12 +48,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -260,7 +263,7 @@ func newTestKubeletWithImageList(
 	kubelet.configMapManager = configMapManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, kubelet.getRootDir())
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -2434,6 +2437,162 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+func TestHandlePodResourcesResize(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.statusManager = status.NewFakeManager()
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu1500m := resource.MustParse("1500m")
+	cpu2500m := resource.MustParse("2500m")
+	cpu5000m := resource.MustParse("5000m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem1500M := resource.MustParse("1500Mi")
+	mem2500M := resource.MustParse("2500Mi")
+	mem4500M := resource.MustParse("4500Mi")
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	testPod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+	testPod2 := testPod1.DeepCopy()
+	testPod2.UID = "2222"
+	testPod2.Name = "pod2"
+	testPod2.Namespace = "ns2"
+	testPod3 := testPod1.DeepCopy()
+	testPod3.UID = "3333"
+	testPod3.Name = "pod3"
+	testPod3.Namespace = "ns2"
+
+	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod1, testPod2, testPod3)
+	kubelet.kubeClient = testKubelet.fakeKubeClient
+	defer testKubelet.fakeKubeClient.ClearActions()
+	kubelet.podManager.AddPod(testPod1)
+	kubelet.podManager.AddPod(testPod2)
+	kubelet.podManager.AddPod(testPod3)
+	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		testPod1.UID: true,
+		testPod2.UID: true,
+		testPod3.UID: true,
+	}
+	defer kubelet.podManager.DeletePod(testPod3)
+	defer kubelet.podManager.DeletePod(testPod2)
+	defer kubelet.podManager.DeletePod(testPod1)
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		newRequests         v1.ResourceList
+		expectedAllocations v1.ResourceList
+		expectedResize      v1.PodResizeStatus
+	}{
+		{
+			name:                "Request CPU and memory decrease - expect InProgress",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedResize:      v1.PodResizeStatusInProgress,
+		},
+		{
+			name:                "Request CPU increase, memory decrease - expect InProgress",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
+			expectedResize:      v1.PodResizeStatusInProgress,
+		},
+		{
+			name:                "Request CPU decrease, memory increase - expect InProgress",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
+			expectedResize:      v1.PodResizeStatusInProgress,
+		},
+		{
+			name:                "Request CPU and memory increase beyond current capacity - expect Deferred",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem2500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize:      v1.PodResizeStatusDeferred,
+		},
+		{
+			name:                "Request CPU decrease and memory increase beyond current capacity - expect Deferred",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize:      v1.PodResizeStatusDeferred,
+		},
+		{
+			name:                "Request memory increase beyond node capacity - expect Infeasible",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem4500M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize:      v1.PodResizeStatusInfeasible,
+		},
+		{
+			name:                "Request CPU increase beyond node capacity - expect Infeasible",
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu5000m, v1.ResourceMemory: mem1000M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize:      v1.PodResizeStatusInfeasible,
+		},
+	}
+
+	for _, tt := range tests {
+		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
+		tt.pod.Status.ContainerStatuses[0].ResourcesAllocated = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
+		kubelet.handlePodResourcesResize(tt.pod)
+		assert.Equal(t, tt.expectedAllocations, tt.pod.Status.ContainerStatuses[0].ResourcesAllocated, tt.name)
+		assert.Equal(t, tt.expectedResize, tt.pod.Status.Resize, tt.name)
+		testKubelet.fakeKubeClient.ClearActions()
+	}
 }
 
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.

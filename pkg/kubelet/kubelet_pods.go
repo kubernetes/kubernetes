@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1454,6 +1455,31 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	}
 }
 
+func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
+	var podResizeStatus v1.PodResizeStatus
+	specStatusDiffer := false
+	for _, c := range pod.Spec.Containers {
+		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
+			if cs.Resources != nil && diff.ObjectDiff(c.Resources, *cs.Resources) != "" {
+				specStatusDiffer = true
+				break
+			}
+		}
+	}
+	if !specStatusDiffer {
+		// Clear last resize state from checkpoint
+		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
+		}
+	} else {
+		checkpointState := kl.statusManager.State()
+		if resizeStatus, found := checkpointState.GetPodResizeStatus(string(pod.UID)); found {
+			podResizeStatus = resizeStatus
+		}
+	}
+	return podResizeStatus
+}
+
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
@@ -1464,6 +1490,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		s.Resize = kl.determinePodResizeStatus(pod, s)
+	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(&pod.Spec, allStatus)
@@ -1715,6 +1744,84 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		return status
 	}
 
+	convertContainerStatusResources := func(cName string, status *v1.ContainerStatus, cStatus *kubecontainer.Status, oldStatuses map[string]v1.ContainerStatus) *v1.ResourceRequirements {
+		var requests, limits v1.ResourceList
+		// oldStatus should always exist if container is running
+		oldStatus, oldStatusFound := oldStatuses[cName]
+		// Initialize limits/requests from container's spec upon transition to Running state
+		// For cpu & memory, values queried from runtime via CRI always supercedes spec values
+		// For ephemeral-storage, a running container's status.limit/request equals spec.limit/request
+		determineResource := func(rName v1.ResourceName, v1ContainerResource, oldStatusResource, resource v1.ResourceList) {
+			if oldStatusFound {
+				if oldStatus.State.Running == nil || status.ContainerID != oldStatus.ContainerID {
+					if r, exists := v1ContainerResource[rName]; exists {
+						resource[rName] = r.DeepCopy()
+					}
+				} else {
+					if oldStatusResource != nil {
+						if r, exists := oldStatusResource[rName]; exists {
+							resource[rName] = r.DeepCopy()
+						}
+					}
+				}
+			}
+		}
+		container := kubecontainer.GetContainerSpec(pod, cName)
+		// ResourcesAllocated values come from checkpoint. It is the source-of-truth.
+		found := false
+		checkpointState := kl.statusManager.State()
+		status.ResourcesAllocated, found = checkpointState.GetContainerResourceAllocation(string(pod.UID), cName)
+		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
+			// Log error and fallback to ResourcesAllocated in oldStatus if it exists
+			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)
+			if oldStatusFound {
+				status.ResourcesAllocated = oldStatus.ResourcesAllocated
+			}
+		}
+		if oldStatus.Resources == nil {
+			oldStatus.Resources = &v1.ResourceRequirements{}
+		}
+		// Convert Limits
+		if container.Resources.Limits != nil {
+			limits = make(v1.ResourceList)
+			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
+				limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+			} else {
+				determineResource(v1.ResourceCPU, container.Resources.Limits, oldStatus.Resources.Limits, limits)
+			}
+			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
+				limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
+			} else {
+				determineResource(v1.ResourceMemory, container.Resources.Limits, oldStatus.Resources.Limits, limits)
+			}
+			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
+				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+			}
+		}
+		// Convert Requests
+		if status.ResourcesAllocated != nil {
+			requests = make(v1.ResourceList)
+			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
+				requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+			} else {
+				determineResource(v1.ResourceCPU, status.ResourcesAllocated, oldStatus.Resources.Requests, requests)
+			}
+			if memory, found := status.ResourcesAllocated[v1.ResourceMemory]; found {
+				requests[v1.ResourceMemory] = memory.DeepCopy()
+			}
+			if ephemeralStorage, found := status.ResourcesAllocated[v1.ResourceEphemeralStorage]; found {
+				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+			}
+		}
+		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
+		// addition to CPU, memory, ephemeral storage. Add test case for extended resources.
+		resources := &v1.ResourceRequirements{
+			Limits:   limits,
+			Requests: requests,
+		}
+		return resources
+	}
+
 	// Fetch old containers statuses from old pod status.
 	oldStatuses := make(map[string]v1.ContainerStatus, len(containers))
 	for _, status := range previousStatus {
@@ -1835,6 +1942,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatusPtr = &oldStatus
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if status.State.Running != nil {
+				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
+			}
+		}
 		if containerSeen[cName] == 0 {
 			statuses[cName] = status
 		} else {
