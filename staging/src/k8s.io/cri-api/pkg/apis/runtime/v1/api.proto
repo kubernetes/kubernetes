@@ -1017,6 +1017,15 @@ message Device {
     string permissions = 3;
 }
 
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+    // Fully qualified CDI device name
+    // for example: vendor.com/gpu=gpudevice1
+    // see more details in the CDI specification:
+    // https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+    string name = 1;
+}
+
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 message ContainerConfig {
@@ -1074,6 +1083,9 @@ message ContainerConfig {
     LinuxContainerConfig linux = 15;
     // Configuration specific to Windows containers.
     WindowsContainerConfig windows = 16;
+
+    // CDI devices for the container.
+    repeated CDIDevice CDI_devices = 17;
 }
 
 message CreateContainerRequest {
