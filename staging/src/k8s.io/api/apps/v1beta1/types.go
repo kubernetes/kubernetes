@@ -420,6 +420,7 @@ type DeploymentSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
 	// The deployment strategy to use to replace existing pods with new ones.

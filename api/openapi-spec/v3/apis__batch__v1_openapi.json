@@ -377,7 +377,7 @@
               }
             ],
             "default": {},
-            "description": "Describes the pod that will be created when executing a job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/"
+            "description": "Describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/"
           },
           "ttlSecondsAfterFinished": {
             "description": "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes.",
@@ -2859,7 +2859,7 @@
             "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "restartPolicy": {
-            "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
+            "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
           },
           "runtimeClassName": {

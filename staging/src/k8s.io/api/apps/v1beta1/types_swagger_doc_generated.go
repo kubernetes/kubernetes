@@ -98,7 +98,7 @@ var map_DeploymentSpec = map[string]string{
 	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 	"selector":                "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-	"template":                "Template describes the pods that will be created.",
+	"template":                "Template describes the pods that will be created. The only allowed template.spec.restartPolicy value is \"Always\".",
 	"strategy":                "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 2.",

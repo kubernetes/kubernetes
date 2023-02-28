@@ -295,6 +295,7 @@ type JobSpec struct {
 	ManualSelector *bool
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	Template api.PodTemplateSpec
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished

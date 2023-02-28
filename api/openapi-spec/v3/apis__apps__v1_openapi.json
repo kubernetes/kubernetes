@@ -252,7 +252,7 @@
               }
             ],
             "default": {},
-            "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template"
+            "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). The only allowed template.spec.restartPolicy value is \"Always\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template"
           },
           "updateStrategy": {
             "allOf": [
@@ -554,7 +554,7 @@
               }
             ],
             "default": {},
-            "description": "Template describes the pods that will be created."
+            "description": "Template describes the pods that will be created. The only allowed template.spec.restartPolicy value is \"Always\"."
           }
         },
         "required": [
@@ -1128,7 +1128,7 @@
               }
             ],
             "default": {},
-            "description": "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\"."
+            "description": "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The only allowed template.spec.restartPolicy value is \"Always\"."
           },
           "updateStrategy": {
             "allOf": [
@@ -3685,7 +3685,7 @@
             "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "restartPolicy": {
-            "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
+            "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
           },
           "runtimeClassName": {

@@ -3217,7 +3217,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,34,rep,name=ephemeralContainers"`
 	// Restart policy for all containers within the pod.
-	// One of Always, OnFailure, Never.
+	// One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
 	// Default to Always.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
@@ -4286,6 +4286,7 @@ type ReplicationControllerSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +optional
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`

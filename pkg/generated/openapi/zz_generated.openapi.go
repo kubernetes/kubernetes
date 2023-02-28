@@ -3858,7 +3858,7 @@ func schema_k8sio_api_apps_v1_DaemonSetSpec(ref common.ReferenceCallback) common
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+							Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). The only allowed template.spec.restartPolicy value is \"Always\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -4208,7 +4208,7 @@ func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) commo
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Template describes the pods that will be created.",
+							Description: "Template describes the pods that will be created. The only allowed template.spec.restartPolicy value is \"Always\".",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -4950,7 +4950,7 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\".",
+							Description: "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The only allowed template.spec.restartPolicy value is \"Always\".",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -5504,7 +5504,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) 
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Template describes the pods that will be created.",
+							Description: "Template describes the pods that will be created. The only allowed template.spec.restartPolicy value is \"Always\".",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -6564,7 +6564,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref common.ReferenceCallback) c
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+							Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). The only allowed template.spec.restartPolicy value is \"Always\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -6913,7 +6913,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref common.ReferenceCallback) 
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Template describes the pods that will be created.",
+							Description: "Template describes the pods that will be created. The only allowed template.spec.restartPolicy value is \"Always\".",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -7771,7 +7771,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\".",
+							Description: "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The only allowed template.spec.restartPolicy value is \"Always\".",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -14084,7 +14084,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Describes the pod that will be created when executing a job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Description: "Describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
@@ -23351,7 +23351,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
+							Description: "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Always", "Never", "OnFailure"},
@@ -24815,7 +24815,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCall
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. This takes precedence over a TemplateRef. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. This takes precedence over a TemplateRef. The only allowed template.spec.restartPolicy value is \"Always\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
 					},

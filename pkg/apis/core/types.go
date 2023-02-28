@@ -3688,6 +3688,7 @@ type ReplicationControllerSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Internally, this takes precedence over a
 	// TemplateRef.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// +optional
 	Template *PodTemplateSpec
 }
