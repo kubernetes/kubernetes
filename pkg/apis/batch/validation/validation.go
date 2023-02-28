@@ -120,6 +120,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateJobName(job.ObjectMeta.Name)...)
 	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
 	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
@@ -131,9 +132,15 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 		// The index could be maximum `.spec.completions-1`
 		// If we don't validate this here, the indexed job will fail to create pods later.
 		maximumPodHostname := fmt.Sprintf("%s-%d", job.ObjectMeta.Name, *job.Spec.Completions-1)
-		if errs := apimachineryvalidation.IsDNS1123Label(maximumPodHostname); len(errs) > 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), job.ObjectMeta.Name, fmt.Sprintf("will not able to create pod with invalid DNS label: %s", maximumPodHostname)))
-		}
+		allErrs = append(allErrs, validateJobName(maximumPodHostname)...)
+	}
+	return allErrs
+}
+
+func validateJobName(jobName string) field.ErrorList {
+	var allErrs field.ErrorList
+	if errs := apimachineryvalidation.IsDNS1123Label(jobName); len(errs) > 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), jobName, fmt.Sprintf("will not able to create pod with invalid DNS label: %s", jobName)))
 	}
 	return allErrs
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -849,6 +850,17 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my job2",
+					Namespace: metav1.NamespaceDefault,
+					UID:       theUID,
+				},
+				Spec: validSpec,
+			},
+		},
+		"long name failure": {
+			wantWarningsCount: 1,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      strings.Repeat("x", 64),
 					Namespace: metav1.NamespaceDefault,
 					UID:       theUID,
 				},

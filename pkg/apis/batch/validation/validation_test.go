@@ -837,6 +837,61 @@ func TestValidateJob(t *testing.T) {
 				Template: validPodTemplateSpecForGenerated,
 			},
 		},
+		"metadata.name: Invalid value: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\": will not able to create pod with invalid DNS label:": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      strings.Repeat("x", 64),
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+				Annotations: map[string]string{
+					batch.JobTrackingFinalizer: "",
+				},
+			},
+			Spec: batch.JobSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"controller-uid": "1a2b3c",
+						"job-name":       strings.Repeat("x", 64),
+					},
+				},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"controller-uid": "1a2b3c",
+							"job-name":       strings.Repeat("x", 64),
+						},
+					},
+					Spec: api.PodSpec{
+						RestartPolicy:  api.RestartPolicyOnFailure,
+						DNSPolicy:      api.DNSClusterFirst,
+						Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+						InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					},
+				},
+			},
+		},
+		"spec.template.labels: Invalid value: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\": must be no more than 63 characters": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": strings.Repeat("x", 64)},
+				},
+				ManualSelector: pointer.BoolPtr(true),
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"a": strings.Repeat("x", 64)},
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
