@@ -74,8 +74,8 @@ type TestContainerInfo struct {
 	Name         string
 	Resources    *ContainerResources
 	Allocations  *ContainerAllocations
-	CPUPolicy    *v1.ResourceResizePolicy
-	MemPolicy    *v1.ResourceResizePolicy
+	CPUPolicy    *v1.ResourceResizeRestartPolicy
+	MemPolicy    *v1.ResourceResizeRestartPolicy
 	RestartCount int32
 }
 
@@ -146,11 +146,11 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 
 	}
 	if tcInfo.CPUPolicy != nil {
-		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, Policy: *tcInfo.CPUPolicy}
+		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: *tcInfo.CPUPolicy}
 		resizePol = append(resizePol, cpuPol)
 	}
 	if tcInfo.MemPolicy != nil {
-		memPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, Policy: *tcInfo.MemPolicy}
+		memPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: *tcInfo.MemPolicy}
 		resizePol = append(resizePol, memPol)
 	}
 	return res, alloc, resizePol
@@ -501,7 +501,7 @@ func doPodResizeTests() {
 	}
 
 	noRestart := v1.RestartNotRequired
-	doRestart := v1.RestartRequired
+	doRestart := v1.RestartContainer
 	tests := []testCase{
 		{
 			name: "Guaranteed QoS pod, one container - increase CPU & memory",
@@ -1010,7 +1010,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, one container - increase CPU (RestartNotRequired) & memory (RestartRequired)",
+			name: "Guaranteed QoS pod, one container - increase CPU (RestartNotRequired) & memory (RestartContainer)",
 			containers: []TestContainerInfo{
 				{
 					Name:      "c1",
@@ -1033,7 +1033,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container - decrease CPU (RestartRequired) & memory (RestartNotRequired)",
+			name: "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (RestartNotRequired)",
 			containers: []TestContainerInfo{
 				{
 					Name:      "c1",
