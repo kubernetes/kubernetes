@@ -472,10 +472,9 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	now := metav1.Now()
 	cases := map[string]struct {
-		job                                *batch.Job
-		update                             func(*batch.Job)
-		wantErrs                           field.ErrorList
-		mutableSchedulingDirectivesEnabled bool
+		job      *batch.Job
+		update   func(*batch.Job)
+		wantErrs field.ErrorList
 	}{
 		"update parallelism": {
 			job: &batch.Job{
@@ -603,7 +602,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
-			mutableSchedulingDirectivesEnabled: true,
 		},
 		"updating node selector for suspended but previously started job disallowed": {
 			job: &batch.Job{
@@ -630,7 +628,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
-			mutableSchedulingDirectivesEnabled: true,
 		},
 		"updating node selector for suspended and not previously started job allowed": {
 			job: &batch.Job{
@@ -651,31 +648,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
 			},
-			mutableSchedulingDirectivesEnabled: true,
-		},
-		"updating node selector whilte gate disabled disallowed": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations:     map[string]string{"foo": "bar"},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
-			},
-			mutableSchedulingDirectivesEnabled: false,
 		},
 		"invalid label selector": {
 			job: &batch.Job{
@@ -701,7 +673,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, tc.mutableSchedulingDirectivesEnabled)()
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)

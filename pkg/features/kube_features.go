@@ -402,6 +402,7 @@ const (
 
 	// owner: @ahg
 	// beta: v1.23
+	// stable: v1.27
 	//
 	// Allow updating node scheduling directives in the pod template of jobs. Specifically,
 	// node affinity, selector and tolerations. This is allowed only for suspended jobs
@@ -963,7 +964,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
-	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
+	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
 
