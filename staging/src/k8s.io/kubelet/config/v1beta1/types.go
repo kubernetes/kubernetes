@@ -205,14 +205,14 @@ type KubeletConfiguration struct {
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced. The value cannot be a negative number.
-	// Default: 5
+	// Default: 50
 	// +optional
 	EventRecordQPS *int32 `json:"eventRecordQPS,omitempty"`
 	// eventBurst is the maximum size of a burst of event creations, temporarily
 	// allows event creations to burst to this number, while still not exceeding
 	// eventRecordQPS. This field canot be a negative number and it is only used
 	// when eventRecordQPS > 0.
-	// Default: 10
+	// Default: 100
 	// +optional
 	EventBurst int32 `json:"eventBurst,omitempty"`
 	// enableDebuggingHandlers enables server endpoints for log access
@@ -467,12 +467,12 @@ type KubeletConfiguration struct {
 	// +optional
 	ContentType string `json:"contentType,omitempty"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	// Default: 5
+	// Default: 50
 	// +optional
 	KubeAPIQPS *int32 `json:"kubeAPIQPS,omitempty"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes API server.
 	// This field cannot be a negative number.
-	// Default: 10
+	// Default: 100
 	// +optional
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one

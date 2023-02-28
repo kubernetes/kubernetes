@@ -96,10 +96,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.RegistryBurst = 10
 	}
 	if obj.EventRecordQPS == nil {
-		obj.EventRecordQPS = utilpointer.Int32(5)
+		obj.EventRecordQPS = utilpointer.Int32(50)
 	}
 	if obj.EventBurst == 0 {
-		obj.EventBurst = 10
+		obj.EventBurst = 100
 	}
 	if obj.EnableDebuggingHandlers == nil {
 		obj.EnableDebuggingHandlers = utilpointer.Bool(true)
@@ -200,10 +200,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	if obj.KubeAPIQPS == nil {
-		obj.KubeAPIQPS = utilpointer.Int32(5)
+		obj.KubeAPIQPS = utilpointer.Int32(50)
 	}
 	if obj.KubeAPIBurst == 0 {
-		obj.KubeAPIBurst = 10
+		obj.KubeAPIBurst = 100
 	}
 	if obj.SerializeImagePulls == nil {
 		// SerializeImagePulls is default to true when MaxParallelImagePulls
