@@ -448,7 +448,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 						"test": "test",
 					},
 					ResourceVersion:   "1",
-					CreationTimestamp: metav1.Time{time.Now()},
+					CreationTimestamp: metav1.Time{Time: time.Now()},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

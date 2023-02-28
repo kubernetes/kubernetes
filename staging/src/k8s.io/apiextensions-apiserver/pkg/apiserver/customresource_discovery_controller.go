@@ -301,7 +301,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 		}
 		for _, crd := range crds {
 			for _, v := range crd.Spec.Versions {
-				gv := schema.GroupVersion{crd.Spec.Group, v.Name}
+				gv := schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name}
 				if err := c.sync(gv); err != nil {
 					utilruntime.HandleError(fmt.Errorf("failed to initially sync CRD version %v: %v", gv, err))
 					return false, nil

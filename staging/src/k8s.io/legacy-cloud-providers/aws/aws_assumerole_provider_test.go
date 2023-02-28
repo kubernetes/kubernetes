@@ -92,6 +92,7 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 		wantProviderCalled:         true,
 		sleepBeforeCallingProvider: 25 * time.Millisecond,
 	}}
+	//nolint:govet // ignore copying of sync.RWMutex, it is empty
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &assumeRoleProviderWithRateLimiting{

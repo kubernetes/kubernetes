@@ -208,9 +208,9 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 	}
 	dangleStatus := flowcontrol.ConditionFalse
 	if rng.Float32() < 0.9 && len(goodPLNames) > 0 {
-		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{pickSetString(rng, goodPLNames)}
+		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{Name: pickSetString(rng, goodPLNames)}
 	} else {
-		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{pickSetString(rng, badPLNames)}
+		fs.Spec.PriorityLevelConfiguration = flowcontrol.PriorityLevelConfigurationReference{Name: pickSetString(rng, badPLNames)}
 		ftr.wellFormed = false
 		dangleStatus = flowcontrol.ConditionTrue
 	}
@@ -220,7 +220,7 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 	fs.Spec.MatchingPrecedence = rng.Int31n(9997) + 2
 	if rng.Float32() < 0.8 {
 		fdmt := flowcontrol.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))
-		fs.Spec.DistinguisherMethod = &flowcontrol.FlowDistinguisherMethod{fdmt}
+		fs.Spec.DistinguisherMethod = &flowcontrol.FlowDistinguisherMethod{Type: fdmt}
 	}
 	fs.Spec.Rules = []flowcontrol.PolicyRulesWithSubjects{}
 	everyResourceMatcher := -1
@@ -347,7 +347,7 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatc
 	if nRR == 0 {
 		_, _, skippingNRIs = genNonResourceRule(rng, pfx+"-o", false, someMatchesAllNonResourceRequests)
 	}
-	rule := flowcontrol.PolicyRulesWithSubjects{subjects, resourceRules, nonResourceRules}
+	rule := flowcontrol.PolicyRulesWithSubjects{Subjects: subjects, ResourceRules: resourceRules, NonResourceRules: nonResourceRules}
 	if testDebugLogs {
 		t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%s, mu=%s, su=%s, mrr=%s, mnr=%s, srr=%s, snr=%s", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
 	}
@@ -450,7 +450,7 @@ func genUser(rng *rand.Rand, pfx string) (*flowcontrol.UserSubject, []user.Info,
 		UID:    mui.UID,
 		Groups: mui.Groups,
 		Extra:  mui.Extra}}
-	return &flowcontrol.UserSubject{mui.Name}, []user.Info{mui}, skips
+	return &flowcontrol.UserSubject{Name: mui.Name}, []user.Info{mui}, skips
 }
 
 var groupCover = []string{"system:authenticated", "system:unauthenticated"}
@@ -462,14 +462,14 @@ func mg(rng *rand.Rand) string {
 func mkUserSubject(username string) flowcontrol.Subject {
 	return flowcontrol.Subject{
 		Kind: flowcontrol.SubjectKindUser,
-		User: &flowcontrol.UserSubject{username},
+		User: &flowcontrol.UserSubject{Name: username},
 	}
 }
 
 func mkGroupSubject(group string) flowcontrol.Subject {
 	return flowcontrol.Subject{
 		Kind:  flowcontrol.SubjectKindGroup,
-		Group: &flowcontrol.GroupSubject{group},
+		Group: &flowcontrol.GroupSubject{Name: group},
 	}
 }
 
@@ -499,7 +499,7 @@ func genGroup(rng *rand.Rand, pfx string) (*flowcontrol.GroupSubject, []user.Inf
 	if rng.Intn(2) == 0 {
 		skipper.Groups = append(skipper.Groups, pfx+"-k")
 	}
-	return &flowcontrol.GroupSubject{name}, []user.Info{ui}, []user.Info{skipper}
+	return &flowcontrol.GroupSubject{Name: name}, []user.Info{ui}, []user.Info{skipper}
 }
 
 func genServiceAccount(rng *rand.Rand, pfx string) (*flowcontrol.ServiceAccountSubject, []user.Info, []user.Info) {

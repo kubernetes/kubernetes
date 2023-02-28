@@ -655,7 +655,8 @@ func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	for i, c := range tests {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = c.allowWatchBookmark
-		ctx, _ := context.WithTimeout(context.Background(), c.timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+		t.Cleanup(cancel)
 		watcher, err := cacher.Watch(ctx, "pods/ns/foo", storage.ListOptions{ResourceVersion: startVersion, Predicate: pred})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
@@ -695,7 +696,8 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	t.Cleanup(cancel)
 	watcher, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

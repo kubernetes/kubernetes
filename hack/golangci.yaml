@@ -22,6 +22,7 @@ linters:
   enable: # please keep this alphabetized
     - ginkgolinter
     - gocritic
+    - govet
     - ineffassign
     - logcheck
     - staticcheck
