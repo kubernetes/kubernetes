@@ -25,6 +25,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -364,6 +365,16 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		Predicate:            p,
 		Recursive:            true,
 	}
+
+	// if we're not already namespace-scoped, see if the field selector narrows the scope of the watch
+	if requestNamespace, _ := genericapirequest.NamespaceFrom(ctx); len(requestNamespace) == 0 {
+		if selectorNamespace, ok := p.MatchesSingleNamespace(); ok {
+			if len(validation.ValidateNamespaceName(selectorNamespace, false)) == 0 {
+				ctx = genericapirequest.WithNamespace(ctx, selectorNamespace)
+			}
+		}
+	}
+
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			storageOpts.Recursive = false
@@ -1278,6 +1289,15 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 // WatchPredicate starts a watch for the items that matches.
 func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p, Recursive: true}
+
+	// if we're not already namespace-scoped, see if the field selector narrows the scope of the watch
+	if requestNamespace, _ := genericapirequest.NamespaceFrom(ctx); len(requestNamespace) == 0 {
+		if selectorNamespace, ok := p.MatchesSingleNamespace(); ok {
+			if len(validation.ValidateNamespaceName(selectorNamespace, false)) == 0 {
+				ctx = genericapirequest.WithNamespace(ctx, selectorNamespace)
+			}
+		}
+	}
 
 	key := e.KeyRootFunc(ctx)
 	if name, ok := p.MatchesSingle(); ok {

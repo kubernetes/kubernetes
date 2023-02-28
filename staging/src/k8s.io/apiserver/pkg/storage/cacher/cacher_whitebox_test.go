@@ -298,6 +298,7 @@ func TestWatchCacheBypass(t *testing.T) {
 	backingStorage.injectError(errDummy)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "0",
+		Predicate:       storage.Everything,
 	})
 	if err != nil {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
