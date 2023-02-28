@@ -747,7 +747,7 @@ func TestParallelJob(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(5),
+					Parallelism: pointer.Int32(5),
 				},
 			})
 			if err != nil {
@@ -755,7 +755,7 @@ func TestParallelJob(t *testing.T) {
 			}
 			want := podsByStatus{Active: 5}
 			if tc.enableReadyPods {
-				want.Ready = pointer.Int32Ptr(0)
+				want.Ready = pointer.Int32(0)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
@@ -833,7 +833,7 @@ func TestParallelJobParallelism(t *testing.T) {
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
 			BackoffLimit: pointer.Int32(2),
-			Parallelism:  pointer.Int32Ptr(5),
+			Parallelism:  pointer.Int32(5),
 		},
 	})
 	if err != nil {
@@ -901,8 +901,8 @@ func TestParallelJobWithCompletions(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(54),
-					Completions: pointer.Int32Ptr(56),
+					Parallelism: pointer.Int32(54),
+					Completions: pointer.Int32(56),
 				},
 			})
 			if err != nil {
@@ -910,7 +910,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			}
 			want := podsByStatus{Active: 54}
 			if tc.enableReadyPods {
-				want.Ready = pointer.Int32Ptr(0)
+				want.Ready = pointer.Int32(0)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
@@ -976,8 +976,8 @@ func TestIndexedJob(t *testing.T) {
 	mode := batchv1.IndexedCompletion
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism:    pointer.Int32Ptr(3),
-			Completions:    pointer.Int32Ptr(4),
+			Parallelism:    pointer.Int32(3),
+			Completions:    pointer.Int32(4),
 			CompletionMode: &mode,
 		},
 	})
@@ -1231,8 +1231,8 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 						Name: fmt.Sprintf("npods-%d-%d", nPods, n),
 					},
 					Spec: batchv1.JobSpec{
-						Parallelism:    pointer.Int32Ptr(nPods),
-						Completions:    pointer.Int32Ptr(nPods),
+						Parallelism:    pointer.Int32(nPods),
+						Completions:    pointer.Int32(nPods),
 						CompletionMode: &mode,
 					},
 				})
@@ -1304,7 +1304,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(2),
+					Parallelism: pointer.Int32(2),
 				},
 			})
 			if err != nil {
@@ -1450,7 +1450,7 @@ func TestOrphanPodsFinalizersClearedOnRestart(t *testing.T) {
 
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism: pointer.Int32Ptr(1),
+			Parallelism: pointer.Int32(1),
 		},
 	})
 	if err != nil {
@@ -1514,8 +1514,8 @@ func TestSuspendJob(t *testing.T) {
 			parallelism := int32(2)
 			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(parallelism),
-					Completions: pointer.Int32Ptr(4),
+					Parallelism: pointer.Int32(parallelism),
+					Completions: pointer.Int32(4),
 					Suspend:     pointer.BoolPtr(tc.create.flag),
 				},
 			})
@@ -1559,8 +1559,8 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism: pointer.Int32Ptr(2),
-			Completions: pointer.Int32Ptr(4),
+			Parallelism: pointer.Int32(2),
+			Completions: pointer.Int32(4),
 			Suspend:     pointer.BoolPtr(true),
 		},
 	})
@@ -1587,7 +1587,7 @@ func TestNodeSelectorUpdate(t *testing.T) {
 			defer cancel()
 
 			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{Spec: batchv1.JobSpec{
-				Parallelism: pointer.Int32Ptr(1),
+				Parallelism: pointer.Int32(1),
 				Suspend:     pointer.BoolPtr(true),
 			}})
 			if err != nil {
