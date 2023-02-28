@@ -133,12 +133,12 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 }
 
 func (f *metadataSharedInformerFactory) Shutdown() {
-	f.lock.Lock()
-	f.shuttingDown = true
-	f.lock.Unlock()
-
 	// Will return immediately if there is nothing to wait for.
-	f.wg.Wait()
+	defer f.wg.Wait()
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.shuttingDown = true
 }
 
 // NewFilteredMetadataInformer constructs a new informer for a metadata type.

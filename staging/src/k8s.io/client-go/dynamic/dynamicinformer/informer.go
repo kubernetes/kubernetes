@@ -135,12 +135,12 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 }
 
 func (f *dynamicSharedInformerFactory) Shutdown() {
-	f.lock.Lock()
-	f.shuttingDown = true
-	f.lock.Unlock()
-
 	// Will return immediately if there is nothing to wait for.
-	f.wg.Wait()
+	defer f.wg.Wait()
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.shuttingDown = true
 }
 
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
