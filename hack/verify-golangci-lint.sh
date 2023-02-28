@@ -16,7 +16,16 @@
 
 # This script checks coding style for go language files in each
 # Kubernetes package by golint.
-# Usage: `hack/verify-golangci-lint.sh`.
+
+usage () {
+  cat <<EOF >&2
+Usage: $0 [-- <golangci-lint run flags>] [packages]"
+   -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
+   [packages]: check specific packages or directories instead of everything
+EOF
+  exit 1
+}
+
 
 set -o errexit
 set -o nounset
@@ -41,7 +50,35 @@ invocation=(./hack/verify-golangci-lint.sh "$@")
 # _output/local/bin/golangci-lint cache clean
 golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
-golangci+=(--config="${golangci_config}")
+while getopts "c:" o; do
+  case "${o}" in
+    c)
+      if [ "${OPTARG}" = "none" ]; then
+        golangci_config=""
+      else
+        golangci_config="${OPTARG}"
+      fi
+      ;;
+   *)
+     usage
+     ;;
+  esac
+done
+
+if [ "${golangci_config}" ]; then
+    golangci+=(--config="${golangci_config}")
+fi
+
+# Filter out arguments that start with "-" and move them to the run flags.
+shift $((OPTIND-1))
+targets=()
+for arg; do
+  if [[ "${arg}" == -* ]]; then
+    golangci+=("${arg}")
+  else
+    targets+=("${arg}")
+  fi
+done
 
 kube::golang::verify_go_version
 
@@ -52,15 +89,18 @@ export GO111MODULE=on
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   go install github.com/golangci/golangci-lint/cmd/golangci-lint
-  go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  if [ "${golangci_config}" ]; then
+    # This cannot be used without a config.
+    go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  fi
 popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
 res=0
-if [[ "$#" -gt 0 ]]; then
-    echo "running ${golangci[*]} $*" >&2
-    "${golangci[@]}" "$@" >&2 || res=$?
+if [[ "${#targets[@]}" -gt 0 ]]; then
+    echo "running ${golangci[*]} ${targets[*]}" >&2
+    "${golangci[@]}" "${targets[@]}" >&2 || res=$?
 else
     echo "running ${golangci[*]} ./..." >&2
     "${golangci[@]}" ./... >&2 || res=$?
