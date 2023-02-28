@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 # build mock plugin
-buildAndPushMockPlugin() {
+build_and_push_mock_plugin() {
     docker buildx build \
         --no-cache \
         --platform linux/amd64 \
@@ -32,20 +32,20 @@ buildAndPushMockPlugin() {
 }
 
 # create local registry
-createRegistry() {
+create_registry() {
     running="$(docker inspect -f '{{.State.Running}}' "kind-registry" 2>/dev/null || true)"
     if [ "${running}" != 'true' ]; then
         echo "Creating local registry"
         docker run \
             -d --restart=always -p "5000:5000" --name "kind-registry" \
             registry:2
-    else 
+    else
         echo "Local registry is already running"
     fi
 }
 
 # connect registry to kind network
-connectRegistry(){
+connect_registry(){
     # wait for the kind network to exist
     for ((; ;)); do
         if docker network ls | grep "kind"; then
@@ -71,7 +71,41 @@ connectRegistry(){
     fi
 }
 
-# main
-createRegistry
-buildAndPushMockPlugin
-connectRegistry &
+# create cluster and run tests using kubetest2
+create_cluster() {
+    echo "creating cluster and running tests"
+    kubetest2 kind -v 5 \
+    --build \
+    --up \
+    --rundir /home/anramase/go/src/k8s.io/kubernetes/_rundir \
+    --config test/e2e/testing-manifests/auth/encrypt/kind.yaml \
+    --cluster-name kms \
+    --test=ginkgo \
+    -- \
+    --v=5 \
+    --focus-regex='\[Conformance\]' \
+    --skip-regex='\[Serial\]' \
+    --parallel 20 \
+    --use-built-binaries
+}
+
+collect_metrics() {
+    echo "collecting metrics"
+    mkdir -p "${ARTIFACTS}/metrics"
+    kubectl get --raw /metrics > "${ARTIFACTS}/metrics/kube-apiserver-metrics.txt"
+}
+
+main() {
+    # ensure artifacts (results) directory exists when not in CI
+    export ARTIFACTS="${ARTIFACTS:-${PWD}/_artifacts}"
+    mkdir -p "${ARTIFACTS}"
+
+    create_registry
+    build_and_push_mock_plugin
+    connect_registry &
+    create_cluster
+    collect_metrics
+}
+
+main "$@"
+exit 0
