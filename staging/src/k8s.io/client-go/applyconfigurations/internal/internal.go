@@ -4214,11 +4214,11 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.ContainerResizePolicy
   map:
     fields:
-    - name: policy
+    - name: resourceName
       type:
         scalar: string
       default: ""
-    - name: resourceName
+    - name: restartPolicy
       type:
         scalar: string
       default: ""
