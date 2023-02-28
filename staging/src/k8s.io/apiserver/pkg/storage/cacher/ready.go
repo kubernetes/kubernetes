@@ -60,30 +60,34 @@ func (r *ready) done() chan struct{} {
 
 // wait blocks until it is Ready or Stopped, it returns an error if is Stopped.
 func (r *ready) wait(ctx context.Context) error {
-	// r.done() only blocks if state is Pending
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-r.done():
-	}
+	for {
+		// r.done() only blocks if state is Pending
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-r.done():
+		}
 
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	switch r.state {
-	case Pending:
-		// since we allow to switch between the states Pending and Ready
-		// if there is a quick transition from Pending -> Ready -> Pending
-		// a process that was waiting can get unblocked and see a Pending state.
-		// If the state is Pending don't return  an error because it can only happen
-		// here after the r.done() channel is closed because the state moved from
-		// Pending to Ready.
-		return nil
-	case Ready:
-		return nil
-	case Stopped:
-		return fmt.Errorf("apiserver cacher is stopped")
-	default:
-		return fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+		r.lock.RLock()
+		switch r.state {
+		case Pending:
+			// since we allow to switch between the states Pending and Ready
+			// if there is a quick transition from Pending -> Ready -> Pending
+			// a process that was waiting can get unblocked and see a Pending
+			// state again. If the state is Pending we have to wait again to
+			// avoid an inconsistent state on the system, with some processes not
+			// waiting despite the state moved back to Pending.
+			r.lock.RUnlock()
+		case Ready:
+			r.lock.RUnlock()
+			return nil
+		case Stopped:
+			r.lock.RUnlock()
+			return fmt.Errorf("apiserver cacher is stopped")
+		default:
+			r.lock.RUnlock()
+			return fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+		}
 	}
 }
 
