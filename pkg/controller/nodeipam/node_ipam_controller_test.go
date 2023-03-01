@@ -22,19 +22,19 @@ package nodeipam
 import (
 	"context"
 	"net"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/controller"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/legacy-cloud-providers/gce"
 	netutils "k8s.io/utils/net"
 )
@@ -48,7 +48,7 @@ func newTestNodeIpamController(ctx context.Context, clusterCIDR []*net.IPNet, se
 		Clientset: fake.NewSimpleClientset(),
 	}
 	fakeClient := &fake.Clientset{}
-	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
 	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
 	fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
 
@@ -78,48 +78,99 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		wantFatal            bool
 	}{
 		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.RangeAllocatorType, false},
-
-		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/10", "10.1.0.0/21", emptyServiceCIDR, []int{24, 98}, ipam.RangeAllocatorType, false},
-		{"valid_range_allocator_dualstack_dualstackservice", "10.0.0.0/21,2000::/10", "10.1.0.0/21", "3000::/10", []int{24, 98}, ipam.RangeAllocatorType, false},
-
-		{"valid_multi_cidr_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.MultiCIDRRangeAllocatorType, false},
-		{"valid_multi_cidr_range_allocator_dualstack", "10.0.0.0/21,2000::/10", "10.1.0.0/21", emptyServiceCIDR, []int{24, 98}, ipam.MultiCIDRRangeAllocatorType, false},
-
+		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.RangeAllocatorType, false},
+		{"valid_range_allocator_dualstack_dualstackservice", "10.0.0.0/21,2000::/48", "10.1.0.0/21", "3000::/112", []int{24, 64}, ipam.RangeAllocatorType, false},
 		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
 		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, false},
 		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, false},
 		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
-		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
-		{"valid_CIDR_smaller_than_mask_cloud_allocator", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
+		{"valid_CIDR_larger_than_mask_cloud_allocator", "10.0.0.0/16", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
+		{"invalid_cluster_CIDR", "", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
 		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, true},
-		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/23", "10.0.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
+		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/16", "10.0.0.0/8", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
 		{"invalid_CIDR_mask_size", "10.0.0.0/24,2000::/64", "10.1.0.0/21", emptyServiceCIDR, []int{24, 48}, ipam.IPAMFromClusterAllocatorType, true},
 	} {
-		_, ctx := ktesting.NewTestContext(t)
-		t.Run(tc.desc, func(t *testing.T) {
-			clusterCidrs, _ := netutils.ParseCIDRs(strings.Split(tc.clusterCIDR, ","))
-			_, serviceCIDRIpNet, _ := netutils.ParseCIDRSloppy(tc.serviceCIDR)
-			_, secondaryServiceCIDRIpNet, _ := netutils.ParseCIDRSloppy(tc.secondaryServiceCIDR)
-
-			if os.Getenv("EXIT_ON_FATAL") == "1" {
-				// This is the subprocess which runs the actual code.
-				newTestNodeIpamController(ctx, clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, tc.maskSize, tc.allocatorType)
-				return
-			}
-			// This is the host process that monitors the exit code of the subprocess.
-			cmd := exec.Command(os.Args[0], "-test.run=TestNewNodeIpamControllerWithCIDRMasks/"+tc.desc)
-			cmd.Env = append(os.Environ(), "EXIT_ON_FATAL=1")
-			err := cmd.Run()
-			var gotFatal bool
+		test := tc
+		t.Run(test.desc, func(t *testing.T) {
+			klog.Warningf("Test case start: %s", test.desc)
+			t.Parallel()
+			clusterCidrs, err := netutils.ParseCIDRs(strings.Split(test.clusterCIDR, ","))
 			if err != nil {
-				exitErr, ok := err.(*exec.ExitError)
-				if !ok {
-					t.Fatalf("Failed to run subprocess: %v", err)
-				}
-				gotFatal = !exitErr.Success()
+				clusterCidrs = nil
 			}
-			if gotFatal != tc.wantFatal {
-				t.Errorf("newTestNodeIpamController(%v, %v, %v, %v) : gotFatal = %t ; wantFatal = %t", clusterCidrs, serviceCIDRIpNet, tc.maskSize, tc.allocatorType, gotFatal, tc.wantFatal)
+			_, serviceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.serviceCIDR)
+			if err != nil {
+				serviceCIDRIpNet = nil
+			}
+			_, secondaryServiceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.secondaryServiceCIDR)
+			if err != nil {
+				secondaryServiceCIDRIpNet = nil
+			}
+			// This is the subprocess which runs the actual code.
+			defer func() {
+				r := recover()
+				if r == nil && test.wantFatal {
+					t.Errorf("Test %s, the code did not panic", test.desc)
+				} else if r != nil && !test.wantFatal {
+					t.Errorf("Test %s, the code did panic", test.desc)
+				}
+			}()
+			_, err = newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
+			// The code is inconsistent about returning error or panic
+			// but we have to keep both ways of existing for backwards compatibility
+			if (err != nil) != test.wantFatal {
+				t.Errorf("Test %s,Got error %v expected %v", test.desc, err, test.wantFatal)
+			}
+		})
+	}
+}
+
+// MultiCIDRRangeAllocatorType need enable feature gate
+func TestNewNodeIpamControllerWithCIDRMasks2(t *testing.T) {
+	emptyServiceCIDR := ""
+	for _, tc := range []struct {
+		desc                 string
+		clusterCIDR          string
+		serviceCIDR          string
+		secondaryServiceCIDR string
+		maskSize             []int
+		allocatorType        ipam.CIDRAllocatorType
+		wantFatal            bool
+	}{
+		{"valid_multi_cidr_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.MultiCIDRRangeAllocatorType, false},
+		{"valid_multi_cidr_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.MultiCIDRRangeAllocatorType, false},
+	} {
+		test := tc
+		t.Run(test.desc, func(t *testing.T) {
+			klog.Warningf("Test case start: %s", test.desc)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
+
+			clusterCidrs, err := netutils.ParseCIDRs(strings.Split(test.clusterCIDR, ","))
+			if err != nil {
+				clusterCidrs = nil
+			}
+			_, serviceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.serviceCIDR)
+			if err != nil {
+				serviceCIDRIpNet = nil
+			}
+			_, secondaryServiceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.secondaryServiceCIDR)
+			if err != nil {
+				secondaryServiceCIDRIpNet = nil
+			}
+			// This is the subprocess which runs the actual code.
+			defer func() {
+				r := recover()
+				if r == nil && test.wantFatal {
+					t.Errorf("Test %s, the code did not panic", test.desc)
+				} else if r != nil && !test.wantFatal {
+					t.Errorf("Test %s, the code did panic", test.desc)
+				}
+			}()
+			_, err = newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
+			// The code is inconsistent about returning error or panic
+			// but we have to keep both ways of existing for backwards compatibility
+			if (err != nil) != test.wantFatal {
+				t.Errorf("Test %s,Got error %v expected %v", test.desc, err, test.wantFatal)
 			}
 		})
 	}
