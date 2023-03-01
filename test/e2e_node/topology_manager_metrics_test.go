@@ -34,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -44,6 +44,8 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManag
 		var cpusNumPerNUMA, numaNodes int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)

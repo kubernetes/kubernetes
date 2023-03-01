@@ -39,7 +39,7 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
-var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
+var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -49,6 +49,8 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 		var smtLevel int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
