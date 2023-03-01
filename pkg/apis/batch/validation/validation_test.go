@@ -661,7 +661,7 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				BackoffLimit: &negative,
+				BackoffLimit: pointer.Int32(-1),
 				Selector:     validGeneratedSelector,
 				Template:     validPodTemplateSpecForGenerated,
 			},
@@ -1108,7 +1108,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completionMode",
 			},
 		},
-		"Completions but not indexed jobs": {
+		"immutable completions for non-indexed job when AllowElasticIndexedJobs is true": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
