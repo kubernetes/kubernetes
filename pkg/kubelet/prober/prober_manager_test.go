@@ -219,65 +219,72 @@ func TestCleanupRepeated(t *testing.T) {
 }
 
 func TestUpdatePodStatus(t *testing.T) {
-	unprobed := kubecontainer.Status{
-		Name: "unprobed_container",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "unprobed_container_id",
+	unprobed := v1.ContainerStatus{
+		Name:        "unprobed_container",
+		ContainerID: "test://unprobed_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	probedReady := kubecontainer.Status{
-		Name: "probed_container_ready",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "probed_container_ready_id",
+	probedReady := v1.ContainerStatus{
+		Name:        "probed_container_ready",
+		ContainerID: "test://probed_container_ready_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	probedPending := kubecontainer.Status{
-		Name: "probed_container_pending",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "probed_container_pending_id",
+	probedPending := v1.ContainerStatus{
+		Name:        "probed_container_pending",
+		ContainerID: "test://probed_container_pending_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	probedUnready := kubecontainer.Status{
-		Name: "probed_container_unready",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "probed_container_unready_id",
+	probedUnready := v1.ContainerStatus{
+		Name:        "probed_container_unready",
+		ContainerID: "test://probed_container_unready_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	notStartedNoReadiness := kubecontainer.Status{
-		Name: "not_started_container_no_readiness",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "not_started_container_no_readiness_id",
+	notStartedNoReadiness := v1.ContainerStatus{
+		Name:        "not_started_container_no_readiness",
+		ContainerID: "test://not_started_container_no_readiness_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	startedNoReadiness := kubecontainer.Status{
-		Name: "started_container_no_readiness",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "started_container_no_readiness_id",
+	startedNoReadiness := v1.ContainerStatus{
+		Name:        "started_container_no_readiness",
+		ContainerID: "test://started_container_no_readiness_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
 		},
-		State: kubecontainer.ContainerStateRunning,
 	}
-	terminated := kubecontainer.Status{
-		Name: "terminated_container",
-		ID: kubecontainer.ContainerID{
-			Type: "test",
-			ID:   "terminated_container_id",
+	terminated := v1.ContainerStatus{
+		Name:        "terminated_container",
+		ContainerID: "test://terminated_container_id",
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
 		},
-		State: kubecontainer.ContainerStateExited,
+	}
+	pod := v1.Pod{}
+	pod.UID = testPodUID
+	pod.Status = v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			unprobed, probedReady, probedPending, probedUnready, notStartedNoReadiness, startedNoReadiness, terminated,
+		},
 	}
 	podStatus := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
-			&unprobed, &probedReady, &probedPending, &probedUnready, &notStartedNoReadiness, &startedNoReadiness, &terminated,
+			{Name: unprobed.Name},
+			{Name: probedReady.Name},
+			{Name: probedPending.Name},
+			{Name: probedUnready.Name},
+			{Name: notStartedNoReadiness.Name},
+			{Name: startedNoReadiness.Name},
+			{Name: terminated.Name},
 		},
 	}
 
@@ -294,12 +301,12 @@ func TestUpdatePodStatus(t *testing.T) {
 		{testPodUID, startedNoReadiness.Name, startup}:    {},
 		{testPodUID, terminated.Name, readiness}:          {},
 	}
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ID.String()), results.Success, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ID.String()), results.Failure, &v1.Pod{})
-	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ID.String()), results.Success, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ID.String()), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
+	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
 
-	m.UpdatePodStatus(testPodUID, &podStatus, nil)
+	m.UpdatePodStatus(pod, &podStatus)
 
 	expectedReadiness := map[probeKey]bool{
 		{testPodUID, unprobed.Name, readiness}:              true,

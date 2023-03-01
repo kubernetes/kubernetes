@@ -1486,11 +1486,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	klog.V(3).InfoS("Generating pod status", "pod", klog.KObj(pod))
 
 	// ensure the probe managers have up-to-date status for containers
-	initContainerNames := sets.New[string]() // FIXME find a better way to recognize an initContainer
-	for _, ic := range pod.Spec.InitContainers {
-		initContainerNames.Insert(ic.Name)
-	}
-	kl.probeManager.UpdatePodStatus(pod.UID, podStatus, initContainerNames)
+	kl.probeManager.UpdatePodStatus(*pod, podStatus)
 
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)

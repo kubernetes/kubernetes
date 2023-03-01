@@ -84,7 +84,7 @@ type Manager interface {
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(types.UID, *kubecontainer.PodStatus, sets.Set[string])
+	UpdatePodStatus(v1.Pod, *kubecontainer.PodStatus)
 }
 
 type manager struct {
@@ -255,33 +255,37 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
-func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *kubecontainer.PodStatus, initContainerNames sets.Set[string]) {
+// UpdatePodStatuses updates kubecontainer.PodStatus
+// with the latest results from the startupManager and readinessManager
+// v1.Pod remains unchanged, it will be updated later by convertStatusToAPIStatus
+func (m *manager) UpdatePodStatus(pod v1.Pod, podStatus *kubecontainer.PodStatus) {
+	kubecontainerIndexes := make(map[string]int)
 	for i, c := range podStatus.ContainerStatuses {
-		// FIXME refactor with sidecar KEP
-		if initContainerNames.Has(c.Name) {
-			continue
-		}
+		kubecontainerIndexes[c.Name] = i
+	}
+
+	for _, c := range pod.Status.ContainerStatuses {
 		var started bool
-		if c.State != kubecontainer.ContainerStateRunning {
+		if c.State.Running == nil {
 			started = false
-		} else if result, ok := m.startupManager.Get(kubecontainer.ParseContainerID(c.ID.String())); ok {
+		} else if result, ok := m.startupManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
 			started = result == results.Success
 		} else {
 			// The check whether there is a probe which hasn't run yet.
-			_, exists := m.getWorker(podUID, c.Name, startup)
+			_, exists := m.getWorker(pod.UID, c.Name, startup)
 			started = !exists
 		}
-		podStatus.ContainerStatuses[i].Started = started
+		podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Started = started
 
 		if started {
 			var ready bool
-			if c.State != kubecontainer.ContainerStateRunning {
+			if c.State.Running == nil {
 				ready = false
-			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ID.String())); ok && result == results.Success {
+			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
 				ready = true
 			} else {
 				// The check whether there is a probe which hasn't run yet.
-				w, exists := m.getWorker(podUID, c.Name, readiness)
+				w, exists := m.getWorker(pod.UID, c.Name, readiness)
 				ready = !exists // no readinessProbe -> always ready
 				if exists {
 					// Trigger an immediate run of the readinessProbe to update ready state
@@ -292,21 +296,17 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *kubecontainer.Pod
 					}
 				}
 			}
-			podStatus.ContainerStatuses[i].Ready = ready
+			podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Ready = ready
 		}
 	}
 	// init containers are ready if they have exited with success or if a readiness probe has
 	// succeeded.
-	for i, c := range podStatus.ContainerStatuses {
-		// FIXME refactor with sidecar KEP
-		if !initContainerNames.Has(c.Name) {
-			continue
-		}
+	for _, c := range pod.Status.InitContainerStatuses {
 		var ready bool
-		if c.State == kubecontainer.ContainerStateExited && c.ExitCode == 0 {
+		if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
 			ready = true
 		}
-		podStatus.ContainerStatuses[i].Ready = ready
+		podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Ready = ready
 	}
 }
 
