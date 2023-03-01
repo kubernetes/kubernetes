@@ -131,7 +131,7 @@ type EnvOptions struct {
 	clientset              *kubernetes.Clientset
 
 	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	WarningPrinter *printers.WarningPrinter
 }
 
 // NewEnvOptions returns an EnvOptions indicating all containers in the selected
@@ -208,7 +208,7 @@ func contains(key string, keyList []string) bool {
 func (o *EnvOptions) keyToEnvName(key string) string {
 	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 	if envName != key {
-		o.warningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
+		o.WarningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
 	}
 	return envName
 }
@@ -253,7 +253,10 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.builder = f.NewBuilder
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 
 	return nil
 }
@@ -272,8 +275,8 @@ func (o *EnvOptions) Validate() error {
 	if len(o.Keys) > 0 && len(o.From) == 0 {
 		return fmt.Errorf("when specifying --keys, a configmap or secret must be provided with --from")
 	}
-	if o.warningPrinter == nil {
-		return fmt.Errorf("warningPrinter can not be used without initialization")
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
 	}
 	return nil
 }
@@ -427,7 +430,7 @@ func (o *EnvOptions) RunEnv() error {
 						}
 					}
 
-					o.warningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
+					o.WarningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
 				}
 				return nil
 			}

@@ -293,7 +293,7 @@ func TestRunResourceFor(t *testing.T) {
 
 			ioStreams, _, _, buf := genericclioptions.NewTestIOStreams()
 			test.o.IOStreams = ioStreams
-			test.o.warningPrinter = printers.NewWarningPrinter(test.o.IOStreams.ErrOut, printers.WarningPrinterOptions{Color: false})
+			test.o.WarningPrinter = printers.NewWarningPrinter(test.o.IOStreams.ErrOut, printers.WarningPrinterOptions{Color: false})
 
 			restMapper, err := tf.ToRESTMapper()
 			if err != nil {

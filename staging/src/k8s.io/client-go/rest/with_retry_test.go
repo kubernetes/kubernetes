@@ -17,7 +17,6 @@ limitations under the License.
 package rest
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -212,7 +211,7 @@ func TestIsNextRetry(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			restReq := &Request{
-				body: bytes.NewReader([]byte{}),
+				bodyBytes: []byte{},
 				c: &RESTClient{
 					base: &url.URL{},
 				},

@@ -226,9 +226,6 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 
 	switch writer.respCode {
 	case http.StatusNotModified:
-		dm.resultsLock.Lock()
-		defer dm.resultsLock.Unlock()
-
 		// Keep old entry, update timestamp
 		cached = cachedResult{
 			discovery:   cached.discovery,

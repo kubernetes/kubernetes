@@ -196,7 +196,7 @@ func (d *DiscoveryClient) GroupsAndMaybeResources() (*metav1.APIGroupList, map[s
 	}
 	// Discovery groups and (possibly) resources downloaded from /apis.
 	apiGroups, apiResources, aerr := d.downloadAPIs()
-	if err != nil {
+	if aerr != nil {
 		return nil, nil, aerr
 	}
 	// Merge apis groups into the legacy groups.

@@ -134,7 +134,7 @@ type DeleteOptions struct {
 	Result        *resource.Result
 
 	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	WarningPrinter *printers.WarningPrinter
 }
 
 func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -232,7 +232,10 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		}
 	}
 
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 
 	return nil
 }
@@ -248,13 +251,13 @@ func (o *DeleteOptions) Validate() error {
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
-	if o.warningPrinter == nil {
-		return fmt.Errorf("warningPrinter can not be used without initialization")
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
 	}
 
 	switch {
 	case o.GracePeriod == 0 && o.ForceDeletion:
-		o.warningPrinter.Print("Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.")
+		o.WarningPrinter.Print("Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.")
 	case o.GracePeriod > 0 && o.ForceDeletion:
 		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
@@ -318,7 +321,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		options.PropagationPolicy = &o.CascadingStrategy
 
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			o.warningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
+			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
 			warnClusterScope = false
 		}
 

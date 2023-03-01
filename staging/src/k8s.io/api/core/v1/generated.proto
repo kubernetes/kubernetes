@@ -4514,7 +4514,8 @@ message ResourceRequirements {
   //
   // This field is immutable.
   //
-  // +listType=set
+  // +listType=map
+  // +listMapKey=name
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated ResourceClaim claims = 3;
