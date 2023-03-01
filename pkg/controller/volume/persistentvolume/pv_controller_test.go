@@ -862,6 +862,24 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 				},
 			},
 		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classCopper, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-7 - pvc storage class is not changed if claim is not bound but already set annotation \"volume.beta.kubernetes.io/storage-class\"",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-7", "uid15-7", "1Gi", "", v1.ClaimPending, nil, v1.BetaStorageClassAnnotation),
+					expectedClaims:  newClaimArray("claim15-7", "uid15-7", "1Gi", "", v1.ClaimPending, nil, v1.BetaStorageClassAnnotation),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		runSyncTests(t, test.tests, test.storageClasses, nil)
