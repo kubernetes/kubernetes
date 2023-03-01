@@ -205,6 +205,12 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @p0lyn0mial
+	// alpha: v1.27
+	//
+	// Allow the API server to stream individual items instead of chunking
+	WatchList featuregate.Feature = "WatchList"
 )
 
 func init() {
@@ -258,4 +264,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+
+	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 }
