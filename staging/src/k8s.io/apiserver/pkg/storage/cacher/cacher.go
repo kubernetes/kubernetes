@@ -104,6 +104,9 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.Clock
+
+	// For injecting into watch cache to test resource expired errors.
+	WatchCacheResourceExpiredChecker func() bool
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -399,6 +402,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
+	watchCache.resourceExpiredChecker = config.WatchCacheResourceExpiredChecker
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 

@@ -195,6 +195,9 @@ type watchCache struct {
 
 	// For testing cache interval invalidation.
 	indexValidator indexValidator
+
+	// For testing resource expired errors.
+	resourceExpiredChecker func() bool
 }
 
 func newWatchCache(
@@ -690,7 +693,13 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 		}
 		return ci, nil
 	}
-	if resourceVersion < oldest-1 {
+	var resourceExpired bool
+	if w.resourceExpiredChecker != nil {
+		resourceExpired = w.resourceExpiredChecker()
+	} else {
+		resourceExpired = resourceVersion < oldest-1
+	}
+	if resourceExpired {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 

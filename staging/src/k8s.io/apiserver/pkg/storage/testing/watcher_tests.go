@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -254,7 +255,7 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 	testCheckResult(t, watch.Modified, w, out)
 }
 
-func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+func RunTestWatchErrorResourceExpired(ctx context.Context, t *testing.T, cacher bool, store InterfaceWithPrefixTransformer) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	key := computePodKey(obj)
 
@@ -276,18 +277,33 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
 
-	// Now trigger watch error by injecting failing transformer.
-	revertTransformer := store.UpdatePrefixTransformer(
-		func(previousTransformer *PrefixTransformer) value.Transformer {
-			return &failingTransformer{}
-		})
-	defer revertTransformer()
+	// If we are testing against etcd, we need to deliberately trigger a watch error.
+	// This is not needed while testing with cacher since cacher will emit a resource
+	// expired error itself.
+	if !cacher {
+		// Now trigger watch error by injecting failing transformer.
+		revertTransformer := store.UpdatePrefixTransformer(
+			func(previousTransformer *PrefixTransformer) value.Transformer {
+				return &failingTransformer{err: rpctypes.ErrCompacted}
+			})
+		defer revertTransformer()
+	}
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckEventType(t, watch.Error, w)
+	// Ensure that we get a StatusReasonExpired reason for a watch.Error event type.
+	testCheckResultFunc(t, watch.Error, w, func(object runtime.Object) error {
+		status, ok := object.(*metav1.Status)
+		if !ok {
+			return fmt.Errorf("expected metav1.Status object")
+		}
+		if status.Reason != metav1.StatusReasonExpired {
+			return fmt.Errorf("expected status.Reason: %s, got: %s", metav1.StatusReasonExpired, status.Reason)
+		}
+		return nil
+	})
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {

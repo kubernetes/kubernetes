@@ -315,11 +315,15 @@ func (rt *reproducingTransformer) createObject(ctx context.Context) error {
 }
 
 // failingTransformer is a custom test-only transformer that always returns
-// an error on transforming data from storage.
+// an error (that maybe injected) on transforming data from storage.
 type failingTransformer struct {
+	err error
 }
 
 func (ft *failingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if ft.err != nil {
+		return nil, false, ft.err
+	}
 	return nil, false, fmt.Errorf("failed transformation")
 }
 

@@ -50,17 +50,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 var (
 	scheme = runtime.NewScheme()
 	codecs = serializer.NewCodecFactory(scheme)
-)
-
-const (
-	// watchCacheDefaultCapacity syncs watch cache defaultLowerBoundCapacity.
-	watchCacheDefaultCapacity = 100
 )
 
 func init() {
@@ -226,37 +220,13 @@ func TestWatchFromZero(t *testing.T) {
 }
 
 func TestWatchErrorResourceExpired(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	fakeClock := testingclock.NewFakeClock(time.Now())
-	cacher, _, err := newTestCacherWithClock(etcdStorage, fakeClock)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	// Create a pod with key pods/ns/foo so that we have something to
-	// create a watch against.
-	updatePod(t, etcdStorage, makeTestPod("foo"), nil)
-
-	// Add watchCacheDefaultCapacity events to make current watch cache full.
-	// Make start and last event duration exceed eventFreshDuration(current 75s) to ensure watch cache won't expand.
-	for i := 0; i < watchCacheDefaultCapacity; i++ {
-		fakeClock.SetTime(time.Now().Add(time.Duration(i) * time.Minute))
-		podFoo := makeTestPod(fmt.Sprintf("foo-%d", i))
-		updatePod(t, etcdStorage, podFoo, nil)
-	}
-
-	// Check whether we get too-old error via the watch channel
-	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Expected no direct error, got %v", err)
-	}
-	defer tooOldWatcher.Stop()
-
-	// Ensure we get a "Gone" error.
-	expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
-	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedResourceExpiredError)
+	// Inject a checker into watch cache such that return of
+	// resource expired error occurs on invocation of watch.
+	ctx, cacher, terminate := testSetup(t, func(so *setupOptions) {
+		so.resourceExpiredChecker = func() bool { return true }
+	})
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchErrorResourceExpired(ctx, t, true, wrapCacherWithPrefixTransformer(cacher))
 }
 
 func TestWatcherTimeout(t *testing.T) {
@@ -719,10 +689,11 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 type tearDownFunc func()
 
 type setupOptions struct {
-	resourcePrefix string
-	keyFunc        func(runtime.Object) (string, error)
-	indexerFuncs   map[string]storage.IndexerFunc
-	clock          clock.Clock
+	resourcePrefix         string
+	keyFunc                func(runtime.Object) (string, error)
+	indexerFuncs           map[string]storage.IndexerFunc
+	clock                  clock.Clock
+	resourceExpiredChecker func() bool
 }
 
 type setupOption func(*setupOptions)
@@ -768,17 +739,18 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 	}
 
 	config := cacherstorage.Config{
-		Storage:        wrappedStorage,
-		Versioner:      storage.APIObjectVersioner{},
-		GroupResource:  schema.GroupResource{Resource: "pods"},
-		ResourcePrefix: setupOpts.resourcePrefix,
-		KeyFunc:        setupOpts.keyFunc,
-		GetAttrsFunc:   GetPodAttrs,
-		NewFunc:        newPod,
-		NewListFunc:    newPodList,
-		IndexerFuncs:   setupOpts.indexerFuncs,
-		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:          setupOpts.clock,
+		Storage:                          wrappedStorage,
+		Versioner:                        storage.APIObjectVersioner{},
+		GroupResource:                    schema.GroupResource{Resource: "pods"},
+		ResourcePrefix:                   setupOpts.resourcePrefix,
+		KeyFunc:                          setupOpts.keyFunc,
+		GetAttrsFunc:                     GetPodAttrs,
+		NewFunc:                          newPod,
+		NewListFunc:                      newPodList,
+		IndexerFuncs:                     setupOpts.indexerFuncs,
+		Codec:                            codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:                            setupOpts.clock,
+		WatchCacheResourceExpiredChecker: setupOpts.resourceExpiredChecker,
 	}
 	cacher, err := cacherstorage.NewCacherFromConfig(config)
 	if err != nil {
@@ -797,4 +769,18 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 	}
 
 	return ctx, cacher, terminate
+}
+
+// The Cacher does not have a notion of a PrefixTransformer, but we introduce this wrapping
+// to help unify tests that need a store with an UpdatePrefixTransformer method.
+type cacherPrefixTransformer struct {
+	*cacherstorage.Cacher
+}
+
+func (c *cacherPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
+	return func() {}
+}
+
+func wrapCacherWithPrefixTransformer(cacher *cacherstorage.Cacher) *cacherPrefixTransformer {
+	return &cacherPrefixTransformer{Cacher: cacher}
 }

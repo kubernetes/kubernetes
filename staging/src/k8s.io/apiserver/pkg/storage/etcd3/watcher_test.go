@@ -61,9 +61,9 @@ func TestWatchFromNoneZero(t *testing.T) {
 	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
 }
 
-func TestWatchError(t *testing.T) {
+func TestWatchErrorResourceExpired(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
+	storagetesting.RunTestWatchErrorResourceExpired(ctx, t, false, &storeWithPrefixTransformer{store})
 }
 
 func TestWatchContextCancel(t *testing.T) {
