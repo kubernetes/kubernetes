@@ -118,7 +118,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager][LinuxOnly]
 
 		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod which will be rejected for SMTAlignmentError")
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-err", 1))
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-err", 1))
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -141,7 +141,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager][LinuxOnly]
 
 		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod")
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-ok", smtLevel))
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-ok", smtLevel))
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.

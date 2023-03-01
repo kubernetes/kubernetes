@@ -101,7 +101,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager][
 
 		ginkgo.It("should report admission failures when the topology manager alignment is known to fail", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod which will be rejected for TopologyAffinity")
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("topology-affinity-err", cpusNumPerNUMA+1))
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("topology-affinity-err", cpusNumPerNUMA+1))
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -127,7 +127,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager][
 
 		ginkgo.It("should not report any admission failures when the topology manager alignment is expected to succeed", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod")
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("topology-alignment-ok", cpusNumPerNUMA))
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("topology-alignment-ok", cpusNumPerNUMA))
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
