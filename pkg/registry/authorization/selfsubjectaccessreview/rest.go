@@ -78,6 +78,9 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		}
 	}
 
+	// when using a scoped token, set the required scopes to perform the self SAR if any is missing
+	userToCheck = userWithRequiredScopes(userToCheck)
+
 	var authorizationAttributes authorizer.AttributesRecord
 	if selfSAR.Spec.ResourceAttributes != nil {
 		authorizationAttributes = authorizationutil.ResourceAttributesFrom(userToCheck, *selfSAR.Spec.ResourceAttributes)
