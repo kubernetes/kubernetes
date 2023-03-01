@@ -22,6 +22,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/pointer"
 )
@@ -155,6 +157,27 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
 					obj.Spec.Containers[i].Resources.Requests[key] = value.DeepCopy()
 				}
+			}
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// For normal containers, set resize restart policy to default value (RestartNotRequired), if not specified.
+			resizePolicySpecified := make(map[v1.ResourceName]bool)
+			for _, p := range obj.Spec.Containers[i].ResizePolicy {
+				resizePolicySpecified[p.ResourceName] = true
+			}
+			if _, found := resizePolicySpecified[v1.ResourceCPU]; !found {
+				obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
+					v1.ContainerResizePolicy{
+						ResourceName:  v1.ResourceCPU,
+						RestartPolicy: v1.RestartNotRequired,
+					})
+			}
+			if _, found := resizePolicySpecified[v1.ResourceMemory]; !found {
+				obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
+					v1.ContainerResizePolicy{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartNotRequired,
+					})
 			}
 		}
 	}
