@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+<<<<<<< HEAD
 // +build gccgo,!hurd
 // +build !aix,!hurd
+=======
+//go:build gccgo && !aix && !hurd
+// +build gccgo,!aix,!hurd
+>>>>>>> v1.26.2
 
 #include <errno.h>
 #include <stdint.h>

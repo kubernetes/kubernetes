@@ -18,7 +18,11 @@ type inflow struct {
 	unsent int32
 }
 
+<<<<<<< HEAD
 // set sets the initial window.
+=======
+// init sets the initial window.
+>>>>>>> v1.26.2
 func (f *inflow) init(n int32) {
 	f.avail = n
 }

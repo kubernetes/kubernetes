@@ -18,6 +18,7 @@ package validation
 
 import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -131,8 +132,7 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	}
 
 	allErrs = append(allErrs, validateAllocationResult(resourceClaim.Status.Allocation, fldPath.Child("allocation"))...)
-	allErrs = append(allErrs, validateSliceIsASet(resourceClaim.Status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
-		validateResourceClaimUserReference, fldPath.Child("reservedFor"))...)
+	allErrs = append(allErrs, validateResourceClaimConsumers(resourceClaim.Status.ReservedFor, resource.ResourceClaimReservedForMaxSize, fldPath.Child("reservedFor"))...)
 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(resourceClaim.Status.ReservedFor) > 0 {
@@ -227,6 +227,28 @@ func validateSliceIsASet[T comparable](slice []T, maxSize int, validateItem func
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
 		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(slice), maxSize))
+	}
+	return allErrs
+}
+
+// validateResourceClaimConsumers ensures that the slice contains no duplicate UIDs and does not exceed a certain maximum size.
+func validateResourceClaimConsumers(consumers []resource.ResourceClaimConsumerReference, maxSize int, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allUIDs := sets.New[types.UID]()
+	for i, consumer := range consumers {
+		idxPath := fldPath.Index(i)
+		if allUIDs.Has(consumer.UID) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("uid"), consumer.UID))
+		} else {
+			allErrs = append(allErrs, validateResourceClaimUserReference(consumer, idxPath)...)
+			allUIDs.Insert(consumer.UID)
+		}
+	}
+	if len(consumers) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(consumers), maxSize))
 	}
 	return allErrs
 }

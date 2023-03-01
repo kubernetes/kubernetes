@@ -112,7 +112,8 @@ type ResourceClaimStatus struct {
 	// There can be at most 32 such reservations. This may get increased in
 	// the future, but not reduced.
 	//
-	// +listType=set
+	// +listType=map
+	// +listMapKey=uid
 	// +optional
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
 

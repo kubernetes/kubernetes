@@ -4432,8 +4432,7 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeralContainers"), "cannot be set on create"))
 	}
 	// A Pod cannot be assigned a Node if there are remaining scheduling gates.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) &&
-		pod.Spec.NodeName != "" && len(pod.Spec.SchedulingGates) != 0 {
+	if pod.Spec.NodeName != "" && len(pod.Spec.SchedulingGates) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared"))
 	}
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)

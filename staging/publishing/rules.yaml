@@ -2432,4 +2432,4 @@ rules:
       dir: staging/src/k8s.io/dynamic-resource-allocation
 recursive-delete-patterns:
 - '*/.gitattributes'
-default-go-version: 1.19.5
+default-go-version: 1.19.6
