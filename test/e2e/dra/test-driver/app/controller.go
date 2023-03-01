@@ -58,7 +58,6 @@ type ExampleController struct {
 	resources  Resources
 	driverName string
 
-	// mutex must be locked at the gRPC call level.
 	mutex sync.Mutex
 	// allocated maps claim.UID to the node (if network-attached) or empty (if not).
 	allocated map[types.UID]string
@@ -77,13 +76,13 @@ func NewController(clientset kubernetes.Interface, driverName string, resources 
 	return c
 }
 
-func (c *ExampleController) Run(ctx context.Context, workers int) *ExampleController {
+func (c *ExampleController) Run(ctx context.Context, workers int) {
 	informerFactory := informers.NewSharedInformerFactory(c.clientset, 0 /* resync period */)
 	ctrl := controller.New(ctx, c.driverName, c, c.clientset, informerFactory)
 	informerFactory.Start(ctx.Done())
 	ctrl.Run(workers)
-
-	return c
+	// If we get here, the context was canceled and we can wait for informer factory goroutines.
+	informerFactory.Shutdown()
 }
 
 type parameters struct {
