@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"net"
 	"os"
 	"path/filepath"
@@ -1768,6 +1769,7 @@ func waitingStateWithReason(cName, reason string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{Reason: reason},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
@@ -1776,6 +1778,7 @@ func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{},
 		},
+		Started: pointer.Bool(false),
 		LastTerminationState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				ExitCode: 0,
@@ -1789,6 +1792,7 @@ func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{},
 		},
+		Started: pointer.Bool(false),
 		LastTerminationState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				ExitCode: -1,
@@ -1802,6 +1806,7 @@ func runningState(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerStatus {
@@ -1810,6 +1815,7 @@ func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerSt
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{Time: startedAt}},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func stoppedState(cName string) v1.ContainerStatus {
@@ -1818,6 +1824,7 @@ func stoppedState(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func succeededState(cName string) v1.ContainerStatus {
@@ -1828,6 +1835,7 @@ func succeededState(cName string) v1.ContainerStatus {
 				ExitCode: 0,
 			},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func failedState(cName string) v1.ContainerStatus {
@@ -1838,6 +1846,7 @@ func failedState(cName string) v1.ContainerStatus {
 				ExitCode: -1,
 			},
 		},
+		Started: pointer.Bool(false),
 	}
 }
 func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.ContainerStatus {
@@ -1846,6 +1855,7 @@ func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.Cont
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"},
 		},
+		Started: pointer.Bool(false),
 		LastTerminationState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				Reason:   "ContainerStatusUnknown",
@@ -2489,6 +2499,16 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
 	sandboxReadyStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:   kubecontainer.ContainerID{ID: "c1"},
+				Name: "containerA",
+			},
+			{
+				ID:   kubecontainer.ContainerID{ID: "c2"},
+				Name: "containerB",
+			},
+		},
 		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
 			{
 				Network: &runtimeapi.PodSandboxNetworkStatus{
@@ -2558,6 +2578,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerA", 0)),
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodDisruptionCondition: v1.PodCondition{
 				Type:               v1.DisruptionTarget,
@@ -2869,6 +2891,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodHasNetworkCondition: v1.PodCondition{
 				Type:   kubetypes.PodHasNetwork,
@@ -2927,6 +2951,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodHasNetworkCondition: v1.PodCondition{
 				Type:   kubetypes.PodHasNetwork,
