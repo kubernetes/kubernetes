@@ -123,7 +123,8 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRuleEvaluator) (*audit.AuditContext, error) {
 	ctx := req.Context()
 	ac := audit.AuditContextFrom(ctx)
-	if !ac.Enabled() {
+	if ac == nil {
+		// Auditing not configured.
 		return nil, nil
 	}
 

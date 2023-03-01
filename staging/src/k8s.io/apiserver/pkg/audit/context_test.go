@@ -84,6 +84,15 @@ func TestAddAuditAnnotation(t *testing.T) {
 		ctx:         context.Background(),
 		validator:   func(_ *testing.T, _ context.Context) {},
 	}, {
+		description: "context initialized, policy not evaluated",
+		// Audit context is initialized, but the policy has not yet been evaluated (no level).
+		// Annotations should be retained.
+		ctx: WithAuditContext(context.Background()),
+		validator: func(t *testing.T, ctx context.Context) {
+			ev := AuditContextFrom(ctx).Event
+			expectAnnotations(t, ev.Annotations)
+		},
+	}, {
 		description: "with metadata level",
 		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelMetadata),
 		validator: func(t *testing.T, ctx context.Context) {
@@ -123,6 +132,29 @@ func TestAddAuditAnnotation(t *testing.T) {
 			test.validator(t, test.ctx)
 		})
 	}
+}
+
+func TestAuditAnnotationsWithAuditLoggingSetup(t *testing.T) {
+	// No audit context data in the request context
+	ctx := context.Background()
+	AddAuditAnnotation(ctx, "nil", "0")
+
+	// initialize audit context, policy not evaluated yet
+	ctx = WithAuditContext(ctx)
+	AddAuditAnnotation(ctx, "before-evaluation", "1")
+
+	// policy evaluated, audit logging enabled
+	if ac := AuditContextFrom(ctx); ac != nil {
+		ac.RequestAuditConfig.Level = auditinternal.LevelMetadata
+	}
+	AddAuditAnnotation(ctx, "after-evaluation", "2")
+
+	expected := map[string]string{
+		"before-evaluation": "1",
+		"after-evaluation":  "2",
+	}
+	actual := AuditContextFrom(ctx).Event.Annotations
+	assert.Equal(t, expected, actual)
 }
 
 func withAuditContextAndLevel(ctx context.Context, l auditinternal.Level) context.Context {
