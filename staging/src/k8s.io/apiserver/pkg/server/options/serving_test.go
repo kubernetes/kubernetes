@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -40,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
@@ -298,6 +301,10 @@ func TestServerRunWithSNI(t *testing.T) {
 			// get port
 			secureOptions.BindPort = ln.Addr().(*net.TCPAddr).Port
 			config.LoopbackClientConfig = &restclient.Config{}
+			// setup a fake authenticator
+			config.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+			})
 			if err := secureOptions.ApplyTo(&config.SecureServing, &config.LoopbackClientConfig); err != nil {
 				t.Fatalf("failed applying the SecureServingOptions: %v", err)
 			}

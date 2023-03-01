@@ -43,6 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -171,6 +173,9 @@ func TestInstallAPIGroups(t *testing.T) {
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
+	config.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+	})
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
@@ -450,6 +455,9 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	authz := mockAuthorizer{}
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
+	config.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+	})
 	config.Authorization.Authorizer = &authz
 
 	config.EnableIndex = true
