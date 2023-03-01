@@ -17,23 +17,10 @@ limitations under the License.
 package meta
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-type ListMetaAccessor interface {
-	GetListMeta() List
-}
-
-// List lets you work with list metadata from any of the versioned or
-// internal API objects. Attempting to set or retrieve a field on an object that does
-// not support that field will be a no-op and return a default value.
-type List metav1.ListInterface
-
-// Type exposes the type and APIVersion of versioned or internal API objects.
-type Type metav1.Type
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does

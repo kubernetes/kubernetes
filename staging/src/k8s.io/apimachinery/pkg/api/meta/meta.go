@@ -38,13 +38,8 @@ var errNotCommon = fmt.Errorf("object does not implement the common interface fo
 // not provide List.
 func CommonAccessor(obj interface{}) (metav1.Common, error) {
 	switch t := obj.(type) {
-	case List:
+	case metav1.ListInterface:
 		return t, nil
-	case ListMetaAccessor:
-		if m := t.GetListMeta(); m != nil {
-			return m, nil
-		}
-		return nil, errNotCommon
 	case metav1.ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
@@ -66,15 +61,10 @@ func CommonAccessor(obj interface{}) (metav1.Common, error) {
 // not provide List.
 // IMPORTANT: Objects are NOT a superset of lists. Do not use this check to determine whether an
 // object *is* a List.
-func ListAccessor(obj interface{}) (List, error) {
+func ListAccessor(obj interface{}) (metav1.ListInterface, error) {
 	switch t := obj.(type) {
-	case List:
+	case metav1.ListInterface:
 		return t, nil
-	case ListMetaAccessor:
-		if m := t.GetListMeta(); m != nil {
-			return m, nil
-		}
-		return nil, errNotList
 	case metav1.ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
@@ -141,7 +131,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 // TODO: this interface is used to test code that does not have ObjectMeta or ListMeta
 // in round tripping (objects which can use apiVersion/kind, but do not fit the Kube
 // api conventions).
-func TypeAccessor(obj interface{}) (Type, error) {
+func TypeAccessor(obj interface{}) (metav1.Type, error) {
 	if typed, ok := obj.(runtime.Object); ok {
 		return objectAccessor{typed}, nil
 	}
