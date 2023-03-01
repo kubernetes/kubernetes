@@ -219,7 +219,13 @@ func TestWatch(t *testing.T) {
 	storagetesting.RunTestWatch(ctx, t, cacher)
 }
 
-// TODO(wojtek-t): We should extend the generic RunTestWatch test to cover the
+func TestWatchFromZero(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, true, nil)
+}
+
+// TODO(wojtek-t,MadhavJivrajani): We should extend the generic RunTestWatch test to cover the
 // scenarios that are not yet covered by it and get rid of this test.
 func TestWatchDeprecated(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
@@ -231,63 +237,9 @@ func TestWatchDeprecated(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	podFoo := makeTestPod("foo")
-	podBar := makeTestPod("bar")
-
-	podFooPrime := makeTestPod("foo")
-	podFooPrime.Spec.NodeName = "fakeNode"
-
-	podFooBis := makeTestPod("foo")
-	podFooBis.Spec.NodeName = "anotherFakeNode"
-
-	podFooNS2 := makeTestPod("foo")
-	podFooNS2.Namespace += "2"
-
-	// initialVersion is used to initate the watcher at the beginning of the world,
-	// which is not defined precisely in etcd.
-	initialVersion, err := cacher.LastSyncResourceVersion()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	startVersion := strconv.Itoa(int(initialVersion))
-
-	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer watcher.Stop()
-
-	// Create in another namespace first to make sure events from other namespaces don't get delivered
-	updatePod(t, etcdStorage, podFooNS2, nil)
-
-	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
-	_ = updatePod(t, etcdStorage, podBar, nil)
-	fooUpdated := updatePod(t, etcdStorage, podFooPrime, fooCreated)
-
-	verifyWatchEvent(t, watcher, watch.Added, podFoo)
-	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
-
-	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: fooCreated.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer initialWatcher.Stop()
-
-	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
-
-	// Now test watch from "now".
-	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer nowWatcher.Stop()
-
-	verifyWatchEvent(t, nowWatcher, watch.Added, podFooPrime)
-
-	_ = updatePod(t, etcdStorage, podFooBis, fooUpdated)
-
-	verifyWatchEvent(t, nowWatcher, watch.Modified, podFooBis)
+	// Create a pod with key pods/ns/foo so that we have something to
+	// create a watch against.
+	updatePod(t, etcdStorage, makeTestPod("foo"), nil)
 
 	// Add watchCacheDefaultCapacity events to make current watch cache full.
 	// Make start and last event duration exceed eventFreshDuration(current 75s) to ensure watch cache won't expand.

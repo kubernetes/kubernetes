@@ -142,9 +142,13 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 }
 
 // RunTestWatchFromZero tests that
-// - watch from 0 should sync up and grab the object added before
-// - watch from 0 is able to return events for objects whose previous version has been compacted
-func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
+//   - watch from 0 should sync up and grab the object added before
+//   - For testing with etcd, watch from 0 is able to return events for objects
+//     whose previous version has been compacted. If testing with cacher, we
+//     expect compaction to be nil.
+//   - This additionally tests for a Modified event after an ADDED event on modifying
+//     existing object.
+func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Interface, cacher bool, compaction Compaction) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
@@ -164,37 +168,61 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
 
+	// If testing against the cacher, we allow for slow processing by allowing
+	// the updates to propagate to the watch cache.
+	if cacher {
+		time.Sleep(100 * time.Millisecond)
+	}
 	// Make sure when we watch from 0 we receive an ADDED event
 	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckResult(t, watch.Added, w, out)
-	w.Stop()
 
-	if compaction == nil {
-		t.Skip("compaction callback not provided")
-	}
-
-	// Update again
+	// Update existing object
 	out = &example.Pod{}
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}, nil
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", Annotations: map[string]string{"a": "2"}}}, nil
 		}), nil)
 	if err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
 
-	// Compact previous versions
-	compaction(ctx, t, out.ResourceVersion)
-
-	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
+	// If testing against the cacher, we allow for slow processing by allowing
+	// the updates to propagate to the watch cache.
+	if cacher {
+		time.Sleep(100 * time.Millisecond)
 	}
-	testCheckResult(t, watch.Added, w, out)
+	testCheckResult(t, watch.Modified, w, out)
+	w.Stop()
+
+	if !cacher {
+		if compaction == nil {
+			t.Skip("compaction callback not provided")
+		}
+
+		// Update again
+		out = &example.Pod{}
+		err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+			func(runtime.Object) (runtime.Object, error) {
+				return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}, nil
+			}), nil)
+		if err != nil {
+			t.Fatalf("GuaranteedUpdate failed: %v", err)
+		}
+
+		// Compact previous versions
+		compaction(ctx, t, out.ResourceVersion)
+
+		// Make sure we can still watch from 0 and receive an ADDED event
+		w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+		if err != nil {
+			t.Fatalf("Watch failed: %v", err)
+		}
+		testCheckResult(t, watch.Added, w, out)
+	}
 }
 
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
