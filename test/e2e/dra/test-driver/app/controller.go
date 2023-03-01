@@ -163,7 +163,7 @@ func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha
 func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, claimParameters interface{}, class *resourcev1alpha1.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha1.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
-		logger.Info("done", "result", prettyPrint(result), "err", err)
+		logger.V(3).Info("done", "result", result, "err", err)
 	}()
 
 	c.mutex.Lock()
@@ -175,9 +175,9 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 		// Idempotent result - kind of. We don't check whether
 		// the parameters changed in the meantime. A real
 		// driver would have to do that.
-		logger.Info("already allocated")
+		logger.V(3).V(3).Info("already allocated")
 	} else {
-		logger.Info("starting", "selectedNode", selectedNode)
+		logger.V(3).Info("starting", "selectedNode", selectedNode)
 		if c.resources.NodeLocal {
 			node = selectedNode
 			if node == "" {
@@ -196,7 +196,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 				// Pick randomly. We could also prefer the one with the least
 				// number of allocations (even spreading) or the most (packing).
 				node = viableNodes[rand.Intn(len(viableNodes))]
-				logger.Info("picked a node ourselves", "selectedNode", selectedNode)
+				logger.V(3).Info("picked a node ourselves", "selectedNode", selectedNode)
 			} else if !contains(c.resources.Nodes, node) ||
 				c.resources.MaxAllocations > 0 &&
 					c.countAllocations(node) >= c.resources.MaxAllocations {
@@ -258,11 +258,11 @@ func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alp
 	defer c.mutex.Unlock()
 
 	if _, ok := c.allocated[claim.UID]; !ok {
-		logger.Info("already deallocated")
+		logger.V(3).Info("already deallocated")
 		return nil
 	}
 
-	logger.Info("done")
+	logger.V(3).Info("done")
 	c.numDeallocations++
 	delete(c.allocated, claim.UID)
 	return nil
@@ -270,11 +270,15 @@ func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alp
 
 func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*controller.ClaimAllocation, potentialNodes []string) (finalErr error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "UnsuitableNodes"), "pod", klog.KObj(pod))
-	logger.Info("starting", "claim", prettyPrintSlice(claims), "potentialNodes", potentialNodes)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	logger.V(3).Info("starting", "claims", claims, "potentialNodes", potentialNodes)
 	defer func() {
 		// UnsuitableNodes is the same for all claims.
-		logger.Info("done", "unsuitableNodes", claims[0].UnsuitableNodes, "err", finalErr)
+		logger.V(3).Info("done", "unsuitableNodes", claims[0].UnsuitableNodes, "err", finalErr)
 	}()
+
 	if c.resources.MaxAllocations == 0 {
 		// All nodes are suitable.
 		return nil
@@ -334,24 +338,4 @@ func contains[T comparable](list []T, value T) bool {
 	}
 
 	return false
-}
-
-func prettyPrint[T any](obj *T) interface{} {
-	if obj == nil {
-		return "<nil>"
-	}
-	return *obj
-}
-
-// prettyPrintSlice prints the values the slice points to, not the pointers.
-func prettyPrintSlice[T any](slice []*T) interface{} {
-	var values []interface{}
-	for _, v := range slice {
-		if v == nil {
-			values = append(values, "<nil>")
-		} else {
-			values = append(values, *v)
-		}
-	}
-	return values
 }
