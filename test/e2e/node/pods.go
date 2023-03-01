@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -384,14 +385,16 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Failf("pod spec TerminationGracePeriodSeconds is not 1: %d", *pod.Spec.TerminationGracePeriodSeconds)
 			}
 
-			time.Sleep(5 * time.Second)
-
-			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
-
-			ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
-			pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
-			_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
+			// retry if the TerminationGracePeriodSeconds is overrided
+			// see more in https://github.com/kubernetes/kubernetes/pull/115606
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "failed to query for pod")
+				ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
+				pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
+				_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
+				return err
+			})
 			framework.ExpectNoError(err, "failed to update pod")
 
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
