@@ -291,8 +291,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	cm.topologyManager, err = topologymanager.NewManager(
 		machineInfo.Topology,
-		nodeConfig.ExperimentalTopologyManagerPolicy,
-		nodeConfig.ExperimentalTopologyManagerScope,
+		nodeConfig.TopologyManagerPolicy,
+		nodeConfig.TopologyManagerScope,
 		nodeConfig.ExperimentalTopologyManagerPolicyOptions,
 	)
 
