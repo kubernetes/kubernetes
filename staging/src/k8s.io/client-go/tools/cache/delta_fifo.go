@@ -601,36 +601,12 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 
 	// Do deletion detection against objects in the queue
 	queuedDeletions := 0
-	for k, oldItem := range f.items {
-		if keys.Has(k) {
-			continue
-		}
-		// Delete pre-existing items not in the new list.
-		// This could happen if watch deletion event was missed while
-		// disconnected from apiserver.
-		var deletedObj interface{}
-		if n := oldItem.Newest(); n != nil {
-			deletedObj = n.Object
-
-			// if the previous object is a DeletedFinalStateUnknown, we have to extract the actual Object
-			if d, ok := deletedObj.(DeletedFinalStateUnknown); ok {
-				deletedObj = d.Obj
-			}
-		}
-		queuedDeletions++
-		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
-			return err
-		}
-	}
 
 	if f.knownObjects != nil {
 		// Detect deletions for objects not present in the queue, but present in KnownObjects
 		knownKeys := f.knownObjects.ListKeys()
 		for _, k := range knownKeys {
 			if keys.Has(k) {
-				continue
-			}
-			if len(f.items[k]) > 0 {
 				continue
 			}
 
@@ -649,12 +625,36 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 		}
 	}
 
+	for k, _ := range f.items {
+		if keys.Has(k) {
+			continue
+		}
+		if f.knownObjects != nil {
+			_, found, _ := f.knownObjects.GetByKey(k)
+			if found {
+				continue
+			}
+		}
+		// this is very hacky and most as a proof-of-concept
+		delete(f.items, k)
+		f.queue = remove(f.queue, k)
+		queuedDeletions--
+	}
+
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = keys.Len() + queuedDeletions
 	}
 
 	return nil
+}
+func remove[T comparable](l []T, item T) []T {
+	for i, other := range l {
+		if other == item {
+			return append(l[:i], l[i+1:]...)
+		}
+	}
+	return l
 }
 
 // Resync adds, with a Sync type of Delta, every object listed by

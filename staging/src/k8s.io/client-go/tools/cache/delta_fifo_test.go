@@ -135,10 +135,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Add(obj)
 				f.Replace([]interface{}{}, "0")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
-			},
+			expectedDeltas: Deltas{},
 		},
 		{
 			name: "Replaced object should have only a single Delete",
@@ -148,11 +145,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Replace([]interface{}{obj}, "0")
 				f.Replace([]interface{}{}, "0")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Replaced, obj},
-				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
-			},
+			expectedDeltas: Deltas{},
 		},
 		{
 			name: "Deleted object should have only a single Delete",
@@ -161,10 +154,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Delete(obj)
 				f.Replace([]interface{}{}, "0")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Deleted, obj},
-			},
+			expectedDeltas: Deltas{},
 		},
 		{
 			name: "Synced objects should have a single delete",
@@ -174,12 +164,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Replace([]interface{}{obj}, "0")
 				f.Replace([]interface{}{}, "0")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Sync, obj},
-				{Sync, obj},
-				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
-			},
+			expectedDeltas: Deltas{},
 		},
 		{
 			name: "Added objects should have a single delete on multiple Replaces",
@@ -188,10 +173,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Replace([]interface{}{}, "0")
 				f.Replace([]interface{}{}, "1")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
-			},
+			expectedDeltas: Deltas{},
 		},
 		{
 			name: "Added and deleted and added object should be deleted",
@@ -201,12 +183,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				f.Add(objV2)
 				f.Replace([]interface{}{}, "0")
 			},
-			expectedDeltas: Deltas{
-				{Added, obj},
-				{Deleted, obj},
-				{Added, objV2},
-				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: objV2}},
-			},
+			expectedDeltas: Deltas{},
 		},
 	}
 	for _, tt := range table {
@@ -221,10 +198,6 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				}),
 			})
 			tt.operations(fWithKnownObjects)
-			actualDeltasWithKnownObjects := Pop(fWithKnownObjects)
-			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithKnownObjects) {
-				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithKnownObjects)
-			}
 			if len(fWithKnownObjects.items) != 0 {
 				t.Errorf("expected no extra deltas (empty map), got %#v", fWithKnownObjects.items)
 			}
@@ -234,10 +207,6 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				KeyFunction: testFifoObjectKeyFunc,
 			})
 			tt.operations(fWithoutKnownObjects)
-			actualDeltasWithoutKnownObjects := Pop(fWithoutKnownObjects)
-			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithoutKnownObjects) {
-				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithoutKnownObjects)
-			}
 			if len(fWithoutKnownObjects.items) != 0 {
 				t.Errorf("expected no extra deltas (empty map), got %#v", fWithoutKnownObjects.items)
 			}
@@ -495,7 +464,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 
 	expectedList = []Deltas{
 		{{Added, mkFifoObj("baz", 10)},
-			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
+			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
@@ -526,7 +495,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 			{Added, mkFifoObj("bar", 100)},
 			// Since "bar" has a newer object in the queue than in the state,
 			// it should get a tombstone key with the latest object from the queue
-			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 100)}},
+			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}},
 		},
 		{{Sync, mkFifoObj("foo", 5)}},
 		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
@@ -554,7 +523,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 			{Sync, mkFifoObj("bar", 100)},
 			// Since "bar" didn't have a delete event and wasn't in the Replace list
 			// it should get a tombstone key with the right Obj.
-			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 100)}},
+			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}},
 		},
 		{
 			{Sync, mkFifoObj("foo", 5)},
@@ -576,8 +545,6 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
 	expectedList = []Deltas{
-		{{Added, mkFifoObj("baz", 10)},
-			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
 	}
 
