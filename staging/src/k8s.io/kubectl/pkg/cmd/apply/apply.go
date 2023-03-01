@@ -121,8 +121,8 @@ type ApplyOptions struct {
 
 	// Stores visited objects/namespaces for later use
 	// calculating the set of objects to prune.
-	VisitedUids       sets.String
-	VisitedNamespaces sets.String
+	VisitedUids       sets.Set[types.UID]
+	VisitedNamespaces sets.Set[string]
 
 	// Function run after the objects are generated and
 	// stored in the "objects" field, but before the
@@ -352,8 +352,8 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		objects:       []*resource.Info{},
 		objectsCached: false,
 
-		VisitedUids:       sets.NewString(),
-		VisitedNamespaces: sets.NewString(),
+		VisitedUids:       sets.New[types.UID](),
+		VisitedNamespaces: sets.New[string](),
 
 		ApplySet: applySet,
 	}
@@ -981,7 +981,7 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 	if err != nil {
 		return err
 	}
-	o.VisitedUids.Insert(string(metadata.GetUID()))
+	o.VisitedUids.Insert(metadata.GetUID())
 	return nil
 }
 
