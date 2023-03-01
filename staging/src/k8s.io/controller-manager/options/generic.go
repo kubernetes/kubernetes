@@ -113,9 +113,13 @@ func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers [
 		if controller == "*" {
 			continue
 		}
-		controller = strings.TrimPrefix(controller, "-")
-		if !allControllersSet.Has(controller) {
-			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+		if strings.HasPrefix(controller, "-") {
+			// We allow exclusion of a non-existent controller,
+			// so that it is easier to introduce new controllers.
+		} else {
+			if !allControllersSet.Has(controller) {
+				errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+			}
 		}
 	}
 
