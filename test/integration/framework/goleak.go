@@ -17,6 +17,9 @@ limitations under the License.
 package framework
 
 import (
+	"testing"
+	"time"
+
 	"go.uber.org/goleak"
 	"k8s.io/apiserver/pkg/server/healthz"
 )
@@ -33,4 +36,35 @@ func IgnoreBackgroundGoroutines() []goleak.Option {
 	_ = healthz.LogHealthz.Check(nil)
 
 	return []goleak.Option{goleak.IgnoreCurrent()}
+}
+
+// GoleakCheck sets up leak checking for a test or benchmark.
+// The check runs as cleanup operation and records an
+// error when goroutines were leaked.
+func GoleakCheck(tb testing.TB, opts ...goleak.Option) {
+	// Must be called *before* creating new goroutines.
+	opts = append(opts, IgnoreBackgroundGoroutines()...)
+
+	tb.Cleanup(func() {
+		if err := goleakFindRetry(opts...); err != nil {
+			tb.Error(err.Error())
+		}
+	})
+}
+
+func goleakFindRetry(opts ...goleak.Option) error {
+	// Several tests don't wait for goroutines to stop. goleak.Find retries
+	// internally, but not long enough. 5 seconds seemed to be enough for
+	// most tests, even when testing in the CI.
+	timeout := 5 * time.Second
+	start := time.Now()
+	for {
+		err := goleak.Find(opts...)
+		if err == nil {
+			return nil
+		}
+		if time.Now().Sub(start) >= timeout {
+			return err
+		}
+	}
 }
