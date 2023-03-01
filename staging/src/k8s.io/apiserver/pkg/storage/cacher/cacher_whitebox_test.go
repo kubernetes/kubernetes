@@ -128,6 +128,7 @@ type dummyStorage struct {
 	sync.RWMutex
 	err       error
 	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 }
 
 type dummyWatch struct {
@@ -155,7 +156,10 @@ func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, 
 func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
+func (d *dummyStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if d.watchFn != nil {
+		return d.watchFn(ctx, key, opts)
+	}
 	d.RLock()
 	defer d.RUnlock()
 
@@ -447,7 +451,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	}
 }
 
-func TestCacheDontAcceptRequestsStopped(t *testing.T) {
+func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -506,6 +510,117 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 	case <-watchClosed:
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timed out waiting for watch to close")
+	}
+}
+
+func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
+	makePod := func(i int) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", i),
+			},
+		}
+	}
+
+	listCalls, watchCalls := 0, 0
+	backingStorage := &dummyStorage{
+		getListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			var err error
+			switch listCalls {
+			case 0:
+				podList.ListMeta = metav1.ListMeta{ResourceVersion: "1"}
+			case 1:
+				podList.ListMeta = metav1.ListMeta{ResourceVersion: "10"}
+			default:
+				err = fmt.Errorf("unexpected list call")
+			}
+			listCalls++
+			return err
+		},
+		watchFn: func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
+			var w *watch.FakeWatcher
+			var err error
+			switch watchCalls {
+			case 0:
+				w = watch.NewFakeWithChanSize(10, false)
+				for i := 2; i < 8; i++ {
+					w.Add(makePod(i))
+				}
+				// Emit an error to force relisting.
+				w.Error(nil)
+				w.Stop()
+			case 1:
+				w = watch.NewFakeWithChanSize(10, false)
+				for i := 12; i < 18; i++ {
+					w.Add(makePod(i))
+				}
+				w.Stop()
+			default:
+				err = fmt.Errorf("unexpected watch call")
+			}
+			watchCalls++
+			return w, err
+		},
+	}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	concurrency := 1000
+	wg := sync.WaitGroup{}
+	wg.Add(concurrency)
+
+	// Ensure that test doesn't deadlock if cacher already processed everything
+	// and get back into Pending state before some watches get called.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			w, err := cacher.Watch(ctx, "pods", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
+			if err != nil {
+				// Watch failed to initialize (this most probably means that cacher
+				// already moved back to Pending state before watch initialized.
+				// Ignore this case.
+				return
+			}
+			defer w.Stop()
+
+			prevRV := -1
+			for event := range w.ResultChan() {
+				if event.Type == watch.Error {
+					break
+				}
+				object := event.Object
+				if co, ok := object.(runtime.CacheableObject); ok {
+					object = co.GetObject()
+				}
+				rv, err := strconv.Atoi(object.(*example.Pod).ResourceVersion)
+				if err != nil {
+					errCh <- fmt.Errorf("incorrect resource version: %v", err)
+					return
+				}
+				if prevRV != -1 && prevRV+1 != rv {
+					errCh <- fmt.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
+					return
+				}
+				prevRV = rv
+			}
+
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Error(err)
 	}
 }
 
