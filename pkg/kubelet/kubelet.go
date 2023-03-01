@@ -344,7 +344,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	minimumGCAge metav1.Duration,
 	maxPerPodContainerCount int32,
 	maxContainerCount int32,
-	masterServiceNamespace string,
 	registerSchedulable bool,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
@@ -522,7 +521,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		serviceHasSynced:                        serviceHasSynced,
 		nodeLister:                              nodeLister,
 		nodeHasSynced:                           nodeHasSynced,
-		masterServiceNamespace:                  masterServiceNamespace,
 		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                                kubeDeps.Recorder,
 		cadvisor:                                kubeDeps.CAdvisorInterface,
@@ -975,8 +973,6 @@ type Kubelet struct {
 	// dnsConfigurer is used for setting up DNS resolver configuration when launching pods.
 	dnsConfigurer *dns.Configurer
 
-	// masterServiceNamespace is the namespace that the master service is exposed in.
-	masterServiceNamespace string
 	// serviceLister knows how to list services
 	serviceLister serviceLister
 	// serviceHasSynced indicates whether services have been sync'd at least once.
