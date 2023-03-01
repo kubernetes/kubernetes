@@ -15,6 +15,7 @@
 package etcdserver
 
 import (
+	"errors"
 	"io"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -100,7 +101,7 @@ func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync b
 		if wmetadata, st, ents, err = w.ReadAll(); err != nil {
 			w.Close()
 			// we can only repair ErrUnexpectedEOF and we never repair twice.
-			if repaired || err != io.ErrUnexpectedEOF {
+			if repaired || !errors.Is(err, io.ErrUnexpectedEOF) {
 				lg.Fatal("failed to read WAL, cannot be repaired", zap.Error(err))
 			}
 			if !wal.Repair(lg, waldir) {
