@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/cli-runtime/pkg/resource"
 )
 
 var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
@@ -84,6 +85,36 @@ func (a ApplySet) Validate() error {
 		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet"))
 	}
 	return utilerrors.NewAggregate(errors)
+}
+
+func (a *ApplySet) LabelsForMember() map[string]string {
+	return map[string]string{
+		"applyset.k8s.io/part-of": a.ID(),
+	}
+}
+
+// addLabels sets our tracking labels on each object; this should be called as part of loading the objects.
+func (a *ApplySet) addLabels(objects []*resource.Info) error {
+	applysetLabels := a.LabelsForMember()
+	for _, obj := range objects {
+		accessor, err := meta.Accessor(obj.Object)
+		if err != nil {
+			return fmt.Errorf("getting accessor: %w", err)
+		}
+		labels := accessor.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		for k, v := range applysetLabels {
+			if _, found := labels[k]; found {
+				return fmt.Errorf("applyset label %q already set in input data", k)
+			}
+			labels[k] = v
+		}
+		accessor.SetLabels(labels)
+	}
+
+	return nil
 }
 
 func (p *ApplySetParentRef) IsNamespaced() bool {

@@ -28,6 +28,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,6 +58,7 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/strings/slices"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -2211,4 +2213,59 @@ func TestApplySetParentValidation(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestLoadObjects(t *testing.T) {
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
+	testdirs := []string{"testdata/prune/simple"}
+	for _, testdir := range testdirs {
+		t.Run(testdir, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+				cmd := &cobra.Command{}
+				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags.AddFlags(cmd)
+				cmd.Flags().Set("filename", filepath.Join(testdir, "manifest1.yaml"))
+				cmd.Flags().Set("applyset", filepath.Base(testdir))
+				cmd.Flags().Set("prune", "true")
+
+				o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
+				if err != nil {
+					t.Fatalf("unexpected error creating apply options: %v", err)
+				}
+
+				// TODO(justinsb): Enable validation once we unblock --applyset
+				// err = o.Validate()
+				// if err != nil {
+				// 	t.Fatalf("unexpected error from validate: %v", err)
+				// }
+
+				resources, err := o.GetObjects()
+				if err != nil {
+					t.Fatalf("GetObjects gave unexpected error %v", err)
+				}
+
+				var objectYAMLs []string
+				for _, obj := range resources {
+					y, err := yaml.Marshal(obj.Object)
+					if err != nil {
+						t.Fatalf("error marshaling object: %v", err)
+					}
+					objectYAMLs = append(objectYAMLs, string(y))
+				}
+				got := strings.Join(objectYAMLs, "\n---\n\n")
+
+				p := filepath.Join(testdir, "expected-manifest1-getobjects.yaml")
+				wantBytes, err := os.ReadFile(p)
+				if err != nil {
+					t.Fatalf("error reading file %q: %v", p, err)
+				}
+				want := string(wantBytes)
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("GetObjects returned unexpected diff (-want +got):\n%s", diff)
+				}
+			})
+		})
+	}
 }
