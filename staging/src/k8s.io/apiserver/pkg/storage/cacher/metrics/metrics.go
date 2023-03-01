@@ -179,7 +179,7 @@ func RecordListCacheMetrics(resourcePrefix, indexName string, numFetched, numRet
 func RecordsWatchCacheCapacityChange(objType string, old, new int) {
 	WatchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 	if old < new {
-		WatchCacheCapacity.WithLabelValues(objType).Inc()
+		watchCacheCapacityIncreaseTotal.WithLabelValues(objType).Inc()
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
