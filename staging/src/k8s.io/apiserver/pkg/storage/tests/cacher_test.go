@@ -225,9 +225,7 @@ func TestWatchFromZero(t *testing.T) {
 	storagetesting.RunTestWatchFromZero(ctx, t, cacher, true, nil)
 }
 
-// TODO(wojtek-t,MadhavJivrajani): We should extend the generic RunTestWatch test to cover the
-// scenarios that are not yet covered by it and get rid of this test.
-func TestWatchDeprecated(t *testing.T) {
+func TestWatchErrorResourceExpired(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	fakeClock := testingclock.NewFakeClock(time.Now())
