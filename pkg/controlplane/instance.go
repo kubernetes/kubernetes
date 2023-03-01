@@ -602,7 +602,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	controllerName := "bootstrap-controller"
 	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	// Kubernetes clusters contains the following system namespaces:
-	// kube-system, kube-node-lease, kube-public
+	// kube-system, kube-node-lease, kube-public, default
 	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		go systemnamespaces.NewController(client, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
 		return nil

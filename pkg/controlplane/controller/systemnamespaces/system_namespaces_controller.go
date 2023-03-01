@@ -47,7 +47,7 @@ type Controller struct {
 
 // NewController creates a new Controller to ensure system namespaces exist.
 func NewController(clientset kubernetes.Interface, namespaceInformer coreinformers.NamespaceInformer) *Controller {
-	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease}
+	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease, metav1.NamespaceDefault}
 	interval := 1 * time.Minute
 
 	return &Controller{

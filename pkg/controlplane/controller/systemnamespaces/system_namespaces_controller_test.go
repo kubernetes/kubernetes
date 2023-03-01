@@ -44,12 +44,14 @@ func Test_Controller(t *testing.T) {
 				{"create", "namespaces"},
 				{"create", "namespaces"},
 				{"create", "namespaces"},
+				{"create", "namespaces"},
 			},
 		},
 		{
 			name:       "no system namespaces but others",
 			namespaces: []string{"foo", "bar"},
 			actions: [][]string{
+				{"create", "namespaces"},
 				{"create", "namespaces"},
 				{"create", "namespaces"},
 				{"create", "namespaces"},
@@ -61,6 +63,7 @@ func Test_Controller(t *testing.T) {
 			actions: [][]string{
 				{"create", "namespaces"},
 				{"create", "namespaces"},
+				{"create", "namespaces"},
 			},
 		},
 		{
@@ -68,12 +71,20 @@ func Test_Controller(t *testing.T) {
 			namespaces: []string{metav1.NamespaceSystem, metav1.NamespacePublic},
 			actions: [][]string{
 				{"create", "namespaces"},
+				{"create", "namespaces"},
+			},
+		},
+		{
+			name:       "three namespaces",
+			namespaces: []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease},
+			actions: [][]string{
+				{"create", "namespaces"},
 			},
 		},
 
 		{
-			name:       "the three namespaces",
-			namespaces: []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease},
+			name:       "the four namespaces",
+			namespaces: []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease, v1.NamespaceDefault},
 		},
 	}
 
