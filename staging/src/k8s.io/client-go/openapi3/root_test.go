@@ -70,6 +70,7 @@ func TestOpenAPIV3Root_GroupVersions(t *testing.T) {
 				"foo/apps/v1":                     nil, // bad prefix
 				"apis/networking.k8s.io/v1alpha1": nil,
 				"api":                             nil, // No version
+				"apis/apps":                       nil, // Missing Version
 				"apis/apps/v1":                    nil,
 			},
 			// Alphabetical ordering, since GV's are returned sorted.
@@ -268,17 +269,23 @@ func TestOpenAPIV3Root_GroupVersionToPath(t *testing.T) {
 
 func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		expectedGV schema.GroupVersion
+		name        string
+		path        string
+		expectedGV  schema.GroupVersion
+		expectedErr bool
 	}{
 		{
-			name: "OpenAPI V3 Root: Path to GroupVersion apps group",
+			name: "OpenAPI V3 Root: Path to GroupVersion apps/v1 group",
 			path: "apis/apps/v1",
 			expectedGV: schema.GroupVersion{
 				Group:   "apps",
 				Version: "v1",
 			},
+		},
+		{
+			name:        "Group without Version throws error",
+			path:        "apis/apps",
+			expectedErr: true,
 		},
 		{
 			name: "OpenAPI V3 Root: Path to GroupVersion batch group",
@@ -300,9 +307,13 @@ func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualGV, err := pathToGroupVersion(test.path)
-			require.NoError(t, err)
-			assert.Equal(t, test.expectedGV, actualGV, "expected GroupVersion (%s), got (%s)",
-				test.expectedGV, actualGV)
+			if test.expectedErr {
+				require.Error(t, err, "should have received error for path: %s", test.path)
+			} else {
+				require.NoError(t, err, "expected no error, got (%v)", err)
+				assert.Equal(t, test.expectedGV, actualGV, "expected GroupVersion (%s), got (%s)",
+					test.expectedGV, actualGV)
+			}
 		})
 	}
 }
