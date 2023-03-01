@@ -90,6 +90,12 @@ type ServerRunOptions struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	// AnnotateEarlyAndLateRequests indicates whether the request(s) that
+	// arrive too early (before the apiserver is ready to serve) or late
+	// (during the server shutdown window) should be annotated so they
+	// can be identified by inspecting the apiserver audit logs.
+	AnnotateEarlyAndLateRequests bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -106,6 +112,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		EnablePriorityAndFairness:           true,
 		ShutdownSendRetryAfter:              false,
+		AnnotateEarlyAndLateRequests:        defaults.AnnotateEarlyAndLateRequests,
 	}
 }
 
@@ -126,6 +133,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.AnnotateEarlyAndLateRequests = s.AnnotateEarlyAndLateRequests
 
 	return nil
 }
@@ -341,6 +349,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ShutdownWatchTerminationGracePeriod, "shutdown-watch-termination-grace-period", s.ShutdownWatchTerminationGracePeriod, ""+
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
+
+	fs.BoolVar(&s.AnnotateEarlyAndLateRequests, "annotate-early-and-late-requests", s.AnnotateEarlyAndLateRequests, ""+
+		"If true, the apiserver will track the request(s) that arrive too early (before the apiserver is fully intialized), "+
+		"or the request(s) that arrive late during the server shutdown window; audit events for these request(s) will "+
+		"be annotated so they can be identified.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

@@ -255,6 +255,12 @@ type Config struct {
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
 
+	// AnnotateEarlyAndLateRequests indicates whether the request(s) that
+	// arrive too early (before the apiserver is ready to serve) or late
+	// (during the server shutdown window) should be annotated so they
+	// can be identified by inspecting the apiserver audit logs.
+	AnnotateEarlyAndLateRequests bool
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -434,6 +440,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		lifecycleSignals:                    lifecycleSignals,
 		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
 		ShutdownWatchTerminationGracePeriod: time.Duration(0),
+		AnnotateEarlyAndLateRequests:        false,
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -915,8 +922,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator, c.LongRunningFunc)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "audit")
 
-	handler = genericfilters.WithShutdownLateAnnotation(handler, c.lifecycleSignals.ShutdownInitiated, c.ShutdownDelayDuration)
-	handler = genericfilters.WithStartupEarlyAnnotation(handler, c.lifecycleSignals.HasBeenReady)
+	if c.AnnotateEarlyAndLateRequests {
+		handler = genericfilters.WithShutdownLateAnnotation(handler, c.lifecycleSignals.ShutdownInitiated, c.ShutdownDelayDuration)
+		handler = genericfilters.WithStartupEarlyAnnotation(handler, c.lifecycleSignals.HasBeenReady)
+	}
 
 	failedHandler := genericapifilters.Unauthorized(c.Serializer)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyRuleEvaluator)

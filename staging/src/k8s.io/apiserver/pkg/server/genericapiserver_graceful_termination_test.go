@@ -1021,6 +1021,7 @@ func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *G
 	config.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
 	})
+	config.AnnotateEarlyAndLateRequests = true
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
