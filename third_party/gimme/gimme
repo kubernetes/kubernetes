@@ -1,0 +1,947 @@
+#!/usr/bin/env bash
+# vim:noexpandtab:ts=2:sw=2:
+#
+#+  Usage: $(basename $0) [flags] [go-version] [version-prefix]
+#+  -
+#+  Version: ${GIMME_VERSION}
+#+  Copyright: ${GIMME_COPYRIGHT}
+#+  License URL: ${GIMME_LICENSE_URL}
+#+  -
+#+  Install go!  There are multiple types of installations available, with 'auto' being the default.
+#+  If either 'auto' or 'binary' is specified as GIMME_TYPE, gimme will first check for an existing
+#+  go installation.  This behavior may be disabled by providing '-f/--force/force' as first positional
+#+  argument.
+#+  -
+#+  Option flags:
+#+          -h --help help - show this help text and exit
+#+    -V --version version - show the version only and exit
+#+        -f --force force - remove the existing go installation if present prior to install
+#+          -l --list list - list installed go versions and exit
+#+        -k --known known - list known go versions and exit
+#+    --force-known-update - when used with --known, ignores the cache and updates
+#+    -r --resolve resolve - resolve a version specifier to a version, show that and exit
+#+  -
+#+  Influential env vars:
+#+  -
+#+        GIMME_GO_VERSION - version to install (*REQUIRED*, may be given as first positional arg)
+#+    GIMME_VERSION_PREFIX - prefix for installed versions (default '${GIMME_VERSION_PREFIX}',
+#+                           may be given as second positional arg)
+#+              GIMME_ARCH - arch to install (default '${GIMME_ARCH}')
+#+        GIMME_BINARY_OSX - darwin-specific binary suffix (default '${GIMME_BINARY_OSX}')
+#+        GIMME_ENV_PREFIX - prefix for env files (default '${GIMME_ENV_PREFIX}')
+#+     GIMME_GO_GIT_REMOTE - git remote for git-based install (default '${GIMME_GO_GIT_REMOTE}')
+#+                GIMME_OS - os to install (default '${GIMME_OS}')
+#+               GIMME_TMP - temp directory (default '${GIMME_TMP}')
+#+              GIMME_TYPE - install type to perform ('auto', 'binary', 'source', or 'git')
+#+                           (default '${GIMME_TYPE}')
+#+      GIMME_INSTALL_RACE - install race directory after compile if non-empty.
+#+                           If the install type is 'binary', this option is ignored.
+#+             GIMME_DEBUG - enable tracing if non-empty
+#+      GIMME_NO_ENV_ALIAS - disable creation of env 'alias' file when os and arch match host
+#+        GIMME_SILENT_ENV - omit the 'go version' line from env file
+#+       GIMME_CGO_ENABLED - enable build of cgo support
+#+     GIMME_CC_FOR_TARGET - cross compiler for cgo support
+#+     GIMME_DOWNLOAD_BASE - override base URL dir for download (default '${GIMME_DOWNLOAD_BASE}')
+#+        GIMME_LIST_KNOWN - override base URL for known go versions (default '${GIMME_LIST_KNOWN}')
+#+   GIMME_KNOWN_CACHE_MAX - seconds the cache for --known is valid for (default '${GIMME_KNOWN_CACHE_MAX}')
+#+  -
+#
+set -e
+shopt -s nullglob
+shopt -s dotglob
+shopt -s extglob
+set -o pipefail
+
+[[ ${GIMME_DEBUG} ]] && set -x
+
+readonly GIMME_VERSION="v1.5.4"
+readonly GIMME_COPYRIGHT="Copyright (c) 2015-2020 gimme contributors"
+readonly GIMME_LICENSE_URL="https://raw.githubusercontent.com/travis-ci/gimme/${GIMME_VERSION}/LICENSE"
+export GIMME_VERSION
+export GIMME_COPYRIGHT
+export GIMME_LICENSE_URL
+
+program_name="$(basename "$0")"
+# shellcheck disable=SC1117
+warn() { printf >&2 "%s: %s\n" "${program_name}" "${*}"; }
+die() {
+	warn "$@"
+	exit 1
+}
+
+# We don't want to go around hitting Google's servers with requests for
+# files named HEAD@{date}.tar so we only try binary/source downloads if
+# it looks like a plausible name to us.
+# We don't need to support 0. releases of Go.
+# We don't support 5 digit major-versions of Go (limit back-tracking in RE).
+# We don't support very long versions
+#   (both to avoid annoying download server operators with attacks and
+#    because regexp backtracking can be pathological).
+# Per _assert_version_given we do assume 2.0 not 2
+ALLOWED_UPSTREAM_VERSION_RE='^[1-9][0-9]{0,3}(\.[0-9][0-9a-zA-Z_-]{0,9})+$'
+#
+# The main path which allowed these to leak upstream before has been closed
+# but a valid git repo tag or branch-name will still reach the point of
+# being _tried_ upstream.
+
+# _do_curl "url" "file"
+_do_curl() {
+	mkdir -p "$(dirname "${2}")"
+
+	if command -v curl >/dev/null; then
+		curl -sSLf "${1}" -o "${2}" 2>/dev/null
+		return
+	fi
+
+	if command -v wget >/dev/null; then
+		wget -q "${1}" -O "${2}" 2>/dev/null
+		return
+	fi
+
+	if command -v fetch >/dev/null; then
+		fetch -q "${1}" -o "${2}" 2>/dev/null
+		return
+	fi
+
+	echo >&2 'error: no curl, wget, or fetch found'
+	exit 1
+}
+
+# _sha256sum "file"
+_sha256sum() {
+	if command -v sha256sum &>/dev/null; then
+		sha256sum "$@"
+	elif command -v gsha256sum &>/dev/null; then
+		gsha256sum "$@"
+	else
+		shasum -a 256 "$@"
+	fi
+}
+
+# sort versions, handling 1.10 after 1.9, not before 1.2
+# FreeBSD sort has --version-sort, none of the others do
+# Looks like --general-numeric-sort is the safest; checked macOS 10.12.6, FreeBSD 10.3, Ubuntu Trusty
+if sort --version-sort </dev/null &>/dev/null; then
+	_version_sort() { sort --version-sort; }
+else
+	_version_sort() {
+		# If we go to four-digit minor or patch versions, then extend the padding here
+		# (but in such a world, perhaps --version-sort will have become standard by then?)
+		sed -E 's/\.([0-9](\.|$))/.00\1/g; s/\.([0-9][0-9](\.|$))/.0\1/g' |
+			sort --general-numeric-sort |
+			sed 's/\.00*/./g'
+	}
+fi
+
+# _do_curls "file" "url" ["url"...]
+_do_curls() {
+	f="${1}"
+	shift
+	if _sha256sum -c "${f}.sha256" &>/dev/null; then
+		return 0
+	fi
+	for url in "${@}"; do
+		if _do_curl "${url}" "${f}"; then
+			if _do_curl "${url}.sha256" "${f}.sha256"; then
+				echo "$(cat "${f}.sha256")  ${f}" >"${f}.sha256.tmp"
+				mv "${f}.sha256.tmp" "${f}.sha256"
+				if ! _sha256sum -c "${f}.sha256" &>/dev/null; then
+					warn "sha256sum failed for '${f}'"
+					warn 'continuing to next candidate URL'
+					continue
+				fi
+			fi
+			return
+		fi
+	done
+	rm -f "${f}"
+	return 1
+}
+
+# _binary "version" "file.tar.gz" "arch"
+_binary() {
+	local version=${1}
+	local file=${2}
+	local arch=${3}
+	urls=(
+		"${GIMME_DOWNLOAD_BASE}/go${version}.${GIMME_OS}-${arch}.tar.gz"
+	)
+	if [[ "${GIMME_OS}" == 'darwin' && "${GIMME_BINARY_OSX}" ]]; then
+		urls=(
+			"${GIMME_DOWNLOAD_BASE}/go${version}.${GIMME_OS}-${arch}-${GIMME_BINARY_OSX}.tar.gz"
+			"${urls[@]}"
+		)
+	fi
+	if [ "${arch}" = 'arm' ]; then
+		# attempt "armv6l" vs just "arm" first (since that's what's officially published)
+		urls=(
+			"${GIMME_DOWNLOAD_BASE}/go${version}.${GIMME_OS}-${arch}v6l.tar.gz" # go1.6beta2 & go1.6rc1
+			"${GIMME_DOWNLOAD_BASE}/go${version}.${GIMME_OS}-${arch}6.tar.gz" # go1.6beta1
+			"${urls[@]}"
+		)
+	fi
+	if [ "${GIMME_OS}" = 'windows' ]; then
+		urls=(
+			"${GIMME_DOWNLOAD_BASE}/go${version}.${GIMME_OS}-${arch}.zip"
+		)
+	fi
+	_do_curls "${file}" "${urls[@]}"
+}
+
+# _source "version" "file.src.tar.gz"
+_source() {
+	urls=(
+		"${GIMME_DOWNLOAD_BASE}/go${1}.src.tar.gz"
+		"https://github.com/golang/go/archive/go${1}.tar.gz"
+	)
+	_do_curls "${2}" "${urls[@]}"
+}
+
+# _fetch "dir"
+_fetch() {
+	mkdir -p "$(dirname "${1}")"
+
+	if [[ -d "${1}/.git" ]]; then
+		(
+			cd "${1}"
+			git remote set-url origin "${GIMME_GO_GIT_REMOTE}"
+			git fetch -q --all && git fetch -q --tags
+		)
+		return
+	fi
+
+	git clone -q "${GIMME_GO_GIT_REMOTE}" "${1}"
+}
+
+# _checkout "version" "dir"
+# NB: might emit a "renamed version" on stdout
+_checkout() {
+	local spec="${1:?}" godir="${2:?}"
+	# We are called twice, once during validation that a version was given and
+	# later during build.  We don't want to fetch twice, so we are fetching
+	# during the validation only, in the caller.
+
+	if [[ "${spec}" =~ ^[0-9a-f]{6,}$ ]]; then
+		# We always treat this as a commit sha, whether instead of doing
+		# branch tests etc.  It looks like a commit sha and the Go maintainers
+		# aren't daft enough to use pure hex for a tag or branch.
+		git -C "$godir" reset -q --hard "${spec}" || return 1
+		return 0
+	fi
+
+	# If spec looks like HEAD^{something} or HEAD^^^ then trying
+	# origin/$spec would succeed but we'd write junk to the filesystem,
+	# propagating annoying characters out.
+	local retval probe_named disallow rev
+
+	probe_named=1
+	disallow='[@^~:{}]'
+	if [[ "${spec}" =~ $disallow ]]; then
+		probe_named=0
+		[[ "${spec}" != "@" ]] || spec="HEAD"
+	fi
+
+	try_spec() { git -C "${godir}" reset -q --hard "$@" -- 2>/dev/null; }
+
+	retval=1
+	if ((probe_named)); then
+		retval=0
+		try_spec "origin/${spec}" ||
+			try_spec "origin/go${spec}" ||
+			{ [[ "${spec}" == "tip" ]] && try_spec origin/master; } ||
+			try_spec "refs/tags/${spec}" ||
+			try_spec "refs/tags/go${spec}" ||
+			retval=1
+	fi
+
+	if ((retval)); then
+		retval=0
+		# We're about to reset anyway, if we succeed, so we should reset to a
+		# known state before parsing what might be relative specs
+		try_spec origin/master &&
+			rev="$(git -C "${godir}" rev-parse --verify -q "${spec}^{object}")" &&
+			try_spec "${rev}" &&
+			git -C "${godir}" rev-parse --verify -q --short=12 "${rev}" ||
+			retval=1
+		# that rev-parse prints to stdout, so we can affect the version seen
+	fi
+
+	unset -f try_spec
+	return $retval
+}
+
+# _extract "file.tar.gz" "dir"
+_extract() {
+	mkdir -p "${2}"
+
+	if [[ "${1}" == *.tar.gz ]]; then
+		tar -xf "${1}" -C "${2}" --strip-components 1
+	else
+		unzip -q "${1}" -d "${2}"
+		mv "${2}"/go/* "${2}"
+		rmdir "${2}"/go
+	fi
+}
+
+# _setup_bootstrap
+_setup_bootstrap() {
+	local versions=("1.18" "1.17" "1.16" "1.15" "1.14" "1.13" "1.12" "1.11" "1.10" "1.9" "1.8" "1.7" "1.6" "1.5" "1.4")
+
+	# try existing
+	for v in "${versions[@]}"; do
+		for candidate in "${GIMME_ENV_PREFIX}/go${v}"*".env"; do
+			if [ -s "${candidate}" ]; then
+				# shellcheck source=/dev/null
+				GOROOT_BOOTSTRAP="$(source "${candidate}" 2>/dev/null && go env GOROOT)"
+				export GOROOT_BOOTSTRAP
+				return 0
+			fi
+		done
+	done
+
+	# try binary
+	for v in "${versions[@]}"; do
+		if [ -n "$(_try_binary "${v}" "${GIMME_HOSTARCH}")" ]; then
+			export GOROOT_BOOTSTRAP="${GIMME_VERSION_PREFIX}/go${v}.${GIMME_OS}.${GIMME_HOSTARCH}"
+			return 0
+		fi
+	done
+
+	echo >&2 "Unable to setup go bootstrap from existing or binary"
+	return 1
+}
+
+# _compile "dir"
+_compile() {
+	(
+		if grep -q GOROOT_BOOTSTRAP "${1}/src/make.bash" &>/dev/null; then
+			_setup_bootstrap || return 1
+		fi
+		cd "${1}"
+		if [[ -d .git ]]; then
+			git clean -dfx -q
+		fi
+		cd src
+		export GOOS="${GIMME_OS}" GOARCH="${GIMME_ARCH}"
+		export CGO_ENABLED="${GIMME_CGO_ENABLED}"
+		export CC_FOR_TARGET="${GIMME_CC_FOR_TARGET}"
+
+		local make_log="${1}/make.${GOOS}.${GOARCH}.log"
+		if [[ "${GIMME_DEBUG}" -ge "2" ]]; then
+			./make.bash -v 2>&1 | tee "${make_log}" 1>&2 || return 1
+		else
+			./make.bash &>"${make_log}" || return 1
+		fi
+	)
+}
+
+_try_install_race() {
+	if [[ ! "${GIMME_INSTALL_RACE}" ]]; then
+		return 0
+	fi
+	"${1}/bin/go" install -race std
+}
+
+_can_compile() {
+	cat >"${GIMME_TMP}/test.go" <<'EOF'
+package main
+import "os"
+func main() {
+	os.Exit(0)
+}
+EOF
+	"${1}/bin/go" run "${GIMME_TMP}/test.go"
+}
+
+# _env "dir"
+_env() {
+	[[ -d "${1}/bin" && -x "${1}/bin/go" ]] || return 1
+
+	# if we try to run a Darwin binary on Linux, we need to fail so 'auto' can fallback to cross-compiling from source
+	# automatically
+	GOROOT="${1}" GOFLAGS="" "${1}/bin/go" version &>/dev/null || return 1
+
+	# https://twitter.com/davecheney/status/431581286918934528
+	# we have to GOROOT sometimes because we use official release binaries in unofficial locations :(
+	#
+	# Issue 87 leads to:
+	#   No, we should _always_ set GOROOT when using official release binaries, and sanest to just always set it.
+	#   The "avoid setting it" is _only_ for people using official releases in official locations.
+	#   Tools like `gimme` are the reason that GOROOT-in-env exists.
+
+	echo
+	if [[ "$(GOROOT="${1}" "${1}/bin/go" env GOHOSTOS)" == "${GIMME_OS}" ]]; then
+		echo 'unset GOOS;'
+	else
+		echo 'export GOOS="'"${GIMME_OS}"'";'
+	fi
+	if [[ "$(GOROOT="${1}" "${1}/bin/go" env GOHOSTARCH)" == "${GIMME_ARCH}" ]]; then
+		echo 'unset GOARCH;'
+	else
+		echo 'export GOARCH="'"${GIMME_ARCH}"'";'
+	fi
+
+	echo "export GOROOT='${1}';"
+
+	# shellcheck disable=SC2016
+	echo 'export PATH="'"${1}/bin"':${PATH}";'
+	if [[ -z "${GIMME_SILENT_ENV}" ]]; then
+		echo 'go version >&2;'
+	fi
+	echo
+}
+
+# _env_alias "dir" "env-file"
+_env_alias() {
+	if [[ "${GIMME_NO_ENV_ALIAS}" ]]; then
+		echo "${2}"
+		return
+	fi
+
+	if [[ "$(GOROOT="${1}" "${1}/bin/go" env GOHOSTOS)" == "${GIMME_OS}" && "$(GOROOT="${1}" "${1}/bin/go" env GOHOSTARCH)" == "${GIMME_ARCH}" ]]; then
+		# GIMME_GO_VERSION might be a branch, which can contain '/'
+		local dest="${GIMME_ENV_PREFIX}/go${GIMME_GO_VERSION//\//__}.env"
+		cp "${2}" "${dest}"
+		ln -sf "${dest}" "${GIMME_ENV_PREFIX}/latest.env"
+		echo "${dest}"
+	else
+		echo "${2}"
+	fi
+}
+
+_try_existing() {
+	case "${1}" in
+	binary)
+		local existing_ver="${GIMME_VERSION_PREFIX}/go${GIMME_GO_VERSION}.${GIMME_OS}.${GIMME_ARCH}"
+		local existing_env="${GIMME_ENV_PREFIX}/go${GIMME_GO_VERSION}.${GIMME_OS}.${GIMME_ARCH}.env"
+		;;
+	source)
+		local existing_ver="${GIMME_VERSION_PREFIX}/go${GIMME_GO_VERSION}.src"
+		local existing_env="${GIMME_ENV_PREFIX}/go${GIMME_GO_VERSION}.src.env"
+		;;
+	*)
+		_try_existing binary || _try_existing source
+		return $?
+		;;
+	esac
+
+	if [[ -x "${existing_ver}/bin/go" && -s "${existing_env}" ]]; then
+		# newer envs have existing semi-colon at end of line, because newer gimme
+		# puts them there; envs created before that change lack those semi-colons
+		# and should gain them, to make it easier for people using eval without
+		# double-quoting the command substition.
+		sed -e 's/\([^;]\)$/\1;/' <"${existing_env}"
+		# gimme is the corner-case where GOROOT _should_ be overriden, since if the
+		# ancilliary tooling's system-internal DefaultGoroot exists, and GOROOT is
+		# unset, then it will be used and the wrong golang will be picked up.
+		# Lots of old installs won't have GOROOT; munge it from $PATH
+		if grep -qs '^unset GOROOT' -- "${existing_env}"; then
+			sed -n -e 's/^export PATH="\(.*\)\/bin:.*$/export GOROOT='"'"'\1'"'"';/p' <"${existing_env}"
+			echo
+		fi
+		# Export the same variables whether building new or using existing
+		echo "export GIMME_ENV='${existing_env}';"
+		return
+	fi
+
+	return 1
+}
+
+# _try_binary "version" "arch"
+_try_binary() {
+	local version=${1}
+	local arch=${2}
+	local bin_tgz="${GIMME_TMP}/go${version}.${GIMME_OS}.${arch}.tar.gz"
+	local bin_dir="${GIMME_VERSION_PREFIX}/go${version}.${GIMME_OS}.${arch}"
+	local bin_env="${GIMME_ENV_PREFIX}/go${version}.${GIMME_OS}.${arch}.env"
+
+	[[ "${version}" =~ ${ALLOWED_UPSTREAM_VERSION_RE} ]] || return 1
+
+	if [ "${GIMME_OS}" = 'windows' ]; then
+		bin_tgz=${bin_tgz%.tar.gz}.zip
+	fi
+
+	_binary "${version}" "${bin_tgz}" "${arch}" || return 1
+	_extract "${bin_tgz}" "${bin_dir}" || return 1
+	_env "${bin_dir}" | tee "${bin_env}" || return 1
+	echo "export GIMME_ENV=\"$(_env_alias "${bin_dir}" "${bin_env}")\""
+}
+
+_try_source() {
+	local src_tgz="${GIMME_TMP}/go${GIMME_GO_VERSION}.src.tar.gz"
+	local src_dir="${GIMME_VERSION_PREFIX}/go${GIMME_GO_VERSION}.src"
+	local src_env="${GIMME_ENV_PREFIX}/go${GIMME_GO_VERSION}.src.env"
+
+	[[ "${GIMME_GO_VERSION}" =~ ${ALLOWED_UPSTREAM_VERSION_RE} ]] || return 1
+
+	_source "${GIMME_GO_VERSION}" "${src_tgz}" || return 1
+	_extract "${src_tgz}" "${src_dir}" || return 1
+	_compile "${src_dir}" || return 1
+	_try_install_race "${src_dir}" || return 1
+	_env "${src_dir}" | tee "${src_env}" || return 1
+	echo "export GIMME_ENV=\"$(_env_alias "${src_dir}" "${src_env}")\""
+}
+
+# We do _not_ try to use any version caching with _try_existing(), but instead
+# build afresh each time.  We don't want to deal with someone moving the repo
+# to other-version, doing an install, then resetting it back to
+# last-version-we-saw and thus introducing conflicts.
+#
+# If you want to re-use a built-at-spec version, then avoid moving the repo
+# and source the generated .env manually.
+# Note that the env will just refer to the 'go' directory, so it's not safe
+# to reuse anyway.
+_try_git() {
+	local git_dir="${GIMME_VERSION_PREFIX}/go"
+	local git_env="${GIMME_ENV_PREFIX}/go.git.${GIMME_OS}.${GIMME_ARCH}.env"
+	local resolved_sha
+
+	# Any tags should have been resolved when we asserted that we were
+	# given a version, so no need to handle that here.
+	_checkout "${GIMME_GO_VERSION}" "${git_dir}" >/dev/null || return 1
+	_compile "${git_dir}" || return 1
+	_try_install_race "${git_dir}" || return 1
+	_env "${git_dir}" | tee "${git_env}" || return 1
+	echo "export GIMME_ENV=\"$(_env_alias "${git_dir}" "${git_env}")\""
+}
+
+_wipe_version() {
+	local env_file="${GIMME_ENV_PREFIX}/go${1}.${GIMME_OS}.${GIMME_ARCH}.env"
+
+	if [[ -s "${env_file}" ]]; then
+		rm -rf "$(awk -F\" '/GOROOT/ { print $2 }' "${env_file}")"
+		rm -f "${env_file}"
+	fi
+}
+
+_list_versions() {
+	if [ ! -d "${GIMME_VERSION_PREFIX}" ]; then
+		return 0
+	fi
+
+	local current_version
+	current_version="$(go env GOROOT 2>/dev/null)"
+	current_version="${current_version##*/go}"
+	current_version="${current_version%%.${GIMME_OS}.*}"
+
+	# 1.1 1.10 1.2 is bad; zsh has `setopt numeric_glob_sort` but bash
+	# doesn't appear to have anything like that.
+	for d in "${GIMME_VERSION_PREFIX}/go"*".${GIMME_OS}."*; do
+		local cleaned="${d##*/go}"
+		cleaned="${cleaned%%.${GIMME_OS}.*}"
+		echo "${cleaned}"
+	done | _version_sort | while read -r cleaned; do
+		echo -en "${cleaned}"
+		if [[ "${cleaned}" == "${current_version}" ]]; then
+			echo -en ' <= current' >&2
+		fi
+		echo
+	done
+}
+
+_update_remote_known_list_if_needed() {
+	# shellcheck disable=SC1117
+	local exp="go([[:alnum:]\.]*)\.src.*" # :alnum: catches beta versions too
+	local list="${GIMME_VERSION_PREFIX}/known-versions.txt"
+	local dlfile="${GIMME_TMP}/known-dl"
+
+	if [[ -e "${list}" ]] &&
+		! ((force_known_update)) &&
+		! _file_older_than_secs "${list}" "${GIMME_KNOWN_CACHE_MAX}"; then
+		echo "${list}"
+		return 0
+	fi
+
+	[[ -d "${GIMME_VERSION_PREFIX:?}" ]] || mkdir -p -- "${GIMME_VERSION_PREFIX}"
+
+	_do_curl "${GIMME_LIST_KNOWN}" "${dlfile}"
+
+	while read -r line; do
+		if [[ "${line}" =~ ${exp} ]]; then
+			echo "${BASH_REMATCH[1]}"
+		fi
+	done <"${dlfile}" | _version_sort | uniq >"${list}.new"
+	rm -f "${list}" &>/dev/null
+	mv "${list}.new" "${list}"
+
+	rm -f "${dlfile}"
+	echo "${list}"
+	return 0
+}
+
+_list_known() {
+	local knownfile
+	knownfile="$(_update_remote_known_list_if_needed)"
+
+	(
+		_list_versions 2>/dev/null
+		cat -- "${knownfile}"
+	) | grep . | _version_sort | uniq
+}
+
+# For the "invoked on commandline" case, we want to always pass unknown
+# strings through, so that we can be a uniqueness filter, but for unknown
+# names we want to exit with a value other than 1, so we document that
+# we'll exit 2.  For use by other functions, 2 is as good as 1.
+_resolve_version() {
+	case "${1}" in
+	stable)
+		_get_curr_stable
+		return 0
+		;;
+	oldstable)
+		_get_old_stable
+		return 0
+		;;
+	tip)
+		echo "tip"
+		return 0
+		;;
+	*.x)
+		true
+		;;
+	*)
+		echo "${1}"
+		local GIMME_GO_VERSION="$1"
+		local ASSERT_ABORT='return'
+		if _assert_version_given 2>/dev/null; then
+			return 0
+		fi
+		warn "version specifier '${1}' unknown"
+		return 2
+		;;
+	esac
+	# We have a .x suffix
+	local base="${1%.x}"
+	local ver last='' known
+	known="$(_update_remote_known_list_if_needed)" # will be version-sorted
+	if [[ ! "${base}" =~ ^[0-9.]+$ ]]; then
+		warn "resolve pattern '${base}.x' invalid for .x finding"
+		return 2
+	fi
+	# The `.x` is optional; "1.10" matches "1.10.x"
+	local search="^${base//./\\.}(\\.[0-9.]+)?\$"
+	# avoid regexp attacks
+	while read -r ver; do
+		[[ "${ver}" =~ $search ]] || continue
+		last="${ver}"
+	done <"$known"
+	if [[ -n "${last}" ]]; then
+		echo "${last}"
+		return 0
+	fi
+	echo "${1}"
+	warn "given '${1}' but no release for '${base}' found"
+	return 2
+}
+
+_realpath() {
+	# shellcheck disable=SC2005
+	[ -d "$1" ] && echo "$(cd "$1" && pwd)" || echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+}
+
+_get_curr_stable() {
+	local stable="${GIMME_VERSION_PREFIX}/stable"
+
+	if _file_older_than_secs "${stable}" 86400; then
+		_update_stable "${stable}"
+	fi
+
+	cat "${stable}"
+}
+
+_get_old_stable() {
+	local oldstable="${GIMME_VERSION_PREFIX}/oldstable"
+
+	if _file_older_than_secs "${oldstable}" 86400; then
+		_update_oldstable "${oldstable}"
+	fi
+
+	cat "${oldstable}"
+}
+
+_update_stable() {
+	local stable="${1}"
+	local url="https://golang.org/VERSION?m=text"
+
+	_do_curl "${url}" "${stable}"
+	sed -i.old -e 's/^go\(.*\)/\1/' "${stable}"
+	rm -f "${stable}.old"
+}
+
+_update_oldstable() {
+	local oldstable="${1}"
+	local oldstable_x
+	oldstable_x=$(_get_curr_stable | awk -F. '{
+		$2--;
+		print $1 "." $2 "." "x"
+	}')
+	_resolve_version "${oldstable_x}" >"${oldstable}"
+}
+
+_last_mod_timestamp() {
+	local filename="${1}"
+	case "${GIMME_HOSTOS}" in
+	darwin | *bsd)
+		stat -f %m "${filename}"
+		;;
+	linux)
+		stat -c %Y "${filename}"
+		;;
+	esac
+}
+
+_file_older_than_secs() {
+	local file="${1}"
+	local age_secs="${2}"
+	local ts
+	# if the file does not exist, we return true, as the cache needs updating
+	ts="$(_last_mod_timestamp "${file}" 2>/dev/null)" || return 0
+	((($(date +%s) - ts) > age_secs))
+}
+
+_assert_version_given() {
+	# By the time we're called, aliases such as "stable" must have been resolved
+	# but we could be a reference in git.
+	#
+	# Versions can include suffices such as in "1.8beta2", so our assumption is that
+	# there will always be a minor present; the first public release was "1.0" so
+	# we assume "2.0" not "2".
+
+	if [[ -z "${GIMME_GO_VERSION}" ]]; then
+		echo >&2 'error: no GIMME_GO_VERSION supplied'
+		echo >&2 "  ex: GIMME_GO_VERSION=1.4.1 ${0} ${*}"
+		echo >&2 "  ex: ${0} 1.4.1 ${*}"
+		${ASSERT_ABORT:-exit} 1
+	fi
+
+	# Note: _resolve_version calls back to us (_assert_version_given), but
+	# only for cases where the version does not end with .x, so this should
+	# be safe.
+	# This should be untangled.  PRs accepted, good starter project.
+	if [[ "${GIMME_GO_VERSION}" == *.x ]]; then
+		GIMME_GO_VERSION="$(_resolve_version "${GIMME_GO_VERSION}")" || ${ASSERT_ABORT:-exit} 1
+	fi
+
+	if [[ "${GIMME_GO_VERSION}" == +([[:digit:]]).+([[:digit:]])* ]]; then
+		return 0
+	fi
+
+	# Here we resolve symbolic references.  If we don't, then we get some
+	# random git tag name being accepted as valid and then we try to
+	# curl garbage from upstream.
+	if [[ "${GIMME_TYPE}" == "auto" || "${GIMME_TYPE}" == "git" ]]; then
+		local git_dir="${GIMME_VERSION_PREFIX}/go"
+		local resolved_sha
+		_fetch "${git_dir}"
+		if resolved_sha="$(_checkout "${GIMME_GO_VERSION}" "${git_dir}")"; then
+			if [[ -n "${resolved_sha}" ]]; then
+				# Break our normal silence, this one really needs to be seen on stderr
+				# always; auditability and knowing what version of Go you got wins.
+				warn "resolved '${GIMME_GO_VERSION}' to '${resolved_sha}'"
+				GIMME_GO_VERSION="${resolved_sha}"
+			fi
+			return 0
+		fi
+	fi
+
+	echo >&2 'error: GIMME_GO_VERSION not recognized as valid'
+	echo >&2 "  got: ${GIMME_GO_VERSION}"
+	${ASSERT_ABORT:-exit} 1
+}
+
+_exclude_from_backups() {
+	# Please avoid anything which requires elevated privileges or is obnoxious
+	# enough to offend the invoker
+	case "${GIMME_HOSTOS}" in
+	darwin)
+		# Darwin: Time Machine is "standard", we can add others.  The default
+		# mechanism is sticky, as an attribute on the dir, requires no
+		# privileges, is idempotent (and doesn't support -- to end flags).
+		tmutil addexclusion "$@"
+		;;
+	esac
+}
+
+_versint() {
+	IFS=" " read -r -a args <<<"${1//[^0-9]/ }"
+	printf '1%03d%03d%03d%03d' "${args[@]}"
+}
+
+_to_goarch() {
+	case "${1}" in
+	aarch64) echo "arm64" ;;
+	*) echo "${1}" ;;
+	esac
+}
+
+: "${GIMME_OS:=$(uname -s | tr '[:upper:]' '[:lower:]')}"
+: "${GIMME_HOSTOS:=$(uname -s | tr '[:upper:]' '[:lower:]')}"
+: "${GIMME_ARCH:=$(_to_goarch "$(uname -m)")}"
+: "${GIMME_HOSTARCH:=$(_to_goarch "$(uname -m)")}"
+: "${GIMME_ENV_PREFIX:=${HOME}/.gimme/envs}"
+: "${GIMME_VERSION_PREFIX:=${HOME}/.gimme/versions}"
+: "${GIMME_TMP:=${TMPDIR:-/tmp}/gimme}"
+: "${GIMME_GO_GIT_REMOTE:=https://github.com/golang/go.git}"
+: "${GIMME_TYPE:=auto}" # 'auto', 'binary', 'source', or 'git'
+: "${GIMME_BINARY_OSX:=osx10.8}"
+: "${GIMME_DOWNLOAD_BASE:=https://dl.google.com/go}"
+: "${GIMME_LIST_KNOWN:=https://golang.org/dl}"
+: "${GIMME_KNOWN_CACHE_MAX:=10800}"
+
+# The version prefix must be an absolute path
+case "${GIMME_VERSION_PREFIX}" in
+/*) true ;;
+*)
+	echo >&2 " Fixing GIMME_VERSION_PREFIX from relative: $GIMME_VERSION_PREFIX"
+	GIMME_VERSION_PREFIX="$(pwd)/${GIMME_VERSION_PREFIX}"
+	echo >&2 " to: $GIMME_VERSION_PREFIX"
+	;;
+esac
+
+case "${GIMME_OS}" in mingw* | msys_nt*)
+	# Minimalist GNU for Windows
+	GIMME_OS='windows'
+
+	if [ "${GIMME_ARCH}" = 'i686' ]; then
+		GIMME_ARCH="386"
+	else
+		GIMME_ARCH="amd64"
+	fi
+	;;
+esac
+
+force_install=0
+force_known_update=0
+
+while [[ $# -gt 0 ]]; do
+	case "${1}" in
+	-h | --help | help | wat)
+		_old_ifs="$IFS"
+		IFS=';'
+		awk '/^#\+  / {
+				sub(/^#\+  /, "", $0) ;
+				sub(/-$/, "", $0) ;
+				print $0
+			}' "$0" | while read -r line; do
+			eval "echo \"$line\""
+		done
+		IFS="$_old_ifs"
+		exit 0
+		;;
+	-V | --version | version)
+		echo "${GIMME_VERSION}"
+		exit 0
+		;;
+	-r | --resolve | resolve)
+		# The normal mkdir of versions is below; we don't want to move it up
+		# to where we create files just if asked our version; thus
+		# _resolve_version has to mkdir the versions dir itself.
+		if [[ $# -ge 2 ]]; then
+			_resolve_version "${2}"
+		elif [[ -n "${GIMME_GO_VERSION:-}" ]]; then
+			_resolve_version "${GIMME_GO_VERSION}"
+		else
+			die "resolve must be given a version to resolve"
+		fi
+		exit $?
+		;;
+	-l | --list | list)
+		_list_versions
+		exit 0
+		;;
+	-k | --known | known)
+		_list_known
+		exit 0
+		;;
+	-f | --force | force)
+		force_install=1
+		;;
+	--force-known-update | force-known-update)
+		force_known_update=1
+		;;
+	-i | install)
+		true # ignore a dummy argument
+		;;
+	*)
+		break
+		;;
+	esac
+	shift
+done
+
+if [[ -n "${1}" ]]; then
+	GIMME_GO_VERSION="${1}"
+fi
+if [[ -n "${2}" ]]; then
+	GIMME_VERSION_PREFIX="${2}"
+fi
+
+case "${GIMME_ARCH}" in
+x86_64) GIMME_ARCH=amd64 ;;
+x86) GIMME_ARCH=386 ;;
+arm64)
+	if [[ "${GIMME_GO_VERSION}" != master && "$(_versint "${GIMME_GO_VERSION}")" < "$(_versint 1.5)" ]]; then
+		echo >&2 "error: ${GIMME_ARCH} is not supported by this go version"
+		echo >&2 "try go1.5 or newer"
+		exit 1
+	fi
+	if [[ "${GIMME_HOSTOS}" == "linux" && "${GIMME_HOSTARCH}" != "${GIMME_ARCH}" ]]; then
+		: "${GIMME_CC_FOR_TARGET:="aarch64-linux-gnu-gcc"}"
+	fi
+	;;
+arm*) GIMME_ARCH=arm ;;
+esac
+
+case "${GIMME_HOSTARCH}" in
+x86_64) GIMME_HOSTARCH=amd64 ;;
+x86) GIMME_HOSTARCH=386 ;;
+arm64) ;;
+arm*) GIMME_HOSTARCH=arm ;;
+esac
+
+case "${GIMME_GO_VERSION}" in
+stable) GIMME_GO_VERSION=$(_get_curr_stable) ;;
+oldstable) GIMME_GO_VERSION=$(_get_old_stable) ;;
+esac
+
+_assert_version_given "$@"
+
+((force_install)) && _wipe_version "${GIMME_GO_VERSION}"
+
+unset GOARCH
+unset GOBIN
+unset GOOS
+unset GOPATH
+unset GOROOT
+unset CGO_ENABLED
+unset CC_FOR_TARGET
+# GO111MODULE breaks build of Go itself
+unset GO111MODULE
+
+mkdir -p "${GIMME_VERSION_PREFIX}" "${GIMME_ENV_PREFIX}"
+# The envs dir stays small and provides a record of what had been installed
+# whereas the versions dir grows by hundreds of MB per version and is not
+# intended to support local modifications (as that subverts the point of gimme)
+# _and_ is a cache, so we're unilaterally declaring that the contents of
+# the versions dir should be excluded from system backups.
+_exclude_from_backups "${GIMME_VERSION_PREFIX}"
+
+GIMME_VERSION_PREFIX="$(_realpath "${GIMME_VERSION_PREFIX}")"
+GIMME_ENV_PREFIX="$(_realpath "${GIMME_ENV_PREFIX}")"
+
+if ! case "${GIMME_TYPE}" in
+	binary) _try_existing binary || _try_binary "${GIMME_GO_VERSION}" "${GIMME_ARCH}" ;;
+	source) _try_existing source || _try_source || _try_git ;;
+	git) _try_git ;;
+	auto) _try_existing || _try_binary "${GIMME_GO_VERSION}" "${GIMME_ARCH}" || _try_source || _try_git ;;
+	*)
+		echo >&2 "I don't know how to '${GIMME_TYPE}'."
+		echo >&2 "  Try 'auto', 'binary', 'source', or 'git'."
+		exit 1
+		;;
+	esac; then
+	echo >&2 "I don't have any idea what to do with '${GIMME_GO_VERSION}'."
+	echo >&2 "  (using download type '${GIMME_TYPE}')"
+	exit 1
+fi
