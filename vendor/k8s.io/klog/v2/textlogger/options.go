@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ktesting
+package textlogger
 
 import (
 	"flag"
+	"io"
+	"os"
 	"strconv"
 
-	"k8s.io/klog/v2/internal/serialize"
 	"k8s.io/klog/v2/internal/verbosity"
 )
 
-// Config influences logging in a test logger. To make this configurable via
+// Config influences logging in a text logger. To make this configurable via
 // command line flags, instantiate this once per program and use AddFlags to
 // bind command line flags to the instance before passing it to NewTestContext.
 //
@@ -62,40 +63,21 @@ func (c *Config) VModule() flag.Value {
 type ConfigOption func(co *configOptions)
 
 type configOptions struct {
-	anyToString       serialize.AnyToStringFunc
 	verbosityFlagName string
 	vmoduleFlagName   string
 	verbosityDefault  int
-	bufferLogs        bool
+	output            io.Writer
 }
 
-// AnyToString overrides the default formatter for values that are not
-// supported directly by klog. The default is `fmt.Sprintf("%+v")`.
-// The formatter must not panic.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
-func AnyToString(anyToString func(value interface{}) string) ConfigOption {
-	return func(co *configOptions) {
-		co.anyToString = anyToString
-	}
-}
-
-// VerbosityFlagName overrides the default -testing.v for the verbosity level.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// VerbosityFlagName overrides the default -v for the verbosity level.
 func VerbosityFlagName(name string) ConfigOption {
 	return func(co *configOptions) {
+
 		co.verbosityFlagName = name
 	}
 }
 
-// VModulFlagName overrides the default -testing.vmodule for the per-module
+// VModulFlagName overrides the default -vmodule for the per-module
 // verbosity levels.
 //
 // # Experimental
@@ -108,12 +90,9 @@ func VModuleFlagName(name string) ConfigOption {
 	}
 }
 
-// Verbosity overrides the default verbosity level of 5. That default is higher
-// than in klog itself because it enables logging entries for "the steps
-// leading up to errors and warnings" and "troubleshooting" (see
-// https://github.com/kubernetes/community/blob/9406b4352fe2d5810cb21cc3cb059ce5886de157/contributors/devel/sig-instrumentation/logging.md#logging-conventions),
-// which is useful when debugging a failed test. `go test` only shows the log
-// output for failed tests. To see all output, use `go test -v`.
+// Verbosity overrides the default verbosity level of 0.
+// See https://github.com/kubernetes/community/blob/9406b4352fe2d5810cb21cc3cb059ce5886de157/contributors/devel/sig-instrumentation/logging.md#logging-conventions
+// for log level conventions in Kubernetes.
 //
 // # Experimental
 //
@@ -125,18 +104,15 @@ func Verbosity(level int) ConfigOption {
 	}
 }
 
-// BufferLogs controls whether log entries are captured in memory in addition
-// to being printed. Off by default. Unit tests that want to verify that
-// log entries are emitted as expected can turn this on and then retrieve
-// the captured log through the Underlier LogSink interface.
+// Output overrides stderr as the output stream.
 //
 // # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
-func BufferLogs(enabled bool) ConfigOption {
+func Output(output io.Writer) ConfigOption {
 	return func(co *configOptions) {
-		co.bufferLogs = enabled
+		co.output = output
 	}
 }
 
@@ -149,18 +125,19 @@ func BufferLogs(enabled bool) ConfigOption {
 // later release.
 func NewConfig(opts ...ConfigOption) *Config {
 	c := &Config{
+		vstate: verbosity.New(),
 		co: configOptions{
-			verbosityFlagName: "testing.v",
-			vmoduleFlagName:   "testing.vmodule",
-			verbosityDefault:  5,
+			verbosityFlagName: "v",
+			vmoduleFlagName:   "vmodule",
+			verbosityDefault:  0,
+			output:            os.Stderr,
 		},
 	}
 	for _, opt := range opts {
 		opt(&c.co)
 	}
 
-	c.vstate = verbosity.New()
-	c.vstate.V().Set(strconv.FormatInt(int64(c.co.verbosityDefault), 10))
+	c.Verbosity().Set(strconv.FormatInt(int64(c.co.verbosityDefault), 10))
 	return c
 }
 
@@ -171,6 +148,6 @@ func NewConfig(opts ...ConfigOption) *Config {
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
 func (c *Config) AddFlags(fs *flag.FlagSet) {
-	fs.Var(c.vstate.V(), c.co.verbosityFlagName, "number for the log level verbosity of the testing logger")
-	fs.Var(c.vstate.VModule(), c.co.vmoduleFlagName, "comma-separated list of pattern=N log level settings for files matching the patterns")
+	fs.Var(c.Verbosity(), c.co.verbosityFlagName, "number for the log level verbosity of the testing logger")
+	fs.Var(c.VModule(), c.co.vmoduleFlagName, "comma-separated list of pattern=N log level settings for files matching the patterns")
 }
