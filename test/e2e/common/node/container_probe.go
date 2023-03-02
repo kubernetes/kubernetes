@@ -970,7 +970,9 @@ func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
-	deadline := time.Now().Add(timeout)
+	// If initialRestartCount is not zero, there is restarting back-off time.
+	deadline := time.Now().Add(timeout + time.Duration(initialRestartCount)*10*time.Second)
+
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
