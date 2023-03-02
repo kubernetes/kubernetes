@@ -2705,7 +2705,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2794,7 +2794,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execHostnameTest(*pausePod0, nodePortAddress, webserverPod0.Name)
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2867,7 +2867,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2945,7 +2945,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -3020,7 +3020,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 

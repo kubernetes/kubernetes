@@ -359,7 +359,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.NewString("10.0.0.1:80"),
 		localEndpoints:   nil,
 	}, {
-		name:        "Cluster traffic policy, PTE enabled, all endpoints are terminating",
+		name:        "Cluster traffic policy, all endpoints are terminating",
 		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{},
 		endpoints: []Endpoint{
@@ -367,16 +367,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
 		},
 		clusterEndpoints: sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
-		localEndpoints:   nil,
-	}, {
-		name:        "Cluster traffic policy, PTE disabled, all endpoints are terminating",
-		pteEnabled:  false,
-		serviceInfo: &BaseServicePortInfo{},
-		endpoints: []Endpoint{
-			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: false, Serving: true, Terminating: true, IsLocal: true},
-			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
-		},
-		clusterEndpoints: sets.NewString(),
 		localEndpoints:   nil,
 	}, {
 		name:        "iTP: Local, eTP: Cluster, some endpoints local",
@@ -419,17 +409,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   sets.NewString(),
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
-		name:        "iTP: Local, eTP: Local, PTE disabled, all endpoints remote and terminating",
-		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
-		endpoints: []Endpoint{
-			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
-			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
-		},
-		clusterEndpoints: sets.NewString(),
-		localEndpoints:   sets.NewString(),
-		allEndpoints:     sets.NewString(),
-	}, {
-		name:        "iTP: Local, eTP: Local, PTE enabled, all endpoints remote and terminating",
+		name:        "iTP: Local, eTP: Local, all endpoints remote and terminating",
 		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
@@ -441,19 +421,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:        sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 		onlyRemoteEndpoints: true,
 	}, {
-		name:        "iTP: Cluster, eTP: Local, PTE disabled, with terminating endpoints",
-		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
-		endpoints: []Endpoint{
-			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
-			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: false, IsLocal: true},
-			&BaseEndpointInfo{Endpoint: "10.0.0.2:80", Ready: false, Serving: true, Terminating: true, IsLocal: true},
-			&BaseEndpointInfo{Endpoint: "10.0.0.3:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
-		},
-		clusterEndpoints: sets.NewString("10.0.0.0:80"),
-		localEndpoints:   sets.NewString(),
-		allEndpoints:     sets.NewString("10.0.0.0:80"),
-	}, {
-		name:        "iTP: Cluster, eTP: Local, PTE enabled, with terminating endpoints",
+		name:        "iTP: Cluster, eTP: Local, with terminating endpoints",
 		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
@@ -490,7 +458,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, tc.pteEnabled)()
 
 			clusterEndpoints, localEndpoints, allEndpoints, hasAnyEndpoints := CategorizeEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeLabels)
 

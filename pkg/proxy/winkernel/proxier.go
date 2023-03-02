@@ -1255,7 +1255,7 @@ func (proxier *Proxier) syncProxyRules() {
 		var allEndpointsTerminating, allEndpointsNonServing bool
 		someEndpointsServing := true
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints) && len(svcInfo.loadBalancerIngressIPs) > 0 {
+		if len(svcInfo.loadBalancerIngressIPs) > 0 {
 			// Check should be done only if comes under the feature gate or enabled
 			// The check should be done only if Spec.Type == Loadbalancer.
 			allEndpointsTerminating = proxier.isAllEndpointsTerminating(svcName, svcInfo.localTrafficDSR)
@@ -1263,7 +1263,7 @@ func (proxier *Proxier) syncProxyRules() {
 			someEndpointsServing = !allEndpointsNonServing
 			klog.V(4).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "allEndpointsNonServing", allEndpointsNonServing, "localTrafficDSR", svcInfo.localTrafficDSR)
 		} else {
-			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "proxyEndpointsFeatureGateEnabled", utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
+			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
 		for _, epInfo := range proxier.endpointsMap[svcName] {
