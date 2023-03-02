@@ -955,7 +955,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
 
-	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
+	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA}, // LockToDefault when CSI driver with GA support for Windows, raw block and xfs features are available
 
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
