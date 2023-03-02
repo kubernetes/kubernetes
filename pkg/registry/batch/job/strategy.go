@@ -211,9 +211,8 @@ func generateSelector(obj *batch.Job) {
 	// a label.
 	_, found := obj.Spec.Template.Labels["job-name"]
 	if found {
-		// User asked us to not automatically generate a selector and labels,
-		// but set a possibly conflicting value.  If there is a conflict,
-		// we will reject in validation.
+		// User asked us to automatically generate a selector, but set manual labels.
+		// If there is a conflict, we will reject in validation.
 	} else {
 		obj.Spec.Template.Labels["job-name"] = string(obj.ObjectMeta.Name)
 	}
@@ -221,9 +220,8 @@ func generateSelector(obj *batch.Job) {
 	// only match this job.
 	_, found = obj.Spec.Template.Labels["controller-uid"]
 	if found {
-		// User asked us to automatically generate a selector and labels,
-		// but set a possibly conflicting value.  If there is a conflict,
-		// we will reject in validation.
+		// User asked us to automatically generate a selector, but set manual labels.
+		// If there is a conflict, we will reject in validation.
 	} else {
 		obj.Spec.Template.Labels["controller-uid"] = string(obj.ObjectMeta.UID)
 	}
