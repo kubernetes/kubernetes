@@ -230,13 +230,13 @@ func (d *DiscoveryClient) downloadLegacy() (*metav1.APIGroupList, map[schema.Gro
 		Do(context.TODO()).
 		ContentType(&responseContentType).
 		Raw()
-	// Special error handling for 403 or 404 to be compatible with older v1.0 servers.
-	// Return empty group list to be merged with /apis.
-	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
-		return nil, nil, err
-	}
-	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
-		return &metav1.APIGroupList{}, nil, nil
+	if err != nil {
+		// Tolerate 404, since aggregated api servers can return it.
+		if errors.IsNotFound(err) {
+			return &metav1.APIGroupList{}, nil, nil
+		} else {
+			return nil, nil, err
+		}
 	}
 
 	apiGroupList := &metav1.APIGroupList{}
@@ -283,13 +283,8 @@ func (d *DiscoveryClient) downloadAPIs() (*metav1.APIGroupList, map[schema.Group
 		Do(context.TODO()).
 		ContentType(&responseContentType).
 		Raw()
-	// Special error handling for 403 or 404 to be compatible with older v1.0 servers.
-	// Return empty group list to be merged with /api.
-	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
+	if err != nil {
 		return nil, nil, err
-	}
-	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
-		return &metav1.APIGroupList{}, nil, nil
 	}
 
 	apiGroupList := &metav1.APIGroupList{}
@@ -341,8 +336,10 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	}
 	err = d.restClient.Get().AbsPath(url.String()).Do(context.TODO()).Into(resources)
 	if err != nil {
-		// ignore 403 or 404 error to be compatible with an v1.0 server.
-		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+		// Tolerate core/v1 not found response by returning empty resource list;
+		// this probably should not happen. But we should verify all callers are
+		// not depending on this toleration before removal.
+		if groupVersion == "v1" && errors.IsNotFound(err) {
 			return resources, nil
 		}
 		return nil, err
