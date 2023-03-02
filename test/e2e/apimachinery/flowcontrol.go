@@ -281,9 +281,10 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 }
 
 func getPriorityLevelConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
-	resp, err := c.CoreV1().RESTClient().Get().RequestURI("/metrics").DoRaw(context.TODO())
+	req := c.CoreV1().RESTClient().Get().AbsPath("/metrics")
+	resp, err := req.DoRaw(context.TODO())
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error requesting metrics; request=%#+v, request.URL()=%s: %w", req, req.URL(), err)
 	}
 	sampleDecoder := expfmt.SampleDecoder{
 		Dec:  expfmt.NewDecoder(bytes.NewBuffer(resp), expfmt.FmtText),
