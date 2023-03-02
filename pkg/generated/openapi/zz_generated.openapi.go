@@ -57699,6 +57699,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"maxParallelImagePulls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MaxParallelImagePulls sets the maximum number of image pulls in parallel. This field cannot be set if SerializeImagePulls is true. Setting it to nil means no limit. Default: nil",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"evictionHard": {
 						SchemaProps: spec.SchemaProps{
 							Description: "evictionHard is a map of signal names to quantities that defines hard eviction thresholds. For example: `{\"memory.available\": \"300Mi\"}`. To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource. Default:\n  memory.available:  \"100Mi\"\n  nodefs.available:  \"10%\"\n  nodefs.inodesFree: \"5%\"\n  imagefs.available: \"15%\"",

@@ -206,7 +206,14 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.KubeAPIBurst = 10
 	}
 	if obj.SerializeImagePulls == nil {
-		obj.SerializeImagePulls = utilpointer.Bool(true)
+		// SerializeImagePulls is default to true when MaxParallelImagePulls
+		// is not set, and false when MaxParallelImagePulls is set.
+		// This is to save users from having to set both configs.
+		if obj.MaxParallelImagePulls == nil || *obj.MaxParallelImagePulls < 2 {
+			obj.SerializeImagePulls = utilpointer.Bool(true)
+		} else {
+			obj.SerializeImagePulls = utilpointer.Bool(false)
+		}
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}

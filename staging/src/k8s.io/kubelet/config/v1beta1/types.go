@@ -482,6 +482,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	SerializeImagePulls *bool `json:"serializeImagePulls,omitempty"`
+	// MaxParallelImagePulls sets the maximum number of image pulls in parallel.
+	// This field cannot be set if SerializeImagePulls is true.
+	// Setting it to nil means no limit.
+	// Default: nil
+	// +optional
+	MaxParallelImagePulls *int32 `json:"maxParallelImagePulls,omitempty"`
 	// evictionHard is a map of signal names to quantities that defines hard eviction
 	// thresholds. For example: `{"memory.available": "300Mi"}`.
 	// To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource.

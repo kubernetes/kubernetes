@@ -266,6 +266,7 @@ var (
 		"RunOnce",
 		"SeccompDefault",
 		"SerializeImagePulls",
+		"MaxParallelImagePulls",
 		"ShowHiddenMetricsForVersion",
 		"ShutdownGracePeriodByPodPriority[*].Priority",
 		"ShutdownGracePeriodByPodPriority[*].ShutdownGracePeriodSeconds",
