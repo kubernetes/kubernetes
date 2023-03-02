@@ -673,21 +673,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("should support querying api-server using in-cluster config", func(ctx context.Context) {
 		// This functionality is only support on containerd  v1.7+
-		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
-		windowsNode, err := findWindowsNode(ctx, f)
-		framework.ExpectNoError(err, "error finding Windows node")
-		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
-		framework.ExpectNoError(err, "error getting node container runtime and version")
-		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
-
-		if !strings.EqualFold(r, "containerd") {
-			e2eskipper.Skipf("container runtime is not containerd")
-		}
-
-		v1dot7 := semver.MustParse("1.7.0")
-		if v.LT(v1dot7) {
-			e2eskipper.Skipf("container runtime is < 1.7.0")
-		}
+		skipUnlessContainerdOneSevenOrGreater(ctx, f)
 
 		ginkgo.By("Scheduling a pod that runs agnhost inclusterclient")
 		podName := "host-process-agnhost-icc"
@@ -752,21 +738,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
 		// This functionality is only supported on containerd v1.7+
-		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
-		windowsNode, err := findWindowsNode(ctx, f)
-		framework.ExpectNoError(err, "error finding Windows node")
-		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
-		framework.ExpectNoError(err, "error getting node container runtime and version")
-		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
-
-		if !strings.EqualFold(r, "containerd") {
-			e2eskipper.Skipf("container runtime is not containerd")
-		}
-
-		v1dot7 := semver.MustParse("1.7.0")
-		if v.LT(v1dot7) {
-			e2eskipper.Skipf("container runtime is < 1.7.0")
-		}
+		skipUnlessContainerdOneSevenOrGreater(ctx, f)
 
 		ginkgo.By("Scheduling a pod that creates a localgroup from an init container then starts a container using that group")
 		localGroupName := getRandomUserGrounName()
