@@ -29,6 +29,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sync"
 	"time"
@@ -182,6 +183,10 @@ type PriorityQueue struct {
 	closed bool
 
 	nsLister listersv1.NamespaceLister
+
+	metricsRecorder metrics.MetricAsyncRecorder
+	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
+	pluginMetricsSamplePercent int
 }
 
 type priorityQueueOptions struct {
@@ -190,6 +195,8 @@ type priorityQueueOptions struct {
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
 	podLister                         listersv1.PodLister
+	metricsRecorder                   metrics.MetricAsyncRecorder
+	pluginMetricsSamplePercent        int
 	clusterEventMap                   map[framework.ClusterEvent]sets.String
 	preEnqueuePluginMap               map[string][]framework.PreEnqueuePlugin
 }
@@ -246,6 +253,20 @@ func WithPreEnqueuePluginMap(m map[string][]framework.PreEnqueuePlugin) Option {
 	}
 }
 
+// WithMetricsRecorder sets metrics recorder.
+func WithMetricsRecorder(recorder metrics.MetricAsyncRecorder) Option {
+	return func(o *priorityQueueOptions) {
+		o.metricsRecorder = recorder
+	}
+}
+
+// WithPluginMetricsSamplePercent sets the percentage of plugin metrics to be sampled.
+func WithPluginMetricsSamplePercent(percent int) Option {
+	return func(o *priorityQueueOptions) {
+		o.pluginMetricsSamplePercent = percent
+	}
+}
+
 var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                             clock.RealClock{},
 	podInitialBackoffDuration:         DefaultPodInitialBackoffDuration,
@@ -298,6 +319,8 @@ func NewPriorityQueue(
 		moveRequestCycle:                  -1,
 		clusterEventMap:                   options.clusterEventMap,
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
+		metricsRecorder:                   options.metricsRecorder,
+		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -325,8 +348,9 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preEnqueue, s.Code().String(), pod.Spec.SchedulerName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	shouldRecordMetric := rand.Intn(100) < p.pluginMetricsSamplePercent
 	for _, pl := range p.preEnqueuePluginMap[pod.Spec.SchedulerName] {
-		s = pl.PreEnqueue(ctx, pod)
+		s = p.runPreEnqueuePlugin(ctx, pl, pod, shouldRecordMetric)
 		if s.IsSuccess() {
 			continue
 		}
@@ -340,6 +364,16 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 		return false
 	}
 	return true
+}
+
+func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl framework.PreEnqueuePlugin, pod *v1.Pod, shouldRecordMetric bool) *framework.Status {
+	if !shouldRecordMetric {
+		return pl.PreEnqueue(ctx, pod)
+	}
+	startTime := p.clock.Now()
+	s := pl.PreEnqueue(ctx, pod)
+	p.metricsRecorder.ObservePluginDurationAsync(preEnqueue, pl.Name(), s.Code().String(), p.clock.Since(startTime).Seconds())
+	return s
 }
 
 // addToActiveQ tries to add pod to active queue. It returns 2 parameters:

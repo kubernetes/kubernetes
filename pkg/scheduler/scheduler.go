@@ -283,6 +283,7 @@ func New(client clientset.Interface,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
+	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh)
 
 	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -292,8 +293,10 @@ func New(client clientset.Interface,
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithClusterEventMap(clusterEventMap),
+		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
+		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -316,6 +319,8 @@ func New(client clientset.Interface,
 		internalqueue.WithClusterEventMap(clusterEventMap),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
+		internalqueue.WithMetricsRecorder(*metricsRecorder),
 	)
 
 	for _, fwk := range profiles {

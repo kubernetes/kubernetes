@@ -1599,11 +1599,12 @@ func TestPendingPodsMetric(t *testing.T) {
 	pInfosWithDelay := makeQueuedPodInfos(totalWithDelay, "z", queueable, timestamp.Add(2*time.Second))
 
 	tests := []struct {
-		name        string
-		operations  []operation
-		operands    [][]*framework.QueuedPodInfo
-		metricsName string
-		wants       string
+		name                       string
+		operations                 []operation
+		operands                   [][]*framework.QueuedPodInfo
+		metricsName                string
+		pluginMetricsSamplePercent int
+		wants                      string
 	}{
 		{
 			name: "add pods to activeQ and unschedulablePods",
@@ -1765,6 +1766,59 @@ scheduler_pending_pods{queue="gated"} 5
 scheduler_pending_pods{queue="unschedulable"} 20
 `,
 		},
+		{
+			name: "the metrics should not be recorded (pluginMetricsSamplePercent=0)",
+			operations: []operation{
+				add,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:1],
+			},
+			metricsName:                "scheduler_plugin_execution_duration_seconds",
+			pluginMetricsSamplePercent: 0,
+			wants: `
+# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
+# TYPE scheduler_plugin_execution_duration_seconds histogram
+`, // the observed value will always be 0, because we don't proceed the fake clock.
+		},
+		{
+			name: "the metrics should be recorded (pluginMetricsSamplePercent=100)",
+			operations: []operation{
+				add,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:1],
+			},
+			metricsName:                "scheduler_plugin_execution_duration_seconds",
+			pluginMetricsSamplePercent: 100,
+			wants: `
+# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
+# TYPE scheduler_plugin_execution_duration_seconds histogram
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.5000000000000002e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.2500000000000005e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="3.375000000000001e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.062500000000001e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="7.593750000000002e-05"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00011390625000000003"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00017085937500000006"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0002562890625000001"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00038443359375000017"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0005766503906250003"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0008649755859375004"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0012974633789062506"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0019461950683593758"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0029192926025390638"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.004378938903808595"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.006568408355712893"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.009852612533569338"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.014778918800354007"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.02216837820053101"} 1
+scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="+Inf"} 1
+scheduler_plugin_execution_duration_seconds_sum{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 0
+scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 1
+`, // the observed value will always be 0, because we don't proceed the fake clock.
+		},
 	}
 
 	resetMetrics := func() {
@@ -1772,6 +1826,7 @@ scheduler_pending_pods{queue="unschedulable"} 20
 		metrics.BackoffPods().Set(0)
 		metrics.UnschedulablePods().Set(0)
 		metrics.GatedPods().Set(0)
+		metrics.PluginExecutionDuration.Reset()
 	}
 
 	for _, test := range tests {
@@ -1781,12 +1836,15 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			defer cancel()
 
 			m := map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{queueable}}}}
-			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(m))
+			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(m), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(*recorder))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)
 				}
 			}
+
+			recorder.FlushMetrics()
 
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
 				t.Fatal(err)
