@@ -20,6 +20,7 @@ limitations under the License.
 package nodeipam
 
 import (
+	"fmt"
 	"net"
 
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -40,7 +41,7 @@ func createLegacyIPAM(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-) *ipam.Controller {
+) (*ipam.Controller, error) {
 	cfg := &ipam.Config{
 		Resync:       ipamResyncInterval,
 		MaxBackoff:   ipamMaxBackoff,
@@ -63,12 +64,10 @@ func createLegacyIPAM(
 	}
 	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
 	if err != nil {
-		logger.Error(err, "Error creating ipam controller")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, fmt.Errorf("error creating ipam controller: %w", err)
 	}
 	if err := ipamc.Start(logger, nodeInformer); err != nil {
-		logger.Error(err, "Error trying to Init()")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, fmt.Errorf("error trying to Init(): %w", err)
 	}
-	return ipamc
+	return ipamc, nil
 }

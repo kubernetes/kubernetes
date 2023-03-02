@@ -21,6 +21,7 @@ package nodeipam
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -31,7 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
@@ -75,24 +76,24 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		secondaryServiceCIDR string
 		maskSize             []int
 		allocatorType        ipam.CIDRAllocatorType
-		wantFatal            bool
+		expectedError        error
 	}{
-		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.RangeAllocatorType, false},
-		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.RangeAllocatorType, false},
-		{"valid_range_allocator_dualstack_dualstackservice", "10.0.0.0/21,2000::/48", "10.1.0.0/21", "3000::/112", []int{24, 64}, ipam.RangeAllocatorType, false},
-		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
-		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, false},
-		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, false},
-		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
-		{"valid_CIDR_larger_than_mask_cloud_allocator", "10.0.0.0/16", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, false},
-		{"invalid_cluster_CIDR", "", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
-		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, true},
-		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/16", "10.0.0.0/8", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, true},
-		{"invalid_CIDR_mask_size", "10.0.0.0/24,2000::/64", "10.1.0.0/21", emptyServiceCIDR, []int{24, 48}, ipam.IPAMFromClusterAllocatorType, true},
+		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.RangeAllocatorType, nil},
+		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.RangeAllocatorType, nil},
+		{"valid_range_allocator_dualstack_dualstackservice", "10.0.0.0/21,2000::/48", "10.1.0.0/21", "3000::/112", []int{24, 64}, ipam.RangeAllocatorType, nil},
+		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, nil},
+		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, nil},
+		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, nil},
+		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, nil},
+		{"valid_CIDR_larger_than_mask_cloud_allocator", "10.0.0.0/16", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.CloudAllocatorType, nil},
+		{"invalid_cluster_CIDR", "", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, errors.New("Controller: Must specify --cluster-cidr if --allocate-node-cidrs is set")},
+		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.IPAMFromCloudAllocatorType, errors.New("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than or equal to --node-cidr-mask-size configured for CIDR family")},
+		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/16", "10.0.0.0/8", emptyServiceCIDR, []int{24}, ipam.IPAMFromClusterAllocatorType, errors.New("error creating ipam controller: failed after occupy serviceCIDR: CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")},
+		{"invalid_CIDR_mask_size", "10.0.0.0/24,2000::/64", "10.1.0.0/21", emptyServiceCIDR, []int{24, 48}, ipam.IPAMFromClusterAllocatorType, errors.New("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than or equal to --node-cidr-mask-size configured for CIDR family")},
 	} {
 		test := tc
+		_, ctx := ktesting.NewTestContext(t)
 		t.Run(test.desc, func(t *testing.T) {
-			klog.Warningf("Test case start: %s", test.desc)
 			t.Parallel()
 			clusterCidrs, err := netutils.ParseCIDRs(strings.Split(test.clusterCIDR, ","))
 			if err != nil {
@@ -106,20 +107,15 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 			if err != nil {
 				secondaryServiceCIDRIpNet = nil
 			}
-			// This is the subprocess which runs the actual code.
-			defer func() {
-				r := recover()
-				if r == nil && test.wantFatal {
-					t.Errorf("Test %s, the code did not panic", test.desc)
-				} else if r != nil && !test.wantFatal {
-					t.Errorf("Test %s, the code did panic", test.desc)
+			_, err = newTestNodeIpamController(ctx, clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
+			if test.expectedError == nil {
+				if err != nil {
+					t.Errorf("Test %s, unexpected error: %v", test.desc, err)
 				}
-			}()
-			_, err = newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
-			// The code is inconsistent about returning error or panic
-			// but we have to keep both ways of existing for backwards compatibility
-			if (err != nil) != test.wantFatal {
-				t.Errorf("Test %s,Got error %v expected %v", test.desc, err, test.wantFatal)
+			} else {
+				if err.Error() != test.expectedError.Error() {
+					t.Errorf("Test %s, got error: %v, expected error: %v", test.desc, err, test.expectedError)
+				}
 			}
 		})
 	}
@@ -135,14 +131,13 @@ func TestNewNodeIpamControllerWithCIDRMasks2(t *testing.T) {
 		secondaryServiceCIDR string
 		maskSize             []int
 		allocatorType        ipam.CIDRAllocatorType
-		wantFatal            bool
 	}{
-		{"valid_multi_cidr_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.MultiCIDRRangeAllocatorType, false},
-		{"valid_multi_cidr_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.MultiCIDRRangeAllocatorType, false},
+		{"valid_multi_cidr_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.MultiCIDRRangeAllocatorType},
+		{"valid_multi_cidr_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.MultiCIDRRangeAllocatorType},
 	} {
 		test := tc
+		_, ctx := ktesting.NewTestContext(t)
 		t.Run(test.desc, func(t *testing.T) {
-			klog.Warningf("Test case start: %s", test.desc)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
 			clusterCidrs, err := netutils.ParseCIDRs(strings.Split(test.clusterCIDR, ","))
@@ -157,20 +152,9 @@ func TestNewNodeIpamControllerWithCIDRMasks2(t *testing.T) {
 			if err != nil {
 				secondaryServiceCIDRIpNet = nil
 			}
-			// This is the subprocess which runs the actual code.
-			defer func() {
-				r := recover()
-				if r == nil && test.wantFatal {
-					t.Errorf("Test %s, the code did not panic", test.desc)
-				} else if r != nil && !test.wantFatal {
-					t.Errorf("Test %s, the code did panic", test.desc)
-				}
-			}()
-			_, err = newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
-			// The code is inconsistent about returning error or panic
-			// but we have to keep both ways of existing for backwards compatibility
-			if (err != nil) != test.wantFatal {
-				t.Errorf("Test %s,Got error %v expected %v", test.desc, err, test.wantFatal)
+			_, err = newTestNodeIpamController(ctx, clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
+			if err != nil {
+				t.Errorf("Test %s, got error %v", test.desc, err)
 			}
 		})
 	}

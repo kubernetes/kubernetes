@@ -21,6 +21,7 @@ package nodeipam
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -45,8 +46,6 @@ func createLegacyIPAM(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-) *fakeController {
-	logger.Error(nil, "Error trying to Init(): legacy cloud provider support disabled at build time")
-	klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	return &fakeController{}
+) (*fakeController, error) {
+	return nil, errors.New("Error trying to Init(): legacy cloud provider support disabled at build time")
 }
