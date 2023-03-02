@@ -701,7 +701,7 @@ func NewProxier(
 
 	// windows listens to all node addresses
 	nodePortAddresses := utilproxy.NewNodePortAddresses(nil)
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	hns, supportedFeatures := newHostNetworkService()
 	hnsNetworkName, err := getNetworkName(config.NetworkName)
