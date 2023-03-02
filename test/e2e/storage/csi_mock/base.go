@@ -248,6 +248,17 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	framework.ExpectNoError(err, "while cleaning up after test")
 }
 
+func (m *mockDriverSetup) update(o utils.PatchCSIOptions) {
+	item, err := m.cs.StorageV1().CSIDrivers().Get(context.TODO(), m.config.GetUniqueDriverName(), metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
+
+	err = utils.PatchCSIDeployment(nil, o, item)
+	framework.ExpectNoError(err, "Failed to apply %v to CSIDriver object %v", o, m.config.GetUniqueDriverName())
+
+	_, err = m.cs.StorageV1().CSIDrivers().Update(context.TODO(), item, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Failed to update CSIDriver %v", m.config.GetUniqueDriverName())
+}
+
 func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 	ginkgo.By("Creating pod")
 	f := m.f
@@ -722,8 +733,8 @@ func checkPodLogs(ctx context.Context, getCalls func(ctx context.Context) ([]dri
 		switch call.Method {
 		case "NodePublishVolume":
 			numNodePublishVolume++
-			if numNodePublishVolume == 1 {
-				// Check that NodePublish had expected attributes for first volume
+			if numNodePublishVolume == expectedNumNodePublish {
+				// Check that NodePublish had expected attributes for last of expected volume
 				for k, v := range expectedAttributes {
 					vv, found := call.Request.VolumeContext[k]
 					if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
