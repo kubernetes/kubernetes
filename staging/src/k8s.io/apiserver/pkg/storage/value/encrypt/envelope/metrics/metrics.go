@@ -64,7 +64,7 @@ var (
 	lastToStorage                                   time.Time
 	keyIDHashTotalMetricLabels                      *lru.Cache
 	keyIDHashStatusLastTimestampSecondsMetricLabels *lru.Cache
-	cacheSize                                       int = 10
+	cacheSize                                       = 100
 
 	// This metric is only used for KMS v1 API.
 	dekCacheFillPercent = metrics.NewGauge(
