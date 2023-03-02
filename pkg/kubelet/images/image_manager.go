@@ -19,9 +19,9 @@ package images
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -32,6 +32,7 @@ import (
 	crierrors "k8s.io/cri-api/pkg/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 type ImagePodPullingTimeRecorder interface {
@@ -189,19 +190,18 @@ func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes e
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
 // a default tag will be applied.
 func applyDefaultImageTag(image string) (string, error) {
-	named, err := dockerref.ParseNormalizedNamed(image)
+	_, tag, digest, err := parsers.ParseImageName(image)
 	if err != nil {
-		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
+		return "", err
 	}
-	_, isTagged := named.(dockerref.Tagged)
-	_, isDigested := named.(dockerref.Digested)
-	if !isTagged && !isDigested {
+	// we just concatenate the image name with the default tag here instead
+	if len(digest) == 0 && len(tag) > 0 && !strings.HasSuffix(image, ":"+tag) {
 		// we just concatenate the image name with the default tag here instead
 		// of using dockerref.WithTag(named, ...) because that would cause the
 		// image to be fully qualified as docker.io/$name if it's a short name
 		// (e.g. just busybox). We don't want that to happen to keep the CRI
 		// agnostic wrt image names and default hostnames.
-		image = image + ":latest"
+		image = image + ":" + tag
 	}
 	return image, nil
 }
