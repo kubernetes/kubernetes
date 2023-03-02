@@ -274,4 +274,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.ContainerRuntimeEndpoint == "" {
 		obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
 	}
+	if obj.ExternalCloudProvider == nil {
+		obj.ExternalCloudProvider = utilpointer.BoolPtr(false)
+	}
 }

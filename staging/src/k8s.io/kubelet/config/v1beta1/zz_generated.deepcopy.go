@@ -407,6 +407,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExternalCloudProvider != nil {
+		in, out := &in.ExternalCloudProvider, &out.ExternalCloudProvider
+		*out = new(bool)
+		**out = **in
+	}
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler

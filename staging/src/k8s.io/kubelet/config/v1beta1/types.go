@@ -676,6 +676,10 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
+	// ExternalCloudProvider replaces --cloud-provider=external.  When set to
+	// true, an external cloud provider is expected to be used.
+	// +optional
+	ExternalCloudProvider *bool `json:"externalCloudProvider,omitempty"`
 	// kernelMemcgNotification, if set, instructs the kubelet to integrate with the
 	// kernel memcg notification for determining if memory eviction thresholds are
 	// exceeded rather than polling.

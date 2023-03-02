@@ -486,6 +486,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
+	if err := v1.Convert_Pointer_bool_To_bool(&in.ExternalCloudProvider, &out.ExternalCloudProvider, s); err != nil {
+		return err
+	}
 	out.KernelMemcgNotification = in.KernelMemcgNotification
 	out.Logging = in.Logging
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
@@ -541,6 +544,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.ReadOnlyPort = in.ReadOnlyPort
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
+	if err := v1.Convert_bool_To_Pointer_bool(&in.ExternalCloudProvider, &out.ExternalCloudProvider, s); err != nil {
+		return err
+	}
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))

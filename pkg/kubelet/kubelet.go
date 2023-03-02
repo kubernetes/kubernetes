@@ -538,7 +538,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		cloud:                          kubeDeps.Cloud,
-		externalCloudProvider:          cloudprovider.IsExternal(cloudProvider),
+		externalCloudProvider:          isExternalCloudProvider(cloudProvider, kubeCfg),
 		providerID:                     providerID,
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
@@ -2914,4 +2914,19 @@ func (kl *Kubelet) PrepareDynamicResources(pod *v1.Pod) error {
 // This method implements the RuntimeHelper interface
 func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(pod)
+}
+
+// isExternalCloudProvider determines if either:
+// - the cloud provider flag is set to `external` (i.e. `--cloud-provider=external`),
+// - the KubeletConfiguration `ExternalCloudProvider` option is set to true.
+// This should be removed when the `--cloud-provider` flag is removed.
+func isExternalCloudProvider(cloudProvider string, kubeletCfg *kubeletconfiginternal.KubeletConfiguration) bool {
+	externalFlag := cloudprovider.IsExternal(cloudProvider)
+	externalConfig := kubeletCfg.ExternalCloudProvider
+	either := externalFlag || externalConfig
+	klog.V(2).InfoS(
+		fmt.Sprintf("External cloud provider expected: %v", either),
+		"kubeletFlag", externalFlag,
+		"kubeletConfiguration", externalConfig)
+	return either
 }

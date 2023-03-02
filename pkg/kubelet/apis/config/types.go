@@ -114,6 +114,9 @@ type KubeletConfiguration struct {
 	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
 	// can use to identify a specific node
 	ProviderID string
+	// ExternalCloudProvider replaces --cloud-provider=external.  When set to
+	// true, an external cloud provider is expected to be used
+	ExternalCloudProvider bool
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate

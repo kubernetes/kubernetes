@@ -58845,6 +58845,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"externalCloudProvider": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExternalCloudProvider replaces --cloud-provider=external.  When set to true, an external cloud provider is expected to be used.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"kernelMemcgNotification": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kernelMemcgNotification, if set, instructs the kubelet to integrate with the kernel memcg notification for determining if memory eviction thresholds are exceeded rather than polling. Default: false",
