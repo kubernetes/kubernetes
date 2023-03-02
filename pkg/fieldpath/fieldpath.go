@@ -33,8 +33,8 @@ func FormatMap(m map[string]string) (fmtStr string) {
 	var grow int
 	for k, v := range m {
 		keys = append(keys, k)
-		// why add 3: (for =, " and ")
-		grow += len(k) + len(v) + 3
+		// why add 4: (for =, \n, " and ")
+		grow += len(k) + len(v) + 4
 	}
 	sort.Strings(keys)
 	// allocate space to avoid expansion
