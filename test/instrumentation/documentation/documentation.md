@@ -6,10 +6,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
-## Metrics (v1.26)
+## Metrics (v1.27)
 
-<!-- (auto-generated 2022 Nov 11) -->
-<!-- (auto-generated v1.26) -->
+<!-- (auto-generated 2023 Mar 01) -->
+<!-- (auto-generated v1.27) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -134,6 +134,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">reason</div><div class="metric_label">result</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_pod_resource_limit</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="custom">Custom</td>
+<td class="metric_description">Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.</td>
+<td class="metric_labels_varying"><div class="metric_label">namespace</div><div class="metric_label">pod</div><div class="metric_label">node</div><div class="metric_label">scheduler</div><div class="metric_label">priority</div><div class="metric_label">resource</div><div class="metric_label">unit</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_pod_resource_request</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="custom">Custom</td>
+<td class="metric_description">Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.</td>
+<td class="metric_labels_varying"><div class="metric_label">namespace</div><div class="metric_label">pod</div><div class="metric_label">node</div><div class="metric_label">scheduler</div><div class="metric_label">priority</div><div class="metric_label">resource</div><div class="metric_label">unit</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">node_collector_evictions_total</td>
 <td class="metric_stability_level" data-stability="stable">STABLE</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -204,6 +218,25 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">profile</div><div class="metric_label">result</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+</tbody>
+</table>
+
+### List of Beta Kubernetes Metrics
+
+<table class="table metrics" caption="This is the list of BETA metrics emitted from core Kubernetes components">
+<thead>
+	<tr>
+		<th class="metric_name">Name</th>
+		<th class="metric_stability_level">Stability Level</th>
+		<th class="metric_type">Type</th>
+		<th class="metric_help">Help</th>
+		<th class="metric_labels">Labels</th>
+		<th class="metric_const_labels">Const Labels</th>
+		<th class="metric_deprecated_version">Deprecated Version</th>
+	</tr>
+</thead>
+<tbody>
+
 </tbody>
 </table>
 
@@ -345,14 +378,14 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">apiserver_cel_compilation_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description"></td>
+<td class="metric_description">CEL compilation time in seconds.</td>
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_cel_evaluation_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description"></td>
+<td class="metric_description">CEL evaluation time in seconds.</td>
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -452,6 +485,41 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Time (in seconds) of inter arrival of transformation requests.</td>
 <td class="metric_labels_varying"><div class="metric_label">transformation_type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_envelope_encryption_invalid_key_id_from_status_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of times an invalid keyID is returned by the Status RPC call split by error.</td>
+<td class="metric_labels_varying"><div class="metric_label">error</div><div class="metric_label">provider_name</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">The last time in seconds when a keyID was used.</td>
+<td class="metric_labels_varying"><div class="metric_label">key_id_hash</div><div class="metric_label">provider_name</div><div class="metric_label">transformation_type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_envelope_encryption_key_id_hash_status_last_timestamp_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">The last time in seconds when a keyID was returned by the Status RPC call.</td>
+<td class="metric_labels_varying"><div class="metric_label">key_id_hash</div><div class="metric_label">provider_name</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_envelope_encryption_key_id_hash_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of times a keyID is used split by transformation type and provider.</td>
+<td class="metric_labels_varying"><div class="metric_label">key_id_hash</div><div class="metric_label">provider_name</div><div class="metric_label">transformation_type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_envelope_encryption_kms_operations_latency_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">KMS operation duration with gRPC error code status total.</td>
+<td class="metric_labels_varying"><div class="metric_label">grpc_status_code</div><div class="metric_label">method_name</div><div class="metric_label">provider_name</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_current_executing_requests</td>
@@ -783,11 +851,25 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">endpoint</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_storage_decode_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of stored object decode errors split by object type</td>
+<td class="metric_labels_varying"><div class="metric_label">resource</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_envelope_transformation_cache_misses_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Total number of cache misses while accessing key decryption key(KEK).</td>
 <td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_storage_events_received_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of etcd events received split by kind.</td>
+<td class="metric_labels_varying"><div class="metric_label">resource</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_list_evaluated_objects_total</td>
@@ -822,7 +904,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Latencies in seconds of value transformation operations.</td>
-<td class="metric_labels_varying"><<div class="metric_label">status</div><div class="metric_label">transformation_type</div><div class="metric_label">transformer_prefix</div></td>
+<td class="metric_labels_varying"><div class="metric_label">transformation_type</div><div class="metric_label">transformer_prefix</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_transformation_operations_total</td>
@@ -871,6 +953,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Counter of events dispatched in watch cache broken by resource type.</td>
+<td class="metric_labels_varying"><div class="metric_label">resource</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_watch_cache_events_received_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Counter of events received in watch cache broken by resource type.</td>
 <td class="metric_labels_varying"><div class="metric_label">resource</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -1276,8 +1365,8 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">field_validation_request_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Response latency distribution in seconds for each field validation value and whether field validation is enabled or not</td>
-<td class="metric_labels_varying"><div class="metric_label">enabled</div><div class="metric_label">field_validation</div></td>
+<td class="metric_description">Response latency distribution in seconds for each field validation value</td>
+<td class="metric_labels_varying"><div class="metric_label">field_validation</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">garbagecollector_controller_resources_sync_error_total</td>
@@ -1343,6 +1432,34 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">cidr</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_apiserver_nodeport_allocator_allocated_ports</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Gauge measuring the number of allocated NodePorts for Services</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_apiserver_nodeport_allocator_allocation_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of errors trying to allocate NodePort</td>
+<td class="metric_labels_varying"><div class="metric_label">scope</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_apiserver_nodeport_allocator_allocation_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of NodePort allocations</td>
+<td class="metric_labels_varying"><div class="metric_label">scope</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kube_apiserver_nodeport_allocator_available_ports</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Gauge measuring the number of available NodePorts for Services</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kube_apiserver_pod_logs_pods_logs_backend_tls_failure_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -1355,20 +1472,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Total number of requests for pods/logs sliced by usage type: enforce_tls, skip_tls_allowed, skip_tls_denied</td>
 <td class="metric_labels_varying"><div class="metric_label">usage</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">kube_pod_resource_limit</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="custom">Custom</td>
-<td class="metric_description">Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.</td>
-<td class="metric_labels_varying"><div class="metric_label">namespace</div><div class="metric_label">pod</div><div class="metric_label">node</div><div class="metric_label">scheduler</div><div class="metric_label">priority</div><div class="metric_label">resource</div><div class="metric_label">unit</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">kube_pod_resource_request</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="custom">Custom</td>
-<td class="metric_description">Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.</td>
-<td class="metric_labels_varying"><div class="metric_label">namespace</div><div class="metric_label">pod</div><div class="metric_label">node</div><div class="metric_label">scheduler</div><div class="metric_label">priority</div><div class="metric_label">resource</div><div class="metric_label">unit</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kubelet_certificate_manager_client_expiration_renew_errors</td>
@@ -1735,6 +1838,27 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_topology_manager_admission_duration_ms</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Duration in milliseconds to serve a pod admission request.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_topology_manager_admission_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of admission request failures where resources could not be aligned.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_topology_manager_admission_requests_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of admission requests where resources have to be aligned.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kubelet_volume_metric_collection_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -1931,6 +2055,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">zone</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">node_collector_update_all_nodes_health_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Duration in seconds for NodeController to update the health of all nodes.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">node_collector_update_node_health_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Duration in seconds for NodeController to update the health of a single node.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">node_collector_zone_health</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
@@ -1980,6 +2118,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">clusterCIDR</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">node_ipam_controller_cirdset_max_cidrs</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Maximum number of CIDRs that can be allocated.</td>
+<td class="metric_labels_varying"><div class="metric_label">clusterCIDR</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">node_ipam_controller_multicidrset_allocation_tries_per_request</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -2005,6 +2150,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
 <td class="metric_description">Gauge measuring percentage of allocated CIDRs.</td>
+<td class="metric_labels_varying"><div class="metric_label">clusterCIDR</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">node_ipam_controller_multicirdset_max_cidrs</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Maximum number of CIDRs that can be allocated.</td>
 <td class="metric_labels_varying"><div class="metric_label">clusterCIDR</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -2134,6 +2286,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">resourceclaim_controller_create_attempts_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of ResourceClaims creation requests</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">resourceclaim_controller_create_failures_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of ResourceClaims creation request failures</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">rest_client_exec_plugin_call_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -2167,6 +2333,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Request latency in seconds. Broken down by verb, and host.</td>
 <td class="metric_labels_varying"><div class="metric_label">host</div><div class="metric_label">verb</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">rest_client_request_retries_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of request retries, partitioned by status code, verb, and host.</td>
+<td class="metric_labels_varying"><div class="metric_label">code</div><div class="metric_label">host</div><div class="metric_label">verb</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">rest_client_request_size_bytes</td>
