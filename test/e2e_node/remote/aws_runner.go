@@ -91,7 +91,7 @@ func (a *AWSRunner) Validate() error {
 func (a *AWSRunner) StartTests(suite TestSuite, archivePath string, results chan *TestResult) (numTests int) {
 	for i := range a.internalAWSImages {
 		img := a.internalAWSImages[i]
-		fmt.Printf("Initializing e2e tests using image %s /  %s.\n", img.imageDesc, img.amiID)
+		fmt.Printf("Initializing e2e tests using image %s / %s.\n", img.imageDesc, img.amiID)
 		numTests++
 		go func() {
 			results <- a.testAWSImage(suite, archivePath, img)
@@ -311,6 +311,7 @@ func (a *AWSRunner) getAWSInstance(img internalAWSImage) (*awsInstance, error) {
 
 		// generate a temporary SSH key and send it to the node via instance-connect
 		if *instanceConnect && !createdSSHKey {
+			klog.Info("instance-connect flag is set, using ec2 instance connect to configure a temporary SSH key")
 			err = a.assignNewSSHKey(testInstance)
 			if err != nil {
 				continue

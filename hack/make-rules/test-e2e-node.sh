@@ -188,6 +188,8 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = aws ] ; then
   instance_prefix=${INSTANCE_PREFIX:-"test"}
   cleanup=${CLEANUP:-"true"}
   delete_instances=${DELETE_INSTANCES:-"false"}
+  instance_profile=${INSTANCE_PROFILE:-""}
+  user_data_file=${USER_DATA_FILE:-""}
   preemptible_instances=${PREEMPTIBLE_INSTANCES:-"false"}
   test_suite=${TEST_SUITE:-"default"}
   if [[ -n "${TIMEOUT:-}" ]] ; then
@@ -205,7 +207,7 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = aws ] ; then
   test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
   test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
 
-  region=${AWS_REGION:-${AWS_DEFAULT_REGION:-""}}
+  region=$(aws configure get region)
   if [[ ${region} == "" ]]; then
       echo "Could not find AWS region specified"
       exit 1
@@ -226,15 +228,15 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = aws ] ; then
 
   # Invoke the runner
   go run test/e2e_node/runner/remote/run_remote.go  --mode="aws" --vmodule=*=4 \
-    --ssh-env="aws" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
-    --gubernator="${gubernator}" \
+    --ssh-env="aws" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" --ssh-user="${ssh_user}" \
+    --gubernator="${gubernator}" --instance-profile="${instance_profile}" \
     --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
     --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
-    --instance-name-prefix="${instance_prefix}" \
+    --instance-name-prefix="${instance_prefix}" --user-data-file="${user_data_file}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
-    --image-config-dir="${image_config_dir}" \
+    --image-config-dir="${image_config_dir}" --region="${region}" \
     --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"

@@ -216,8 +216,8 @@ define TEST_E2E_NODE_HELP_INFO
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host.  Defaults to false.
-#  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, ssh).
-#    If set to "gce", an instance can be provisioned or reused from GCE. If set
+#  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, aws, ssh).
+#    If set to "gce" or "aws", an instance can be provisioned or reused from GCE/AWS. If set
 #    to "ssh", provided `HOSTS` must be IPs or resolvable.  Defaults to "gce".
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
@@ -258,6 +258,8 @@ define TEST_E2E_NODE_HELP_INFO
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
+#  INSTANCE_PROFILE: For REMOTE=true and running on AWS only. An AWS IAM instance profile to use with the node. 
+#  USER_DATA_FILE: For REMOTE=true and running on AWS only. Userdata file to use when launching an instance.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
