@@ -27,9 +27,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"sigs.k8s.io/yaml"
+
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -479,7 +480,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 	})
 
 	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
-	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
+	ginkgo.It("kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
 		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
 		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}
@@ -496,7 +497,17 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := verifyKubectlExplain(f.Namespace.Name, customServiceShortName+".spec", `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
+		if err := verifyKubectlExplainArgs(f.Namespace.Name, []string{"service.spec", "--api-version", crdSvc.Crd.Spec.Group + "/v1", "-v", "7"}, `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
+			_ = cleanupCRD(ctx, f, crdSvc) // need to remove the crd since its name is unchanged
+			framework.Failf("%v", err)
+		}
+
+		if err := verifyKubectlExplainArgs(f.Namespace.Name, []string{customServiceShortName + ".spec", "--api-version", crdSvc.Crd.Spec.Group + "/v1", "-v", "7"}, `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
+			_ = cleanupCRD(ctx, f, crdSvc) // need to remove the crd since its name is unchanged
+			framework.Failf("%v", err)
+		}
+
+		if err := verifyKubectlExplainArgs(f.Namespace.Name, []string{customServiceShortName + ".spec", "-v", "7"}, `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
 			_ = cleanupCRD(ctx, f, crdSvc) // need to remove the crd since its name is unchanged
 			framework.Failf("%v", err)
 		}
@@ -716,13 +727,17 @@ func dropDefaults(s *spec.Schema) {
 }
 
 func verifyKubectlExplain(ns, name, pattern string) error {
-	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
+	return verifyKubectlExplainArgs(ns, []string{name}, pattern)
+}
+
+func verifyKubectlExplainArgs(ns string, args []string, pattern string) error {
+	result, err := e2ekubectl.RunKubectl(ns, append([]string{"explain"}, args...)...)
 	if err != nil {
-		return fmt.Errorf("failed to explain %s: %w", name, err)
+		return fmt.Errorf("failed to explain %v: %w", args, err)
 	}
 	r := regexp.MustCompile(pattern)
 	if !r.Match([]byte(result)) {
-		return fmt.Errorf("kubectl explain %s result {%s} doesn't match pattern {%s}", name, result, pattern)
+		return fmt.Errorf("kubectl explain %v result {%s} doesn't match pattern {%s}", args, result, pattern)
 	}
 	return nil
 }
