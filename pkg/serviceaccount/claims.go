@@ -198,7 +198,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 
 	// Check special 'warnafter' field for projected service account token transition.
 	warnafter := private.Kubernetes.WarnAfter
-	if warnafter != nil {
+	if warnafter != nil && *warnafter != 0 {
 		if nowTime.After(warnafter.Time()) {
 			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
 			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)
