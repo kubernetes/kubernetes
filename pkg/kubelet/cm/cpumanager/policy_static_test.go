@@ -36,6 +36,7 @@ type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
 	numReservedCPUs int
+	reservedCPUs    *cpuset.CPUSet
 	podUID          string
 	options         map[string]string
 	containerName   string
@@ -197,17 +198,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 
 	optionsInsensitiveTestCases := []staticPolicyTest{
 		{
-			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
-			topo:            topoSingleSocketHT,
-			numReservedCPUs: 1,
-			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
-			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
-			expCPUAlloc:     false,
-			expCSet:         cpuset.New(),
-		},
-		{
 			description:     "GuPodMultipleCores, SingleSocketHT, ExpectAllocOneCore",
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
@@ -221,21 +211,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 5),
-		},
-		{
-			description:     "GuPodMultipleCores, SingleSocketHT, ExpectSameAllocation",
-			topo:            topoSingleSocketHT,
-			numReservedCPUs: 1,
-			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(2, 3, 6, 7),
-				},
-			},
-			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
-			pod:             makePod("fakePod", "fakeContainer3", "4000m", "4000m"),
-			expErr:          nil,
-			expCPUAlloc:     true,
-			expCSet:         cpuset.New(2, 3, 6, 7),
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocket",
@@ -335,36 +310,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCSet:         cpuset.New(),
 		},
 		{
-			description:     "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
-			topo:            topoSingleSocketHT,
-			numReservedCPUs: 1,
-			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(1, 2, 3, 4, 5, 6),
-				},
-			},
-			stDefaultCPUSet: cpuset.New(0, 7),
-			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
-			expCPUAlloc:     false,
-			expCSet:         cpuset.New(),
-		},
-		{
-			description:     "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
-			topo:            topoDualSocketHT,
-			numReservedCPUs: 1,
-			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(1, 2, 3),
-				},
-			},
-			stDefaultCPUSet: cpuset.New(0, 4, 5, 6, 7, 8, 9, 10, 11),
-			pod:             makePod("fakePod", "fakeContainer5", "10000m", "10000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
-			expCPUAlloc:     false,
-			expCSet:         cpuset.New(),
-		},
-		{
 			// All the CPUs from Socket 0 are available. Some CPUs from each
 			// Socket have been already assigned.
 			// Expect all CPUs from Socket 0.
@@ -416,23 +361,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCPUAlloc: true,
 			expCSet:     largeTopoSock1CPUSet.Union(cpuset.New(10, 34, 22, 47)),
 		},
-		{
-			// Only 7 CPUs are available.
-			// Pod requests 76 cores.
-			// Error is expected since available CPUs are less than the request.
-			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, NoAlloc",
-			topo:        topoQuadSocketFourWayHT,
-			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)),
-				},
-			},
-			stDefaultCPUSet: cpuset.New(10, 11, 53, 37, 55, 67, 52),
-			pod:             makePod("fakePod", "fakeContainer5", "76000m", "76000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
-			expCPUAlloc:     false,
-			expCSet:         cpuset.New(),
-		},
 	}
 
 	// testcases for the default behaviour of the policy.
@@ -463,6 +391,79 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(10, 11, 53, 67, 52),
+		},
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.New(),
+		},
+		{
+			description:     "GuPodMultipleCores, SingleSocketHT, ExpectSameAllocation",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer3": cpuset.New(2, 3, 6, 7),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
+			pod:             makePod("fakePod", "fakeContainer3", "4000m", "4000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(2, 3, 6, 7),
+		},
+		{
+			description:     "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": cpuset.New(1, 2, 3),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainer5", "10000m", "10000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.New(),
+		},
+		{
+			description:     "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": cpuset.New(1, 2, 3, 4, 5, 6),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 7),
+			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.New(),
+		},
+		{
+			// Only 7 CPUs are available.
+			// Pod requests 76 cores.
+			// Error is expected since available CPUs are less than the request.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, NoAlloc",
+			topo:        topoQuadSocketFourWayHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(10, 11, 53, 37, 55, 67, 52),
+			pod:             makePod("fakePod", "fakeContainer5", "76000m", "76000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.New(),
 		},
 	}
 
@@ -496,6 +497,50 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, ExpectDoNotAllocPartialCPU",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    newCPUSetPtr(1, 6),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_1", "10000m", "10000m"),
+			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8},
+			expCPUAlloc:     false,
+			expCSet:         cpuset.New(),
+		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, AutoReserve, ExpectAllocAllCPUs",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_2", "10000m", "10000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, ExpectAllocAllCPUs",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    newCPUSetPtr(0, 6),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_2", "10000m", "10000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 		},
 	}
 	newNUMAAffinity := func(bits ...int) bitmask.BitMask {
@@ -565,7 +610,11 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	if testCase.topologyHint != nil {
 		tm = topologymanager.NewFakeManagerWithHint(testCase.topologyHint)
 	}
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), tm, testCase.options)
+	cpus := cpuset.New()
+	if testCase.reservedCPUs != nil {
+		cpus = testCase.reservedCPUs.Clone()
+	}
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -1092,4 +1141,9 @@ func TestStaticPolicyOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
+	ret := cpuset.New(cpus...)
+	return &ret
 }
