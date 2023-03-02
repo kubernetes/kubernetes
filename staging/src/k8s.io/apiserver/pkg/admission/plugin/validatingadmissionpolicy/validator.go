@@ -18,298 +18,92 @@ package validatingadmissionpolicy
 
 import (
 	"fmt"
-	"reflect"
+	"k8s.io/klog/v2"
 	"strings"
-	"time"
 
 	celtypes "github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/interpreter"
 
-	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
-	authenticationv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
-var _ ValidatorCompiler = &CELValidatorCompiler{}
-var _ matching.MatchCriteria = &matchCriteria{}
-
-type matchCriteria struct {
-	constraints *v1alpha1.MatchResources
+// validator implements the Validator interface
+type validator struct {
+	filter     cel.Filter
+	failPolicy *v1.FailurePolicyType
 }
 
-// GetParsedNamespaceSelector returns the converted LabelSelector which implements labels.Selector
-func (m *matchCriteria) GetParsedNamespaceSelector() (labels.Selector, error) {
-	return metav1.LabelSelectorAsSelector(m.constraints.NamespaceSelector)
-}
-
-// GetParsedObjectSelector returns the converted LabelSelector which implements labels.Selector
-func (m *matchCriteria) GetParsedObjectSelector() (labels.Selector, error) {
-	return metav1.LabelSelectorAsSelector(m.constraints.ObjectSelector)
-}
-
-// GetMatchResources returns the matchConstraints
-func (m *matchCriteria) GetMatchResources() v1alpha1.MatchResources {
-	return *m.constraints
-}
-
-// CELValidatorCompiler implement the interface ValidatorCompiler.
-type CELValidatorCompiler struct {
-	Matcher *matching.Matcher
-}
-
-// DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *CELValidatorCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
-	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
-	return c.Matcher.Matches(a, o, &criteria)
-}
-
-// BindingMatches returns whether this ValidatingAdmissionPolicyBinding matches the provided admission resource request
-func (c *CELValidatorCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
-	if binding.Spec.MatchResources == nil {
-		return true, nil
-	}
-	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	isMatch, _, err := c.Matcher.Matches(a, o, &criteria)
-	return isMatch, err
-}
-
-// ValidateInitialization checks if Matcher is initialized.
-func (c *CELValidatorCompiler) ValidateInitialization() error {
-	return c.Matcher.ValidateInitialization()
-}
-
-type validationActivation struct {
-	object, oldObject, params, request interface{}
-}
-
-// ResolveName returns a value from the activation by qualified name, or false if the name
-// could not be found.
-func (a *validationActivation) ResolveName(name string) (interface{}, bool) {
-	switch name {
-	case ObjectVarName:
-		return a.object, true
-	case OldObjectVarName:
-		return a.oldObject, true
-	case ParamsVarName:
-		return a.params, true
-	case RequestVarName:
-		return a.request, true
-	default:
-		return nil, false
+func NewValidator(filter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
+	return &validator{
+		filter:     filter,
+		failPolicy: failPolicy,
 	}
 }
 
-// Parent returns the parent of the current activation, may be nil.
-// If non-nil, the parent will be searched during resolve calls.
-func (a *validationActivation) Parent() interpreter.Activation {
-	return nil
-}
-
-// Compile compiles the cel expression defined in ValidatingAdmissionPolicy
-func (c *CELValidatorCompiler) Compile(p *v1alpha1.ValidatingAdmissionPolicy) Validator {
-	if len(p.Spec.Validations) == 0 {
-		return nil
-	}
-	hasParam := false
-	if p.Spec.ParamKind != nil {
-		hasParam = true
-	}
-	compilationResults := make([]CompilationResult, len(p.Spec.Validations))
-	for i, validation := range p.Spec.Validations {
-		compilationResults[i] = CompileValidatingPolicyExpression(validation.Expression, hasParam)
-	}
-	return &CELValidator{policy: p, compilationResults: compilationResults}
-}
-
-// CELValidator implements the Validator interface
-type CELValidator struct {
-	policy             *v1alpha1.ValidatingAdmissionPolicy
-	compilationResults []CompilationResult
-}
-
-func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
-	if obj == nil || reflect.ValueOf(obj).IsNil() {
-		return &unstructured.Unstructured{Object: nil}, nil
-	}
-	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{Object: ret}, nil
-}
-
-func objectToResolveVal(r runtime.Object) (interface{}, error) {
-	if r == nil || reflect.ValueOf(r).IsNil() {
-		return nil, nil
-	}
-	v, err := convertObjectToUnstructured(r)
-	if err != nil {
-		return nil, err
-	}
-	return v.Object, nil
-}
-
-func policyDecisionActionForError(f v1alpha1.FailurePolicyType) PolicyDecisionAction {
-	if f == v1alpha1.Ignore {
+func policyDecisionActionForError(f v1.FailurePolicyType) PolicyDecisionAction {
+	if f == v1.Ignore {
 		return ActionAdmit
 	}
 	return ActionDeny
 }
 
-// Validate validates all cel expressions in Validator and returns a PolicyDecision for each CEL expression or returns an error.
-// An error will be returned if failed to convert the object/oldObject/params/request to unstructured.
-// Each PolicyDecision will have a decision and a message.
-// policyDecision.message will be empty if the decision is allowed and no error met.
-func (v *CELValidator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) ([]PolicyDecision, error) {
-	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
-	decisions := make([]PolicyDecision, len(v.compilationResults))
-	var err error
-
-	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
-	if err != nil {
-		return nil, err
-	}
-	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
-	if err != nil {
-		return nil, err
-	}
-	paramsVal, err := objectToResolveVal(versionedParams)
-	if err != nil {
-		return nil, err
-	}
-
-	request := createAdmissionRequest(versionedAttr.Attributes)
-	requestVal, err := convertObjectToUnstructured(request)
-	if err != nil {
-		return nil, err
-	}
-	va := &validationActivation{
-		object:    objectVal,
-		oldObject: oldObjectVal,
-		params:    paramsVal,
-		request:   requestVal.Object,
-	}
-
-	var f v1alpha1.FailurePolicyType
-	if v.policy.Spec.FailurePolicy == nil {
-		f = v1alpha1.Fail
+// Validate takes a list of Evaluation and a failure policy and converts them into actionable PolicyDecisions
+func (v *validator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object) []PolicyDecision {
+	var f v1.FailurePolicyType
+	if v.failPolicy == nil {
+		f = v1.Fail
 	} else {
-		f = *v.policy.Spec.FailurePolicy
+		f = *v.failPolicy
 	}
 
-	for i, compilationResult := range v.compilationResults {
-		validation := v.policy.Spec.Validations[i]
+	evalResults, err := v.filter.ForInput(versionedAttr, versionedParams, cel.CreateAdmissionRequest(versionedAttr.Attributes))
+	if err != nil {
+		return []PolicyDecision{
+			{
+				Action:     policyDecisionActionForError(f),
+				Evaluation: EvalError,
+				Message:    err.Error(),
+			},
+		}
+	}
+	decisions := make([]PolicyDecision, len(evalResults))
 
-		var policyDecision = &decisions[i]
-
-		if compilationResult.Error != nil {
-			policyDecision.Action = policyDecisionActionForError(f)
-			policyDecision.Evaluation = EvalError
-			policyDecision.Message = fmt.Sprintf("compilation error: %v", compilationResult.Error)
+	for i, evalResult := range evalResults {
+		var decision = &decisions[i]
+		// TODO: move this to generics
+		validation, ok := evalResult.ExpressionAccessor.(*ValidationCondition)
+		if !ok {
+			klog.Error("Invalid type conversion to ValidationCondition")
+			decision.Action = policyDecisionActionForError(f)
+			decision.Evaluation = EvalError
+			decision.Message = "Invalid type sent to validator, expected ValidationCondition"
 			continue
 		}
-		if compilationResult.Program == nil {
-			policyDecision.Action = policyDecisionActionForError(f)
-			policyDecision.Evaluation = EvalError
-			policyDecision.Message = "unexpected internal error compiling expression"
-			continue
-		}
-		t1 := time.Now()
-		evalResult, _, err := compilationResult.Program.Eval(va)
-		elapsed := time.Since(t1)
-		policyDecision.Elapsed = elapsed
-		if err != nil {
-			policyDecision.Action = policyDecisionActionForError(f)
-			policyDecision.Evaluation = EvalError
-			policyDecision.Message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
-		} else if evalResult != celtypes.True {
-			policyDecision.Action = ActionDeny
+
+		if evalResult.Error != nil {
+			decision.Action = policyDecisionActionForError(f)
+			decision.Evaluation = EvalError
+			decision.Message = evalResult.Error.Error()
+		} else if evalResult.EvalResult != celtypes.True {
+			decision.Action = ActionDeny
 			if validation.Reason == nil {
-				policyDecision.Reason = metav1.StatusReasonInvalid
+				decision.Reason = metav1.StatusReasonInvalid
 			} else {
-				policyDecision.Reason = *validation.Reason
+				decision.Reason = *validation.Reason
 			}
 			if len(validation.Message) > 0 {
-				policyDecision.Message = strings.TrimSpace(validation.Message)
+				decision.Message = strings.TrimSpace(validation.Message)
 			} else {
-				policyDecision.Message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
+				decision.Message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
 			}
 
 		} else {
-			policyDecision.Action = ActionAdmit
-			policyDecision.Evaluation = EvalAdmit
+			decision.Action = ActionAdmit
+			decision.Evaluation = EvalAdmit
 		}
 	}
-
-	return decisions, nil
-}
-
-func createAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionRequest {
-	// FIXME: how to get resource GVK, GVR and subresource?
-	gvk := attr.GetKind()
-	gvr := attr.GetResource()
-	subresource := attr.GetSubresource()
-
-	requestGVK := attr.GetKind()
-	requestGVR := attr.GetResource()
-	requestSubResource := attr.GetSubresource()
-
-	aUserInfo := attr.GetUserInfo()
-	var userInfo authenticationv1.UserInfo
-	if aUserInfo != nil {
-		userInfo = authenticationv1.UserInfo{
-			Extra:    make(map[string]authenticationv1.ExtraValue),
-			Groups:   aUserInfo.GetGroups(),
-			UID:      aUserInfo.GetUID(),
-			Username: aUserInfo.GetName(),
-		}
-		// Convert the extra information in the user object
-		for key, val := range aUserInfo.GetExtra() {
-			userInfo.Extra[key] = authenticationv1.ExtraValue(val)
-		}
-	}
-
-	dryRun := attr.IsDryRun()
-
-	return &admissionv1.AdmissionRequest{
-		Kind: metav1.GroupVersionKind{
-			Group:   gvk.Group,
-			Kind:    gvk.Kind,
-			Version: gvk.Version,
-		},
-		Resource: metav1.GroupVersionResource{
-			Group:    gvr.Group,
-			Resource: gvr.Resource,
-			Version:  gvr.Version,
-		},
-		SubResource: subresource,
-		RequestKind: &metav1.GroupVersionKind{
-			Group:   requestGVK.Group,
-			Kind:    requestGVK.Kind,
-			Version: requestGVK.Version,
-		},
-		RequestResource: &metav1.GroupVersionResource{
-			Group:    requestGVR.Group,
-			Resource: requestGVR.Resource,
-			Version:  requestGVR.Version,
-		},
-		RequestSubResource: requestSubResource,
-		Name:               attr.GetName(),
-		Namespace:          attr.GetNamespace(),
-		Operation:          admissionv1.Operation(attr.GetOperation()),
-		UserInfo:           userInfo,
-		// Leave Object and OldObject unset since we don't provide access to them via request
-		DryRun: &dryRun,
-		Options: runtime.RawExtension{
-			Object: attr.GetOperationOptions(),
-		},
-	}
+	return decisions
 }

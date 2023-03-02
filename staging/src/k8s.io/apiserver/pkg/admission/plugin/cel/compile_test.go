@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package cel
 
 import (
 	"strings"
@@ -104,22 +104,34 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expr := range tc.expressions {
-				result := CompileValidatingPolicyExpression(expr, tc.hasParams)
+				result := CompileCELExpression(&fakeExpressionAccessor{
+					expr,
+				}, tc.hasParams)
 				if result.Error != nil {
 					t.Errorf("Unexpected error: %v", result.Error)
 				}
 			}
 			for expr, expectErr := range tc.errorExpressions {
-				result := CompileValidatingPolicyExpression(expr, tc.hasParams)
+				result := CompileCELExpression(&fakeExpressionAccessor{
+					expr,
+				}, tc.hasParams)
 				if result.Error == nil {
 					t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
 					continue
 				}
 				if !strings.Contains(result.Error.Error(), expectErr) {
-					t.Errorf("Expected validation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
+					t.Errorf("Expected compilation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
 				}
 				continue
 			}
 		})
 	}
+}
+
+type fakeExpressionAccessor struct {
+	expression string
+}
+
+func (f *fakeExpressionAccessor) GetExpression() string {
+	return f.expression
 }

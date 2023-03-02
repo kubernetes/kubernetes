@@ -24,19 +24,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
-
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -67,6 +67,14 @@ type policyData struct {
 	definitionInfo
 	paramController generic.Controller[runtime.Object]
 	bindings        []bindingInfo
+}
+
+// contains the cel PolicyDecisions along with the ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding
+// that determined the decision
+type policyDecisionWithMetadata struct {
+	PolicyDecision
+	Definition *v1alpha1.ValidatingAdmissionPolicy
+	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
 // namespaceName is used as a key in definitionInfo and bindingInfos
@@ -118,9 +126,8 @@ func NewAdmissionController(
 			restMapper,
 			client,
 			dynamicClient,
-			&CELValidatorCompiler{
-				Matcher: matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client),
-			},
+			cel.NewFilterCompiler(),
+			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
 				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
@@ -213,7 +220,7 @@ func (c *celAdmissionController) Validate(
 
 	for _, definitionInfo := range policyDatas {
 		definition := definitionInfo.lastReconciledValue
-		matches, matchKind, err := c.policyController.DefinitionMatches(a, o, definition)
+		matches, matchKind, err := c.policyController.matcher.DefinitionMatches(a, o, definition)
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -232,7 +239,7 @@ func (c *celAdmissionController) Validate(
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
 			binding := bindingInfo.lastReconciledValue
-			matches, err := c.policyController.BindingMatches(a, o, binding)
+			matches, err := c.policyController.matcher.BindingMatches(a, o, binding)
 			if err != nil {
 				// Configuration error.
 				addConfigError(err, definition, binding)
@@ -310,13 +317,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			decisions, err := bindingInfo.validator.Validate(versionedAttr, param)
-			if err != nil {
-				// runtime error. Apply failure policy
-				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
-				addConfigError(wrappedError, definition, binding)
-				continue
-			}
+			decisions := bindingInfo.validator.Validate(versionedAttr, param)
 
 			for _, decision := range decisions {
 				switch decision.Action {
@@ -354,7 +355,7 @@ func (c *celAdmissionController) Validate(
 			reason = metav1.StatusReasonInvalid
 		}
 		err.ErrStatus.Reason = reason
-		err.ErrStatus.Code = ReasonToCode(reason)
+		err.ErrStatus.Code = reasonToCode(reason)
 		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Message: message})
 		return err
 	}
@@ -366,7 +367,7 @@ func (c *celAdmissionController) HasSynced() bool {
 }
 
 func (c *celAdmissionController) ValidateInitialization() error {
-	return c.policyController.ValidateInitialization()
+	return c.policyController.matcher.ValidateInitialization()
 }
 
 func (c *celAdmissionController) refreshPolicies() {
