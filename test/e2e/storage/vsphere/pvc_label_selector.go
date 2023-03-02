@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		Bootstrap(f)
-		nodeInfo = GetReadySchedulableRandomNodeInfo()
+		nodeInfo = GetReadySchedulableRandomNodeInfo(c)
 		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
