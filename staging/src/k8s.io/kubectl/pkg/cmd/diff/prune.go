@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -34,16 +35,16 @@ type pruner struct {
 	mapper        meta.RESTMapper
 	dynamicClient dynamic.Interface
 
-	visitedUids       sets.String
-	visitedNamespaces sets.String
+	visitedUids       sets.Set[types.UID]
+	visitedNamespaces sets.Set[string]
 	labelSelector     string
 	resources         []prune.Resource
 }
 
 func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource, selector string) *pruner {
 	return &pruner{
-		visitedUids:       sets.NewString(),
-		visitedNamespaces: sets.NewString(),
+		visitedUids:       sets.New[types.UID](),
+		visitedNamespaces: sets.New[string](),
 		dynamicClient:     dc,
 		mapper:            m,
 		resources:         r,
@@ -104,7 +105,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 			continue
 		}
 		uid := metadata.GetUID()
-		if p.visitedUids.Has(string(uid)) {
+		if p.visitedUids.Has(uid) {
 			continue
 		}
 
@@ -123,5 +124,5 @@ func (p *pruner) MarkVisited(info *resource.Info) {
 	if err != nil {
 		return
 	}
-	p.visitedUids.Insert(string(metadata.GetUID()))
+	p.visitedUids.Insert(metadata.GetUID())
 }
