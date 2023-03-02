@@ -654,6 +654,19 @@ func TestValidateJob(t *testing.T) {
 				Template:    validPodTemplateSpecForGenerated,
 			},
 		},
+		"spec.backoffLimit:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				BackoffLimit: pointer.Int32(-1),
+				Selector:     validGeneratedSelector,
+				Template:     validPodTemplateSpecForGenerated,
+			},
+		},
+
 		"spec.completions:must be greater than or equal to 0": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
@@ -1095,6 +1108,26 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completionMode",
 			},
 		},
+		"immutable completions for non-indexed job when AllowElasticIndexedJobs is true": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:       validGeneratedSelector,
+					Template:       validPodTemplateSpecForGenerated,
+					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+					Completions:    pointer.Int32Ptr(2),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(4)
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.completions",
+			},
+			opts: JobValidationOptions{AllowElasticIndexedJobs: true},
+		},
+
 		"immutable node affinity": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},

@@ -49,7 +49,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Job{},
 		&JobList{},
-		&JobTemplate{},
 		&CronJob{},
 		&CronJobList{},
 	)
