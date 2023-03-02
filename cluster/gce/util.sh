@@ -326,15 +326,16 @@ function upload-tars() {
   local node_binary_tar_urls=()
 
   for region in "${PREFERRED_REGION[@]}"; do
-    retention_period="1d" # https://cloud.google.com/storage/docs/bucket-lock#retention-periods
     suffix="-${region}"
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
     if ! gsutil ls "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gsutil mb -l "${region}" -p "${PROJECT}" --retention "${retention_period}" "${staging_bucket}"
+      gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
     fi
+
+    gsutil retention clear "${staging_bucket}"
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
 
