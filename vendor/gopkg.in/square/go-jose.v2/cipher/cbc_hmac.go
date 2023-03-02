@@ -150,7 +150,7 @@ func (ctx *cbcAEAD) computeAuthTag(aad, nonce, ciphertext []byte) []byte {
 	return hmac.Sum(nil)[:ctx.authtagBytes]
 }
 
-// resize ensures the the given slice has a capacity of at least n bytes.
+// resize ensures that the given slice has a capacity of at least n bytes.
 // If the capacity of the slice is less than n, a new slice is allocated
 // and the existing data will be copied.
 func resize(in []byte, n uint64) (head, tail []byte) {
