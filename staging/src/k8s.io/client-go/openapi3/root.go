@@ -157,6 +157,10 @@ func pathToGroupVersion(path string) (schema.GroupVersion, error) {
 	}
 	apiPrefix := parts[0]
 	if apiPrefix == "apis" {
+		// Example: apis/apps (without version)
+		if len(parts) < 3 {
+			return gv, fmt.Errorf("Group without Version not allowed")
+		}
 		gv.Group = parts[1]
 		gv.Version = parts[2]
 	} else if apiPrefix == "api" {
