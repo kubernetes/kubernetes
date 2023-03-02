@@ -214,6 +214,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		t.Fatalf("KMSCloseGracePeriod mismatch (-want +got):\n%s", cmp.Diff(expectedKMSCloseGracePeriod, aesGcmFirstEncryptionConfiguration.KMSCloseGracePeriod))
 	}
 
+	invalidConfigWithAesGcm := "testdata/invalid-configs/invalid-aes-gcm.yaml"
+	_, err = LoadEncryptionConfig(ctx, invalidConfigWithAesGcm, false)
+	if !strings.Contains(errString(err), "error while parsing file") {
+		t.Fatalf("should result in error while parsing configuration file: %s.\nThe file was:\n%s", err, invalidConfigWithAesGcm)
+	}
+
 	// Math for GracePeriod is explained at - https://github.com/kubernetes/kubernetes/blob/c9ed04762f94a319d7b1fb718dc345491a32bea6/staging/src/k8s.io/apiserver/pkg/server/options/encryptionconfig/config.go#L159-L163
 	expectedKMSCloseGracePeriod = 26 * time.Second
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
@@ -307,9 +313,27 @@ func TestKMSMaxTimeout(t *testing.T) {
 
 	testCases := []struct {
 		name            string
+		expectedErr     string
 		expectedTimeout time.Duration
 		config          apiserverconfig.EncryptionConfiguration
 	}{
+		{
+			name: "config with bad provider",
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: nil,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:     "provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity",
+			expectedTimeout: 6 * time.Second,
+		},
 		{
 			name: "default timeout",
 			config: apiserverconfig.EncryptionConfiguration{
@@ -333,6 +357,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 				},
 			},
+			expectedErr:     "",
 			expectedTimeout: 6 * time.Second,
 		},
 		{
@@ -375,6 +400,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 				},
 			},
+			expectedErr:     "",
 			expectedTimeout: 12 * time.Second,
 		},
 		{
@@ -433,6 +459,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 				},
 			},
+			expectedErr:     "",
 			expectedTimeout: 32 * time.Second,
 		},
 		{
@@ -491,6 +518,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 				},
 			},
+			expectedErr:     "",
 			expectedTimeout: 15 * time.Second,
 		},
 	}
@@ -509,14 +537,21 @@ func TestKMSMaxTimeout(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel() // cancel this upfront so the kms v2 checks do not block
 
-			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, &testCase.config)
-			if kmsUsed == nil {
-				t.Fatal("kmsUsed should not be nil")
+			_, _, kmsUsed, err := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, &testCase.config)
+
+			if !strings.Contains(errString(err), testCase.expectedErr) {
+				t.Fatalf("expecting error calling prefixTransformersAndProbes, expected: %s, got: %s", testCase.expectedErr, errString(err))
+			}
+			if len(testCase.expectedErr) == 0 {
+				if kmsUsed == nil {
+					t.Fatal("kmsUsed should not be nil")
+				}
+
+				if kmsUsed.kmsTimeoutSum != testCase.expectedTimeout {
+					t.Fatalf("expected timeout %v, got %v", testCase.expectedTimeout, kmsUsed.kmsTimeoutSum)
+				}
 			}
 
-			if kmsUsed.kmsTimeoutSum != testCase.expectedTimeout {
-				t.Fatalf("expected timeout %v, got %v", testCase.expectedTimeout, kmsUsed.kmsTimeoutSum)
-			}
 		})
 	}
 }
@@ -539,6 +574,30 @@ func TestKMSPluginHealthz(t *testing.T) {
 		kmsv2   bool
 		kmsv1   bool
 	}{
+		{
+			desc:    "Invalid config file path",
+			config:  "invalid/path",
+			want:    nil,
+			wantErr: `error opening encryption provider configuration file "invalid/path"`,
+		},
+		{
+			desc:    "Empty config file content",
+			config:  "testdata/invalid-configs/kms/invalid-content.yaml",
+			want:    nil,
+			wantErr: `encryption provider configuration file "testdata/invalid-configs/kms/invalid-content.yaml" is empty`,
+		},
+		{
+			desc:    "Unable to decode",
+			config:  "testdata/invalid-configs/kms/invalid-gvk.yaml",
+			want:    nil,
+			wantErr: `error decoding encryption provider configuration file`,
+		},
+		{
+			desc:    "Unexpected config type",
+			config:  "testdata/invalid-configs/kms/invalid-config-type.yaml",
+			want:    nil,
+			wantErr: `no kind "EncryptionConfigurations" is registered for version "apiserver.config.k8s.io/v1"`,
+		},
 		{
 			desc:   "Install Healthz",
 			config: "testdata/valid-configs/kms/default-timeout.yaml",
@@ -593,7 +652,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			config, _, err := loadConfig(tt.config, false)
-			if errStr := errString(err); errStr != tt.wantErr {
+			if errStr := errString(err); !strings.Contains(errStr, tt.wantErr) {
 				t.Fatalf("unexpected error state got=%s want=%s", errStr, tt.wantErr)
 			}
 			if len(tt.wantErr) > 0 {
@@ -837,7 +896,7 @@ func TestCBCKeyRotationWithoutOverlappingProviders(t *testing.T) {
 func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstPrefix, secondEncryptionConfig, secondPrefix string) {
 	p := getTransformerFromEncryptionConfig(t, firstEncryptionConfig)
 
-	ctx := context.Background()
+	ctx := testContext(t)
 	dataCtx := value.DefaultContext([]byte("authenticated_data"))
 
 	out, err := p.TransformToStorage(ctx, []byte("firstvalue"), dataCtx)
@@ -907,6 +966,7 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 	testCases := []struct {
 		desc           string
+		expectedErr    string
 		statusResponse *kmsservice.StatusResponse
 	}{
 		{
@@ -914,12 +974,14 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "unhealthy",
 			},
+			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2alpha1, got , expected KMSv2 KeyID to be set, got ",
 		},
 		{
 			desc: "version is not v2alpha1",
 			statusResponse: &kmsservice.StatusResponse{
 				Version: "v1beta1",
 			},
+			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2alpha1, got v1beta1, expected KMSv2 KeyID to be set, got ",
 		},
 		{
 			desc: "missing keyID",
@@ -927,13 +989,24 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 				Healthz: "ok",
 				Version: "v2alpha1",
 			},
+			expectedErr: "expected KMSv2 KeyID to be set, got ",
+		},
+		{
+			desc: "invalid long keyID",
+			statusResponse: &kmsservice.StatusResponse{
+				Healthz: "ok",
+				Version: "v2alpha1",
+				KeyID:   sampleInvalidKeyID,
+			},
+			expectedErr: "expected KMSv2 KeyID to be set, got ",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			if err := isKMSv2ProviderHealthy("testplugin", tt.statusResponse); err == nil {
-				t.Fatalf("isKMSv2ProviderHealthy() should have returned an error")
+			err := isKMSv2ProviderHealthy("testplugin", tt.statusResponse)
+			if !strings.Contains(errString(err), tt.expectedErr) {
+				t.Errorf("expected err %q, got %q", tt.expectedErr, errString(err))
 			}
 		})
 	}
@@ -959,5 +1032,38 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 	sum := computeEncryptionConfigHash([]byte(""))
 	if expect != sum {
 		t.Errorf("expected hash %q but got %q", expect, sum)
+	}
+}
+
+func TestGetCurrentKeyID(t *testing.T) {
+	ctx := testContext(t)
+	kmsv2Probe := &kmsv2PluginProbe{
+		name: "foo",
+		ttl:  3 * time.Second,
+	}
+	testCases := []struct {
+		desc        string
+		keyID       string
+		expectedErr string
+	}{
+		{
+			desc:        "empty keyID",
+			keyID:       "",
+			expectedErr: "got unexpected empty keyID",
+		},
+		{
+			desc:        "valid keyID",
+			keyID:       "1",
+			expectedErr: "",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			kmsv2Probe.keyID.Store(&tt.keyID)
+			_, err := kmsv2Probe.getCurrentKeyID(ctx)
+			if errString(err) != tt.expectedErr {
+				t.Errorf("expected err %q, got %q", tt.expectedErr, errString(err))
+			}
+		})
 	}
 }

@@ -345,6 +345,51 @@ func TestRecordKeyIDLRUKey(t *testing.T) {
 	}
 }
 
+func TestRecordKeyIDFromStatus(t *testing.T) {
+	RegisterMetrics()
+
+	cacheSize = 3
+	registerLRUMetrics()
+	KeyIDHashStatusLastTimestampSeconds.Reset()
+	defer KeyIDHashStatusLastTimestampSeconds.Reset()
+
+	var wg sync.WaitGroup
+	for i := 1; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			keyID := rand.String(32)
+			key := metricLabels{
+				providerName: rand.String(32),
+				keyIDHash:    getHash(keyID),
+			}
+			RecordKeyIDFromStatus(key.providerName, keyID)
+		}()
+	}
+	wg.Wait()
+
+	validMetrics := 0
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_envelope_encryption_key_id_hash_status_last_timestamp_seconds" {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			if metric.Gauge.GetValue() == 0 {
+				t.Errorf("invalid metric seen: %s", metric.String())
+			} else {
+				validMetrics++
+			}
+		}
+	}
+	if validMetrics != cacheSize {
+		t.Fatalf("expected total valid metrics to be the same as cacheSize %d, got %d", cacheSize, validMetrics)
+	}
+}
+
 func TestRecordInvalidKeyIDFromStatus(t *testing.T) {
 	testCases := []struct {
 		desc         string

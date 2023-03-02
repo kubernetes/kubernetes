@@ -347,7 +347,7 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 
 	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
 	}
 	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
 	if !ok {
