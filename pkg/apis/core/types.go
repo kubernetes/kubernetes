@@ -2326,8 +2326,6 @@ type ProbeHandler struct {
 	TCPSocket *TCPSocketAction
 
 	// GRPC specifies an action involving a GRPC port.
-	// This is a beta field and requires enabling GRPCContainerProbe feature gate.
-	// +featureGate=GRPCContainerProbe
 	// +optional
 	GRPC *GRPCAction
 }

@@ -298,6 +298,7 @@ const (
 	// kep: https://kep.k8s.io/2727
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables GRPC probe method for {Liveness,Readiness,Startup}Probe.
 	GRPCContainerProbe featuregate.Feature = "GRPCContainerProbe"
@@ -934,7 +935,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 
-	GRPCContainerProbe: {Default: true, PreRelease: featuregate.Beta},
+	GRPCContainerProbe: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.29
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 

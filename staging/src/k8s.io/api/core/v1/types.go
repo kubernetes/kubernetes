@@ -2548,8 +2548,6 @@ type ProbeHandler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 
 	// GRPC specifies an action involving a GRPC port.
-	// This is a beta field and requires enabling GRPCContainerProbe feature gate.
-	// +featureGate=GRPCContainerProbe
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
 }
