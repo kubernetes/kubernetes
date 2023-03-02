@@ -77,13 +77,12 @@ func TestRecordEvaluation(t *testing.T) {
 							if level == api.LevelPrivileged {
 								expectedVersion = "latest"
 							}
-							expectedNamespace := "non-platform"
 
 							expected := fmt.Sprintf(`
 							# HELP pod_security_evaluations_total [ALPHA] Number of policy evaluations that occurred, not counting ignored or exempt requests.
         	            	# TYPE pod_security_evaluations_total counter
-							pod_security_evaluations_total{decision="%s",mode="%s",ocp_namespace="%s",policy_level="%s",policy_version="%s",request_operation="%s",resource="%s",subresource=""} 1
-							`, decision, mode, expectedNamespace, level, expectedVersion, strings.ToLower(string(op)), expectedResource)
+							pod_security_evaluations_total{decision="%s",mode="%s",ocp_namespace="",policy_level="%s",policy_version="%s",request_operation="%s",resource="%s",subresource=""} 1
+							`, decision, mode, level, expectedVersion, strings.ToLower(string(op)), expectedResource)
 							expected = expectCachedMetrics("pod_security_evaluations_total", expected)
 
 							assert.NoError(t, testutil.GatherAndCompare(registry, bytes.NewBufferString(expected), "pod_security_evaluations_total"))
