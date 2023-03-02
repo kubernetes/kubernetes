@@ -128,6 +128,9 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	case jwt.ErrNotValidYet:
 		return nil, errors.New("service account token is not valid yet")
 
+	case jwt.ErrIssuedInTheFuture:
+		return nil, errors.New("service account token is issued in the future")
+
 	// our current use of jwt.Expected above should make these cases impossible to hit
 	case jwt.ErrInvalidAudience, jwt.ErrInvalidID, jwt.ErrInvalidIssuer, jwt.ErrInvalidSubject:
 		klog.Errorf("service account token claim validation got unexpected validation failure: %v", err)
