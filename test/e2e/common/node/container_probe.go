@@ -459,7 +459,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for livenessProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	framework.ConformanceIt("should override timeoutGracePeriodSeconds when LivenessProbe field is set", func(ctx context.Context) {
+	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [NodeConformance]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -479,7 +479,8 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
+		// add 10s more for kubelet syncing information to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
 	})
 
 	/*
@@ -487,7 +488,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for startupProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	framework.ConformanceIt("should override timeoutGracePeriodSeconds when StartupProbe field is set", func(ctx context.Context) {
+	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [NodeConformance]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -512,7 +513,8 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
+		// add 10s more for kubelet syncing information to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
 	})
 
 	/*
@@ -971,12 +973,13 @@ func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 
 	// Wait for the restart state to be as desired.
 	// If initialRestartCount is not zero, there is restarting back-off time.
-	deadline := time.Now().Add(timeout + time.Duration(initialRestartCount)*10*time.Second)
+	deadline := time.Now().Add(timeout + time.Duration(initialRestartCount*10)*time.Second)
 
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.Logf("Get pod %s in namespace %s", pod.Name, ns)
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
@@ -999,8 +1002,8 @@ func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
-			ns, pod.Name, expectNumRestarts, observedRestarts)
+		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d. Pod status: %s.",
+			ns, pod.Name, expectNumRestarts, observedRestarts, &pod.Status)
 	}
 }
 

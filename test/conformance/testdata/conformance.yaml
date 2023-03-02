@@ -2232,22 +2232,6 @@
     every time health check fails, measure up to 5 restart.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
-- testname: Set terminationGracePeriodSeconds for livenessProbe
-  codename: '[sig-node] Probing container should override timeoutGracePeriodSeconds
-    when LivenessProbe field is set [Conformance]'
-  description: A pod with a long terminationGracePeriod is created with a shorter
-    livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination
-    period is used.
-  release: v1.21
-  file: test/e2e/common/node/container_probe.go
-- testname: Set terminationGracePeriodSeconds for startupProbe
-  codename: '[sig-node] Probing container should override timeoutGracePeriodSeconds
-    when StartupProbe field is set [Conformance]'
-  description: A pod with a long terminationGracePeriod is created with a shorter
-    startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination
-    period is used.
-  release: v1.21
-  file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, with initial delay
   codename: '[sig-node] Probing container with readiness probe should not be ready
     before initial delay and never restart [NodeConformance] [Conformance]'
