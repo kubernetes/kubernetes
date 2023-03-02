@@ -335,6 +335,8 @@ function upload-tars() {
       echo "Creating ${staging_bucket}"
       gsutil mb -l "${region}" -p "${PROJECT}" --retention "${retention_period}" "${staging_bucket}"
     fi
+    # Temporary: ensure existing buckets are reconfigured with updated policies from above
+    gustil retention set "${retention_period}" "${staging_bucket}"
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
 
