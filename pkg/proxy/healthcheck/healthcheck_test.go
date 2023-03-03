@@ -178,7 +178,7 @@ func TestServer(t *testing.T) {
 	if len(listener.openPorts) != 1 {
 		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
-	if !listener.hasPort(":9376") {
+	if !listener.hasPort("0.0.0.0:9376") {
 		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler

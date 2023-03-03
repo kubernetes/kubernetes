@@ -21,7 +21,6 @@ import (
 	"net"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
 )
 
@@ -91,16 +90,17 @@ func (npa *NodePortAddresses) MatchAll() bool {
 	return npa.matchAll
 }
 
-// GetNodeAddresses return all matched node IP addresses for npa's CIDRs. If no matching
+// GetNodeIPs return all matched node IP addresses for npa's CIDRs. If no matching
 // IPs are found, it returns an empty list.
 // NetworkInterfacer is injected for test purpose.
-func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[string], error) {
+func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error) {
 	addrs, err := nw.InterfaceAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
 	}
 
-	uniqueAddressList := sets.New[string]()
+	// Use a map to dedup matches
+	addresses := make(map[string]net.IP)
 	for _, cidr := range npa.cidrs {
 		for _, addr := range addrs {
 			var ip net.IP
@@ -115,12 +115,17 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[s
 			}
 
 			if cidr.Contains(ip) {
-				uniqueAddressList.Insert(ip.String())
+				addresses[ip.String()] = ip
 			}
 		}
 	}
 
-	return uniqueAddressList, nil
+	ips := make([]net.IP, 0, len(addresses))
+	for _, ip := range addresses {
+		ips = append(ips, ip)
+	}
+
+	return ips, nil
 }
 
 // ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.

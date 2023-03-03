@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -31,7 +32,24 @@ type InterfaceAddrsPair struct {
 	addrs []net.Addr
 }
 
-func TestGetNodeAddresses(t *testing.T) {
+func checkNodeIPs(expected sets.Set[string], actual []net.IP) error {
+	notFound := expected.Clone()
+	extra := sets.New[string]()
+	for _, ip := range actual {
+		str := ip.String()
+		if notFound.Has(str) {
+			notFound.Delete(str)
+		} else {
+			extra.Insert(str)
+		}
+	}
+	if len(notFound) != 0 || len(extra) != 0 {
+		return fmt.Errorf("not found: %v, extra: %v", notFound.UnsortedList(), extra.UnsortedList())
+	}
+	return nil
+}
+
+func TestGetNodeIPs(t *testing.T) {
 	type expectation struct {
 		matchAll bool
 		ips      sets.Set[string]
@@ -367,16 +385,18 @@ func TestGetNodeAddresses(t *testing.T) {
 					t.Errorf("unexpected MatchAll(%s), expected: %v", family, tc.expected[family].matchAll)
 				}
 
-				addrList, err := npa.GetNodeAddresses(nw)
+				ips, err := npa.GetNodeIPs(nw)
+				expectedIPs := tc.expected[family].ips
+
 				// The fake InterfaceAddrs() never returns an error, so
-				// the only error GetNodeAddresses will return is "no
+				// the only error GetNodeIPs will return is "no
 				// addresses found".
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-
-				if !addrList.Equal(tc.expected[family].ips) {
-					t.Errorf("unexpected mismatch for %s, expected: %v, got: %v", family, tc.expected[family].ips, addrList)
+				err = checkNodeIPs(expectedIPs, ips)
+				if err != nil {
+					t.Errorf("unexpected mismatch for %s: %v", family, err)
 				}
 			}
 		})

@@ -1011,16 +1011,14 @@ func (proxier *Proxier) syncProxyRules() {
 				nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
 			}
 		} else {
-			nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
+			allNodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 			if err != nil {
 				klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 			} else {
-				for address := range nodeAddrSet {
-					a := netutils.ParseIPSloppy(address)
-					if a.IsLoopback() {
-						continue
+				for _, ip := range allNodeIPs {
+					if !ip.IsLoopback() {
+						nodeIPs = append(nodeIPs, ip)
 					}
-					nodeIPs = append(nodeIPs, a)
 				}
 			}
 		}

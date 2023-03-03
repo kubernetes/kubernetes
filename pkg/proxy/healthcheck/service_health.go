@@ -32,7 +32,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
 
@@ -59,18 +58,16 @@ type proxierHealthChecker interface {
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *utilproxy.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
-	var nodeAddresses sets.Set[string]
+	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
+	// treats them all the same.
+	nodeIPs := []net.IP{net.IPv4zero}
 
-	// if any of the addresses is zero cidr then we listen
-	// to old style :<port>
-	if nodePortAddresses.MatchAll() {
-		nodeAddresses = sets.New("")
-	} else {
-		var err error
-		nodeAddresses, err = nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
-		if err != nil || nodeAddresses.Len() == 0 {
+	if !nodePortAddresses.MatchAll() {
+		ips, err := nodePortAddresses.GetNodeIPs(utilproxy.RealNetwork{})
+		if err == nil {
+			nodeIPs = ips
+		} else {
 			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
-			nodeAddresses = sets.New(utilproxy.IPv4ZeroCIDR)
 		}
 	}
 
@@ -81,7 +78,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 		httpFactory:   factory,
 		healthzServer: healthzServer,
 		services:      map[types.NamespacedName]*hcInstance{},
-		nodeAddresses: nodeAddresses,
+		nodeIPs:       nodeIPs,
 	}
 }
 
@@ -93,10 +90,10 @@ func NewServiceHealthServer(hostname string, recorder events.EventRecorder, node
 type server struct {
 	hostname string
 	// node addresses where health check port will listen on
-	nodeAddresses sets.Set[string]
-	recorder      events.EventRecorder // can be nil
-	listener      listener
-	httpFactory   httpServerFactory
+	nodeIPs     []net.IP
+	recorder    events.EventRecorder // can be nil
+	listener    listener
+	httpFactory httpServerFactory
 
 	healthzServer proxierHealthChecker
 
@@ -167,12 +164,11 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	var err error
 	var listener net.Listener
 
-	addresses := hcs.nodeAddresses.UnsortedList()
-	hcI.httpServers = make([]httpServer, 0, len(addresses))
+	hcI.httpServers = make([]httpServer, 0, len(hcs.nodeIPs))
 
 	// for each of the node addresses start listening and serving
-	for _, address := range addresses {
-		addr := net.JoinHostPort(address, fmt.Sprint(hcI.port))
+	for _, ip := range hcs.nodeIPs {
+		addr := net.JoinHostPort(ip.String(), fmt.Sprint(hcI.port))
 		// create http server
 		httpSrv := hcs.httpFactory.New(addr, hcHandler{name: hcI.nsn, hcs: hcs})
 		// start listener
