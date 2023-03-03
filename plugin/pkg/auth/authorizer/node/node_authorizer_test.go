@@ -42,16 +42,19 @@ func TestAuthorizer(t *testing.T) {
 	g := NewGraph()
 
 	opts := &sampleDataOpts{
-		nodes:                  2,
-		namespaces:             2,
-		podsPerNode:            2,
-		attachmentsPerNode:     1,
-		sharedConfigMapsPerPod: 0,
-		uniqueConfigMapsPerPod: 1,
-		sharedSecretsPerPod:    1,
-		uniqueSecretsPerPod:    1,
-		sharedPVCsPerPod:       0,
-		uniquePVCsPerPod:       1,
+		nodes:                              2,
+		namespaces:                         2,
+		podsPerNode:                        2,
+		attachmentsPerNode:                 1,
+		sharedConfigMapsPerPod:             0,
+		uniqueConfigMapsPerPod:             1,
+		sharedSecretsPerPod:                1,
+		uniqueSecretsPerPod:                1,
+		sharedPVCsPerPod:                   0,
+		uniquePVCsPerPod:                   1,
+		uniqueResourceClaimsPerPod:         1,
+		uniqueResourceClaimTemplatesPerPod: 1,
+		uniqueResourceClaimTemplatesWithClaimPerPod: 1,
 	}
 	nodes, pods, pvs, attachments := generate(opts)
 	populate(g, nodes, pods, pvs, attachments)
@@ -118,6 +121,16 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "allowed resource claim",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-pod0-node0-ns0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "allowed resource claim with template",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "generated-claim-pod0-node0-ns0-0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
 			name:   "allowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
 			expect: authorizer.DecisionAllow,
@@ -140,6 +153,16 @@ func TestAuthorizer(t *testing.T) {
 		{
 			name:   "disallowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed resource claim, other node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-pod0-node1-ns0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed resource claim with template",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "pod0-node1-claimtemplate0", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
@@ -468,9 +491,12 @@ type sampleDataOpts struct {
 	sharedSecretsPerPod    int
 	sharedPVCsPerPod       int
 
-	uniqueSecretsPerPod    int
-	uniqueConfigMapsPerPod int
-	uniquePVCsPerPod       int
+	uniqueSecretsPerPod                         int
+	uniqueConfigMapsPerPod                      int
+	uniquePVCsPerPod                            int
+	uniqueResourceClaimsPerPod                  int
+	uniqueResourceClaimTemplatesPerPod          int
+	uniqueResourceClaimTemplatesWithClaimPerPod int
 }
 
 func BenchmarkPopulationAllocation(b *testing.B) {
@@ -844,6 +870,40 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pv.Spec.ClaimRef.Name},
 		}})
+	}
+	for i := 0; i < opts.uniqueResourceClaimsPerPod; i++ {
+		claimName := fmt.Sprintf("claim%d-%s-%s", i, pod.Name, pod.Namespace)
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
+			Name: fmt.Sprintf("claim%d", i),
+			Source: corev1.ClaimSource{
+				ResourceClaimName: &claimName,
+			},
+		})
+	}
+	for i := 0; i < opts.uniqueResourceClaimTemplatesPerPod; i++ {
+		claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, pod.Name, pod.Namespace)
+		podClaimName := fmt.Sprintf("claimtemplate%d", i)
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
+			Name: podClaimName,
+			Source: corev1.ClaimSource{
+				ResourceClaimTemplateName: &claimTemplateName,
+			},
+		})
+	}
+	for i := 0; i < opts.uniqueResourceClaimTemplatesWithClaimPerPod; i++ {
+		claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, pod.Name, pod.Namespace)
+		podClaimName := fmt.Sprintf("claimtemplate-with-claim%d", i)
+		claimName := fmt.Sprintf("generated-claim-%s-%s-%d", pod.Name, pod.Namespace, i)
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
+			Name: podClaimName,
+			Source: corev1.ClaimSource{
+				ResourceClaimTemplateName: &claimTemplateName,
+			},
+		})
+		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
+			Name:              podClaimName,
+			ResourceClaimName: &claimName,
+		})
 	}
 	// Choose shared pvcs randomly from shared pvcs in a namespace.
 	subset = randomSubset(opts.sharedPVCsPerPod, opts.sharedPVCsPerNamespace)
