@@ -43,6 +43,6 @@ CONFIG_FILE="${KUBE_ROOT}/hack/testdata/levee/levee-config.yaml"
 targets=()
 while IFS='' read -r line; do
   targets+=("${line}")
-done < <(go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
+done < <(go list --find -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
 
 go vet -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}" "${targets[@]}"
