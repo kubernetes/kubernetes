@@ -24,6 +24,7 @@ linters:
     - gocritic
     - ineffassign
     - logcheck
+    - promlinter
     - staticcheck
     - stylecheck
     - unused
