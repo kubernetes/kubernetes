@@ -16,7 +16,10 @@ limitations under the License.
 
 package apply
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 type applySetPruner struct {
 }
@@ -25,6 +28,6 @@ func newApplySetPruner(_ *ApplyOptions) *applySetPruner {
 	return &applySetPruner{}
 }
 
-func (p *applySetPruner) pruneAll() error {
+func (p *applySetPruner) pruneAll(context.Context, *ApplySet) error {
 	return fmt.Errorf("ApplySet-based pruning is not yet implemented")
 }
