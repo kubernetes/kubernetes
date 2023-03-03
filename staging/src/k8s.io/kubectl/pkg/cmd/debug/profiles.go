@@ -173,17 +173,15 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		return fmt.Errorf("restricted profile: %s", err)
 	}
 
+	clearSecurityContext(pod, containerName)
 	disallowRoot(pod, containerName)
 	dropCapabilities(pod, containerName)
 
 	switch style {
-	case node:
-		clearSecurityContext(pod, containerName)
-
 	case podCopy:
 		shareProcessNamespace(pod)
 
-	case ephemeral:
+	case ephemeral, node:
 		// no additional modifications needed
 	}
 
@@ -286,9 +284,10 @@ func disallowRoot(p *corev1.Pod, containerName string) {
 		if c.Name != containerName {
 			return true
 		}
-		c.SecurityContext = &corev1.SecurityContext{
-			RunAsNonRoot: pointer.Bool(true),
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
 		}
+		c.SecurityContext.RunAsNonRoot = pointer.Bool(true)
 		return false
 	})
 }
@@ -302,9 +301,11 @@ func dropCapabilities(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.Capabilities = &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
+		if c.SecurityContext.Capabilities == nil {
+			c.SecurityContext.Capabilities = &corev1.Capabilities{}
 		}
+		c.SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
+		c.SecurityContext.Capabilities.Add = nil
 		return false
 	})
 }

@@ -397,7 +397,15 @@ func TestRestrictedProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "dbg", Image: "dbgimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"ALL"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -410,6 +418,12 @@ func TestRestrictedProfile(t *testing.T) {
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
 						},
 					},
 				},
