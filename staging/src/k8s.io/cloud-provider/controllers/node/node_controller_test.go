@@ -38,6 +38,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"

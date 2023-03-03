@@ -61,6 +61,12 @@ const (
 	// beta: v1.4
 	AppArmor featuregate.Feature = "AppArmor"
 
+	// owner: @danwinship
+	// alpha: v1.27
+	//
+	// Enables dual-stack --node-ip in kubelet with external cloud providers
+	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
+
 	// owner: @szuecs
 	// alpha: v1.12
 	//
@@ -925,6 +931,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APISelfSubjectReview: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.27
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
+
+	CloudDualStackNodeIPs: {Default: false, PreRelease: featuregate.Alpha},
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
