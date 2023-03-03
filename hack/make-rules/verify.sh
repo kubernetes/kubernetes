@@ -33,7 +33,6 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
   )
 
