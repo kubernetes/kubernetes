@@ -164,17 +164,29 @@ func TestParseNodeIPArgument(t *testing.T) {
 		},
 	}
 
+	configurations := []struct {
+		cloudProvider       string
+		allowCloudDualStack bool
+		dualStackSupported  bool
+	}{
+		{cloudProviderNone, false, true},
+		{cloudProviderNone, true, true},
+		{cloudProviderExternal, false, false},
+		{cloudProviderExternal, true, true},
+		{"gce", false, false},
+		{"gce", true, false},
+	}
+
 	for _, tc := range testCases {
-		for _, cloudProvider := range []string{cloudProviderNone, cloudProviderExternal, "gce"} {
-			desc := fmt.Sprintf("%s, cloudProvider=%q", tc.desc, cloudProvider)
+		for _, conf := range configurations {
+			desc := fmt.Sprintf("%s, cloudProvider=%q, allowCloudDualStack=%v", tc.desc, conf.cloudProvider, conf.allowCloudDualStack)
 			t.Run(desc, func(t *testing.T) {
-				parsed, err := ParseNodeIPArgument(tc.in, cloudProvider)
+				parsed, err := ParseNodeIPArgument(tc.in, conf.cloudProvider, conf.allowCloudDualStack)
 
 				expectedOut := tc.out
 				expectedErr := tc.err
 
-				// Dual-stack is only supported with no cloudProvider
-				if cloudProvider != "" {
+				if !conf.dualStackSupported {
 					if len(tc.out) == 2 {
 						expectedOut = nil
 					}
