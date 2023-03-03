@@ -121,6 +121,8 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=admissionregistration.k8s.io, Version=v1
+	case v1.SchemeGroupVersion.WithKind("MatchCondition"):
+		return &admissionregistrationv1.MatchConditionApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MutatingWebhook"):
 		return &admissionregistrationv1.MutatingWebhookApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
@@ -167,6 +169,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ValidationApplyConfiguration{}
 
 		// Group=admissionregistration.k8s.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithKind("MatchCondition"):
+		return &admissionregistrationv1beta1.MatchConditionApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhook"):
 		return &admissionregistrationv1beta1.MutatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
