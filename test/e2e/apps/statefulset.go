@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1350,7 +1351,125 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 	})
+
+	ginkgo.Describe("Automatically recreate PVC for pending pod when PVC is missing", func() {
+		ssName := "ss"
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+		headlessSvcName := "test"
+		var statefulPodMounts []v1.VolumeMount
+		var ss *appsv1.StatefulSet
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, statefulPodMounts, nil, labels)
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if ginkgo.CurrentSpecReport().Failed() {
+				e2eoutput.DumpDebugInfo(ctx, c, ns)
+			}
+			framework.Logf("Deleting all statefulset in ns %v", ns)
+			e2estatefulset.DeleteAllStatefulSets(ctx, c, ns)
+		})
+
+		ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", func(ctx context.Context) {
+			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
+
+			readyNode, err := e2enode.GetRandomReadySchedulableNode(ctx, c)
+			framework.ExpectNoError(err)
+			hostLabel := "kubernetes.io/hostname"
+			hostLabelVal := readyNode.Labels[hostLabel]
+
+			ss.Spec.Template.Spec.NodeSelector = map[string]string{hostLabel: hostLabelVal} // force the pod on a specific node
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming PVC exists")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming Pod is ready")
+			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
+			podName := getStatefulSetPodNameAtIndex(0, ss)
+			pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			nodeName := pod.Spec.NodeName
+			framework.ExpectEqual(nodeName, readyNode.Name)
+			node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			oldData, err := json.Marshal(node)
+			framework.ExpectNoError(err)
+
+			node.Spec.Unschedulable = true
+
+			newData, err := json.Marshal(node)
+			framework.ExpectNoError(err)
+
+			// cordon node, to make sure pod does not get scheduled to the node until the pvc is deleted
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+			framework.ExpectNoError(err)
+			ginkgo.By("Cordoning Node")
+			_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+			framework.ExpectNoError(err)
+			cordoned := true
+
+			defer func() {
+				if cordoned {
+					uncordonNode(c, oldData, newData, nodeName)
+				}
+			}()
+
+			// wait for the node to be unschedulable
+			e2enode.WaitForNodeSchedulable(c, nodeName, 10*time.Second, false)
+
+			ginkgo.By("Deleting Pod")
+			err = c.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// wait for the pod to be recreated
+			e2estatefulset.WaitForStatusCurrentReplicas(c, ss, 1)
+			_, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pvcList.Items), 1)
+			pvcName := pvcList.Items[0].Name
+
+			ginkgo.By("Deleting PVC")
+			err = c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			uncordonNode(c, oldData, newData, nodeName)
+			cordoned = false
+
+			ginkgo.By("Confirming PVC recreated")
+			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming Pod is ready after being recreated")
+			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
+			pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(pod.Spec.NodeName, readyNode.Name) // confirm the pod was scheduled back to the original node
+		})
+	})
 })
+
+func uncordonNode(c clientset.Interface, oldData, newData []byte, nodeName string) {
+	ginkgo.By("Uncordoning Node")
+	// uncordon node, by reverting patch
+	revertPatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
+	framework.ExpectNoError(err)
+	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
+	framework.ExpectNoError(err)
+}
 
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error
