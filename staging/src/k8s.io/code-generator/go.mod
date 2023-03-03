@@ -11,7 +11,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/klog/v2 v2.90.1
-	k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a
+	k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
 )
 
 require (

@@ -347,6 +347,30 @@ func (e *Encoder) unwriteEmptyObjectMember(prevName *string) bool {
 	return true
 }
 
+// unwriteOnlyObjectMemberName unwrites the only object member name
+// and returns the unquoted name.
+func (e *Encoder) unwriteOnlyObjectMemberName() string {
+	if last := e.tokens.last; !last.isObject() || last.length() != 1 {
+		panic("BUG: must be called on an object after writing first name")
+	}
+
+	// Unwrite the name and whitespace.
+	b := trimSuffixString(e.buf)
+	isVerbatim := bytes.IndexByte(e.buf[len(b):], '\\') < 0
+	name := string(unescapeStringMayCopy(e.buf[len(b):], isVerbatim))
+	e.buf = trimSuffixWhitespace(b)
+
+	// Undo state changes.
+	e.tokens.last.decrement()
+	if !e.options.AllowDuplicateNames {
+		if e.tokens.last.isActiveNamespace() {
+			e.namespaces.last().removeLast()
+		}
+		e.names.clearLast()
+	}
+	return name
+}
+
 func trimSuffixWhitespace(b []byte) []byte {
 	// NOTE: The arguments and logic are kept simple to keep this inlineable.
 	n := len(b) - 1
