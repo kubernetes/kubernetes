@@ -43,6 +43,13 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
+	// owner: @ivelichkovich, @tallclair
+	// alpha: v1.27
+	// kep: https://kep.k8s.io/3716
+	//
+	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
+	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -908,6 +915,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APISelfSubjectReview: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.27
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
+
+	AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
