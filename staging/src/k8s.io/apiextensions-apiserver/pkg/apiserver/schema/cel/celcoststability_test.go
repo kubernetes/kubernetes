@@ -1087,6 +1087,8 @@ func TestCelCostStability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
+				validRule := validRule
+				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]

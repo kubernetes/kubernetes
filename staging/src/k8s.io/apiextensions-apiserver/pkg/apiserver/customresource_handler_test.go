@@ -787,7 +787,7 @@ unknown: foo`
 				t.Fatal(err)
 			}
 			structuralSchemas[v] = structuralSchema
-			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{tc.yaml, false, tc.strictDecoding})
+			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{Yaml: tc.yaml, Strict: tc.strictDecoding})
 			decoder := &schemaCoercingDecoder{
 				delegate: delegate,
 				validator: unstructuredSchemaCoercer{

@@ -678,7 +678,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 					p.service = nil
 					p.l = nil
 					p.lastResponse = nil
-					p.keyID = kmsv2Probe.keyID
+					p.keyID.Store(kmsv2Probe.keyID.Load())
 				default:
 					t.Fatalf("unexpected probe type %T", p)
 				}

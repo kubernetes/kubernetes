@@ -41,7 +41,7 @@ type recorderImpl struct {
 }
 
 func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
-	timestamp := metav1.MicroTime{time.Now()}
+	timestamp := metav1.MicroTime{Time: time.Now()}
 	message := fmt.Sprintf(note, args...)
 	refRegarding, err := reference.GetReference(recorder.scheme, regarding)
 	if err != nil {

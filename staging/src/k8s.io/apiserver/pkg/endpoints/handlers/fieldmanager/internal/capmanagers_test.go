@@ -45,7 +45,6 @@ func (*fakeManager) Update(_, newObj runtime.Object, managed internal.Managed, _
 
 func (*fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ bool) (runtime.Object, internal.Managed, error) {
 	panic("not implemented")
-	return nil, nil, nil
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {

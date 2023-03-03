@@ -729,13 +729,8 @@ func setupInFlightWatchRequestHandler(s *GenericAPIServer) *inFlightRequest {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		select {
-		case <-signals.ShuttingDown():
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		w.WriteHeader(http.StatusInternalServerError)
+		<-signals.ShuttingDown()
+		w.WriteHeader(http.StatusOK)
 	})
 	s.Handler.NonGoRestfulMux.Handle("/apis/watches.group/v1/namespaces/foo/bar", handler)
 	return inflight

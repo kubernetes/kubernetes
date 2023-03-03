@@ -404,6 +404,7 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("success", func(t *testing.T) {
 		for i := range successCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				if err := validateAnnotations(successCases[i]); err != nil {
@@ -441,6 +442,7 @@ func TestValidateAnnotations(t *testing.T) {
 
 	t.Run("name error", func(t *testing.T) {
 		for i := range annotationsNameErrorCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsNameErrorCases[i].annotations)
@@ -468,6 +470,7 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("size error", func(t *testing.T) {
 		for i := range annotationsSizeErrorCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsSizeErrorCases[i].annotations)

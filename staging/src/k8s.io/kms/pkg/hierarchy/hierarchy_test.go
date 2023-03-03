@@ -508,15 +508,20 @@ func TestRotationKeyUsage(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte(rand.String(32)))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, encLocalKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	fakeClock.Step(30 * time.Second)
 	rotated := false
@@ -541,15 +546,20 @@ func TestRotationKeyUsage(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte(rand.String(32)))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, lk.encKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	// check we can decrypt data encrypted with the old and new local KEKs
 	record.Range(func(key, _ any) bool {
@@ -591,15 +601,20 @@ func TestRotationKeyExpiry(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte("test-plaintext"))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, encLocalKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	// check local KEK has only been used 3 times and still under the suggested usage
 	if lk.usage.Load() != 3 {
@@ -629,15 +644,20 @@ func TestRotationKeyExpiry(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte("test-plaintext"))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, lk.encKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	// check we can decrypt data encrypted with the old and new local KEKs
 	record.Range(func(key, _ any) bool {
@@ -679,15 +699,20 @@ func TestRotationRemoteKeyIDChanged(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte("test-plaintext"))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, encLocalKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, encLocalKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	// check local KEK has only been used 3 times and still under the suggested usage
 	if lk.usage.Load() != 3 {
@@ -719,15 +744,20 @@ func TestRotationRemoteKeyIDChanged(t *testing.T) {
 			defer wg.Done()
 			resp, err := localKEKService.Encrypt(ctx, "test-uid", []byte("test-plaintext"))
 			if err != nil {
-				t.Fatalf("Encrypt() error = %v", err)
+				t.Errorf("Encrypt() error = %v", err)
+				return
 			}
 			if v, ok := resp.Annotations[referenceKEKAnnotationKey]; !ok || !bytes.Equal(v, lk.encKEK) {
-				t.Fatalf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				t.Errorf("Encrypt() annotations = %v, want %v", resp.Annotations, lk.encKEK)
+				return
 			}
 			record.Store(resp, nil)
 		}()
 	}
 	wg.Wait()
+	if t.Failed() {
+		return
+	}
 
 	// check we can decrypt data encrypted with the old and new local KEKs
 	record.Range(func(key, _ any) bool {

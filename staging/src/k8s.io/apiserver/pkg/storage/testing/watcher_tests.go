@@ -288,7 +288,8 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
-	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	watchCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	t.Cleanup(cancel)
 	w, err := store.Watch(watchCtx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -314,7 +315,8 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 }
 
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
-	ctx, _ = context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	t.Cleanup(cancel)
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 

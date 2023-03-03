@@ -230,6 +230,7 @@ func (s *EtcdOptions) Complete(
 
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
 		ctxServer := wait.ContextForChannel(stopCh)
+		// nolint:govet // The only code path where closeTransformers does not get called is when it gets stored in dynamicTransformers.
 		ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
 
 		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload)
@@ -248,6 +249,7 @@ func (s *EtcdOptions) Complete(
 				return fmt.Errorf("failed to start kms encryption config hot reload controller. only 1 health check should be available when reload is enabled")
 			}
 
+			// Here the dynamic transformers take ownership of the transformers and their cancellation.
 			dynamicTransformers := encryptionconfig.NewDynamicTransformers(encryptionConfiguration.Transformers, encryptionConfiguration.HealthChecks[0], closeTransformers, encryptionConfiguration.KMSCloseGracePeriod)
 
 			// add post start hook to start hot reload controller
@@ -285,6 +287,7 @@ func (s *EtcdOptions) Complete(
 
 	s.complete = true
 
+	// nolint:govet // The only code path where closeTransformers does not get called is when it gets stored in dynamicTransformers.
 	return nil
 }
 

@@ -168,18 +168,18 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	}
 	ast, issues := env.Compile(rule.Rule)
 	if issues != nil {
-		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "compilation failed: " + issues.String()}
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "compilation failed: " + issues.String()}
 		return
 	}
 	if ast.OutputType() != cel.BoolType {
-		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "cel expression must evaluate to a bool"}
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "cel expression must evaluate to a bool"}
 		return
 	}
 
 	checkedExpr, err := cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
-		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "unexpected compilation error: " + err.Error()}
 		return
 	}
 	for _, ref := range checkedExpr.ReferenceMap {
@@ -198,12 +198,12 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		cel.InterruptCheckFrequency(checkFrequency),
 	)
 	if err != nil {
-		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "program instantiation failed: " + err.Error()}
 		return
 	}
 	costEst, err := env.EstimateCost(ast, estimator)
 	if err != nil {
-		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "cost estimation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
 		return
 	}
 	compilationResult.MaxCost = costEst.Max

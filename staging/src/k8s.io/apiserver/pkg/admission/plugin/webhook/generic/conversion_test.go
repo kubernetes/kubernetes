@@ -168,7 +168,7 @@ func TestConvertVersionedAttributes(t *testing.T) {
 	o := admission.NewObjectInterfacesFromScheme(scheme)
 
 	gvk := func(g, v, k string) schema.GroupVersionKind {
-		return schema.GroupVersionKind{g, v, k}
+		return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
 	}
 	attrs := func(obj, oldObj runtime.Object) admission.Attributes {
 		return admission.NewAttributesRecord(obj, oldObj, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)

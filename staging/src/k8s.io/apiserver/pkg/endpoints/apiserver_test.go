@@ -2085,7 +2085,7 @@ func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
 }
 
 func TestGetPartialObjectMetadata(t *testing.T) {
-	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	now := metav1.Time{Time: metav1.Now().Rfc3339Copy().Local()}
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{

@@ -851,7 +851,7 @@ func TestUpdateViaSubresources(t *testing.T) {
 			APIVersion: "apps/v1",
 			FieldsType: "FieldsV1",
 			FieldsV1: &metav1.FieldsV1{
-				[]byte(`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`),
+				Raw: []byte(`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`),
 			},
 		},
 	})

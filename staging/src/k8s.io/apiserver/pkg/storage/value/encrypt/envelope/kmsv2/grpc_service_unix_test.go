@@ -149,7 +149,8 @@ func TestTimeouts(t *testing.T) {
 
 				service, err = NewGRPCService(ctx, socketName.endpoint, testProviderName, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					t.Errorf("failed to create envelope service, error: %v", err)
+					return
 				}
 				defer destroyService(service)
 				kubeAPIServerWG.Done()
@@ -164,10 +165,12 @@ func TestTimeouts(t *testing.T) {
 
 				f, err := mock.NewBase64Plugin(socketName.path)
 				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
+					t.Errorf("failed to construct test KMS provider server, error: %v", err)
+					return
 				}
 				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
+					t.Errorf("Failed to start test KMS provider server, error: %v", err)
+					return
 				}
 				defer f.CleanUp()
 				kmsPluginWG.Done()
@@ -176,6 +179,9 @@ func TestTimeouts(t *testing.T) {
 			}()
 
 			kubeAPIServerWG.Wait()
+			if t.Failed() {
+				return
+			}
 			_, err = service.Encrypt(ctx, uid, data)
 
 			if err == nil && tt.wantErr != "" {
