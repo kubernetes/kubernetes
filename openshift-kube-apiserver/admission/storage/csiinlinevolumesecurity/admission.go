@@ -33,6 +33,8 @@ const (
 	defaultPodSecEnforceProfile = podsecapi.LevelRestricted
 	defaultPodSecWarnProfile    = podsecapi.LevelRestricted
 	defaultPodSecAuditProfile   = podsecapi.LevelRestricted
+	// Format string used for audit/warn/enforce response messages
+	admissionResponseFormatStr = "%s uses an inline volume provided by CSIDriver %s and namespace %s has a pod security %s level that is lower than %s"
 )
 
 var (
@@ -155,12 +157,12 @@ func (c *csiInlineVolSec) Validate(ctx context.Context, attrs admission.Attribut
 
 	// Extract the pod spec to evaluate
 	obj := attrs.GetObject()
-	podMeta, podSpec, err := c.podSpecExtractor.ExtractPodSpec(obj)
+	_, podSpec, err := c.podSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		return admission.NewForbidden(attrs, fmt.Errorf("failed to extract pod spec: %v", err))
 	}
 	// If an object with an optional pod spec does not contain a pod spec, skip validation
-	if podMeta == nil && podSpec == nil {
+	if podSpec == nil {
 		return nil
 	}
 
@@ -188,15 +190,15 @@ func (c *csiInlineVolSec) Validate(ctx context.Context, attrs admission.Attribut
 		// Compare CSIDriver level to the policy for the namespace
 		if podsecapi.CompareLevels(nsPolicy.Enforce.Level, driverLevel) > 0 {
 			// Not permitted, enforce error and deny admission
-			return admission.NewForbidden(attrs, fmt.Errorf("admission denied: pod %s uses an inline volume provided by CSIDriver %s and namespace %s has a pod security enforce level that is lower than %s", podMeta.Name, driverName, namespace.Name, driverLevel))
+			return admission.NewForbidden(attrs, fmt.Errorf(admissionResponseFormatStr, attrs.GetName(), driverName, attrs.GetNamespace(), "enforce", driverLevel))
 		}
 		if podsecapi.CompareLevels(nsPolicy.Warn.Level, driverLevel) > 0 {
 			// Violates policy warn level, add warning
-			warning.AddWarning(ctx, "", fmt.Sprintf("pod %s uses an inline volume provided by CSIDriver %s and namespace %s has a pod security warn level that is lower than %s", podMeta.Name, driverName, namespace.Name, driverLevel))
+			warning.AddWarning(ctx, "", fmt.Sprintf(admissionResponseFormatStr, attrs.GetName(), driverName, attrs.GetNamespace(), "warn", driverLevel))
 		}
 		if podsecapi.CompareLevels(nsPolicy.Audit.Level, driverLevel) > 0 {
 			// Violates policy audit level, add audit annotation
-			auditMessageString := fmt.Sprintf("pod %s uses an inline volume provided by CSIDriver %s and namespace %s has a pod security audit level that is lower than %s", podMeta.Name, driverName, namespace.Name, driverLevel)
+			auditMessageString := fmt.Sprintf(admissionResponseFormatStr, attrs.GetName(), driverName, attrs.GetNamespace(), "audit", driverLevel)
 			audit.AddAuditAnnotation(ctx, PluginName, auditMessageString)
 		}
 	}
