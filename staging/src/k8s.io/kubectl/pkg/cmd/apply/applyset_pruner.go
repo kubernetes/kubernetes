@@ -28,6 +28,6 @@ func newApplySetPruner(_ *ApplyOptions) *applySetPruner {
 	return &applySetPruner{}
 }
 
-func (p *applySetPruner) pruneAll(_ context.Context, _ *ApplySet) error {
+func (p *applySetPruner) pruneAll(context.Context, *ApplySet) error {
 	return fmt.Errorf("ApplySet-based pruning is not yet implemented")
 }

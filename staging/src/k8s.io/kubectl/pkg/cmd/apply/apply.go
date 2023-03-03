@@ -176,6 +176,8 @@ var (
 	warningMigrationReapplyFailed        = "Warning: failed to re-apply configuration after performing Server-Side Apply migration. This is non-fatal and will be retried next time you apply. Error: %[1]s\n"
 )
 
+var ApplySetToolVersion = version.Get().GitVersion
+
 // NewApplyFlags returns a default ApplyFlags
 func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
@@ -312,7 +314,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 			parent.Namespace = namespace
 		}
 		// TODO: is version.Get() the right thing? Does it work for non-kubectl package consumers?
-		tooling := ApplySetTooling{name: baseName, version: version.Get().String()}
+		tooling := ApplySetTooling{name: baseName, version: ApplySetToolVersion}
 		restClient, err := f.ClientForMapping(parent.RESTMapping)
 		if err != nil || restClient == nil {
 			return nil, fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
@@ -509,6 +511,18 @@ func (o *ApplyOptions) Run() error {
 
 	if o.ApplySet != nil {
 		if err := o.ApplySet.FetchParent(); err != nil {
+			return err
+		}
+		// Update the live parent object to the superset of the current and previous resources.
+		// Doing this before the actual apply and prune operations improves behavior by ensuring
+		// the live object contains the superset on failure. This may cause the next pruning
+		// operation to make a larger number of GET requests than strictly necessary, but it prevents
+		// object leakage from the set. The superset will automatically be reduced to the correct
+		// set by the next successful operation.
+		for _, info := range infos {
+			o.ApplySet.AddResource(info.ResourceMapping(), info.Namespace)
+		}
+		if err := o.ApplySet.UpdateParent(UpdateToSuperset, o.DryRunStrategy, o.ValidationDirective); err != nil {
 			return err
 		}
 	}
@@ -997,10 +1011,6 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 		return err
 	}
 	o.VisitedUids.Insert(metadata.GetUID())
-
-	if o.ApplySet != nil {
-		o.ApplySet.MarkObjectVisited(info.Mapping, info.Namespace)
-	}
 	return nil
 }
 
@@ -1021,10 +1031,12 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
 				pruner := newApplySetPruner(o)
 				if err := pruner.pruneAll(ctx, o.ApplySet); err != nil {
-					applySetErr := o.ApplySet.UpdateParent(SetUpdateIncomplete, o.DryRunStrategy, o.ValidationDirective)
-					return utilerrors.NewAggregate([]error{err, applySetErr})
+					// Do not update the ApplySet. If pruning failed, we want to keep the superset
+					// of the previous and current resources in the ApplySet, so that the pruning
+					// step of the next apply will be able to clean up the set correctly.
+					return err
 				}
-				if err := o.ApplySet.UpdateParent(SetUpdateSuccessful, o.DryRunStrategy, o.ValidationDirective); err != nil {
+				if err := o.ApplySet.UpdateParent(UpdateToLatestSet, o.DryRunStrategy, o.ValidationDirective); err != nil {
 					return fmt.Errorf("apply and prune succeeded, but ApplySet update failed: %w", err)
 				}
 			} else {

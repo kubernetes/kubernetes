@@ -335,20 +335,6 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 	return metaAccessor.GetName(), rcBytes
 }
 
-func readService(t *testing.T, filenameSVC string) (string, []byte) {
-	svcObj := readServiceFromFile(t, filenameSVC)
-	metaAccessor, err := meta.Accessor(svcObj)
-	if err != nil {
-		t.Fatal(err)
-	}
-	svcBytes, err := runtime.Encode(codec, svcObj)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return metaAccessor.GetName(), svcBytes
-}
-
 func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.ReplicationController {
 	data := readBytesFromFile(t, filename)
 	rc := corev1.ReplicationController{}
@@ -2205,8 +2191,8 @@ func TestApplySetParentValidation(t *testing.T) {
 					return
 				}
 
-				assert.Equal(t, expectedParentNs, o.ApplySet.parent.Namespace)
-				assert.Equal(t, test.expectParentKind, o.ApplySet.parent.GroupVersionKind.Kind)
+				assert.Equal(t, expectedParentNs, o.ApplySet.parentRef.Namespace)
+				assert.Equal(t, test.expectParentKind, o.ApplySet.parentRef.GroupVersionKind.Kind)
 
 				err = o.Validate()
 				if test.expectErr != "" {
@@ -2486,19 +2472,19 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "helm/v3",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling helm instead of kubectl",
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with one segment can be parsed": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "helm",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling helm instead of kubectl",
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with many segments can be parsed": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "example.com/tool/why/v1",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling example.com/tool/why instead of kubectl",
+			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"example.com/tool/why\" instead of \"kubectl\"",
 		},
 		"ID label is required": {
 			grsAnnotation:     validGrsAnnotation,

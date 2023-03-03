@@ -72,8 +72,8 @@ var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resour
 
 // ApplySet tracks the information about an applyset apply/prune
 type ApplySet struct {
-	// parent is the reference to the parent object that is used to track the applyset.
-	parent *ApplySetParent
+	// parentRef is a reference to the parent object that is used to track the applyset.
+	parentRef *ApplySetParentRef
 
 	// toolingID is the value to be used and validated in the applyset.k8s.io/tooling annotation.
 	toolingID ApplySetTooling
@@ -92,7 +92,7 @@ type ApplySet struct {
 
 	restMapper meta.RESTMapper
 
-	// client is a client specific to the parent's type
+	// client is a client specific to the ApplySet parent object's type
 	client resource.RESTClient
 }
 
@@ -101,15 +101,21 @@ var builtinApplySetParentGVRs = map[schema.GroupVersionResource]bool{
 	{Version: "v1", Resource: "configmaps"}: true,
 }
 
-// ApplySetParent stores object and type meta for the parent object that is used to track the applyset.
-type ApplySetParent struct {
+// ApplySetParentRef stores object and type meta for the parent object that is used to track the applyset.
+type ApplySetParentRef struct {
 	Name      string
 	Namespace string
 	*meta.RESTMapping
 }
 
-func (p ApplySetParent) IsNamespaced() bool {
+func (p ApplySetParentRef) IsNamespaced() bool {
 	return p.Scope.Name() == meta.RESTScopeNameNamespace
+}
+
+// String returns the string representation of the parent object using the same format
+// that we expect to receive in the --applyset flag on the CLI.
+func (p ApplySetParentRef) String() string {
+	return fmt.Sprintf("%s.%s/%s", p.Resource.Resource, p.Resource.Group, p.Name)
 }
 
 type ApplySetTooling struct {
@@ -122,23 +128,17 @@ func (t ApplySetTooling) String() string {
 }
 
 // NewApplySet creates a new ApplySet object tracked by the given parent object.
-func NewApplySet(parent *ApplySetParent, tooling ApplySetTooling, mapper meta.RESTMapper, client resource.RESTClient) *ApplySet {
+func NewApplySet(parent *ApplySetParentRef, tooling ApplySetTooling, mapper meta.RESTMapper, client resource.RESTClient) *ApplySet {
 	return &ApplySet{
 		currentResources:  make(map[schema.GroupVersionResource]*meta.RESTMapping),
 		currentNamespaces: make(sets.Set[string]),
 		updatedResources:  make(map[schema.GroupVersionResource]*meta.RESTMapping),
 		updatedNamespaces: make(sets.Set[string]),
-		parent:            parent,
+		parentRef:         parent,
 		toolingID:         tooling,
 		restMapper:        mapper,
 		client:            client,
 	}
-}
-
-// ParentRef returns the string representation of the parent object using the same format
-// that we expect to receive in the --applyset flag on the CLI.
-func (a *ApplySet) ParentRef() string {
-	return fmt.Sprintf("%s.%s/%s", a.parent.Resource.Resource, a.parent.Resource.Group, a.parent.Name)
 }
 
 // ID is the label value that we are using to identify this applyset.
@@ -151,10 +151,10 @@ func (a ApplySet) ID() string {
 func (a ApplySet) Validate() error {
 	var errors []error
 	// TODO: permit CRDs that have the annotation required by the ApplySet specification
-	if !builtinApplySetParentGVRs[a.parent.Resource] {
-		errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.parent.Resource))
+	if !builtinApplySetParentGVRs[a.parentRef.Resource] {
+		errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.parentRef.Resource))
 	}
-	if a.parent.IsNamespaced() && a.parent.Namespace == "" {
+	if a.parentRef.IsNamespaced() && a.parentRef.Namespace == "" {
 		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet"))
 	}
 	return utilerrors.NewAggregate(errors)
@@ -190,67 +190,55 @@ func (a *ApplySet) addLabels(objects []*resource.Info) error {
 	return nil
 }
 
-// MarkObjectVisited keeps track of the applied objects, so that we can update the list of in-use namespaces
-// and resouce kinds, and so that we can prune objects not applied.
-func (a *ApplySet) MarkObjectVisited(resource *meta.RESTMapping, namespace string) {
-	a.updatedResources[resource.Resource] = resource
-	if namespace != "" {
-		a.updatedNamespaces.Insert(namespace)
-	}
-}
-
 func (a *ApplySet) FetchParent() error {
-	helper := resource.NewHelper(a.client, a.parent.RESTMapping)
-	obj, err := helper.Get(a.parent.Namespace, a.parent.Name)
+	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping)
+	obj, err := helper.Get(a.parentRef.Namespace, a.parentRef.Name)
 	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to fetch ApplySet parent object %q from server: %w", a.ParentRef(), err)
+		return fmt.Errorf("failed to fetch ApplySet parent object %q from server: %w", a.parentRef, err)
 	} else if obj == nil {
-		return fmt.Errorf("failed to fetch ApplySet parent object %q from server", a.ParentRef())
+		return fmt.Errorf("failed to fetch ApplySet parent object %q from server", a.parentRef)
 	}
 
-	labels, annotations := getLabelsAndAnnotations(obj)
+	labels, annotations, err := getLabelsAndAnnotations(obj)
+	if err != nil {
+		return fmt.Errorf("getting metadata from parent object %q: %w", a.parentRef, err)
+	}
 
 	toolAnnotation, hasToolAnno := annotations[ApplySetToolingAnnotation]
 	if !hasToolAnno {
-		return fmt.Errorf("ApplySet parent object %q already exists and is missing required annotation %q", a.ParentRef(), ApplySetToolingAnnotation)
+		return fmt.Errorf("ApplySet parent object %q already exists and is missing required annotation %q", a.parentRef, ApplySetToolingAnnotation)
 	}
 	if managedBy := toolingBaseName(toolAnnotation); managedBy != a.toolingID.name {
-		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %s instead of %s", a.ParentRef(), managedBy, a.toolingID.name)
+		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %q instead of %q", a.parentRef, managedBy, a.toolingID.name)
 	}
 
 	idLabel, hasIDLabel := labels[ApplySetParentIDLabel]
 	if !hasIDLabel {
-		return fmt.Errorf("ApplySet parent object %q exists and does not have required label %s", a.ParentRef(), ApplySetParentIDLabel)
+		return fmt.Errorf("ApplySet parent object %q exists and does not have required label %s", a.parentRef, ApplySetParentIDLabel)
 	}
 	if idLabel != a.ID() {
-		return fmt.Errorf("ApplySet parent object %q exists and has incorrect value for label %q (got: %s, want: %s)", a.ParentRef(), ApplySetParentIDLabel, idLabel, a.ID())
+		return fmt.Errorf("ApplySet parent object %q exists and has incorrect value for label %q (got: %s, want: %s)", a.parentRef, ApplySetParentIDLabel, idLabel, a.ID())
 	}
 
 	if a.currentResources, err = parseResourcesAnnotation(annotations, a.restMapper); err != nil {
 		// TODO: handle GVRs for now-deleted CRDs
-		return fmt.Errorf("parsing ApplySet annotation on %q: %w", a.ParentRef(), err)
+		return fmt.Errorf("parsing ApplySet annotation on %q: %w", a.parentRef, err)
 	}
 	a.currentNamespaces = parseNamespacesAnnotation(annotations)
-	if a.parent.IsNamespaced() {
-		a.currentNamespaces.Insert(a.parent.Namespace)
+	if a.parentRef.IsNamespaced() {
+		a.currentNamespaces.Insert(a.parentRef.Namespace)
 	}
 	return nil
 }
 
-func getLabelsAndAnnotations(obj runtime.Object) (map[string]string, map[string]string) {
-	accessor := meta.NewAccessor()
-	annotations := make(map[string]string)
-	labels := make(map[string]string)
-
-	if data, err := accessor.Annotations(obj); err == nil {
-		annotations = data
+func getLabelsAndAnnotations(obj runtime.Object) (map[string]string, map[string]string, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, nil, err
 	}
-	if data, err := accessor.Labels(obj); err == nil {
-		labels = data
-	}
-	return labels, annotations
+	return accessor.GetLabels(), accessor.GetAnnotations(), nil
 }
 
 func toolingBaseName(toolAnnotation string) string {
@@ -285,21 +273,26 @@ func parseResourcesAnnotation(annotations map[string]string, mapper meta.RESTMap
 }
 
 func parseNamespacesAnnotation(annotations map[string]string) sets.Set[string] {
-	namespaces := make(sets.Set[string])
 	annotation, ok := annotations[ApplySetAdditionalNamespacesAnnotation]
 	if !ok { // this annotation is completely optional
-		return namespaces
+		return sets.Set[string]{}
 	}
-	for _, ns := range strings.Split(annotation, ",") {
-		namespaces.Insert(ns)
+	return sets.New(strings.Split(annotation, ",")...)
+}
+
+// AddResource registers the given resource and namespace as being part of the updated set of
+// resources being applied by the current operation.
+func (a *ApplySet) AddResource(resource *meta.RESTMapping, namespace string) {
+	a.updatedResources[resource.Resource] = resource
+	if resource.Scope == meta.RESTScopeNamespace && namespace != "" {
+		a.updatedNamespaces.Insert(namespace)
 	}
-	return namespaces
 }
 
 type ApplySetUpdateMode string
 
-var SetUpdateSuccessful ApplySetUpdateMode = "latest"
-var SetUpdateIncomplete ApplySetUpdateMode = "superset"
+var UpdateToLatestSet ApplySetUpdateMode = "latest"
+var UpdateToSuperset ApplySetUpdateMode = "superset"
 
 func (a *ApplySet) UpdateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunStrategy, validation string) error {
 	data, err := json.Marshal(a.buildParentPatch(mode))
@@ -322,7 +315,7 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 	if dryRun == cmdutil.DryRunClient {
 		return nil
 	}
-	helper := resource.NewHelper(a.client, a.parent.RESTMapping).
+	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping).
 		DryRun(dryRun == cmdutil.DryRunServer).
 		WithFieldManager(a.FieldManager()).
 		WithFieldValidation(validation)
@@ -331,8 +324,8 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 		Force: &forceConficts,
 	}
 	_, err := helper.Patch(
-		a.parent.Namespace,
-		a.parent.Name,
+		a.parentRef.Namespace,
+		a.parentRef.Name,
 		types.ApplyPatchType,
 		data,
 		&options,
@@ -343,32 +336,26 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 func (a *ApplySet) buildParentPatch(mode ApplySetUpdateMode) *metav1.PartialObjectMetadata {
 	var newGRsAnnotation, newNsAnnotation string
 	switch mode {
-	case SetUpdateIncomplete:
+	case UpdateToSuperset:
 		// If the apply succeeded but pruning failed, the set of group resources that
 		// the ApplySet should track is the superset of the previous and current resources.
 		// This ensures that the resources that failed to be pruned are not orphaned from the set.
-		grSuperset := make(map[schema.GroupVersionResource]*meta.RESTMapping)
-		for versionResource, mapping := range a.currentResources {
-			grSuperset[versionResource] = mapping
-		}
-		for versionResource, mapping := range a.updatedResources {
-			grSuperset[versionResource] = mapping
-		}
+		grSuperset := sets.KeySet(a.currentResources).Union(sets.KeySet(a.updatedResources))
 		newGRsAnnotation = generateResourcesAnnotation(grSuperset)
-		newNsAnnotation = generateNamespacesAnnotation(a.currentNamespaces.Union(a.updatedNamespaces), a.parent.Namespace)
-	case SetUpdateSuccessful:
-		newGRsAnnotation = generateResourcesAnnotation(a.updatedResources)
-		newNsAnnotation = generateNamespacesAnnotation(a.updatedNamespaces, a.parent.Namespace)
+		newNsAnnotation = generateNamespacesAnnotation(a.currentNamespaces.Union(a.updatedNamespaces), a.parentRef.Namespace)
+	case UpdateToLatestSet:
+		newGRsAnnotation = generateResourcesAnnotation(sets.KeySet(a.updatedResources))
+		newNsAnnotation = generateNamespacesAnnotation(a.updatedNamespaces, a.parentRef.Namespace)
 	}
 
 	return &metav1.PartialObjectMetadata{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       a.parent.GroupVersionKind.Kind,
-			APIVersion: a.parent.GroupVersionKind.GroupVersion().String(),
+			Kind:       a.parentRef.GroupVersionKind.Kind,
+			APIVersion: a.parentRef.GroupVersionKind.GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      a.parent.Name,
-			Namespace: a.parent.Namespace,
+			Name:      a.parentRef.Name,
+			Namespace: a.parentRef.Namespace,
 			Annotations: map[string]string{
 				ApplySetToolingAnnotation:              a.toolingID.String(),
 				ApplySetGRsAnnotation:                  newGRsAnnotation,
@@ -382,17 +369,12 @@ func (a *ApplySet) buildParentPatch(mode ApplySetUpdateMode) *metav1.PartialObje
 }
 
 func generateNamespacesAnnotation(namespaces sets.Set[string], skip string) string {
-	var ns []string
-	for n := range namespaces {
-		if n != "" && n != skip {
-			ns = append(ns, n)
-		}
-	}
-	sort.Strings(ns)
-	return strings.Join(ns, ",")
+	nsList := namespaces.Clone().Delete(skip).UnsortedList()
+	sort.Strings(nsList)
+	return strings.Join(nsList, ",")
 }
 
-func generateResourcesAnnotation(resources map[schema.GroupVersionResource]*meta.RESTMapping) string {
+func generateResourcesAnnotation(resources sets.Set[schema.GroupVersionResource]) string {
 	var grs []string
 	for gvr := range resources {
 		grs = append(grs, gvr.GroupResource().String())
@@ -406,7 +388,7 @@ func (a ApplySet) FieldManager() string {
 }
 
 // ParseApplySetParentRef creates a new ApplySetParentRef from a parent reference in the format [RESOURCE][.GROUP]/NAME
-func ParseApplySetParentRef(parentRefStr string, mapper meta.RESTMapper) (*ApplySetParent, error) {
+func ParseApplySetParentRef(parentRefStr string, mapper meta.RESTMapper) (*ApplySetParentRef, error) {
 	var gvr schema.GroupVersionResource
 	var name string
 
@@ -430,5 +412,5 @@ func ParseApplySetParentRef(parentRefStr string, mapper meta.RESTMapper) (*Apply
 	if err != nil {
 		return nil, err
 	}
-	return &ApplySetParent{Name: name, RESTMapping: mapping}, nil
+	return &ApplySetParentRef{Name: name, RESTMapping: mapping}, nil
 }
