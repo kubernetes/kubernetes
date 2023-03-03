@@ -1004,22 +1004,15 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Both nodeAddresses and nodeIPs can be reused for all nodePort services
-	// and only need to be computed if we have at least one nodePort service.
-	var (
-		// List of node addresses to listen on if a nodePort is set.
-		nodeAddresses []string
-		// List of node IP addresses to be used as IPVS services if nodePort is set.
-		nodeIPs []net.IP
-	)
-
+	// List of node IP addresses to be used as IPVS services if nodePort is set. This
+	// can be reused for all nodePort services.
+	var nodeIPs []net.IP
 	if hasNodePort {
 		nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
 		if err != nil {
 			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {
-			nodeAddresses = nodeAddrSet.UnsortedList()
-			for _, address := range nodeAddresses {
+			for _, address := range nodeAddrSet.UnsortedList() {
 				a := netutils.ParseIPSloppy(address)
 				if a.IsLoopback() {
 					continue
@@ -1292,7 +1285,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort() != 0 {
-			if len(nodeAddresses) == 0 || len(nodeIPs) == 0 {
+			if len(nodeIPs) == 0 {
 				// Skip nodePort configuration since an error occurred when
 				// computing nodeAddresses or nodeIPs.
 				continue
