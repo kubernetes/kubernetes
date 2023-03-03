@@ -45,7 +45,7 @@ type ByteWriter struct {
 	// WrappingAPIVersion is the apiVersion for WrappingKind
 	WrappingAPIVersion string
 
-	// Sort if set, will cause ByteWriter to sort the the nodes before writing them.
+	// Sort if set, will cause ByteWriter to sort the nodes before writing them.
 	Sort bool
 }
 

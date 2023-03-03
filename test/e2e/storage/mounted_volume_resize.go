@@ -121,6 +121,14 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 
+		ginkgo.By("Wait for a pod from deployment to be running")
+		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
+		framework.ExpectNoError(err, "While getting pods from deployment")
+		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
+		pod := podList.Items[0]
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+		framework.ExpectNoError(err, "While waiting for pods to be ready")
+
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
 		newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, c)
@@ -138,10 +146,10 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
-		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
+		podList, err = e2edeployment.GetPodsForDeployment(ctx, c, deployment)
 		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
-		pod := podList.Items[0]
+		pod = podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
 		err = e2epod.DeletePodWithWait(ctx, c, &pod)

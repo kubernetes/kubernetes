@@ -79,7 +79,11 @@ func (ns Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
 		CreateKind: yaml.ScalarNode, // Namespace is a ScalarNode
 		CreateTag:  yaml.NodeTagString,
 	})
-	return node, err
+	invalidKindErr := &yaml.InvalidNodeKindError{}
+	if err != nil && errors.As(err, &invalidKindErr) && invalidKindErr.ActualNodeKind() != yaml.ScalarNode {
+		return nil, errors.WrapPrefixf(err, "namespace field specs must target scalar nodes")
+	}
+	return node, errors.WrapPrefixf(err, "namespace transformation failed")
 }
 
 // metaNamespaceHack is a hack for implementing the namespace transform
@@ -174,8 +178,7 @@ func setNamespaceField(node *yaml.RNode, setter filtersutil.SetFn) error {
 func (ns Filter) removeRoleBindingSubjectFieldSpecs(fs types.FsSlice) types.FsSlice {
 	var val types.FsSlice
 	for i := range fs {
-		if isRoleBinding(fs[i].Kind) &&
-			(fs[i].Path == subjectsNamespacePath || fs[i].Path == subjectsField) {
+		if isRoleBinding(fs[i].Kind) && fs[i].Path == subjectsNamespacePath {
 			continue
 		}
 		val = append(val, fs[i])

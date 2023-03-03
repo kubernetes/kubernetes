@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/patchjson6902"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/yaml"
 )
@@ -61,7 +61,7 @@ func (p *PatchJson6902TransformerPlugin) Config(
 	}
 	p.decodedPatch, err = jsonpatch.DecodePatch([]byte(p.JsonOp))
 	if err != nil {
-		return errors.Wrapf(err, "decoding %s", p.JsonOp)
+		return errors.WrapPrefixf(err, "decoding %s", p.JsonOp)
 	}
 	if len(p.decodedPatch) == 0 {
 		return fmt.Errorf(
