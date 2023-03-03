@@ -17,6 +17,8 @@ limitations under the License.
 package apply
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -141,10 +143,24 @@ func NewApplySet(parent *ApplySetParentRef, tooling ApplySetTooling, mapper meta
 	}
 }
 
+const applySetIDPartDelimiter = "."
+
 // ID is the label value that we are using to identify this applyset.
+// Format: base64(sha256(<name>.<namespace>.<kind>.<group>)), using the URL safe encoding of RFC4648.
 func (a ApplySet) ID() string {
-	// TODO: base64(sha256(gknn))
-	return "placeholder-todo"
+	var unencoded string
+	if a.parentRef.IsNamespaced() {
+		unencoded = strings.Join([]string{a.parentRef.Name, a.parentRef.Namespace, a.parentRef.GroupVersionKind.Kind, a.parentRef.GroupVersionKind.Group}, applySetIDPartDelimiter)
+	} else {
+		unencoded = strings.Join([]string{a.parentRef.Name, a.parentRef.GroupVersionKind.Kind, a.parentRef.GroupVersionKind.Group}, applySetIDPartDelimiter)
+	}
+	w := bytes.Buffer{}
+	encoder := base64.NewEncoder(base64.URLEncoding, &w)
+	_, err := encoder.Write([]byte(unencoded))
+	if err != nil {
+		klog.Fatalf("failed to encode parent ID %s: %w", unencoded, err)
+	}
+	return w.String()
 }
 
 // Validate imposes restrictions on the parent object that is used to track the applyset.
@@ -413,7 +429,7 @@ func generateResourcesAnnotation(resources sets.Set[schema.GroupVersionResource]
 }
 
 func (a ApplySet) FieldManager() string {
-	return fmt.Sprintf("%s-applyset-%s", a.toolingID.name, a.ID()) // TODO: validate this choice
+	return fmt.Sprintf("%s-applyset", a.toolingID.name)
 }
 
 // ParseApplySetParentRef creates a new ApplySetParentRef from a parent reference in the format [RESOURCE][.GROUP]/NAME
