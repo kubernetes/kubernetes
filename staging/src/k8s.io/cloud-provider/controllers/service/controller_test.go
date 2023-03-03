@@ -2150,6 +2150,17 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		shouldSync           bool
 		stableNodeSetEnabled bool
 	}{{
+		name:       "nothing changed",
+		oldNode:    makeNode(),
+		newNode:    makeNode(),
+		shouldSync: false,
+	}, {
+		name:                 "nothing changed",
+		oldNode:              makeNode(),
+		newNode:              makeNode(),
+		shouldSync:           false,
+		stableNodeSetEnabled: true,
+	}, {
 		name:       "taint F->T",
 		oldNode:    makeNode(),
 		newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
@@ -2159,11 +2170,6 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
 		newNode:    makeNode(),
 		shouldSync: true,
-	}, {
-		name:       "taint F->F",
-		oldNode:    makeNode(),
-		newNode:    makeNode(),
-		shouldSync: false,
 	}, {
 		name:       "taint T->T",
 		oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
@@ -2195,11 +2201,6 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 		shouldSync: false,
 	}, {
-		name:       "excluded changed F->F",
-		oldNode:    makeNode(),
-		newNode:    makeNode(),
-		shouldSync: false,
-	}, {
 		name:                 "excluded F->T",
 		oldNode:              makeNode(),
 		newNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
@@ -2215,12 +2216,6 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		name:                 "excluded changed T->T",
 		oldNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 		newNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-		shouldSync:           false,
-		stableNodeSetEnabled: true,
-	}, {
-		name:                 "excluded changed F->F",
-		oldNode:              makeNode(),
-		newNode:              makeNode(),
 		shouldSync:           false,
 		stableNodeSetEnabled: true,
 	}, {
@@ -2243,11 +2238,6 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		oldNode:    makeNode(),
 		newNode:    makeNode(tweakSetReady(false)),
 		shouldSync: true,
-	}, {
-		name:       "readiness changed T->T",
-		oldNode:    makeNode(),
-		newNode:    makeNode(),
-		shouldSync: false,
 	}, {
 		name:       "readiness changed F->F",
 		oldNode:    makeNode(tweakSetReady(false)),
