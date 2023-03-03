@@ -49,6 +49,7 @@ import (
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -187,6 +188,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
+	dc.recorder = record.NewFakeRecorder(10)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -485,6 +487,8 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyUnsupportedControllerEventEmitted(t, dc)
+
 }
 
 // Verify that an integer MaxUnavailable will recompute allowed disruptions when the scale of
@@ -556,6 +560,7 @@ func TestNakedPod(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyUnsupportedControllerEventEmitted(t, dc)
 }
 
 // Verify that disruption controller is not erroring when unmanaged pods are found
@@ -572,9 +577,8 @@ func TestStatusForUnmanagedPod(t *testing.T) {
 	pod, _ := newPod(t, "unmanaged")
 	add(t, dc.podStore, pod)
 	dc.sync(ctx, pdbName)
-
 	ps.VerifyNoStatusError(t, pdbName)
-
+	verifyUnsupportedControllerEventEmitted(t, dc)
 }
 
 // Check if the unmanaged pods are correctly collected or not
@@ -598,7 +602,7 @@ func TestTotalUnmanagedPods(t *testing.T) {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}
 	ps.VerifyNoStatusError(t, pdbName)
-
+	verifyUnsupportedControllerEventEmitted(t, dc)
 }
 
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
@@ -1536,6 +1540,20 @@ func waitForCacheCount(store cache.Store, n int) error {
 	return wait.Poll(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		return len(store.List()) == n, nil
 	})
+}
+
+func verifyUnsupportedControllerEventEmitted(t *testing.T, dc *disruptionController) {
+	// Verify that an UnmanagedPod event is generated
+	found := false
+	for e := range dc.recorder.(*record.FakeRecorder).Events {
+		if strings.Contains(e, "managed by an unsupported controller") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("UnmanagedPod event not generated")
+	}
 }
 
 // TestMain adds klog flags to make debugging tests easier.
