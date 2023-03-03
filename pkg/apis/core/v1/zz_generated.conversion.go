@@ -6503,6 +6503,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodS
 	out.EphemeralContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
 	out.Resize = core.PodResizeStatus(in.Resize)
 	out.ResourceClaimStatuses = *(*[]core.PodResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
+	out.RequestedResources = *(*core.ResourceList)(unsafe.Pointer(&in.RequestedResources))
 	return nil
 }
 
@@ -6522,6 +6523,7 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodS
 	out.EphemeralContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
 	out.Resize = v1.PodResizeStatus(in.Resize)
 	out.ResourceClaimStatuses = *(*[]v1.PodResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
+	out.RequestedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.RequestedResources))
 	return nil
 }
 

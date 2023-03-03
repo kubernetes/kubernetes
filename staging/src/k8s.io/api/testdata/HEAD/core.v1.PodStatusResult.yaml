@@ -186,6 +186,8 @@ status:
   - ip: ipValue
   qosClass: qosClassValue
   reason: reasonValue
+  requestedResources:
+    requestedResourcesKey: "0"
   resize: resizeValue
   resourceClaimStatuses:
   - name: nameValue

@@ -463,6 +463,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
 	}
+	SetDefaults_ResourceList(&in.Status.RequestedResources)
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
@@ -497,6 +498,7 @@ func SetObjectDefaults_PodStatusResult(in *v1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
 	}
+	SetDefaults_ResourceList(&in.Status.RequestedResources)
 }
 
 func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {

@@ -4136,6 +4136,16 @@ message PodStatus {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;
+
+  // RequestedResources is the effective resource requests for this pod taking into consideration init
+  // and regular containers, and the pod overhead. This field reflects the total desired resources for
+  // the pod which may differ from actual resources allocated for the pod by the node. The node will
+  // update this value as it observes changes to requested resources.  If no node can be  assigned by
+  // the scheduler this value will be set to ease debugging of out-of-resource situations.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +featureGate=SidecarContainers
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requestedResources = 17;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

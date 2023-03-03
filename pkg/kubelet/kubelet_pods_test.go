@@ -48,6 +48,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+
+	netutils "k8s.io/utils/net"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -57,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	netutils "k8s.io/utils/net"
 )
 
 var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
@@ -2188,6 +2190,17 @@ func failedState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+func completedState(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name: cName,
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				ExitCode: 0,
+				Reason:   "Completed",
+			},
+		},
+	}
+}
 func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -3305,6 +3318,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	tests := []struct {
 		name                                       string
 		enablePodHostIPs                           bool // enable PodHostIPs feature gate
+		enableSidecarContainers                    bool // enable the sidecar containers feature gate
 		pod                                        *v1.Pod
 		currentStatus                              *kubecontainer.PodStatus
 		unreadyContainer                           []string
@@ -3751,6 +3765,192 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		{
+			name: "sets RequestedResources if not present and SidecarContainers feature is enabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2G"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3G")},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerA"),
+						waitingState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				SandboxStatuses: sandboxReadyStatus.SandboxStatuses,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "containerB",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				Phase:   v1.PodPending,
+				Reason:  "Test",
+				Message: "test",
+				ContainerStatuses: []v1.ContainerStatus{
+					waitingState("containerA"),
+					runningState("containerB"),
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					ready(completedState("initContainerA")),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodPending,
+				Reason:   "Test",
+				Message:  "test",
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBurstable,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					ready(completedState("initContainerA")),
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingStateWithReason("containerA", "PodInitializing")),
+					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
+				},
+				RequestedResources: v1.ResourceList{
+					v1.ResourceCPU:              resource.MustParse("1"),
+					v1.ResourceMemory:           resource.MustParse("3G"),
+					v1.ResourceEphemeralStorage: resource.MustParse("2G"),
+				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			enableSidecarContainers: true,
+		},
+		{
+			name: "doesn't set RequestedResources if SidecarContainers feature is disabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2G"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3G")},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerA"),
+						waitingState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				SandboxStatuses: sandboxReadyStatus.SandboxStatuses,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "containerB",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				Phase:   v1.PodPending,
+				Reason:  "Test",
+				Message: "test",
+				ContainerStatuses: []v1.ContainerStatus{
+					waitingState("containerA"),
+					runningState("containerB"),
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					ready(completedState("initContainerA")),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodPending,
+				Reason:   "Test",
+				Message:  "test",
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBurstable,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					ready(completedState("initContainerA")),
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingStateWithReason("containerA", "PodInitializing")),
+					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
+				},
+				RequestedResources:         v1.ResourceList{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			enableSidecarContainers: false,
+		},
 	}
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
@@ -3758,6 +3958,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, test.enablePodHostIPs)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, test.enableSidecarContainers)()
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet

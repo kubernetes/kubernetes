@@ -991,7 +991,7 @@ func TestPodResourceRequests(t *testing.T) {
 				},
 			}
 			request := PodRequests(p, tc.options)
-			if !resourcesEqual(tc.expectedRequests, request) {
+			if !ResourcesEqual(tc.expectedRequests, request) {
 				t.Errorf("[%s] expected requests = %v, got %v", tc.description, tc.expectedRequests, request)
 			}
 		})
@@ -1021,12 +1021,12 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 	}
 	requests := PodRequests(p, opts)
 
-	if !resourcesEqual(expectedRequests, requests) {
+	if !ResourcesEqual(expectedRequests, requests) {
 		t.Errorf("expected requests = %v, got %v", expectedRequests, requests)
 	}
 
 	// should re-use the maps we passed in
-	if !resourcesEqual(expectedRequests, opts.Reuse) {
+	if !ResourcesEqual(expectedRequests, opts.Reuse) {
 		t.Errorf("expected to re-use the requests")
 	}
 }
@@ -1422,25 +1422,9 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			}
 			limits := PodLimits(p, tc.options)
-			if !resourcesEqual(tc.expectedLimits, limits) {
+			if !ResourcesEqual(tc.expectedLimits, limits) {
 				t.Errorf("[%s] expected limits = %v, got %v", tc.description, tc.expectedLimits, limits)
 			}
 		})
 	}
-}
-
-func resourcesEqual(lhs, rhs v1.ResourceList) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for name, lhsv := range lhs {
-		rhsv, ok := rhs[name]
-		if !ok {
-			return false
-		}
-		if !lhsv.Equal(rhsv) {
-			return false
-		}
-	}
-	return true
 }

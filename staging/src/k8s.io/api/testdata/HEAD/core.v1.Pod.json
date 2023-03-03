@@ -1845,6 +1845,9 @@
         "name": "nameValue",
         "resourceClaimName": "resourceClaimNameValue"
       }
-    ]
+    ],
+    "requestedResources": {
+      "requestedResourcesKey": "0"
+    }
   }
 }

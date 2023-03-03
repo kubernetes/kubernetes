@@ -42,6 +42,7 @@ type PodStatusApplyConfiguration struct {
 	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
 	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty"`
 	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	RequestedResources         *v1.ResourceList                           `json:"requestedResources,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs an declarative configuration of the PodStatus type for use with
@@ -210,5 +211,13 @@ func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodRe
 		}
 		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
+	return b
+}
+
+// WithRequestedResources sets the RequestedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequestedResources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithRequestedResources(value v1.ResourceList) *PodStatusApplyConfiguration {
+	b.RequestedResources = &value
 	return b
 }

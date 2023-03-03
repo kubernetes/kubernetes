@@ -41,6 +41,9 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	netutils "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -48,8 +51,6 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	netutils "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // podStrategy implements behavior for Pods
@@ -85,6 +86,12 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		pod.Status.RequestedResources = podutil.PodRequests(pod, podutil.PodResourcesOptions{
+			InPlacePodVerticalScalingEnabled: true,
+		})
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)

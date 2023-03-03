@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	utilpointer "k8s.io/utils/pointer"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -48,7 +50,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 type describeClient struct {
@@ -232,6 +233,30 @@ func TestDescribePodTolerations(t *testing.T) {
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
 		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
 		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
+	}
+}
+
+func TestDescribePodRequestedResources(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Status: corev1.PodStatus{
+			RequestedResources: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Requested Resources:\n") ||
+		!strings.Contains(out, "cpu:           1\n") {
 		t.Errorf("unexpected out:\n%s", out)
 	}
 }

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -589,6 +590,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
 		podStatus.HostIPs = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		podStatus.RequestedResources = nil
+	}
 }
 
 func hostIPsInUse(podStatus *api.PodStatus) bool {
@@ -885,4 +890,185 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			}
 		}
 	}
+}
+
+// PodResourcesOptions controls the behavior of PodRequests and PodLimits.
+type PodResourcesOptions struct {
+	// Reuse, if provided will be reused to accumulate resources and returned by the PodRequests or PodLimits
+	// functions. All existing values in Reuse will be lost.
+	Reuse v1.ResourceList
+	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
+	InPlacePodVerticalScalingEnabled bool
+	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
+	ExcludeOverhead bool
+}
+
+// PodRequests computes the pod requests per the PodResourcesOptions supplied. If PodResourcesOptions is nil, then
+// the requests are returned including pod overhead. The computation is part of the API and must be reviewed
+// as an API change.
+func PodRequests(pod *api.Pod, opts PodResourcesOptions) api.ResourceList {
+	reqs := api.ResourceList{}
+
+	var containerStatuses map[string]*api.ContainerStatus
+	if opts.InPlacePodVerticalScalingEnabled {
+		containerStatuses = map[string]*api.ContainerStatus{}
+		for i := range pod.Status.ContainerStatuses {
+			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		containerReqs := container.Resources.Requests
+		if opts.InPlacePodVerticalScalingEnabled {
+			cs, found := containerStatuses[container.Name]
+			if found {
+				if pod.Status.Resize == api.PodResizeStatusInfeasible {
+					containerReqs = cs.AllocatedResources.DeepCopy()
+				} else {
+					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
+				}
+			}
+		}
+
+		addResourceList(reqs, containerReqs)
+	}
+
+	restartableInitContainerReqs := api.ResourceList{}
+	initContainerReqs := api.ResourceList{}
+	// init containers define the minimum of any resource
+	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
+	//
+	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
+	// init container is initializing, then
+	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
+	//
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
+	for _, container := range pod.Spec.InitContainers {
+		containerReqs := container.Resources.Requests
+
+		if container.RestartPolicy != nil && *container.RestartPolicy == api.ContainerRestartPolicyAlways {
+			// and add them to the resulting cumulative container requests
+			addResourceList(reqs, containerReqs)
+
+			// track our cumulative restartable init container resources
+			addResourceList(restartableInitContainerReqs, containerReqs)
+			containerReqs = restartableInitContainerReqs
+		} else {
+			tmp := api.ResourceList{}
+			addResourceList(tmp, containerReqs)
+			addResourceList(tmp, restartableInitContainerReqs)
+			containerReqs = tmp
+		}
+
+		maxResourceList(initContainerReqs, containerReqs)
+	}
+
+	maxResourceList(reqs, initContainerReqs)
+
+	// Add overhead for running a pod to the sum of requests if requested:
+	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+		addResourceList(reqs, pod.Spec.Overhead)
+	}
+
+	return reqs
+}
+
+// PodLimits computes the pod limits per the PodResourcesOptions supplied. If PodResourcesOptions is nil, then
+// the limits are returned including pod overhead for any non-zero limits. The computation is part of the API and must be reviewed
+// as an API change.
+func PodLimits(pod *api.Pod, opts PodResourcesOptions) api.ResourceList {
+	// attempt to reuse the maps if passed, or allocate otherwise
+	limits := api.ResourceList{}
+
+	for _, container := range pod.Spec.Containers {
+		addResourceList(limits, container.Resources.Limits)
+	}
+
+	restartableInitContainerLimits := api.ResourceList{}
+	initContainerLimits := api.ResourceList{}
+	// init containers define the minimum of any resource
+	//
+	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
+	// init container is initializing, then
+	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
+	//
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
+	for _, container := range pod.Spec.InitContainers {
+		containerLimits := container.Resources.Limits
+		// Is the init container marked as a restartable init container?
+		if container.RestartPolicy != nil && *container.RestartPolicy == api.ContainerRestartPolicyAlways {
+			addResourceList(limits, containerLimits)
+
+			// track our cumulative restartable init container resources
+			addResourceList(restartableInitContainerLimits, containerLimits)
+			containerLimits = restartableInitContainerLimits
+		} else {
+			tmp := api.ResourceList{}
+			addResourceList(tmp, containerLimits)
+			addResourceList(tmp, restartableInitContainerLimits)
+			containerLimits = tmp
+		}
+
+		maxResourceList(initContainerLimits, containerLimits)
+	}
+
+	maxResourceList(limits, initContainerLimits)
+
+	// Add overhead to non-zero limits if requested:
+	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+		for name, quantity := range pod.Spec.Overhead {
+			if value, ok := limits[name]; ok && !value.IsZero() {
+				value.Add(quantity)
+				limits[name] = value
+			}
+		}
+	}
+
+	return limits
+}
+
+// maxResourceList sets list to the greater of list/newList for every resource
+// either list
+func maxResourceList(list, new api.ResourceList) {
+	for name, quantity := range new {
+		if value, ok := list[name]; !ok {
+			list[name] = quantity.DeepCopy()
+			continue
+		} else if quantity.Cmp(value) > 0 {
+			list[name] = quantity.DeepCopy()
+		}
+	}
+}
+
+// addResourceList adds the resources in newList to list.
+func addResourceList(list, newList api.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; !ok {
+			list[name] = quantity.DeepCopy()
+		} else {
+			value.Add(quantity)
+			list[name] = value
+		}
+	}
+}
+
+// max returns the result of max(a, b) for each named resource and is only used if we can't
+// accumulate into an existing resource list
+func max(a api.ResourceList, b api.ResourceList) api.ResourceList {
+	result := api.ResourceList{}
+	for key, value := range a {
+		if other, found := b[key]; found {
+			if value.Cmp(other) <= 0 {
+				result[key] = other.DeepCopy()
+				continue
+			}
+		}
+		result[key] = value.DeepCopy()
+	}
+	for key, value := range b {
+		if _, found := result[key]; !found {
+			result[key] = value.DeepCopy()
+		}
+	}
+	return result
 }

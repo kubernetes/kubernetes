@@ -1672,3 +1672,152 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 		t.Error("NodeInclusionPolicy updated with unexpected result")
 	}
 }
+
+func TestPodResourceRequestedUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	fakePodName := "test"
+	restartAlways := api.ContainerRestartPolicyAlways
+	tcs := []struct {
+		name                      string
+		pod                       *api.Pod
+		expected                  api.ResourceList
+		sidecarFeatureGateEnabled bool
+	}{
+		{
+			name: "no requests",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "mycontainer"},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{},
+			},
+			sidecarFeatureGateEnabled: true,
+		},
+		{
+			name: "simple",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("1"),
+							}, api.ResourceList{}),
+						},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{},
+			},
+			expected: api.ResourceList{
+				"cpu": resource.MustParse("1"),
+			},
+			sidecarFeatureGateEnabled: true,
+		},
+		{
+			name: "sidecar, flag enabled",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						// sidecar
+						{
+							Name: "init1",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("2"),
+							}, api.ResourceList{}),
+							RestartPolicy: &restartAlways,
+						},
+						// not a sidecar
+						{
+							Name: "init2",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("0.5"),
+							}, api.ResourceList{}),
+						},
+					},
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("1"),
+							}, api.ResourceList{}),
+						},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{},
+			},
+			expected: api.ResourceList{
+				"cpu": resource.MustParse("3"),
+			},
+			sidecarFeatureGateEnabled: true,
+		},
+		{
+			name: "sidecar, flag disabled",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						// sidecar
+						{
+							Name: "init1",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("2"),
+							}, api.ResourceList{}),
+							RestartPolicy: &restartAlways,
+						},
+						// not a sidecar
+						{
+							Name: "init2",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("2"),
+							}, api.ResourceList{}),
+						},
+					},
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: getResourceRequirements(api.ResourceList{
+								"cpu": resource.MustParse("1"),
+							}, api.ResourceList{}),
+						},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{},
+			},
+			sidecarFeatureGateEnabled: false,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.sidecarFeatureGateEnabled)()
+			Strategy.PrepareForCreate(ctx, tc.pod)
+			if !resourcesEqual(tc.pod.Status.RequestedResources, tc.expected) {
+				t.Errorf("expected %v, got %v", tc.expected, tc.pod.Status.RequestedResources)
+			}
+		})
+	}
+}
+
+func resourcesEqual(lhs api.ResourceList, rhs api.ResourceList) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for k, lhsv := range lhs {
+		rhsv, ok := rhs[k]
+		if !ok {
+			return false
+		}
+		if !lhsv.Equal(rhsv) {
+			return false
+		}
+	}
+	return true
+}

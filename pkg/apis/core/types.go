@@ -3753,6 +3753,16 @@ type PodStatus struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus
+
+	// RequestedResources is the effective resource requests for this pod taking into consideration init
+	// and regular containers, and the pod overhead. This field reflects the total desired resources for
+	// the pod which may differ from actual resources allocated for the pod by the node. The node will
+	// update this value as it observes changes to requested resources.  If no node can be  assigned by
+	// the scheduler this value will be set to ease debugging of out-of-resource situations.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +featureGate=SidecarContainers
+	// +optional
+	RequestedResources ResourceList
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

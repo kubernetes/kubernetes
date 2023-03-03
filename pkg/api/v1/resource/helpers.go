@@ -24,6 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
+	"k8s.io/kubernetes/pkg/features"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -444,4 +447,39 @@ func MergeContainerResourceLimits(container *v1.Container,
 // resource prefix.
 func IsHugePageResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// ResourcesEqual returns true if the two resources lists provided are equal.
+func ResourcesEqual(lhs v1.ResourceList, rhs v1.ResourceList) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for k, vlhs := range lhs {
+		vrhs, ok := rhs[k]
+		if !ok {
+			return false
+		}
+		if !vlhs.Equal(vrhs) {
+			return false
+		}
+	}
+	return true
+}
+
+// UpdateRequestedResources updates the pod's RequestedResources field.
+// Returns true if pod RequestedResources field has changed.
+func UpdateRequestedResources(status *v1.PodStatus, pod *v1.Pod) bool {
+	// This field is part of the Sidecar feature
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		return false
+	}
+	requests := PodRequests(pod, PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+	})
+
+	if ResourcesEqual(requests, status.RequestedResources) {
+		return false
+	}
+	status.RequestedResources = requests
+	return true
 }

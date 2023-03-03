@@ -33,6 +33,8 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+	"k8s.io/klog/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -73,7 +75,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
-	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
@@ -875,6 +876,13 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		} else {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
+		}
+		if len(pod.Status.RequestedResources) > 0 {
+			w.Write(LEVEL_0, "Requested Resources:\n")
+			for _, name := range SortedResourceNames(pod.Status.RequestedResources) {
+				quantity := pod.Status.RequestedResources[name]
+				w.Write(LEVEL_1, "%s:\t%s\n", name, quantity.String())
+			}
 		}
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
