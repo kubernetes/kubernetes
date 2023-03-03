@@ -43,13 +43,6 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
-	// owner: @ivelichkovich, @tallclair
-	// alpha: v1.27
-	// kep: https://kep.k8s.io/3716
-	//
-	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
-	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
-
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -916,8 +909,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
-	AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
-
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
 	CPUManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
@@ -1138,6 +1129,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
+
+	genericfeatures.AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
 

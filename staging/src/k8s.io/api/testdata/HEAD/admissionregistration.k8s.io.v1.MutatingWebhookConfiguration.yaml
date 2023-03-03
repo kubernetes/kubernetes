@@ -44,6 +44,9 @@ webhooks:
       port: 4
     url: urlValue
   failurePolicy: failurePolicyValue
+  matchConditions:
+  - expression: expressionValue
+    name: nameValue
   matchPolicy: matchPolicyValue
   name: nameValue
   namespaceSelector:

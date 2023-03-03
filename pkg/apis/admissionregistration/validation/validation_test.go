@@ -17,12 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -751,6 +751,229 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+		},
+		{
+			name: "single match condition must have a name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "all match conditions must have a name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+						{
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value, webhooks[0].matchConditions[1].name: Required value, webhooks[1].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "single match condition must have a qualified name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "-hello",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Invalid value: "-hello": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+		},
+		{
+			name: "all match conditions must have qualified names",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       ".io",
+							Expression: "true",
+						},
+						{
+							Name:       "thing.test.com",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "some name",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `[webhooks[0].matchConditions[0].name: Invalid value: ".io": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'), webhooks[1].matchConditions[0].name: Invalid value: "some name": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')]`,
+		},
+		{
+			name: "expression is required",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name: "webhook.k8s.io",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "expression is required to have some value",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "invalid expression",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "object.x in [1, 2, ",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "object.x in [1, 2,": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>'`,
+		},
+		{
+			name: "unique names same hook",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `matchConditions[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "repeat names allowed across different hooks",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: ``,
+		},
+		{
+			name: "must evaluate to bool",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "6",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "6": must evaluate to bool`,
+		},
+		{
+			name: "max of 64 match conditions",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:            "webhook.k8s.io",
+					ClientConfig:    validClientConfig,
+					SideEffects:     &noSideEffect,
+					MatchConditions: get65MatchConditions(),
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
 		},
 	}
 	for _, test := range tests {
@@ -1651,6 +1874,229 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+		},
+		{
+			name: "single match condition must have a name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "all match conditions must have a name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+						{
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value, webhooks[0].matchConditions[1].name: Required value, webhooks[1].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "single match condition must have a qualified name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "-hello",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Invalid value: "-hello": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+		},
+		{
+			name: "all match conditions must have qualified names",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       ".io",
+							Expression: "true",
+						},
+						{
+							Name:       "thing.test.com",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "some name",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `[webhooks[0].matchConditions[0].name: Invalid value: ".io": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'), webhooks[1].matchConditions[0].name: Invalid value: "some name": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')]`,
+		},
+		{
+			name: "expression is required",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name: "webhook.k8s.io",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "expression is required to have some value",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "invalid expression",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "object.x in [1, 2, ",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "object.x in [1, 2,": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>'`,
+		},
+		{
+			name: "unique names same hook",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `matchConditions[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "repeat names allowed across different hooks",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: ``,
+		},
+		{
+			name: "must evaluate to bool",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "6",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "6": must evaluate to bool`,
+		},
+		{
+			name: "max of 64 match conditions",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:            "webhook.k8s.io",
+					ClientConfig:    validClientConfig,
+					SideEffects:     &noSideEffect,
+					MatchConditions: get65MatchConditions(),
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
 		},
 	}
 	for _, test := range tests {
@@ -3533,4 +3979,15 @@ func TestValidateValidatingAdmissionPolicyStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func get65MatchConditions() []admissionregistration.MatchCondition {
+	result := []admissionregistration.MatchCondition{}
+	for i := 0; i < 65; i++ {
+		result = append(result, admissionregistration.MatchCondition{
+			Name:       fmt.Sprintf("test%v", i),
+			Expression: "true",
+		})
+	}
+	return result
 }

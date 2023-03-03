@@ -26,14 +26,13 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"go.opentelemetry.io/otel/attribute"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/klog/v2"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -48,6 +47,7 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -73,6 +73,30 @@ func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generi
 	return func(cm *webhookutil.ClientManager) generic.Dispatcher {
 		return &mutatingDispatcher{cm, p}
 	}
+}
+
+var _ generic.VersionedAttributeAccessor = &versionedAttributeAccessor{}
+
+type versionedAttributeAccessor struct {
+	versionedAttr    *admission.VersionedAttributes
+	attr             admission.Attributes
+	objectInterfaces admission.ObjectInterfaces
+}
+
+func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error) {
+	if v.versionedAttr == nil {
+		// First call, create versioned attributes
+		var err error
+		if v.versionedAttr, err = admission.NewVersionedAttributes(v.attr, gvk, v.objectInterfaces); err != nil {
+			return nil, apierrors.NewInternalError(err)
+		}
+	} else {
+		// Subsequent call, convert existing versioned attributes to the requested version
+		if err := admission.ConvertVersionedAttributes(v.versionedAttr, gvk, v.objectInterfaces); err != nil {
+			return nil, apierrors.NewInternalError(err)
+		}
+	}
+	return v.versionedAttr, nil
 }
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
@@ -101,13 +125,19 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		if versionedAttr != nil {
 			attrForCheck = versionedAttr
 		}
-		invocation, statusErr := a.plugin.ShouldCallHook(hook, attrForCheck, o)
+		v := &versionedAttributeAccessor{
+			attr:             attr,
+			objectInterfaces: o,
+			versionedAttr:    versionedAttr,
+		}
+		invocation, statusErr := a.plugin.ShouldCallHook(ctx, hook, attrForCheck, o, v)
 		if statusErr != nil {
 			return statusErr
 		}
 		if invocation == nil {
 			continue
 		}
+
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
 		if !ok {
 			return fmt.Errorf("mutating webhook dispatch requires v1.MutatingWebhook, but got %T", hook)
@@ -121,17 +151,11 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
-		if versionedAttr == nil {
-			// First webhook, create versioned attributes
-			var err error
-			if versionedAttr, err = admission.NewVersionedAttributes(attr, invocation.Kind, o); err != nil {
-				return apierrors.NewInternalError(err)
-			}
-		} else {
-			// Subsequent webhook, convert existing versioned attributes to this webhook's version
-			if err := admission.ConvertVersionedAttributes(versionedAttr, invocation.Kind, o); err != nil {
-				return apierrors.NewInternalError(err)
-			}
+		// Subsequent webhook, convert existing versioned attributes to this webhook's version
+		var err error
+		versionedAttr, err = v.VersionedAttribute(invocation.Kind)
+		if err != nil {
+			return apierrors.NewInternalError(err)
 		}
 
 		t := time.Now()

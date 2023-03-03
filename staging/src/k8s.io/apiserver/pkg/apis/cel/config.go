@@ -25,6 +25,11 @@ const (
 	// current RuntimeCELCostBudget gives roughly 1 seconds for the validation
 	RuntimeCELCostBudget = 10000000
 
+	// RuntimeCELCostBudgetMatchConditions is the overall cost budget for runtime CEL validation cost on matchConditions per object with matchConditions
+	// this is per webhook for validatingwebhookconfigurations and mutatingwebhookconfigurations or per ValidatingAdmissionPolicyBinding
+	// current RuntimeCELCostBudgetMatchConditions gives roughly 1/4 seconds for the validation
+	RuntimeCELCostBudgetMatchConditions = 2500000
+
 	// CheckFrequency configures the number of iterations within a comprehension to evaluate
 	// before checking whether the function evaluation has been interrupted
 	CheckFrequency = 100

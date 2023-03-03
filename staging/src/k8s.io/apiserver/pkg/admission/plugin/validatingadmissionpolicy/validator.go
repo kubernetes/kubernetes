@@ -23,8 +23,6 @@ import (
 
 	celtypes "github.com/google/cel-go/common/types"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +31,7 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/klog/v2"
 )
 
 // validator implements the Validator interface
