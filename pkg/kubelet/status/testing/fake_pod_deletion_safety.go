@@ -16,13 +16,21 @@ limitations under the License.
 
 package testing
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
+)
 
 // FakePodDeletionSafetyProvider is a fake PodDeletionSafetyProvider for test.
 type FakePodDeletionSafetyProvider struct {
-	HasRunning bool
+	HasRunning                    bool
+	MightNeedToUnprepareResources bool
 }
 
 func (f *FakePodDeletionSafetyProvider) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	return f.HasRunning
+}
+
+func (f *FakePodDeletionSafetyProvider) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return f.MightNeedToUnprepareResources
 }

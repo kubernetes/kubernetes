@@ -99,6 +99,9 @@ type PodStatusProvider interface {
 type PodDeletionSafetyProvider interface {
 	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
 	PodCouldHaveRunningContainers(pod *v1.Pod) bool
+	// PodMightNeedToUnprepareResources returns true if the pod might need to
+	// unprepare resources
+	PodMightNeedToUnprepareResources(UID types.UID) bool
 }
 
 type PodStartupLatencyStateHelper interface {
@@ -824,7 +827,12 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 
-	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
+	delayTransitioningToTerminal := m.podDeletionSafety.PodCouldHaveRunningContainers(pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		delayTransitioningToTerminal = delayTransitioningToTerminal || m.podDeletionSafety.PodMightNeedToUnprepareResources(pod.UID)
+	}
+
+	mergedStatus := mergePodStatus(pod.Status, status.status, delayTransitioningToTerminal)
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(context.TODO(), m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
 	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
@@ -1000,7 +1008,7 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 // mergePodStatus merges oldPodStatus and newPodStatus to preserve where pod conditions
 // not owned by kubelet and to ensure terminal phase transition only happens after all
 // running containers have terminated. This method does not modify the old status.
-func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
+func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, delayTransitioningToTerminal bool) v1.PodStatus {
 	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
 
 	for _, c := range oldPodStatus.Conditions {
@@ -1021,7 +1029,7 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 				// it will only be sent once all containers have terminated and the phase
 				// is terminal. This avoids sending an unnecessary patch request to add
 				// the condition if the actual status phase transition is delayed.
-				if transitioningToTerminalPhase && !couldHaveRunningContainers {
+				if transitioningToTerminalPhase && !delayTransitioningToTerminal {
 					// update the LastTransitionTime again here because the older transition
 					// time set in updateStatusInternal is likely stale as sending of
 					// the condition was delayed until all pod's containers have terminated.
@@ -1038,7 +1046,9 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 
 	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
 	// The Kubelet should never transition a pod to terminal status that could have running
-	// containers and thus actively be leveraging exclusive resources. Note that resources
+	// containers or unprepared dynamic resources and thus actively be leveraging exclusive
+	// resources.
+	// Note that resources
 	// like volumes are reconciled by a subsystem in the Kubelet and will converge if a new
 	// pod reuses an exclusive resource (unmount -> free -> mount), which means we do not
 	// need wait for those resources to be detached by the Kubelet. In general, resources
@@ -1046,7 +1056,7 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// while resources that have participanting components above the API use the pod's
 	// transition to a terminal phase (or full deletion) to release those resources.
 	if transitioningToTerminalPhase {
-		if couldHaveRunningContainers {
+		if delayTransitioningToTerminal {
 			newPodStatus.Phase = oldPodStatus.Phase
 			newPodStatus.Reason = oldPodStatus.Reason
 			newPodStatus.Message = oldPodStatus.Message

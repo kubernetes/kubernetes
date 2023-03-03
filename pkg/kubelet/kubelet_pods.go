@@ -904,21 +904,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 // PodCouldHaveRunningContainers returns true if the pod with the given UID could still have running
 // containers. This returns false if the pod has not yet been started or the pod is unknown.
 func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
-	if kl.podWorkers.CouldHaveRunningContainers(pod.UID) {
-		return true
-	}
-
-	// Check if pod might need to unprepare resources before termination
-	// NOTE: This is a temporary solution. This call is here to avoid changing
-	// status manager and its tests.
-	// TODO: extend PodDeletionSafetyProvider interface and implement it
-	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
-			return true
-		}
-	}
-	return false
+	return kl.podWorkers.CouldHaveRunningContainers(pod.UID)
 }
 
 // PodIsFinished returns true if SyncTerminatedPod is finished, ie.
@@ -2180,6 +2166,11 @@ func (kl *Kubelet) enableHostUserNamespace(ctx context.Context, pod *v1.Pod) boo
 		return true
 	}
 	return false
+}
+
+// PodMightNeedToUnprepareResources wraps containerManager PodMightNeedToUnprepareResources call
+func (kl *Kubelet) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return kl.containerManager.PodMightNeedToUnprepareResources(UID)
 }
 
 // hasNonNamespacedCapability returns true if MKNOD, SYS_TIME, or SYS_MODULE is requested for any container.
