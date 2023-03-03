@@ -1,0 +1,3 @@
+ignore:
+    - "output_tests/.*"
+
