@@ -19,10 +19,12 @@ package validation
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	ejson "github.com/exponent-io/jsonpath"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog/v2"
@@ -136,7 +138,37 @@ func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	err = c.verifier.HasSupport(gvk)
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
+		return utilerrors.NewAggregate(c.validateList(obj))
+	}
+
+	return c.validateResource(data, gvk)
+}
+
+func (c *paramVerifyingSchema) validateList(object interface{}) []error {
+	fields, ok := object.(map[string]interface{})
+	if !ok || fields == nil {
+		return []error{errors.New("invalid object to validate")}
+	}
+
+	allErrors := []error{}
+	if _, ok := fields["items"].([]interface{}); !ok {
+		return []error{errors.New("invalid object to validate")}
+	}
+	for _, item := range fields["items"].([]interface{}) {
+		if gvk, errs := getObjectKind(item); errs != nil {
+			allErrors = append(allErrors, errs...)
+		} else if data, err := json.Marshal(item); err != nil {
+			allErrors = append(allErrors, err)
+		} else {
+			allErrors = append(allErrors, c.validateResource(data, gvk))
+		}
+	}
+	return allErrors
+}
+
+func (c *paramVerifyingSchema) validateResource(data []byte, gvk schema.GroupVersionKind) error {
+	err := c.verifier.HasSupport(gvk)
 	if resource.IsParamUnsupportedError(err) {
 		switch c.directive {
 		case metav1.FieldValidationStrict:

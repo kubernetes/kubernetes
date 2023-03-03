@@ -260,3 +260,40 @@ func TestParamVerifyingSchema(t *testing.T) {
 		})
 	}
 }
+
+type podOnlyVerifier struct {
+}
+
+func (v *podOnlyVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "Pod"}) {
+		return nil
+	}
+	return resource.NewParamUnsupportedError(gvk, resource.QueryParamFieldValidation)
+}
+
+
+// TestParamVerifyingSchemaWithList tests that client-side schema validation
+// should be bypassed (and therefore validation succeeds) when
+// the field validation is "Strict" and server-side validation is available for Pods
+// even if the Pod object is stored in the List object
+func TestParamVerifyingSchemaWithList(t *testing.T) {
+	bytes := []byte(`
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      labels:
+        name: redis-master
+      name: name
+    spec:
+      containers:
+      - name: name
+`)
+
+	schema := NewParamVerifyingSchema(AlwaysInvalidSchema{}, &podOnlyVerifier{}, "Strict")
+	if schema.ValidateBytes(bytes) != nil {
+		t.Errorf("Unexpected error on pod object in list object")
+	}
+}
