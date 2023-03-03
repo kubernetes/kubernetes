@@ -14,16 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package admission
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
 )
 
+// VersionedAttributes is a wrapper around the original admission attributes, adding versioned
+// variants of the object and old object.
+type VersionedAttributes struct {
+	// Attributes holds the original admission attributes
+	Attributes
+	// VersionedOldObject holds Attributes.OldObject (if non-nil), converted to VersionedKind.
+	// It must never be mutated.
+	VersionedOldObject runtime.Object
+	// VersionedObject holds Attributes.Object (if non-nil), converted to VersionedKind.
+	// If mutated, Dirty must be set to true by the mutator.
+	VersionedObject runtime.Object
+	// VersionedKind holds the fully qualified kind
+	VersionedKind schema.GroupVersionKind
+	// Dirty indicates VersionedObject has been modified since being converted from Attributes.Object
+	Dirty bool
+}
+
+// GetObject overrides the Attributes.GetObject()
+func (v *VersionedAttributes) GetObject() runtime.Object {
+	if v.VersionedObject != nil {
+		return v.VersionedObject
+	}
+	return v.Attributes.GetObject()
+}
+
 // ConvertToGVK converts object to the desired gvk.
-func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) (runtime.Object, error) {
+func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o ObjectInterfaces) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
 	// if obj is a custom resource, it should not need conversion.
 	if obj.GetObjectKind().GroupVersionKind() == gvk {
@@ -43,7 +67,7 @@ func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o admission.O
 }
 
 // NewVersionedAttributes returns versioned attributes with the old and new object (if non-nil) converted to the requested kind
-func NewVersionedAttributes(attr admission.Attributes, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) (*VersionedAttributes, error) {
+func NewVersionedAttributes(attr Attributes, gvk schema.GroupVersionKind, o ObjectInterfaces) (*VersionedAttributes, error) {
 	// convert the old and new objects to the requested version
 	versionedAttr := &VersionedAttributes{
 		Attributes:    attr,
@@ -72,7 +96,7 @@ func NewVersionedAttributes(attr admission.Attributes, gvk schema.GroupVersionKi
 // * attr.VersionedObject is used as the source for the new object if Dirty=true (and is round-tripped through attr.Attributes.Object, clearing Dirty in the process)
 // * attr.Attributes.Object is used as the source for the new object if Dirty=false
 // * attr.Attributes.OldObject is used as the source for the old object
-func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) error {
+func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersionKind, o ObjectInterfaces) error {
 	// we already have the desired kind, we're done
 	if attr.VersionedKind == gvk {
 		return nil
