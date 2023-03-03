@@ -17,6 +17,8 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
+	"context"
+
 	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -84,5 +86,5 @@ type ValidateResult struct {
 type Validator interface {
 	// Validate is used to take cel evaluations and convert into decisions
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
+	Validate(ctx context.Context, versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
 }

@@ -329,7 +329,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			validationResult := bindingInfo.validator.Validate(versionedAttr, param, celconfig.RuntimeCELCostBudget)
+			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)

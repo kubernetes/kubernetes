@@ -253,7 +253,7 @@ type fakeFilter struct {
 	keyId string
 }
 
-func (f *fakeFilter) ForInput(versionedAttr *whgeneric.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, error) {
+func (f *fakeFilter) ForInput(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, error) {
 	return []cel.EvaluationResult{}, nil
 }
 
@@ -265,10 +265,10 @@ var _ Validator = &fakeValidator{}
 
 type fakeValidator struct {
 	validationFilter, auditAnnotationFilter *fakeFilter
-	ValidateFunc                            func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
+	ValidateFunc                            func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
 }
 
-func (f *fakeValidator) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, validateFunc func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult) {
+func (f *fakeValidator) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult) {
 	//Key must be something that we can decipher from the inputs to Validate so using message which will be on the validationCondition object of evalResult
 	var key string
 	if len(definition.Spec.Validations) > 0 {
@@ -285,8 +285,8 @@ func (f *fakeValidator) RegisterDefinition(definition *v1alpha1.ValidatingAdmiss
 	validatorMap[key] = f
 }
 
-func (f *fakeValidator) Validate(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
-	return f.ValidateFunc(versionedAttr, versionedParams, runtimeCELCostBudget)
+func (f *fakeValidator) Validate(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	return f.ValidateFunc(ctx, versionedAttr, versionedParams, runtimeCELCostBudget)
 }
 
 var _ Matcher = &fakeMatcher{}
@@ -769,7 +769,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -839,7 +839,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -952,7 +952,7 @@ func TestReconfigureBinding(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1062,7 +1062,7 @@ func TestRemoveDefinition(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1131,7 +1131,7 @@ func TestRemoveBinding(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1241,7 +1241,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1309,7 +1309,7 @@ func TestEmptyParamSource(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1411,7 +1411,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 		}
 	})
 
-	validator1.RegisterDefinition(&policy1, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator1.RegisterDefinition(&policy1, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		evaluations1.Add(1)
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -1430,7 +1430,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 		}
 	})
 
-	validator2.RegisterDefinition(&policy2, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator2.RegisterDefinition(&policy2, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		evaluations2.Add(1)
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -1540,7 +1540,7 @@ func TestNativeTypeParam(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(&nativeTypeParamPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		evaluations.Add(1)
 		if _, ok := versionedParams.(*v1.ConfigMap); ok {
 			return ValidateResult{

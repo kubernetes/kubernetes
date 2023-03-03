@@ -17,6 +17,7 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -65,7 +66,7 @@ func auditAnnotationEvaluationForError(f v1.FailurePolicyType) PolicyAuditAnnota
 
 // Validate takes a list of Evaluation and a failure policy and converts them into actionable PolicyDecisions
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (v *validator) Validate(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+func (v *validator) Validate(ctx context.Context, versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 	var f v1.FailurePolicyType
 	if v.failPolicy == nil {
 		f = v1.Fail
@@ -74,7 +75,7 @@ func (v *validator) Validate(versionedAttr *generic.VersionedAttributes, version
 	}
 
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}
-	evalResults, err := v.validationFilter.ForInput(versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, runtimeCELCostBudget)
+	evalResults, err := v.validationFilter.ForInput(ctx context.Context, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
