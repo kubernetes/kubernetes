@@ -313,7 +313,6 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		if enforceNamespace && parent.IsNamespaced() {
 			parent.Namespace = namespace
 		}
-		// TODO: is version.Get() the right thing? Does it work for non-kubectl package consumers?
 		tooling := ApplySetTooling{name: baseName, version: ApplySetToolVersion}
 		restClient, err := f.ClientForMapping(parent.RESTMapping)
 		if err != nil || restClient == nil {
