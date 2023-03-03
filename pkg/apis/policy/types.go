@@ -67,7 +67,7 @@ type PodDisruptionBudgetSpec struct {
 	// if they encounter an unrecognized policy in this field.
 	//
 	// This field is beta-level. The eviction API uses this field when
-	// the feature gate PDBUnhealthyPodEvictionPolicy is enabled (disabled by default).
+	// the feature gate PDBUnhealthyPodEvictionPolicy is enabled (enabled by default).
 	// +optional
 	UnhealthyPodEvictionPolicy *UnhealthyPodEvictionPolicyType
 }
