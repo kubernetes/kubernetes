@@ -544,6 +544,18 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		podStatus.ResourceClaimStatuses = nil
 	}
+
+	// drop HostIPs to empty (disable PodHostIPs).
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
+		podStatus.HostIPs = nil
+	}
+}
+
+func hostIPsInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.HostIPs) > 0
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
