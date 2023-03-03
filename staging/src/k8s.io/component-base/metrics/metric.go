@@ -216,7 +216,6 @@ var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
 var noopTimingHistogramVec = &promext.TimingHistogramVec{}
 var noopGaugeVec = &prometheus.GaugeVec{}
-var noopObserverVec = &noopObserverVector{}
 
 // just use a convenience struct for all the no-ops
 var noop = &noopMetric{}
@@ -235,22 +234,3 @@ func (noopMetric) Desc() *prometheus.Desc            { return nil }
 func (noopMetric) Write(*dto.Metric) error           { return nil }
 func (noopMetric) Describe(chan<- *prometheus.Desc)  {}
 func (noopMetric) Collect(chan<- prometheus.Metric)  {}
-
-type noopObserverVector struct{}
-
-func (noopObserverVector) GetMetricWith(prometheus.Labels) (prometheus.Observer, error) {
-	return noop, nil
-}
-func (noopObserverVector) GetMetricWithLabelValues(...string) (prometheus.Observer, error) {
-	return noop, nil
-}
-func (noopObserverVector) With(prometheus.Labels) prometheus.Observer    { return noop }
-func (noopObserverVector) WithLabelValues(...string) prometheus.Observer { return noop }
-func (noopObserverVector) CurryWith(prometheus.Labels) (prometheus.ObserverVec, error) {
-	return noopObserverVec, nil
-}
-func (noopObserverVector) MustCurryWith(prometheus.Labels) prometheus.ObserverVec {
-	return noopObserverVec
-}
-func (noopObserverVector) Describe(chan<- *prometheus.Desc) {}
-func (noopObserverVector) Collect(chan<- prometheus.Metric) {}

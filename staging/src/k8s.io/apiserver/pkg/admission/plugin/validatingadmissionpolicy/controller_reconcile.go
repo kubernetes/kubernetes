@@ -119,8 +119,12 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		return info.configurationError
 	}
 
-	// Start watching the param CRD
-	if _, ok := c.paramsCRDControllers[*paramSource]; !ok {
+	if info, ok := c.paramsCRDControllers[*paramSource]; ok {
+		// If a param controller is already active for this paramsource, make
+		// sure it is tracking this policy's dependency upon it
+		info.dependentDefinitions.Insert(nn)
+
+	} else {
 		instanceContext, instanceCancel := context.WithCancel(c.runningContext)
 
 		// Watch for new instances of this policy

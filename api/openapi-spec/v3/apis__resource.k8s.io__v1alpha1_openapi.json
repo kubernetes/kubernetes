@@ -466,7 +466,10 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "set"
+            "x-kubernetes-list-map-keys": [
+              "uid"
+            ],
+            "x-kubernetes-list-type": "map"
           }
         },
         "type": "object"

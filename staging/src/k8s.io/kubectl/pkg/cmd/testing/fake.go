@@ -585,7 +585,7 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthenticationV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AutoscalingV2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -746,15 +746,15 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				Name: "autoscaling",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
-					{Version: "v2beta1"},
+					{Version: "v2"},
 				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2beta1"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2"},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
-				"v2beta1": {
+				"v2": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
 			},
