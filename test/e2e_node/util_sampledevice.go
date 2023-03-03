@@ -22,7 +22,7 @@ import (
 
 const (
 	// SampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
-	SampleDevicePluginDSYAML                    = "test/e2e/testing-manifests/sample-device-plugin.yaml"
+	SampleDevicePluginDSYAML                    = "test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin.yaml"
 	SampleDevicePluginControlRegistrationDSYAML = "test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin-control-registration.yaml"
 
 	// SampleDevicePluginName is the name of the device plugin pod
