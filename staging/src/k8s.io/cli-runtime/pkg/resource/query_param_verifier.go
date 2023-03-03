@@ -19,7 +19,6 @@ package resource
 import (
 	"errors"
 	"fmt"
-
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -72,6 +71,10 @@ const (
 
 // HasSupport checks if the given gvk supports the query param configured on v
 func (v *QueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
+		return NewParamUnsupportedError(gvk, v.queryParam)
+	}
+
 	oapi, err := v.openAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)
