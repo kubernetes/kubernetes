@@ -113,7 +113,7 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 		name          string
 		gv            schema.GroupVersion
 		expectedPaths []string
-		err           bool
+		err           error
 	}{
 		{
 			name: "OpenAPI V3 for apps/v1 works",
@@ -144,7 +144,7 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 		{
 			name: "OpenAPI V3 spec not found",
 			gv:   schema.GroupVersion{Group: "not", Version: "found"},
-			err:  true,
+			err:  &GroupVersionNotFoundError{gv: schema.GroupVersion{Group: "not", Version: "found"}},
 		},
 	}
 
@@ -153,8 +153,8 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 			client := openapitest.NewFileClient(t)
 			root := NewRoot(client)
 			gvSpec, err := root.GVSpec(test.gv)
-			if test.err {
-				require.Error(t, err)
+			if test.err != nil {
+				assert.True(t, reflect.DeepEqual(test.err, err))
 				return
 			}
 			require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 		name          string
 		gv            schema.GroupVersion
 		expectedPaths []string
-		err           bool
+		err           error
 	}{
 		{
 			name: "OpenAPI V3 for apps/v1 works",
@@ -203,7 +203,7 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 		{
 			name: "OpenAPI V3 spec not found",
 			gv:   schema.GroupVersion{Group: "not", Version: "found"},
-			err:  true,
+			err:  &GroupVersionNotFoundError{gv: schema.GroupVersion{Group: "not", Version: "found"}},
 		},
 	}
 
@@ -212,8 +212,8 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 			client := openapitest.NewFileClient(t)
 			root := NewRoot(client)
 			gvSpecAsMap, err := root.GVSpecAsMap(test.gv)
-			if test.err {
-				require.Error(t, err)
+			if test.err != nil {
+				assert.True(t, reflect.DeepEqual(test.err, err))
 				return
 			}
 			require.NoError(t, err)

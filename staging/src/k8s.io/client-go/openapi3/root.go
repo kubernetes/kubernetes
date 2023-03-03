@@ -125,7 +125,7 @@ func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, error) {
 	apiPath := gvToAPIPath(gv)
 	gvOpenAPI, found := paths[apiPath]
 	if !found {
-		return nil, fmt.Errorf("GroupVersion (%s) not found in OpenAPI V3 root document", gv)
+		return nil, &GroupVersionNotFoundError{gv: gv}
 	}
 	return gvOpenAPI.Schema(runtime.ContentTypeJSON)
 }
@@ -169,4 +169,14 @@ func pathToGroupVersion(path string) (schema.GroupVersion, error) {
 		return gv, fmt.Errorf("Unable to parse api relative path: %s", path)
 	}
 	return gv, nil
+}
+
+// Encapsulates GroupVersion not found as one of the paths
+// at OpenAPI V3 endpoint.
+type GroupVersionNotFoundError struct {
+	gv schema.GroupVersion
+}
+
+func (r *GroupVersionNotFoundError) Error() string {
+	return fmt.Sprintf("GroupVersion (%v) not found as OpenAPI V3 path", r.gv)
 }
