@@ -721,7 +721,7 @@ func (s *uintSet) has(i uint) bool {
 		return s.lo.has(i)
 	} else {
 		i -= 64
-		iHi, iLo := int(i/64), uint(i%64)
+		iHi, iLo := int(i/64), i%64
 		return iHi < len(s.hi) && s.hi[iHi].has(iLo)
 	}
 }
@@ -735,7 +735,7 @@ func (s *uintSet) insert(i uint) bool {
 		return !has
 	} else {
 		i -= 64
-		iHi, iLo := int(i/64), uint(i%64)
+		iHi, iLo := int(i/64), i%64
 		if iHi >= len(s.hi) {
 			s.hi = append(s.hi, make([]uintSet64, iHi+1-len(s.hi))...)
 			s.hi = s.hi[:cap(s.hi)]
