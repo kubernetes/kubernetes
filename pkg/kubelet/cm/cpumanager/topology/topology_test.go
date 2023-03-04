@@ -26,7 +26,6 @@ import (
 )
 
 func Test_Discover(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		machineInfo cadvisorapi.MachineInfo
@@ -503,6 +502,36 @@ func Test_Discover(t *testing.T) {
 			want:    &CPUTopology{},
 			wantErr: true,
 		},
+		{
+			name: "OneSocketHT second thread lowest",
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores:   4,
+				NumSockets: 1,
+				Topology: []cadvisorapi.Node{
+					{Id: 0,
+						Cores: []cadvisorapi.Core{
+							{SocketID: 0, Id: 0, Threads: []int{0, 1}},
+							{SocketID: 0, Id: 1, Threads: []int{1, 2}},
+							{SocketID: 0, Id: 2, Threads: []int{2, 3}},
+							{SocketID: 0, Id: 3, Threads: []int{3, 2}}, // Corner case - https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cm/cpumanager/topology/topology.go#L268-L273
+						},
+					},
+				},
+			},
+			want: &CPUTopology{
+				NumCPUs:      4,
+				NumSockets:   1,
+				NumCores:     4,
+				NumNUMANodes: 1,
+				CPUDetails: map[int]CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -523,9 +552,7 @@ func Test_Discover(t *testing.T) {
 }
 
 func TestCPUDetailsKeepOnly(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {},
 		1: {},
 		2: {},
@@ -559,7 +586,6 @@ func TestCPUDetailsKeepOnly(t *testing.T) {
 }
 
 func TestCPUDetailsNUMANodes(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -586,9 +612,7 @@ func TestCPUDetailsNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
-
-	var details1 CPUDetails
-	details1 = map[int]CPUInfo{
+	details1 := CPUDetails{
 		0: {SocketID: 0, NUMANodeID: 0},
 		1: {SocketID: 1, NUMANodeID: 0},
 		2: {SocketID: 2, NUMANodeID: 1},
@@ -596,8 +620,7 @@ func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
 	}
 
 	// poorly designed mainboards
-	var details2 CPUDetails
-	details2 = map[int]CPUInfo{
+	details2 := CPUDetails{
 		0: {SocketID: 0, NUMANodeID: 0},
 		1: {SocketID: 0, NUMANodeID: 1},
 		2: {SocketID: 1, NUMANodeID: 2},
@@ -642,7 +665,6 @@ func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsSockets(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -669,9 +691,7 @@ func TestCPUDetailsSockets(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInSockets(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {SocketID: 0},
 		1: {SocketID: 0},
 		2: {SocketID: 1},
@@ -703,9 +723,7 @@ func TestCPUDetailsCPUsInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsSocketsInNUMANodes(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {NUMANodeID: 0, SocketID: 0},
 		1: {NUMANodeID: 0, SocketID: 1},
 		2: {NUMANodeID: 1, SocketID: 2},
@@ -737,7 +755,6 @@ func TestCPUDetailsSocketsInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCores(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -764,9 +781,7 @@ func TestCPUDetailsCores(t *testing.T) {
 }
 
 func TestCPUDetailsCoresInNUMANodes(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {NUMANodeID: 0, CoreID: 0},
 		1: {NUMANodeID: 0, CoreID: 1},
 		2: {NUMANodeID: 1, CoreID: 2},
@@ -798,9 +813,7 @@ func TestCPUDetailsCoresInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCoresInSockets(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {SocketID: 0, CoreID: 0},
 		1: {SocketID: 0, CoreID: 1},
 		2: {SocketID: 1, CoreID: 2},
@@ -832,7 +845,6 @@ func TestCPUDetailsCoresInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsCPUs(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -857,9 +869,7 @@ func TestCPUDetailsCPUs(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInNUMANodes(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {NUMANodeID: 0},
 		1: {NUMANodeID: 0},
 		2: {NUMANodeID: 1},
@@ -891,9 +901,7 @@ func TestCPUDetailsCPUsInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInCores(t *testing.T) {
-
-	var details CPUDetails
-	details = map[int]CPUInfo{
+	details := CPUDetails{
 		0: {CoreID: 0},
 		1: {CoreID: 0},
 		2: {CoreID: 1},
@@ -978,6 +986,42 @@ func TestCPUCoreID(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("CPUCoreID() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUsPerCore(t *testing.T) {
+	for _, test := range []struct {
+		name                string
+		topology            *CPUTopology
+		expectedCPUsPerCore int
+	}{
+		{
+			name:                "no physical core",
+			topology:            &CPUTopology{NumCores: 0},
+			expectedCPUsPerCore: 0,
+		},
+		{
+			name:                "1 logical CPU per core",
+			topology:            &CPUTopology{NumCPUs: 1, NumCores: 1},
+			expectedCPUsPerCore: 1,
+		},
+		{
+			name:                "2 logical CPUs per core",
+			topology:            &CPUTopology{NumCPUs: 8, NumCores: 4},
+			expectedCPUsPerCore: 2,
+		},
+		{
+			name:                "4 logical CPUs per core",
+			topology:            &CPUTopology{NumCPUs: 32, NumCores: 8},
+			expectedCPUsPerCore: 4,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := test.topology.CPUsPerCore()
+			if got != test.expectedCPUsPerCore {
+				t.Errorf("Expected cpu(s) per core: %d, but got: %d", test.expectedCPUsPerCore, got)
 			}
 		})
 	}
@@ -1096,6 +1140,42 @@ func TestCPUNUMANodeID(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("CPUSocketID() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUsPerSocket(t *testing.T) {
+	for _, test := range []struct {
+		name                  string
+		topology              *CPUTopology
+		expectedCPUsPerSocket int
+	}{
+		{
+			name:                  "no socket",
+			topology:              &CPUTopology{NumSockets: 0},
+			expectedCPUsPerSocket: 0,
+		},
+		{
+			name:                  "1 logical CPU per socket",
+			topology:              &CPUTopology{NumCPUs: 1, NumSockets: 1},
+			expectedCPUsPerSocket: 1,
+		},
+		{
+			name:                  "2 logical CPUs per socket",
+			topology:              &CPUTopology{NumCPUs: 8, NumSockets: 4},
+			expectedCPUsPerSocket: 2,
+		},
+		{
+			name:                  "4 logical CPUs per socket",
+			topology:              &CPUTopology{NumCPUs: 32, NumSockets: 8},
+			expectedCPUsPerSocket: 4,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := test.topology.CPUsPerSocket()
+			if got != test.expectedCPUsPerSocket {
+				t.Errorf("Expected cpu(s) per socket: %d, but got: %d", test.expectedCPUsPerSocket, got)
 			}
 		})
 	}

@@ -358,10 +358,17 @@ func TestCheckpointStateHelpers(t *testing.T) {
 					if cpus, _ := state.GetCPUSet(pod, container); !cpus.Equals(set) {
 						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
 					}
+					if cpus := state.GetCPUSetOrDefault(pod, container); !cpus.Equals(set) {
+						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
+					}
 
 					state.Delete(pod, container)
 					if _, ok := state.GetCPUSet(pod, container); ok {
 						t.Fatal("deleted container still existing in state")
+					}
+
+					if !state.GetCPUSetOrDefault(pod, container).Equals(tc.defaultCPUset) {
+						t.Fatal("deleted container, should have returned default cpu set")
 					}
 				}
 			}

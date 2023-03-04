@@ -109,29 +109,49 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 
 func TestValidateStaticPolicyOptions(t *testing.T) {
 	testCases := []struct {
-		description   string
-		policyOption  map[string]string
-		topology      *topology.CPUTopology
-		topoMgrPolicy string
-		expectedErr   bool
+		description         string
+		policyOption        map[string]string
+		topology            *topology.CPUTopology
+		topoMgrPolicy       string
+		expectedErr         bool
+		expectedValidateErr bool
 	}{
 		{
 			description:   "Align by socket not enabled",
 			policyOption:  map[string]string{FullPCPUsOnlyOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
-			expectedErr:   false,
 		},
 		{
-			description:   "Align by socket enabled with topology manager single numa node",
-			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			description:   "Distribute CPUs accros numa nodes",
+			policyOption:  map[string]string{DistributeCPUsAcrossNUMAOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
+			topoMgrPolicy: topologymanager.PreferClosestNUMANodes,
+		},
+		{
+			description:   "Distribute CPUs accros numa nodes with invalid policy",
+			policyOption:  map[string]string{DistributeCPUsAcrossNUMAOption: "invalid"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PreferClosestNUMANodes,
 			expectedErr:   true,
 		},
 		{
-			description:   "Align by socket enabled with num_sockets > num_numa",
-			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			description:         "Align by socket enabled with topology manager single numa node",
+			policyOption:        map[string]string{AlignBySocketOption: "true"},
+			topology:            topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy:       topologymanager.PolicySingleNumaNode,
+			expectedValidateErr: true,
+		},
+		{
+			description:         "Align by socket enabled with num_sockets > num_numa",
+			policyOption:        map[string]string{AlignBySocketOption: "true"},
+			topology:            fakeTopoMultiSocketDualSocketPerNumaHT,
+			topoMgrPolicy:       topologymanager.PolicyNone,
+			expectedValidateErr: true,
+		},
+		{
+			description:   "Align by socket enabled with invalid policy",
+			policyOption:  map[string]string{AlignBySocketOption: "invalid"},
 			topology:      fakeTopoMultiSocketDualSocketPerNumaHT,
 			topoMgrPolicy: topologymanager.PolicyNone,
 			expectedErr:   true,
@@ -141,21 +161,18 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			topoMgrPolicy: topologymanager.PolicyNone,
-			expectedErr:   false,
 		},
 		{
 			description:   "Align by socket enabled: with topology manager best-effort policy",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			topoMgrPolicy: topologymanager.PolicyBestEffort,
-			expectedErr:   false,
 		},
 		{
 			description:   "Align by socket enabled: with topology manager restricted policy",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			topoMgrPolicy: topologymanager.PolicyRestricted,
-			expectedErr:   false,
 		},
 	}
 	for _, testCase := range testCases {
@@ -168,11 +185,15 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
-			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
-			err := ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
+			policyOpt, err := NewStaticPolicyOptions(testCase.policyOption)
 			gotError := (err != nil)
 			if gotError != testCase.expectedErr {
 				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
+			}
+			err = ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
+			gotError = (err != nil)
+			if gotError != testCase.expectedValidateErr {
+				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedValidateErr)
 			}
 		})
 	}
