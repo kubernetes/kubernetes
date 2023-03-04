@@ -2105,21 +2105,30 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// If pod resource allocation checkpoint manager (checkpointState) is nil, it is likely because
+		// kubelet is bootstrapping kube-system pods on master node. In this scenario, pod resource resize
+		// is neither expected nor can be handled. Fall back to regular 'canAdmitPod' processing.
+		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate if we can toss out all this checkpointing
+		// code and instead rely on ResourceAllocation / Resize values persisted in PodStatus. (Ref: KEP 2527)
 		// Use allocated resources values from checkpoint store (source of truth) to determine fit
-		otherPods := make([]*v1.Pod, 0, len(pods))
 		checkpointState := kl.statusManager.State()
-		for _, p := range pods {
-			op := p.DeepCopy()
-			for _, c := range op.Spec.Containers {
-				resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(p.UID), c.Name)
-				if c.Resources.Requests != nil && found {
-					c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
-					c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+		if checkpointState != nil {
+			otherPods := make([]*v1.Pod, 0, len(pods))
+			for _, p := range pods {
+				op := p.DeepCopy()
+				for _, c := range op.Spec.Containers {
+					resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(p.UID), c.Name)
+					if c.Resources.Requests != nil && found {
+						c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
+						c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+					}
 				}
+				otherPods = append(otherPods, op)
 			}
-			otherPods = append(otherPods, op)
+			attrs.OtherPods = otherPods
+		} else {
+			klog.ErrorS(nil, "pod resource allocation checkpoint manager is not initialized.")
 		}
-		attrs.OtherPods = otherPods
 	}
 	for _, podAdmitHandler := range kl.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
@@ -2404,28 +2413,39 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			activePods := kl.filterOutInactivePods(existingPods)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				// To handle kubelet restarts, test pod admissibility using ResourcesAllocated values
-				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
+				// If pod resource allocation checkpoint manager (checkpointState) is nil, it is likely because
+				// kubelet is bootstrapping kube-system pods on master node. In this scenario, pod resource resize
+				// is neither expected nor can be handled. Fall back to regular 'canAdmitPod' processing.
+				// TODO(vinaykul,InPlacePodVerticalScaling): Investigate if we can toss out all this checkpointing
+				// code and instead rely on ResourceAllocation / Resize values persisted in PodStatus. (Ref: KEP 2527)
 				checkpointState := kl.statusManager.State()
-				podCopy := pod.DeepCopy()
-				for _, c := range podCopy.Spec.Containers {
-					resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(pod.UID), c.Name)
-					if c.Resources.Requests != nil && found {
-						c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
-						c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+				if checkpointState != nil {
+					// To handle kubelet restarts, test pod admissibility using ResourcesAllocated values
+					// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
+					podCopy := pod.DeepCopy()
+					for _, c := range podCopy.Spec.Containers {
+						resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(pod.UID), c.Name)
+						if c.Resources.Requests != nil && found {
+							c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
+							c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+						}
 					}
-				}
-
-				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
-					kl.rejectPod(pod, reason, message)
-					continue
-				}
-
-				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
-					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+					// Check if we can admit the pod; if not, reject it.
+					if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
+					// For new pod, checkpoint the resource values at which the Pod has been admitted
+					if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
+						//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
+						klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+					}
+				} else {
+					// Check if we can admit the pod; if not, reject it.
+					if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
 				}
 			} else {
 				// Check if we can admit the pod; if not, reject it.

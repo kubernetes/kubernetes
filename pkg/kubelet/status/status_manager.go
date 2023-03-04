@@ -183,21 +183,23 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 }
 
 func (m *manager) Start() {
+	// Create pod allocation checkpoint manager even if we don't have a client to allow local get/set of ResourcesAllocated & Resize
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
+		if err != nil {
+			//TODO(vinaykul,InPlacePodVerticalScaling): Check if this error should be a critical (stop kubelet) failure
+			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
+			return
+		}
+		m.state = stateImpl
+	}
+
 	// Don't start the status manager if we don't have a client. This will happen
 	// on the master, where the kubelet is responsible for bootstrapping the pods
 	// of the master components.
 	if m.kubeClient == nil {
 		klog.InfoS("Kubernetes client is nil, not starting status manager")
 		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
-		if err != nil {
-			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
-			return
-		}
-		m.state = stateImpl
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
@@ -234,6 +236,9 @@ func (m *manager) State() state.Reader {
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
 func (m *manager) SetPodAllocation(pod *v1.Pod) error {
+	if m.state == nil {
+		return fmt.Errorf("pod allocation checkpoint manager is not initialized")
+	}
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	for _, container := range pod.Spec.Containers {
@@ -250,6 +255,9 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
 func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
+	if m.state == nil {
+		return fmt.Errorf("pod allocation checkpoint manager is not initialized")
+	}
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
@@ -672,6 +680,10 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if m.state == nil {
+			klog.ErrorS(nil, "pod allocation checkpoint manager is not initialized")
+			return
+		}
 		m.state.Delete(string(uid), "")
 	}
 }
@@ -685,6 +697,10 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				if m.state == nil {
+					klog.ErrorS(nil, "pod allocation checkpoint manager is not initialized")
+					continue
+				}
 				m.state.Delete(string(key), "")
 			}
 		}

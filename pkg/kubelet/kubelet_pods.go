@@ -1473,8 +1473,12 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 		}
 	} else {
 		checkpointState := kl.statusManager.State()
-		if resizeStatus, found := checkpointState.GetPodResizeStatus(string(pod.UID)); found {
-			podResizeStatus = resizeStatus
+		if checkpointState != nil {
+			if resizeStatus, found := checkpointState.GetPodResizeStatus(string(pod.UID)); found {
+				podResizeStatus = resizeStatus
+			}
+		} else {
+			klog.ErrorS(nil, "pod resource allocation checkpoint manager is not initialized.")
 		}
 	}
 	return podResizeStatus
@@ -1770,7 +1774,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// ResourcesAllocated values come from checkpoint. It is the source-of-truth.
 		found := false
 		checkpointState := kl.statusManager.State()
-		status.ResourcesAllocated, found = checkpointState.GetContainerResourceAllocation(string(pod.UID), cName)
+		if checkpointState != nil {
+			status.ResourcesAllocated, found = checkpointState.GetContainerResourceAllocation(string(pod.UID), cName)
+		} else {
+			klog.ErrorS(nil, "pod resource allocation checkpoint manager is not initialized.")
+		}
 		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
 			// Log error and fallback to ResourcesAllocated in oldStatus if it exists
 			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)
