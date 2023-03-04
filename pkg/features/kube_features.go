@@ -51,7 +51,7 @@ const (
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
 	// owner: @nabokihms
-	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables API to get self subject attributes after authentication.
 	APISelfSubjectReview featuregate.Feature = "APISelfSubjectReview"
@@ -871,7 +871,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
-	APISelfSubjectReview: {Default: false, PreRelease: featuregate.Alpha},
+	APISelfSubjectReview: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.27
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
