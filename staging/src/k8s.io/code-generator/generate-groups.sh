@@ -18,14 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# generate-groups generates everything for a project with external types only, e.g. a project based
+# generate-groups generates everything for a project with external types, e.g. a project based
 # on CustomResourceDefinitions.
 
 if [ "$#" -lt 4 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename "$0") <generators> <output-package> <apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,applyconfiguration,client,lister,informer) or "all".
+  <generators>        comma-separated list of generators to run (applyconfiguration,client,conversion,deepcopy,
+                      defaulter,informer,lister,openapi) or "all".
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
   <apis-package>      the external types dir (e.g. github.com/example/api or github.com/example/project/pkg/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
@@ -50,7 +51,7 @@ shift 4
   # To support running this script from anywhere, first cd into this directory,
   # and then install with forced module mode on and fully qualified name.
   cd "$(dirname "${0}")"
-  GO111MODULE=on go install k8s.io/code-generator/cmd/{applyconfiguration-gen,defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+  GO111MODULE=on go install k8s.io/code-generator/cmd/{applyconfiguration-gen,client-gen,conversion-gen,deepcopy-gen,defaulter-gen,informer-gen,lister-gen,openapi-gen}
 )
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
 GOBIN="$(go env GOBIN)"
@@ -85,6 +86,22 @@ if [ "${GENS}" = "all" ] || grep -qw "applyconfiguration" <<<"${GENS}"; then
       "$@"
 fi
 
+if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
+  echo "Generating defaulters"
+  "${gobin}/defaulter-gen"  \
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
+      -O zz_generated.defaults \
+      "$@"
+fi
+
+if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
+  echo "Generating conversions"
+  "${gobin}/conversion-gen" \
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
+      -O zz_generated.conversion \
+      "$@"
+fi
+
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
   if [ "${GENS}" = "all" ] || grep -qw "applyconfiguration" <<<"${GENS}"; then
@@ -114,5 +131,16 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --listers-package "${OUTPUT_PKG}/listers" \
       --output-package "${OUTPUT_PKG}/informers" \
+      "$@"
+fi
+
+if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
+  echo "Generating OpenAPI definitions for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/openapi"
+  declare -a OPENAPI_EXTRA_PACKAGES
+  "${gobin}/openapi-gen" \
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}" "${OPENAPI_EXTRA_PACKAGES[@]+"${OPENAPI_EXTRA_PACKAGES[@]}"}")" \
+      --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/runtime,k8s.io/apimachinery/pkg/version" \
+      --output-package "${OUTPUT_PKG}/openapi" \
+      -O zz_generated.openapi \
       "$@"
 fi

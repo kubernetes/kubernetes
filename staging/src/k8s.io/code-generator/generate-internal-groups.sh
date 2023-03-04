@@ -18,8 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# generate-internal-groups generates everything for a project with internal types, e.g. an
-# user-provided API server based on k8s.io/apiserver.
+# generate-internal-groups is a back-compatible wrapper around generate-groups.sh
 
 if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
@@ -33,9 +32,6 @@ Usage: $(basename "$0") <generators> <output-package> <int-apis-package> <apis-p
                       to <api-package>.
   ...                 arbitrary flags passed to all generator binaries.
 
-Examples:
-  $(basename "$0") all                           github.com/example/project/pkg/client github.com/example/project/pkg/apis github.com/example/project/pkg/apis "foo:v1 bar:v1alpha1,v1beta1"
-  $(basename "$0") deepcopy,defaulter,conversion github.com/example/project/pkg/client github.com/example/project/pkg/apis github.com/example/project/apis     "foo:v1 bar:v1alpha1,v1beta1"
 EOF
   exit 0
 fi
@@ -47,86 +43,10 @@ APIS_PKG="$3"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
-(
-  # To support running this script from anywhere, first cd into this directory,
-  # and then install with forced module mode on and fully qualified name.
-  cd "$(dirname "${0}")"
-  GO111MODULE=on go install k8s.io/code-generator/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,openapi-gen}
-)
-
-# Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
-GOBIN="$(go env GOBIN)"
-gobin="${GOBIN:-$(go env GOPATH)/bin}"
-
-function codegen::join() { local IFS="$1"; shift; echo "$*"; }
-
-# enumerate group versions
-FQ_APIS=() # e.g. k8s.io/kubernetes/pkg/apis/apps k8s.io/api/apps/v1
-for GVs in ${GROUPS_WITH_VERSIONS}; do
-  IFS=: read -r G Vs <<<"${GVs}"
-
-  # enumerate versions
-  for V in ${Vs//,/ }; do
-    FQ_APIS+=("${APIS_PKG}/${G}/${V}")
-  done
-done
-
-if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
-  echo "Generating deepcopy funcs"
-  "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy \
-      "$@"
+if [ "${GENS}" = "all" ]; then
+    # Don't pass "all" thru to generate-groups because it has a different meaning there.
+    GENS="client,conversion,deepcopy,defaulter,informer,lister,openapi"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
-  echo "Generating defaulters"
-  "${gobin}/defaulter-gen"  \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.defaults \
-      "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
-  echo "Generating conversions"
-  "${gobin}/conversion-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.conversion \
-      "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
-  echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-  "${gobin}/client-gen" \
-      --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
-      --input-base "" \
-      --input "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
-      "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
-  echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
-  "${gobin}/lister-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/listers" \
-      "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
-  echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
-  "${gobin}/informer-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-      --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-      --listers-package "${OUTPUT_PKG}/listers" \
-      --output-package "${OUTPUT_PKG}/informers" \
-      "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
-  echo "Generating OpenAPI definitions for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/openapi"
-  declare -a OPENAPI_EXTRA_PACKAGES
-  "${gobin}/openapi-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}" "${OPENAPI_EXTRA_PACKAGES[@]+"${OPENAPI_EXTRA_PACKAGES[@]}"}")" \
-      --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/runtime,k8s.io/apimachinery/pkg/version" \
-      --output-package "${OUTPUT_PKG}/openapi" \
-      -O zz_generated.openapi \
-      "$@"
-fi
+echo "WARNING: generate-internal-groups.sh is deprecated: use generate-groups.sh instead"
+exec "$(dirname "${BASH_SOURCE[0]}")/generate-groups.sh" "${GENS}" "${OUTPUT_PKG}" "${APIS_PKG}" "${GROUPS_WITH_VERSIONS}" "$@"
