@@ -748,7 +748,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
-				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				PodPidsLimit:                             s.PodPidsLimit,
 				EnforceCPULimits:                         s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
 				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
