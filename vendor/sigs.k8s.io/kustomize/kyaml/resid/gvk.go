@@ -11,7 +11,7 @@ import (
 )
 
 // Gvk identifies a Kubernetes API type.
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
+// https://git.k8s.io/design-proposals-archive/api-machinery/api-group.md
 type Gvk struct {
 	Group   string `json:"group,omitempty" yaml:"group,omitempty"`
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
@@ -97,27 +97,27 @@ func (x Gvk) String() string {
 	return strings.Join([]string{k, v, g}, fieldSep)
 }
 
-// legacySortString returns an older version of String() that LegacyOrderTransformer depends on
-// to keep its ordering stable across Kustomize versions
-func (x Gvk) legacySortString() string {
-	legacyNoGroup := "~G"
-	legacyNoVersion := "~V"
-	legacyNoKind := "~K"
-	legacyFieldSeparator := "_"
+// stableSortString returns a GVK representation that ensures determinism and
+// backwards-compatibility in testing, logging, ...
+func (x Gvk) stableSortString() string {
+	stableNoGroup := "~G"
+	stableNoVersion := "~V"
+	stableNoKind := "~K"
+	stableFieldSeparator := "_"
 
 	g := x.Group
 	if g == "" {
-		g = legacyNoGroup
+		g = stableNoGroup
 	}
 	v := x.Version
 	if v == "" {
-		v = legacyNoVersion
+		v = stableNoVersion
 	}
 	k := x.Kind
 	if k == "" {
-		k = legacyNoKind
+		k = stableNoKind
 	}
-	return strings.Join([]string{g, v, k}, legacyFieldSeparator)
+	return strings.Join([]string{g, v, k}, stableFieldSeparator)
 }
 
 // ApiVersion returns the combination of Group and Version
@@ -203,7 +203,7 @@ func (x Gvk) IsLessThan(o Gvk) bool {
 	if indexI != indexJ {
 		return indexI < indexJ
 	}
-	return x.legacySortString() < o.legacySortString()
+	return x.stableSortString() < o.stableSortString()
 }
 
 // IsSelected returns true if `selector` selects `x`; otherwise, false.

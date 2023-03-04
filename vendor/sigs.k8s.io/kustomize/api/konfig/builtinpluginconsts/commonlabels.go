@@ -5,9 +5,6 @@ package builtinpluginconsts
 
 const commonLabelFieldSpecs = `
 commonLabels:
-- path: metadata/labels
-  create: true
-
 - path: spec/selector
   create: true
   version: v1
@@ -17,17 +14,7 @@ commonLabels:
   create: true
   version: v1
   kind: ReplicationController
-
-- path: spec/template/metadata/labels
-  create: true
-  version: v1
-  kind: ReplicationController
-
 - path: spec/selector/matchLabels
-  create: true
-  kind: Deployment
-
-- path: spec/template/metadata/labels
   create: true
   kind: Deployment
 
@@ -60,24 +47,11 @@ commonLabels:
   create: true
   kind: ReplicaSet
 
-- path: spec/template/metadata/labels
-  create: true
-  kind: ReplicaSet
-
 - path: spec/selector/matchLabels
   create: true
   kind: DaemonSet
 
-- path: spec/template/metadata/labels
-  create: true
-  kind: DaemonSet
-
 - path: spec/selector/matchLabels
-  create: true
-  group: apps
-  kind: StatefulSet
-
-- path: spec/template/metadata/labels
   create: true
   group: apps
   kind: StatefulSet
@@ -107,33 +81,13 @@ commonLabels:
   group: apps
   kind: StatefulSet
 
-- path: spec/volumeClaimTemplates[]/metadata/labels
-  create: true
-  group: apps
-  kind: StatefulSet
-
 - path: spec/selector/matchLabels
   create: false
-  group: batch
-  kind: Job
-
-- path: spec/template/metadata/labels
-  create: true
   group: batch
   kind: Job
 
 - path: spec/jobTemplate/spec/selector/matchLabels
   create: false
-  group: batch
-  kind: CronJob
-
-- path: spec/jobTemplate/metadata/labels
-  create: true
-  group: batch
-  kind: CronJob
-
-- path: spec/jobTemplate/spec/template/metadata/labels
-  create: true
   group: batch
   kind: CronJob
 
@@ -156,4 +110,4 @@ commonLabels:
   create: false
   group: networking.k8s.io
   kind: NetworkPolicy
-`
+` + metadataLabelsFieldSpecs
