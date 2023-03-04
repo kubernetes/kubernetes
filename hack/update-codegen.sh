@@ -883,19 +883,22 @@ function codegen::informers() {
 
 function codegen::subprojects() {
     # Call generation on sub-projects.
-    # TODO(thockin): make these take a list of codegens and flags
     local subs=(
-        vendor/k8s.io/code-generator/examples/hack/update-codegen.sh
-        vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
-        vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
-        vendor/k8s.io/sample-controller/hack/update-codegen.sh
-        vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
-        vendor/k8s.io/metrics/hack/update-codegen.sh
-        vendor/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
+        vendor/k8s.io/code-generator/examples
+        vendor/k8s.io/kube-aggregator
+        vendor/k8s.io/sample-apiserver
+        vendor/k8s.io/sample-controller
+        vendor/k8s.io/apiextensions-apiserver
+        vendor/k8s.io/metrics
+        vendor/k8s.io/apiextensions-apiserver/examples/client-go
     )
 
-    for s in "${subs[@]}"; do 
-        CODEGEN_PKG=./vendor/k8s.io/code-generator "$s"
+    local codegen
+    codegen="$(pwd)/vendor/k8s.io/code-generator"
+    for sub in "${subs[@]}"; do
+        pushd "${sub}" >/dev/null
+        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh
+        popd >/dev/null
     done
 }
 
