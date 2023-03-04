@@ -481,7 +481,7 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	klog.V(4).Infof("Successfully synced StatefulSet %s/%s", set.Namespace, set.Name)
 	// One more sync to handle the clock skew. This is also helping in requeuing right after status update
 	if set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
 		ssc.enqueueSSAfter(set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
