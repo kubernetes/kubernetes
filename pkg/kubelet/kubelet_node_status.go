@@ -548,17 +548,20 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
-	// In large clusters, GET and PUT operations on Node objects coming
-	// from here are the majority of load on apiserver and etcd.
-	// To reduce the load on etcd, we are serving GET operations from
-	// apiserver cache (the data might be slightly delayed but it doesn't
-	// seem to cause more conflict - the delays are pretty small).
-	// If it result in a conflict, all retries are served directly from etcd.
-	opts := metav1.GetOptions{}
-	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
+	originalNode, err := kl.GetNode()
+	if err != nil || originalNode == nil {
+		// In large clusters, GET and PUT operations on Node objects coming
+		// from here are the majority of load on apiserver and etcd.
+		// To reduce the load on etcd, we are serving GET operations from
+		// apiserver cache (the data might be slightly delayed but it doesn't
+		// seem to cause more conflict - the delays are pretty small).
+		// If it result in a conflict, all retries are served directly from etcd.
+		opts := metav1.GetOptions{}
+		if tryNumber == 0 {
+			util.FromApiserverCache(&opts)
+		}
+		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	}
-	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
