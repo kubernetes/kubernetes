@@ -36,7 +36,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
-			Release: v1.26
+			Release: v1.27
 			Testname: SelfSubjectReview API
 			Description:
 			The authentication.k8s.io API group MUST exist in the /apis discovery document.
@@ -44,7 +44,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 		    The authentication.k8s.io/v1beta1 API group/version MUST exist in the /apis/mode.k8s.io discovery document.
 			The selfsubjectreviews resource MUST exist in the /apis/authentication.k8s.io/v1alpha1 discovery document.
 			The selfsubjectreviews resource MUST exist in the /apis/authentication.k8s.io/v1beta1 discovery document.
-			The selfsubjectreviews resource must support create.
+			The selfsubjectreviews resource MUST support create.
 	*/
 	ginkgo.It("should support SelfSubjectReview API operations", func(ctx context.Context) {
 		ginkgo.DescribeTable(
