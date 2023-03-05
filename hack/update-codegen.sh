@@ -881,6 +881,12 @@ function codegen::informers() {
     fi
 }
 
+function indent() {
+    while read -r X; do
+        echo "    ${X}"
+    done
+}
+
 function codegen::subprojects() {
     # Call generation on sub-projects.
     local subs=(
@@ -896,8 +902,9 @@ function codegen::subprojects() {
     local codegen
     codegen="$(pwd)/vendor/k8s.io/code-generator"
     for sub in "${subs[@]}"; do
+        kube::log::status "Generating code for subproject ${sub}"
         pushd "${sub}" >/dev/null
-        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh
+        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
         popd >/dev/null
     done
 }
