@@ -926,7 +926,7 @@ function codegen::protobindings() {
     fi
 
     for api in "${apis[@]}"; do
-        git ls-files -z -cmo --exclude-standard ":(glob)${api}"/'**/api.pb.go' \
+        git_find -z ":(glob)${api}"/'**/api.pb.go' \
             | xargs -0 rm -f
     done
 
