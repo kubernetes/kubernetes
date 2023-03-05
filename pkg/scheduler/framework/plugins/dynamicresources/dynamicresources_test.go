@@ -223,7 +223,7 @@ func BenchmarkHaveAllNodes(b *testing.B) {
 		},
 	}
 	for _, test := range tests {
-		for i := 0; i < test.nodeCount; i++ {
+		for i := test.nodeCount; i > 0; i-- {
 			test.nodeNames = append(test.nodeNames, "worker-"+strconv.Itoa(i))
 			test.nodes = append(test.nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
 		}
@@ -279,10 +279,6 @@ func TestHaveAllNodes(t *testing.T) {
 	}
 	// Test for the time complexity is O(n)
 	for _, test := range tests {
-		for i := 0; i < haveAllNodesThreshold; i++ {
-			test.nodeNames = append(test.nodeNames, "worker-"+strconv.Itoa(i))
-			test.nodes = append(test.nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
-		}
 		t.Run(test.name, func(t *testing.T) {
 			if test.has != haveAllNodes(test.nodeNames, test.nodes) {
 				t.Errorf("test haveAllNodes wrong, test name is: %s", test.name)

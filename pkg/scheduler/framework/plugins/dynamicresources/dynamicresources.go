@@ -45,8 +45,6 @@ const (
 	Name = names.DynamicResources
 
 	stateKey framework.StateKey = Name
-	// haveAllNodesThreshold is the threshold for using different lookup algorithms in the method (haveAllNodes)
-	haveAllNodesThreshold = 50
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -586,31 +584,14 @@ func haveAllNodes(nodeNames []string, nodes []*v1.Node) bool {
 	if len(nodeNames) < len(nodes) {
 		return false
 	}
-	// The time complexity is O(n)
-	if len(nodeNames) > haveAllNodesThreshold {
-		m := sets.New(nodeNames...)
-		for _, node := range nodes {
-			if !m.Has(node.Name) {
-				return false
-			}
-		}
-	} else { // The time complexity is O(n*n)
-		for _, node := range nodes {
-			if !haveNode(nodeNames, node.Name) {
-				return false
-			}
+	sort.Strings(nodeNames)
+	for _, node := range nodes {
+		i := sort.SearchStrings(nodeNames, node.Name)
+		if i == len(nodeNames) || nodeNames[i] != node.Name {
+			return false
 		}
 	}
 	return true
-}
-
-func haveNode(nodeNames []string, nodeName string) bool {
-	for _, n := range nodeNames {
-		if n == nodeName {
-			return true
-		}
-	}
-	return false
 }
 
 // Reserve reserves claims for the pod.
