@@ -214,10 +214,11 @@ func TestParseNodeIPArgument(t *testing.T) {
 
 func TestParseNodeIPAnnotation(t *testing.T) {
 	testCases := []struct {
-		desc string
-		in   string
-		out  net.IP
-		err  string
+		desc  string
+		in    string
+		out   []net.IP
+		err   string
+		ssErr string
 	}{
 		{
 			desc: "empty --node-ip",
@@ -237,7 +238,9 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 		{
 			desc: "single IPv4",
 			in:   "1.2.3.4",
-			out:  netutils.ParseIPSloppy("1.2.3.4"),
+			out: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+			},
 		},
 		{
 			desc: "single IPv4 with whitespace",
@@ -247,7 +250,9 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 		{
 			desc: "single IPv4 non-canonical",
 			in:   "01.2.3.004",
-			out:  netutils.ParseIPSloppy("1.2.3.4"),
+			out: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+			},
 		},
 		{
 			desc: "single IPv4 invalid",
@@ -262,7 +267,9 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 		{
 			desc: "single IPv4 unspecified",
 			in:   "0.0.0.0",
-			out:  net.IPv4zero,
+			out: []net.IP{
+				net.IPv4zero,
+			},
 		},
 		{
 			desc: "single IPv4 plus garbage",
@@ -272,17 +279,25 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 		{
 			desc: "single IPv6",
 			in:   "abcd::ef01",
-			out:  netutils.ParseIPSloppy("abcd::ef01"),
+			out: []net.IP{
+				netutils.ParseIPSloppy("abcd::ef01"),
+			},
 		},
 		{
 			desc: "single IPv6 non-canonical",
 			in:   "abcd:0abc:00ab:0000:0000::1",
-			out:  netutils.ParseIPSloppy("abcd:abc:ab::1"),
+			out: []net.IP{
+				netutils.ParseIPSloppy("abcd:abc:ab::1"),
+			},
 		},
 		{
 			desc: "simple dual-stack",
 			in:   "1.2.3.4,abcd::ef01",
-			err:  "not supported in this configuration",
+			out: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("abcd::ef01"),
+			},
+			ssErr: "not supported in this configuration",
 		},
 		{
 			desc: "dual-stack with whitespace",
@@ -300,14 +315,16 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 			err:  "either a single IP or a dual-stack pair of IPs",
 		},
 		{
-			desc: "dual-stack with unspecified",
-			in:   "1.2.3.4,::",
-			err:  "not supported in this configuration",
+			desc:  "dual-stack with unspecified",
+			in:    "1.2.3.4,::",
+			err:   "cannot include '0.0.0.0' or '::'",
+			ssErr: "not supported in this configuration",
 		},
 		{
-			desc: "dual-stack with unspecified",
-			in:   "0.0.0.0,abcd::1",
-			err:  "not supported in this configuration",
+			desc:  "dual-stack with unspecified",
+			in:    "0.0.0.0,abcd::1",
+			err:   "cannot include '0.0.0.0' or '::'",
+			ssErr: "not supported in this configuration",
 		},
 		{
 			desc: "dual-stack plus garbage",
@@ -322,21 +339,36 @@ func TestParseNodeIPAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			parsed, err := ParseNodeIPAnnotation(tc.in)
+		for _, allowDualStack := range []bool{false, true} {
+			desc := fmt.Sprintf("%s, allowDualStack=%v", tc.desc, allowDualStack)
+			t.Run(desc, func(t *testing.T) {
+				parsed, err := ParseNodeIPAnnotation(tc.in, allowDualStack)
 
-			if !reflect.DeepEqual(parsed, tc.out) {
-				t.Errorf("expected %#v, got %#v", tc.out, parsed)
-			}
-			if err != nil {
-				if tc.err == "" {
-					t.Errorf("unexpected error %v", err)
-				} else if !strings.Contains(err.Error(), tc.err) {
-					t.Errorf("expected error with %q, got %v", tc.err, err)
+				expectedOut := tc.out
+				expectedErr := tc.err
+
+				if !allowDualStack {
+					if len(tc.out) == 2 {
+						expectedOut = nil
+					}
+					if tc.ssErr != "" {
+						expectedErr = tc.ssErr
+					}
 				}
-			} else if tc.err != "" {
-				t.Errorf("expected error with %q, got no error", tc.err)
-			}
-		})
+
+				if !reflect.DeepEqual(parsed, expectedOut) {
+					t.Errorf("expected %#v, got %#v", expectedOut, parsed)
+				}
+				if err != nil {
+					if expectedErr == "" {
+						t.Errorf("unexpected error %v", err)
+					} else if !strings.Contains(err.Error(), expectedErr) {
+						t.Errorf("expected error with %q, got %v", expectedErr, err)
+					}
+				} else if expectedErr != "" {
+					t.Errorf("expected error with %q, got no error", expectedErr)
+				}
+			})
+		}
 	}
 }

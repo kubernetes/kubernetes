@@ -74,12 +74,9 @@ func ParseNodeIPArgument(nodeIP, cloudProvider string, allowCloudDualStack bool)
 }
 
 // ParseNodeIPAnnotation parses the `alpha.kubernetes.io/provided-node-ip` annotation,
-// which should be a single IP address. Unlike with ParseNodeIPArgument, invalid values
+// which can be either a single IP address or (if allowDualStack is true) a
+// comma-separated pair of IP addresses. Unlike with ParseNodeIPArgument, invalid values
 // are considered an error.
-func ParseNodeIPAnnotation(nodeIP string) (net.IP, error) {
-	ips, err := parseNodeIP(nodeIP, false, false)
-	if err != nil || len(ips) == 0 {
-		return nil, err
-	}
-	return ips[0], nil
+func ParseNodeIPAnnotation(nodeIP string, allowDualStack bool) ([]net.IP, error) {
+	return parseNodeIP(nodeIP, allowDualStack, false)
 }

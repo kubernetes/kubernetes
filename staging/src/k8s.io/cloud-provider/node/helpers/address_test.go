@@ -428,11 +428,131 @@ func TestGetNodeAddressesFromNodeIP(t *testing.T) {
 			},
 			shouldError: false,
 		},
+		{
+			name:   "Single-stack cloud, dual-stack request",
+			nodeIP: "10.1.1.1,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: true,
+		},
+		{
+			name:   "Dual-stack cloud, IPv4 first, IPv4-primary request",
+			nodeIP: "10.1.1.1,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "Dual-stack cloud, IPv6 first, IPv4-primary request",
+			nodeIP: "10.1.1.1,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "Dual-stack cloud, dual-stack request, multiple IPs",
+			nodeIP: "10.1.1.1,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.2"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::1234"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// additional IPs of the same type are removed, as in the
+			// single-stack case.
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "Dual-stack cloud, dual-stack request, extra ExternalIP",
+			nodeIP: "10.1.1.1,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::1234"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// The ExternalIP is preserved, since no ExternalIP was matched
+			// by --node-ip.
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "Dual-stack cloud, dual-stack request, multiple ExternalIPs",
+			nodeIP: "fc01:1234::5678,10.1.1.1",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeExternalIP, Address: "2001:db1::1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// The ExternalIPs are preserved, since no ExternalIP was matched
+			// by --node-ip.
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalIP, Address: "2001:db1::1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "Dual-stack cloud, dual-stack request, mixed InternalIP/ExternalIP match",
+			nodeIP: "55.55.55.55,fc01:1234::5678",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeExternalIP, Address: "2001:db1::1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// Since the IPv4 --node-ip value matched an ExternalIP, that
+			// filters out the IPv6 ExternalIP. Since the IPv6 --node-ip value
+			// matched in InternalIP, that filters out the IPv4 InternalIP
+			// value.
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetNodeAddressesFromNodeIP(tt.nodeIP, tt.nodeAddresses)
+			got, err := GetNodeAddressesFromNodeIP(tt.nodeIP, tt.nodeAddresses, true)
 			if (err != nil) != tt.shouldError {
 				t.Errorf("GetNodeAddressesFromNodeIP() error = %v, wantErr %v", err, tt.shouldError)
 				return

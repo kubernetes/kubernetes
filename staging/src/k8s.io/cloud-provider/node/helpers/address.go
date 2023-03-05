@@ -85,7 +85,7 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 	}
 
 	// Otherwise the result is the same as for GetNodeAddressesFromNodeIP
-	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses)
+	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses, false)
 }
 
 // GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to match the
@@ -102,32 +102,40 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 // GetNodeAddressesFromNodeIPLegacy, because that case never occurs for external cloud
 // providers, because kubelet does not set the `provided-node-ip` annotation in that
 // case.)
-func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
-	nodeIP, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP)
+func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress, allowDualStack bool) ([]v1.NodeAddress, error) {
+	nodeIPs, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP, allowDualStack)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse node IP %q: %v", providedNodeIP, err)
 	}
 
-	// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for
-	// that address Type (like InternalIP and ExternalIP), meaning other addresses of the same Type are discarded.
-	// See #61921 for more information: some cloud providers may supply secondary IPs, so nodeIP serves as a way to
-	// ensure that the correct IPs show up on a Node object.
 	enforcedNodeAddresses := []v1.NodeAddress{}
-
 	nodeIPTypes := make(map[v1.NodeAddressType]bool)
-	for _, nodeAddress := range cloudNodeAddresses {
-		if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
-			enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-			nodeIPTypes[nodeAddress.Type] = true
+
+	for _, nodeIP := range nodeIPs {
+		// For every address supplied by the cloud provider that matches nodeIP,
+		// nodeIP is the enforced node address for that address Type (like
+		// InternalIP and ExternalIP), meaning other addresses of the same Type
+		// are discarded. See #61921 for more information: some cloud providers
+		// may supply secondary IPs, so nodeIP serves as a way to ensure that the
+		// correct IPs show up on a Node object.
+
+		matched := false
+		for _, nodeAddress := range cloudNodeAddresses {
+			if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
+				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+				nodeIPTypes[nodeAddress.Type] = true
+				matched = true
+			}
+		}
+
+		// nodeIP must be among the addresses supplied by the cloud provider
+		if !matched {
+			return nil, fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
 		}
 	}
 
-	// nodeIP must be among the addresses supplied by the cloud provider
-	if len(enforcedNodeAddresses) == 0 {
-		return nil, fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
-	}
-
-	// nodeIP was found, now use all other addresses supplied by the cloud provider NOT of the same Type as nodeIP.
+	// Now use all other addresses supplied by the cloud provider NOT of the same Type
+	// as any nodeIP.
 	for _, nodeAddress := range cloudNodeAddresses {
 		if !nodeIPTypes[nodeAddress.Type] {
 			enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
