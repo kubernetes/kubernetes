@@ -130,6 +130,70 @@ function codegen::protobuf() {
     fi
 }
 
+# Deep-copy generation
+#
+# Any package that wants deep-copy functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:deepcopy-gen=<VALUE>
+#
+# The <VALUE> may be one of:
+#     generate: generate deep-copy functions into the package
+#     register: generate deep-copy functions and register them with a
+#               scheme
+function codegen::deepcopy() {
+    # Build the tool.
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/deepcopy-gen
+
+    # The result file, in each pkg, of deep-copy generation.
+    local output_base="${GENERATED_FILE_PREFIX}deepcopy"
+
+    # The tool used to generate deep copies.
+    local gen_deepcopy_bin
+    gen_deepcopy_bin="$(kube::util::find-binary "deepcopy-gen")"
+
+    # Find all the directories that request deep-copy generation.
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:deepcopy-gen tags"
+    fi
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <( \
+        grep -l --null '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | xargs -0 -n1 dirname \
+            | sort -u)
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
+    fi
+
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+    done
+
+    kube::log::status "Generating deepcopy code for ${#tag_pkgs[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running ${gen_deepcopy_bin} for:"
+        for dir in "${tag_dirs[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+
+    ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
+        --v "${KUBE_VERBOSE}" \
+        --logtostderr \
+        -h "${BOILERPLATE_FILENAME}" \
+        -O "${output_base}" \
+        --bounding-dirs "${PRJ_SRC_PATH},k8s.io/api" \
+        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "$@"
+
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated deepcopy code"
+    fi
+}
+
 # Generates types_swagger_doc_generated file for the given group version.
 # $1: Name of the group version
 # $2: Path to the directory where types.go for that group version exists. This
@@ -259,70 +323,6 @@ function codegen::prerelease() {
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated prerelease-lifecycle code"
-    fi
-}
-
-# Deep-copy generation
-#
-# Any package that wants deep-copy functions generated must include a
-# comment-tag in column 0 of one file of the form:
-#     // +k8s:deepcopy-gen=<VALUE>
-#
-# The <VALUE> may be one of:
-#     generate: generate deep-copy functions into the package
-#     register: generate deep-copy functions and register them with a
-#               scheme
-function codegen::deepcopy() {
-    # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
-        k8s.io/code-generator/cmd/deepcopy-gen
-
-    # The result file, in each pkg, of deep-copy generation.
-    local output_base="${GENERATED_FILE_PREFIX}deepcopy"
-
-    # The tool used to generate deep copies.
-    local gen_deepcopy_bin
-    gen_deepcopy_bin="$(kube::util::find-binary "deepcopy-gen")"
-
-    # Find all the directories that request deep-copy generation.
-    if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: finding all +k8s:deepcopy-gen tags"
-    fi
-    local tag_dirs=()
-    kube::util::read-array tag_dirs < <( \
-        grep -l --null '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
-            | sort -u)
-    if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
-    fi
-
-    local tag_pkgs=()
-    for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
-    done
-
-    kube::log::status "Generating deepcopy code for ${#tag_pkgs[@]} targets"
-    if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_deepcopy_bin} for:"
-        for dir in "${tag_dirs[@]}"; do
-            kube::log::status "DBG:     $dir"
-        done
-    fi
-
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
-
-    ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
-        --v "${KUBE_VERBOSE}" \
-        --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
-        --bounding-dirs "${PRJ_SRC_PATH},k8s.io/api" \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
-        "$@"
-
-    if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "Generated deepcopy code"
     fi
 }
 
