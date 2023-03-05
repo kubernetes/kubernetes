@@ -41,8 +41,8 @@ func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddr
 	}
 }
 
-// PreferNodeIP filters node addresses to prefer a specific node IP or address
-// family.
+// GetNodeAddressesFromNodeIPLegacy filters node addresses to prefer a specific node IP or
+// address family. This function is used only with legacy cloud providers.
 //
 // If nodeIP is either '0.0.0.0' or '::' it is taken to represent any address of
 // that address family: IPv4 or IPv6. i.e. if nodeIP is '0.0.0.0' we will return
@@ -55,7 +55,7 @@ func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddr
 //   - If nodeIP matches an address of a particular type (internal or external),
 //     that will be the *only* address of that type returned.
 //   - All remaining addresses are listed after.
-func PreferNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
 	// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
 	if nodeIP == nil {
 		return cloudNodeAddresses, nil
@@ -81,6 +81,29 @@ func PreferNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.Node
 			}
 		}
 		return sortedAddresses, nil
+	}
+
+	// Otherwise the result is the same as for GetNodeAddressesFromNodeIP
+	return GetNodeAddressesFromNodeIP(nodeIP, cloudNodeAddresses)
+}
+
+// GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to
+// match the provided nodeIP. This is used for external cloud providers.
+//
+// It will return node addresses filtered such that:
+//   - Any address matching nodeIP will be listed first.
+//   - If nodeIP matches an address of a particular type (internal or external),
+//     that will be the *only* address of that type returned.
+//   - All remaining addresses are listed after.
+//
+// (This does not have the same behavior with `0.0.0.0` and `::` as
+// GetNodeAddressesFromNodeIPLegacy, because that case never occurs for external cloud
+// providers, because kubelet does not set the `provided-node-ip` annotation in that
+// case.)
+func GetNodeAddressesFromNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+	// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
+	if nodeIP == nil {
+		return cloudNodeAddresses, nil
 	}
 
 	// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for

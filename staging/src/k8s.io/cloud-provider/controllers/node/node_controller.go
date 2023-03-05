@@ -391,7 +391,7 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 	}
 
 	if nodeIP != nil {
-		nodeAddresses, err = cloudnodeutil.PreferNodeIP(nodeIP, nodeAddresses)
+		nodeAddresses, err = cloudnodeutil.GetNodeAddressesFromNodeIP(nodeIP, nodeAddresses)
 		if err != nil {
 			klog.Errorf("Failed to update node addresses for node %q: %v", node.Name, err)
 			return
@@ -539,7 +539,7 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	}
 
 	if nodeIP != nil {
-		_, err := cloudnodeutil.PreferNodeIP(nodeIP, instanceMeta.NodeAddresses)
+		_, err := cloudnodeutil.GetNodeAddressesFromNodeIP(nodeIP, instanceMeta.NodeAddresses)
 		if err != nil {
 			return nil, fmt.Errorf("provided node ip for node %q is not valid: %w", node.Name, err)
 		}

@@ -94,7 +94,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 	}
 }
 
-func TestPreferNodeIP(t *testing.T) {
+func TestGetNodeAddressesFromNodeIPLegacy(t *testing.T) {
 	cases := []struct {
 		name              string
 		nodeIP            net.IP
@@ -301,13 +301,172 @@ func TestPreferNodeIP(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := PreferNodeIP(tt.nodeIP, tt.nodeAddresses)
+			got, err := GetNodeAddressesFromNodeIPLegacy(tt.nodeIP, tt.nodeAddresses)
 			if (err != nil) != tt.shouldError {
-				t.Errorf("PreferNodeIP() error = %v, wantErr %v", err, tt.shouldError)
+				t.Errorf("GetNodeAddressesFromNodeIPLegacy() error = %v, wantErr %v", err, tt.shouldError)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.expectedAddresses) {
-				t.Errorf("PreferNodeIP() = %v, want %v", got, tt.expectedAddresses)
+				t.Errorf("GetNodeAddressesFromNodeIPLegacy() = %v, want %v", got, tt.expectedAddresses)
+			}
+		})
+	}
+}
+
+func TestGetNodeAddressesFromNodeIP(t *testing.T) {
+	cases := []struct {
+		name              string
+		nodeIP            net.IP
+		nodeAddresses     []v1.NodeAddress
+		expectedAddresses []v1.NodeAddress
+		shouldError       bool
+	}{
+		{
+			name:   "A single InternalIP",
+			nodeIP: netutils.ParseIPSloppy("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "NodeIP is external",
+			nodeIP: netutils.ParseIPSloppy("55.55.55.55"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			// Accommodating #45201 and #49202
+			name:   "InternalIP and ExternalIP are the same",
+			nodeIP: netutils.ParseIPSloppy("55.55.55.55"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "44.44.44.44"},
+				{Type: v1.NodeExternalIP, Address: "44.44.44.44"},
+				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An Internal/ExternalIP, an Internal/ExternalDNS",
+			nodeIP: netutils.ParseIPSloppy("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
+				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
+				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An Internal with multiple internal IPs",
+			nodeIP: netutils.ParseIPSloppy("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "10.2.2.2"},
+				{Type: v1.NodeInternalIP, Address: "10.3.3.3"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An InternalIP that isn't valid: should error",
+			nodeIP: netutils.ParseIPSloppy("10.2.2.2"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: nil,
+			shouldError:       true,
+		},
+		{
+			name:   "Dual-stack cloud, with nodeIP, different IPv6 formats",
+			nodeIP: netutils.ParseIPSloppy("2600:1f14:1d4:d101::ba3d"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101:0:0:0:ba3d"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101:0:0:0:ba3d"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name: "Dual-stack cloud, IPv4 first, no nodeIP",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name: "Dual-stack cloud, IPv6 first, no nodeIP",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetNodeAddressesFromNodeIP(tt.nodeIP, tt.nodeAddresses)
+			if (err != nil) != tt.shouldError {
+				t.Errorf("GetNodeAddressesFromNodeIP() error = %v, wantErr %v", err, tt.shouldError)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.expectedAddresses) {
+				t.Errorf("GetNodeAddressesFromNodeIP() = %v, want %v", got, tt.expectedAddresses)
 			}
 		})
 	}
