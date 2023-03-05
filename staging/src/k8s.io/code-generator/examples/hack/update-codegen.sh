@@ -18,34 +18,36 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+SCRIPT_ROOT="${SCRIPT_DIR}/.."
+CODEGEN_PKG="${CODEGEN_PKG:-"${SCRIPT_ROOT}/.."}"
 
 # generate the code with:
 # - --output-base because this script should also be able to run inside the vendor dir of
 #   k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #   instead of the $GOPATH directly. For normal projects this can be dropped.
-"${SCRIPT_ROOT}/generate-internal-groups.sh" "client,conversion,deepcopy,defaulter,informer,lister,openapi" \
+"${CODEGEN_PKG}/generate-internal-groups.sh" "client,conversion,deepcopy,defaulter,informer,lister,openapi" \
   k8s.io/code-generator/examples/apiserver \
   k8s.io/code-generator/examples/apiserver/apis \
   k8s.io/code-generator/examples/apiserver/apis \
   "example:v1 example2:v1 example3.io:v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
-"${SCRIPT_ROOT}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
+  --output-base "${SCRIPT_DIR}/../../../.." \
+  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
+"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
   k8s.io/code-generator/examples/crd \
   k8s.io/code-generator/examples/crd/apis \
   "example:v1 example2:v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
-"${SCRIPT_ROOT}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
+  --output-base "${SCRIPT_DIR}/../../../.." \
+  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
+"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
   k8s.io/code-generator/examples/MixedCase \
   k8s.io/code-generator/examples/MixedCase/apis \
   "example:v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
-"${SCRIPT_ROOT}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
+  --output-base "${SCRIPT_DIR}/../../../.." \
+  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
+"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
   k8s.io/code-generator/examples/HyphenGroup \
   k8s.io/code-generator/examples/HyphenGroup/apis \
   "example:v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+  --output-base "${SCRIPT_DIR}/../../../.." \
+  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"

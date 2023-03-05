@@ -18,14 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-
-DIFFROOT="${SCRIPT_ROOT}/examples"
-TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/examples"
-_tmp="${SCRIPT_ROOT}/_tmp"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+DIFFROOT="${SCRIPT_ROOT}"
+TMP_DIFFROOT="$(mktemp -d -t "$(basename "$0").XXXXXX")"
 
 cleanup() {
-  rm -rf "${_tmp}"
+  rm -rf "${TMP_DIFFROOT}"
 }
 trap "cleanup" EXIT SIGINT
 
@@ -38,9 +36,7 @@ cp -a "${DIFFROOT}"/* "${TMP_DIFFROOT}"
 echo "diffing ${DIFFROOT} against freshly generated codegen"
 ret=0
 diff -Naupr "${DIFFROOT}" "${TMP_DIFFROOT}" || ret=$?
-cp -a "${TMP_DIFFROOT}"/* "${DIFFROOT}"
-if [[ $ret -eq 0 ]]
-then
+if [[ $ret -eq 0 ]]; then
   echo "${DIFFROOT} up to date."
 else
   echo "${DIFFROOT} is out of date. Please run hack/update-codegen.sh"
@@ -49,7 +45,7 @@ fi
 
 # smoke test
 echo "Smoke testing examples by compiling..."
-pushd "./${SCRIPT_ROOT}/examples"
+pushd "${SCRIPT_ROOT}"
   go build "k8s.io/code-generator/examples/crd/..."
   go build "k8s.io/code-generator/examples/apiserver/..."
   go build "k8s.io/code-generator/examples/MixedCase/..."

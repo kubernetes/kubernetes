@@ -35,7 +35,7 @@ UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS:-}"
 
 OUT_DIR="_output"
 PRJ_SRC_PATH="k8s.io/kubernetes"
-BOILERPLATE_FILENAME="vendor/k8s.io/code-generator/hack/boilerplate.go.txt"
+BOILERPLATE_FILENAME="hack/boilerplate/boilerplate.generatego.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
 
 # Any time we call sort, we want it in the same locale.
@@ -885,7 +885,7 @@ function codegen::subprojects() {
     # Call generation on sub-projects.
     # TODO(thockin): make these take a list of codegens and flags
     local subs=(
-        vendor/k8s.io/code-generator/hack/update-codegen.sh
+        vendor/k8s.io/code-generator/examples/hack/update-codegen.sh
         vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
         vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
         vendor/k8s.io/sample-controller/hack/update-codegen.sh
