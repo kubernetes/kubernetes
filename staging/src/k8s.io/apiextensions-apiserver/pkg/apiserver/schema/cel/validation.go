@@ -64,7 +64,7 @@ type Validator struct {
 // of the Structural schema and returns a custom resource validator that contains nested
 // validators for all items, properties and additionalProperties that transitively contain validator rules.
 // Returns nil if there are no validator rules in the Structural schema. May return a validator containing only errors.
-// Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
+// Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input
 func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
 	if !hasXValidations(s) {
 		return nil
@@ -75,6 +75,7 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
 // returns the Validator if any x-kubernetes-validations exist in the schema, or nil if no x-kubernetes-validations
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
 	compiledRules, err := Compile(s, declType, perCallLimit)
 	var itemsValidator, additionalPropertiesValidator *Validator

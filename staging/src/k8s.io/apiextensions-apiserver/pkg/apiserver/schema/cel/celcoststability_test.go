@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 func TestCelCostStability(t *testing.T) {
@@ -1096,16 +1097,16 @@ func TestCelCostStability(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
 					ctx := context.TODO()
-					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
-					rtCost := RuntimeCELCostBudget - remainingBudegt
+					rtCost := celconfig.RuntimeCELCostBudget - remainingBudegt
 					if rtCost != expectedCost {
 						t.Fatalf("runtime cost %d does not match expected runtime cost %d", rtCost, expectedCost)
 					}

@@ -16,8 +16,6 @@ limitations under the License.
 
 package cel
 
-import apiservercel "k8s.io/apiserver/pkg/cel"
-
 const (
 	// PerCallLimit specify the actual cost limit per CEL validation call
 	// current PerCallLimit gives roughly 0.1 second for each expression validation call
@@ -33,5 +31,6 @@ const (
 
 	// MaxRequestSizeBytes is the maximum size of a request to the API server
 	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
-	MaxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
+	// Note that even if server_run_options.go becomes configurable in the future, this cost constant should be fixed and it should be the max allowed request size for the server
+	MaxRequestSizeBytes = int64(3 * 1024 * 1024)
 )

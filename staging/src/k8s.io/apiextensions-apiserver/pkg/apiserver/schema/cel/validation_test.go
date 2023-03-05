@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -1766,7 +1767,7 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -1777,7 +1778,7 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1801,7 +1802,7 @@ func TestValidationExpressions(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2015,7 +2016,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2082,7 +2083,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -2107,7 +2108,7 @@ func TestCELValidationLimit(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -2150,11 +2151,11 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2163,7 +2164,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -2208,7 +2209,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2216,7 +2217,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2240,7 +2241,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2285,12 +2286,12 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -2325,14 +2326,14 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
@@ -2379,7 +2380,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 					},
 				},
 			}
-			validator := NewValidator(s, true, PerCallLimit)
+			validator := NewValidator(s, true, celconfig.PerCallLimit)
 			if validator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2390,7 +2391,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Errorf("unexpected error: %v", err)
 				}
