@@ -837,34 +837,33 @@ func TestScaleUpContainer(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestIgnoreContainerMetric(t *testing.T) {
-	// when the container metric feature isn't enabled, it's ignored and HPA keeps the current replica.
+func TestContainerMetricWithTheFeatureGateDisabled(t *testing.T) {
+	// In this test case, the container metrics will be ignored
+	// and only the CPUTarget will be taken into consideration.
+
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
 		specReplicas:            3,
 		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
 		metricsTarget: []autoscalingv2.MetricSpec{{
 			Type: autoscalingv2.ContainerResourceMetricSourceType,
 			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(30),
+					AverageUtilization: pointer.Int32(10),
 				},
 				Container: "container1",
 			},
 		}},
-		reportedLevels:      []uint64{300, 500, 700},
+		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:       true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}),
 	}
+
 	tc.runTest(t)
 }
 

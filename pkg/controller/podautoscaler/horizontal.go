@@ -431,10 +431,9 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 	case autoscalingv2.ContainerResourceMetricSourceType:
 		if !a.containerResourceMetricsEnabled {
 			// If the container resource metrics feature is disabled but the object has the one,
-			// that means the user enabled the feature once, created some HPAs with the container resource metrics, and disabled it finally.
-			// We cannot return errors in this case because that'll result in all HPAs with the container resource metric sources failing to scale down.
-			// Thus, here we silently ignore it and return current replica values so that it won't affect the autoscaling decision
-			return specReplicas, "", time.Time{}, condition, nil
+			// that means the user enabled the feature once,
+			// created some HPAs with the container resource metrics, and disabled it finally.
+			return 0, "", time.Time{}, condition, fmt.Errorf("the container resource metrics feature is disabled by the feature gate")
 		}
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForContainerResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
