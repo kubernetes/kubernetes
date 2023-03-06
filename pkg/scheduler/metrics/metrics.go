@@ -193,9 +193,9 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "plugin_evaluation_total",
-			Help:           "Number of attempts to schedule pods by each plugin and the extension point (only Filter is supported now.).",
+			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter and Filter.).",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"plugin", "extension_point"})
+		}, []string{"plugin", "extension_point", "profile"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
