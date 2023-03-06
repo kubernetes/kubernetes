@@ -26,14 +26,34 @@ import (
 )
 
 const (
-	// SchedulerSubsystem - subsystem name used by scheduler
+	// SchedulerSubsystem - subsystem name used by scheduler.
 	SchedulerSubsystem = "scheduler"
-	// Below are possible values for the work label.
+)
 
-	// PrioritizingExtender - prioritizing extender work label value
+// Below are possible values for the work and operation label.
+const (
+	// PrioritizingExtender - prioritizing extender work/operation label value.
 	PrioritizingExtender = "prioritizing_extender"
-	// Binding - binding work label value
+	// Binding - binding work/operation label value.
 	Binding = "binding"
+)
+
+// Below are possible values for the extension_point label.
+const (
+	PreFilter                   = "PreFilter"
+	Filter                      = "Filter"
+	PreFilterExtensionAddPod    = "PreFilterExtensionAddPod"
+	PreFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
+	PostFilter                  = "PostFilter"
+	PreScore                    = "PreScore"
+	Score                       = "Score"
+	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
+	PreBind                     = "PreBind"
+	Bind                        = "Bind"
+	PostBind                    = "PostBind"
+	Reserve                     = "Reserve"
+	Unreserve                   = "Unreserve"
+	Permit                      = "Permit"
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
