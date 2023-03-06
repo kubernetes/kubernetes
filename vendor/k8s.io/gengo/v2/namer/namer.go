@@ -300,6 +300,7 @@ func (ns *NameStrategy) Name(t *types.Type) string {
 // import. You can implement yourself or use the one in the generation package.
 type ImportTracker interface {
 	AddType(*types.Type)
+	AddImport(packagePath string)
 	LocalNameOf(packagePath string) string
 	PathOf(localName string) (string, bool)
 	ImportLines() []string
@@ -323,16 +324,12 @@ func (r *rawNamer) Name(t *types.Type) string {
 	}
 	if t.Name.Package != "" {
 		var name string
-		if r.tracker != nil {
-			r.tracker.AddType(t)
-			if t.Name.Package == r.pkg {
-				name = t.Name.Name
-			} else {
-				name = r.tracker.LocalNameOf(t.Name.Package) + "." + t.Name.Name
-			}
+		if t.Name.Package == r.pkg {
+			name = t.Name.Name
 		} else {
-			if t.Name.Package == r.pkg {
-				name = t.Name.Name
+			if r.tracker != nil {
+				r.tracker.AddType(t)
+				name = r.tracker.LocalNameOf(t.Name.Package) + "." + t.Name.Name
 			} else {
 				name = filepath.Base(t.Name.Package) + "." + t.Name.Name
 			}

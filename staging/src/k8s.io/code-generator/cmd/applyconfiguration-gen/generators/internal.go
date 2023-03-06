@@ -70,6 +70,8 @@ func (g *internalGenerator) GenerateType(c *generator.Context, _ *types.Type, w 
 	if err != nil {
 		return err
 	}
+	g.imports.AddImport("fmt")
+	g.imports.AddImport("sync")
 	sw.Do(schemaBlock, map[string]interface{}{
 		"schemaYAML":    string(schemaYAML),
 		"smdParser":     smdParser,

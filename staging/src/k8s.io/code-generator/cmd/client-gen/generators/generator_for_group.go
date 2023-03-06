@@ -124,6 +124,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			sw.Do(getterImplNamespaced, wrapper)
 		}
 	}
+	g.imports.AddImport("net/http")
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigAndClientTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)

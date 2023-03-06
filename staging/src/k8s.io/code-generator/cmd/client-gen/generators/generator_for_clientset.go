@@ -91,6 +91,8 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		sw.Do(clientsetInterfaceImplTemplate, g)
 	}
 	sw.Do(getDiscoveryTemplate, m)
+	g.imports.AddImport("fmt")
+	g.imports.AddImport("net/http")
 	sw.Do(newClientsetForConfigTemplate, m)
 	sw.Do(newClientsetForConfigAndClientTemplate, m)
 	sw.Do(newClientsetForConfigOrDieTemplate, m)

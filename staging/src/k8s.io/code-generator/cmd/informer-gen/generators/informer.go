@@ -106,6 +106,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 	sw.Do(typeInformerInterface, m)
 	sw.Do(typeInformerStruct, m)
 	sw.Do(typeInformerPublicConstructor, m)
+	g.imports.AddImport("context")
 	sw.Do(typeFilteredInformerPublicConstructor, m)
 	sw.Do(typeInformerConstructor, m)
 	sw.Do(typeInformerInformer, m)

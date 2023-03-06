@@ -17,6 +17,7 @@ limitations under the License.
 package namer
 
 import (
+	"path/filepath"
 	"sort"
 
 	"k8s.io/gengo/v2/types"
@@ -81,6 +82,15 @@ func (tracker *DefaultImportTracker) AddType(t *types.Type) {
 		return
 	}
 	name := tracker.LocalName(t.Name)
+	tracker.nameToPath[name] = path
+	tracker.pathToName[path] = name
+}
+
+func (tracker *DefaultImportTracker) AddImport(path string) {
+	if _, ok := tracker.pathToName[path]; ok {
+		return
+	}
+	name := filepath.Base(path)
 	tracker.nameToPath[name] = path
 	tracker.pathToName[path] = name
 }
