@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"k8s.io/api/core/v1"
+	nodeutil "k8s.io/component-helpers/node/util"
 	netutils "k8s.io/utils/net"
 )
 
@@ -84,11 +85,12 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 	}
 
 	// Otherwise the result is the same as for GetNodeAddressesFromNodeIP
-	return GetNodeAddressesFromNodeIP(nodeIP, cloudNodeAddresses)
+	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses)
 }
 
-// GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to
-// match the provided nodeIP. This is used for external cloud providers.
+// GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to match the
+// providedNodeIP from the Node annotation (which is assumed to be non-empty). This is
+// used for external cloud providers.
 //
 // It will return node addresses filtered such that:
 //   - Any address matching nodeIP will be listed first.
@@ -100,10 +102,10 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 // GetNodeAddressesFromNodeIPLegacy, because that case never occurs for external cloud
 // providers, because kubelet does not set the `provided-node-ip` annotation in that
 // case.)
-func GetNodeAddressesFromNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
-	// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
-	if nodeIP == nil {
-		return cloudNodeAddresses, nil
+func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+	nodeIP, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse node IP %q: %v", providedNodeIP, err)
 	}
 
 	// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for
