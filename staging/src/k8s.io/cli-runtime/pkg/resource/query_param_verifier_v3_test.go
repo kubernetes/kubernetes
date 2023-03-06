@@ -104,6 +104,16 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 			queryParam:       QueryParamFieldValidation,
 			expectedSupports: false,
 		},
+		"List GVK is specifically unsupported": {
+			crds: []schema.GroupKind{},
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "List",
+			},
+			queryParam:       QueryParamFieldValidation,
+			expectedSupports: false,
+		},
 	}
 
 	root := openapi3.NewRoot(cached.NewClient(openapitest.NewFileClient(t)))

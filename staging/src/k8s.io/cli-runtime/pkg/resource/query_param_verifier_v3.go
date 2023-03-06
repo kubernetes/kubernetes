@@ -57,6 +57,9 @@ var namespaceGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Name
 // or if another error occurred. If the Open API V3 spec for a CRD is not
 // found, then the spec for Namespace is checked for query param support instead.
 func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
+		return NewParamUnsupportedError(gvk, v.queryParam)
+	}
 	gvSpec, err := v.root.GVSpec(gvk.GroupVersion())
 	if err == nil {
 		if supports := supportsQueryParamV3(gvSpec, gvk, v.queryParam); supports {
