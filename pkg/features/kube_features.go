@@ -497,6 +497,7 @@ const (
 	// owner: @denkensk
 	// kep: https://kep.k8s.io/3243
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
@@ -989,7 +990,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
 
-	MatchLabelKeysInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
+	MatchLabelKeysInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
 
