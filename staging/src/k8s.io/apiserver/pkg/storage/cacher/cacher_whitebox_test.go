@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -101,6 +102,7 @@ func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
+	utilruntime.Must(example2v1.AddToScheme(scheme))
 }
 
 func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
@@ -1626,7 +1628,7 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 	// test data
 	newEtcdTestStorage := func(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 		server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, example.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, prefix, schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
+		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion, example2v1.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, prefix, schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
 		return server, storage
 	}
 	server, etcdStorage := newEtcdTestStorage(t, "")
@@ -1656,14 +1658,14 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 		require.NoError(t, err)
 		return out
 	}
-	makeReplicaSet := func(name string) *example.ReplicaSet {
-		return &example.ReplicaSet{
+	makeReplicaSet := func(name string) *example2v1.ReplicaSet {
+		return &example2v1.ReplicaSet{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
 		}
 	}
-	createReplicaSet := func(obj *example.ReplicaSet) *example.ReplicaSet {
+	createReplicaSet := func(obj *example2v1.ReplicaSet) *example2v1.ReplicaSet {
 		key := "replicasets/" + obj.Namespace + "/" + obj.Name
-		out := &example.ReplicaSet{}
+		out := &example2v1.ReplicaSet{}
 		err := etcdStorage.Create(context.TODO(), key, obj, out, 0)
 		require.NoError(t, err)
 		return out
