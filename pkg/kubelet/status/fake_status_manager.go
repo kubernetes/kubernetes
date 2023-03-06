@@ -68,6 +68,16 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
+func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+	klog.InfoS("GetContainerResourceAllocation()")
+	return m.state.GetContainerResourceAllocation(podUID, containerName)
+}
+
+func (m *fakeManager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
+	klog.InfoS("GetPodResizeStatus()")
+	return "", false
+}
+
 func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 	klog.InfoS("SetPodAllocation()")
 	for _, container := range pod.Spec.Containers {
