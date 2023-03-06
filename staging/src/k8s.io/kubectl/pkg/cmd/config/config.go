@@ -31,11 +31,7 @@ import (
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericclioptions.IOStreams) *cobra.Command {
-	if len(pathOptions.ExplicitFileFlag) == 0 {
-		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
-	}
-
+func NewCmdConfig(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "config SUBCOMMAND",
 		DisableFlagsInUseLine: true,
@@ -45,31 +41,31 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericclioptions.
 
 			The loading order follows these rules:
 
-			1. If the --`) + pathOptions.ExplicitFileFlag + i18n.T(` flag is set, then only that file is loaded. The flag may only be set once and no merging takes place.
-			2. If $`) + pathOptions.EnvVar + i18n.T(` environment variable is set, then it is used as a list of paths (normal path delimiting rules for your system). These paths are merged. When a value is modified, it is modified in the file that defines the stanza. When a value is created, it is created in the first file that exists. If no files in the chain exist, then it creates the last file in the list.
-			3. Otherwise, `) + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + i18n.T(` is used and no merging takes place.`)),
+			1. If the --`) + clientcmd.RecommendedConfigPathFlag + i18n.T(` flag is set, then only that file is loaded. The flag may only be set once and no merging takes place.
+			2. If $`) + clientcmd.RecommendedConfigPathEnvVar + i18n.T(` environment variable is set, then it is used as a list of paths (normal path delimiting rules for your system). These paths are merged. When a value is modified, it is modified in the file that defines the stanza. When a value is created, it is created in the first file that exists. If no files in the chain exist, then it creates the last file in the list.
+			3. Otherwise, `) + path.Join("${HOME}", clientcmd.RecommendedHomeDir, clientcmd.RecommendedFileName) + i18n.T(` is used and no merging takes place.`)),
 		Run: cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
-	// file paths are common to all sub commands
-	cmd.PersistentFlags().StringVar(&pathOptions.LoadingRules.ExplicitPath, pathOptions.ExplicitFileFlag, pathOptions.LoadingRules.ExplicitPath, "use a particular kubeconfig file")
+	// Just get the config access object so the add command lines look less ugly
+	configAccess := f.ToRawKubeConfigLoader().ConfigAccess()
 
 	// TODO(juanvallejo): update all subcommands to work with genericclioptions.IOStreams
-	cmd.AddCommand(NewCmdConfigView(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetCredentials(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSet(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigUnset(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigCurrentContext(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigUseContext(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigGetContexts(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigGetClusters(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigGetUsers(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, pathOptions))
-	cmd.AddCommand(NewCmdConfigDeleteUser(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigView(streams, configAccess))
+	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigSetCredentials(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigSet(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigUnset(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigCurrentContext(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigUseContext(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigGetContexts(streams, configAccess))
+	cmd.AddCommand(NewCmdConfigGetClusters(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigGetUsers(streams, configAccess))
+	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, configAccess))
+	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, configAccess))
+	cmd.AddCommand(NewCmdConfigDeleteUser(streams, configAccess))
+	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, configAccess))
 
 	return cmd
 }

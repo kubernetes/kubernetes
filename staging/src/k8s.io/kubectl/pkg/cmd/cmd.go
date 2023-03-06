@@ -29,7 +29,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/annotate"
@@ -85,6 +84,7 @@ import (
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
 type KubectlOptions struct {
+	KubercHandler kuberc.Handler
 	PluginHandler PluginHandler
 	Arguments     []string
 	ConfigFlags   *genericclioptions.ConfigFlags
@@ -96,7 +96,10 @@ var defaultConfigFlags = genericclioptions.NewConfigFlags(true).WithDeprecatedPa
 
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
+	// TODO: add something to check for --kuberc flag and override filepath
+	homeDir, _ := os.UserHomeDir()
 	return NewDefaultKubectlCommandWithArgs(KubectlOptions{
+		KubercHandler: kuberc.NewDefaultKubercHandler(homeDir + "/" + kuberc.DefaultKubercPath),
 		PluginHandler: NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes),
 		Arguments:     os.Args,
 		ConfigFlags:   defaultConfigFlags,
@@ -107,22 +110,6 @@ func NewDefaultKubectlCommand() *cobra.Command {
 // NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
 func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	cmd := NewKubectlCommand(o)
-
-	// If the alpha feature of kuberc is enabled then render new command
-	// args using the defined values in the kuberc config file, and
-	// overwrite the args stored in the KubectlOptions object.
-	if os.Getenv("ENABLE_KUBERC") != "" {
-		fmt.Fprintln(o.IOStreams.Out, "kuberc is enabled!")
-		renderedCmdArgs, err := kuberc.ComposeCmdArgs(o.IOStreams, o.Arguments[1:])
-		if err != nil {
-			fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		cmd.SetArgs(renderedCmdArgs)
-
-		fmt.Fprintf(o.IOStreams.Out, "redered arguments are: \n%v\n", renderedCmdArgs)
-	}
 
 	if o.PluginHandler == nil {
 		return cmd
@@ -340,6 +327,12 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags
 	}
+	if os.Getenv("ENABLE_KUBERC") != "" {
+		klog.Infoln("kuberc is enabled!")
+		if o.KubercHandler != nil {
+			o.KubercHandler.InjectOverridesRoot(kubeConfigFlags, o.Arguments)
+		}
+	}
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
@@ -449,7 +442,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), o.IOStreams))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(f, o.IOStreams))
 	cmds.AddCommand(plugin.NewCmdPlugin(o.IOStreams))
 	cmds.AddCommand(version.NewCmdVersion(f, o.IOStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
@@ -459,6 +452,38 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	// If the alpha feature of kuberc is enabled then render new command
+	// args using the defined values in the kuberc config file, and
+	// overwrite the args stored in the KubectlOptions object.
+	if os.Getenv("ENABLE_KUBERC") != "" {
+		if o.KubercHandler != nil {
+			// TODO: Determine how to protect against flags that can be supplied multiple times
+			// inheritence for flags is as follows, in ascending order of hierachy:
+			// 1 - user supplied (ie. passed from command line directly by user)
+			// 2 - from alias definition
+			// 3 - from overrides definition
+			//
+			// This is accomplished by injecting the overrides first, which will then be
+			// overwritten by the aliases, then finally by the user supplied flags in
+			// the subcommand functions.
+
+			// Get the current command being passed
+			// Note: can't use cmds.ArgsLenAtDash because it only looks for "--" and not
+			// "-", should probably try and make a PR for spf13/pflag to change that, should
+			// discuss with others to see if that makes sense.
+			var cmdArgs []string // all "non-flag" arguments
+			for _, arg := range o.Arguments[1:] {
+				if strings.HasPrefix(arg, "-") {
+					break
+				}
+				cmdArgs = append(cmdArgs, arg)
+			}
+			o.KubercHandler.InjectOverrides(cmds, cmdArgs)
+			o.KubercHandler.InjectAliases(cmds, cmdArgs)
+		}
+	}
+
 	return cmds
 }
 

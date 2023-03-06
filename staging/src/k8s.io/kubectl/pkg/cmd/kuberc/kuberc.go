@@ -17,17 +17,15 @@ limitations under the License.
 package kuberc
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
+	"reflect"
 	"strings"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/yaml"
+	"github.com/spf13/cobra"
 
-	"github.com/ohler55/ojg/jp"
-	"github.com/ohler55/ojg/oj"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 // Example kuberc.yaml file
@@ -35,34 +33,48 @@ import (
 //apiVersion: v1alpha1
 //kind: Preferences
 //command:
-//	aliases:
-//		getdbprod:
-//			command: get pods -l what=database --namespace us-2-production
-//	overrides:
-//		apply:
-//			flags:
-//				- name: server-side
-//				  default: "true"
-//		config:
-//			flags:
-//				- name: kubeconfig
-//				  default: "~/.kube/config"
-//			set:
-//				flags:
-//					- name: set-raw-bytes
-//					  default: ""
-//			view:
-//				flags:
-//					- name: raw
-//					  default: ""
-//		delete:
-//			flags:
-//				- name: confirm
-//				  default: "true"
-//		default:
-//			flags:
-//				- name: exec-auth-allowlist
-//				  default: /var/kubectl/exec/...
+//  aliases:
+//    dbprod:
+//      command: get pods
+//      flags:
+//        - -l what=database
+//        - --namespace us-2-production
+//    dbdev:
+//      command: get pods
+//      flags:
+//        - -l what=database
+//        - --namespace us-2-development
+//    raw:
+//      command: config view
+//      flags:
+//        - --raw
+//    nginx:
+//      command: run
+//      arguments:
+//        - nginx
+//      flags:
+//        - --image=nginx
+//        - --port=5701
+//  overrides:
+//    apply:
+//      flags:
+//        - --server-side=true
+//    config set:
+//      flags:
+//        - --set-raw-bytes
+//    config view:
+//      flags:
+//        - --output=json
+//    delete:
+//      flags:
+//        - --confirm=true
+//    default:
+//      flags:
+//        - --kubeconfig='/Users/marcuspuckett/.kube/config-test'
+//        - --namespace='test-ns'
+//        - --v=7
+
+const DefaultKubercPath = ".kube/kuberc"
 
 type Preferences struct {
 	Kind       string  `json:"kind,omitempty"`
@@ -72,144 +84,116 @@ type Preferences struct {
 
 type Command struct {
 	Aliases   map[string]Alias    `json:"aliases,omitempty"`
-	Overrides map[string]Override `json:"omitempty"`
+	Overrides map[string]Override `json:"overrides,omitempty"`
 }
 
 type Alias struct {
-	Command string           `json:"command,omitempty"`
-	Aliases map[string]Alias `json:"omitempty"`
+	Command string   `json:"command,omitempty"`
+	Flags   []string `json:"flags,omitempty"`
 }
 
 type Override struct {
-	Flags     []Flag              `json:"flags,omitempty"`
-	Overrides map[string]Override `json:"omitempty"`
+	Flags []string `json:"flags,omitempty"`
 }
 
-type Flag struct {
-	Name    string `json:"name"`
-	Default string `json:"default"`
+// Handler is responsible for injecting aliases for commands and
+// setting default flags arguments based on user's kuberc configuration.
+type Handler interface {
+	InjectAliases(rootCmd *cobra.Command, args []string)
+	InjectOverrides(rootCmd *cobra.Command, args []string)
+	InjectOverridesRoot(flags *genericclioptions.ConfigFlags, args []string)
 }
 
-// ComposeCmdArgs will rewrite the user provided command in place if there is
-// a definition in the kuberc file for either an alias or an override, then
-// supply the rewritten args back to the top level kubectl command to be
-// run as defined
-func ComposeCmdArgs(ioStreams genericclioptions.IOStreams, arguments []string) ([]string, error) {
-	var renderedCmd []string
-	// Figure out how many subcommands deep we're going before the flags start
-	var flagsStart int
-	for i, arg := range arguments {
-		if string(arg[0]) == "-" {
-			flagsStart = i
-			break
-		}
-	}
-	if flagsStart == 0 {
-		flagsStart = len(arguments)
-	}
+// DefaultKubercHandler implements AliasHandler
+type DefaultKubercHandler struct {
+	Command Command
+}
 
-	subcommands := arguments[:flagsStart]
-	userFlags := arguments[flagsStart:]
-
-	// Search for a --kuberc flag that will provide a non-default path to the
-	// kuberc file
-	kubercPath := filepath.Join(clientcmd.RecommendedConfigDir, "kuberc")
-	for i, flag := range userFlags {
-		if flag == "--kuberc" {
-			kubercPath = userFlags[i+1]
-
-			// remove the kuberc flag and value so it doesn't mess up argument parsing
-			userFlags = append(userFlags[:i], userFlags[i+2:]...)
-			break
-		}
-	}
-
+// NewDefaultKubercHandler instantiates the DefaultKubercHandler by reading the
+// kuberc file.
+func NewDefaultKubercHandler(kubercPath string) *DefaultKubercHandler {
 	kuberc, err := LoadKubeRC(kubercPath)
 	if err != nil {
-		return nil, err
+		return &DefaultKubercHandler{}
 	}
+	return &DefaultKubercHandler{
+		kuberc.Command,
+	}
+}
 
-	// Use jsonpath to look up nested fields in the kuberc yaml without a
-	// bunch of recursive functions
-	kubercYAML, err := oj.Parse(kuberc)
+func (h *DefaultKubercHandler) InjectAliases(rootCmd *cobra.Command, args []string) {
+	// Register all aliases
+	for alias, command := range h.Command.Aliases {
+		commands := strings.Split(command.Command, " ")
+		cmd, _, err := rootCmd.Find(commands)
+		if err != nil {
+			klog.Warningf("Command %q not found to set alias %q", commands, alias)
+			continue
+		}
+
+		// do not allow shadowing built-ins
+		if _, _, err := rootCmd.Find([]string{alias}); err == nil {
+			klog.Warningf("Setting alias %q to a built-in command is not supported", alias)
+			continue
+		}
+
+		// register alias
+		cmd.Aliases = append(cmd.Aliases, alias)
+
+		// inject alias flags if this is the command that is being targetted
+		// fullAliasCmdPath is the command path defined in kuberc minus the
+		// last command (which is being aliased) and the last arg of the cmdArgs
+		// (which is what the alias would be). The cmdArgs will also include
+		// kubectl so we will ignore the first entry in that array
+		//
+		// Example: kuberc defines alias "raw" for "config view" subcommand,
+		// the user thus will supply "kubectl config raw" on the command line
+		// so we take the command defined in the kuberc file and drop the last
+		// subcommand, which is view, and replace it with the alias defined in
+		// the kuberc file, giving us "kubectl config raw", then we check to
+		// see if that is equal to commands supplied by the user.
+		fullAliasCmdPath := append(commands[:len(commands)-1], alias)
+		if reflect.DeepEqual(fullAliasCmdPath, args[1:]) {
+			klog.V(2).Infof("using alias %q, adding flags...", alias)
+			cmd.Flags().Parse(command.Flags)
+		}
+	}
+}
+
+func (h *DefaultKubercHandler) InjectOverrides(rootCmd *cobra.Command, args []string) {
+	cmd, _, err := rootCmd.Find(args)
 	if err != nil {
-		return nil, err
+		klog.Warningf("could not find command %q", args)
+		return
 	}
-	aliasJsonPath := fmt.Sprintf("command.aliases.%s.command", strings.Join(subcommands, "."))
-	x, err := jp.ParseString(aliasJsonPath)
-	resultsAlias := x.Get(kubercYAML)
-
-	if resultsAlias != nil {
-		renderedCmd = strings.Split(resultsAlias[0].(string), " ")
-	} else {
-		renderedCmd = append(subcommands, userFlags...)
-	}
-
-	for i, arg := range renderedCmd {
-		if string(arg[0]) == "-" {
-			flagsStart = i
-			break
+	if flags, found := h.Command.Overrides[strings.Join(args, " ")]; found {
+		klog.V(2).Infof("adding default flags %q for command %q", flags.Flags, strings.Join(args, " "))
+		if err := cmd.Flags().Parse(flags.Flags); err != nil {
+			klog.Warningf("error parsing flags - %q", err)
 		}
 	}
+}
 
-	subcommands = renderedCmd[:flagsStart]
-	userFlags = renderedCmd[flagsStart:]
-
-	// Use jsonpath to look up nested fields in the kuberc yaml without a
-	// bunch of recursive functions
-	overridesJsonPath := fmt.Sprintf("command.overrides.%s.flags", strings.Join(subcommands, "."))
-	x, err = jp.ParseString(overridesJsonPath)
-	resultsOverride := x.Get(kubercYAML)
-
-	// Get all the flags used in the default command override and populate
-	// a new slice with them
-	var overrideFlags []string
-	for i := range resultsOverride {
-		// Get the name of the flag
-		overridesJsonPathFlagName := fmt.Sprintf("%s[%d].name", overridesJsonPath, i)
-		x, err = jp.ParseString(overridesJsonPathFlagName)
-		resultsOverride = x.Get(kubercYAML)
-
-		// Check if this is a short or long flag for proper use of dashes
-		if resultsOverride != nil && len(resultsOverride[0].(string)) == 1 {
-			overrideFlags = append(overrideFlags, "-"+resultsOverride[0].(string))
-		} else if resultsOverride != nil && len(resultsOverride[0].(string)) > 1 {
-			overrideFlags = append(overrideFlags, "--"+resultsOverride[0].(string))
-		}
-
-		// Add the default value for the flag override
-		overridesJsonPathDefault := fmt.Sprintf("%s[%d].default", overridesJsonPath, i)
-		x, err = jp.ParseString(overridesJsonPathDefault)
-		resultsOverride = x.Get(kubercYAML)
-		if resultsOverride != nil && resultsOverride[0].(string) != "" {
-			overrideFlags = append(overrideFlags, resultsOverride[0].(string))
-		}
+func (h *DefaultKubercHandler) InjectOverridesRoot(flags *genericclioptions.ConfigFlags, args []string) {
+	if kubercFlags, found := h.Command.Overrides["default"]; found {
+		klog.V(2).Infof("adding default flags %q", kubercFlags.Flags)
+		flags.OverwriteDefaultConfigFlags(kubercFlags.Flags, args)
 	}
-
-	fmt.Fprintf(ioStreams.Out, "override flags are %s\n", strings.Join(overrideFlags, " "))
-
-	// To follow the proper precidencing we must concatenate the slices
-	// in the order of subcommands -> kuberc specified override flags
-	// -> user supplied flags to ensure that any user supplied flags will
-	// be what is used in the event of collision.
-	finalFlags := append(overrideFlags, userFlags...)
-	renderedCmdStr := append(subcommands, finalFlags...)
-
-	return renderedCmdStr, nil
 }
 
 // LoadKubeRC reads kuberc file and stores the values in a Preferences struct
 // that is then returned
-func LoadKubeRC(path string) ([]byte, error) {
+func LoadKubeRC(path string) (Preferences, error) {
 	kubercBytes, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return Preferences{}, err
 	}
 
-	kuberc, err := yaml.YAMLToJSON(kubercBytes)
-	if err != nil {
-		return nil, err
+	var preferences Preferences
+	// TODO: (mpuckett159) This probably should be UnmarshalStrict but I'm not sure
+	if err := yaml.Unmarshal(kubercBytes, &preferences); err != nil {
+		klog.Warningf("error unmarshalling the yaml for kuberc")
 	}
 
-	return kuberc, nil
+	return preferences, nil
 }

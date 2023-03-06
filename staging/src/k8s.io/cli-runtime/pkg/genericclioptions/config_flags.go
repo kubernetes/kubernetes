@@ -37,11 +37,14 @@ import (
 )
 
 const (
+	flagKubeconfig         = "kubeconfig"
 	flagClusterName        = "cluster"
 	flagAuthInfoName       = "user"
 	flagContext            = "context"
 	flagNamespace          = "namespace"
+	shortFlagNamespace     = "n"
 	flagAPIServer          = "server"
+	shortFlagServer        = "s"
 	flagTLSServerName      = "tls-server-name"
 	flagInsecure           = "insecure-skip-tls-verify"
 	flagCertFile           = "client-certificate"
@@ -122,6 +125,137 @@ type ConfigFlags struct {
 	// Allows increasing qps used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryQPS float32
+}
+
+func parseName(str string) string {
+	if len(str) < 1 {
+		// just return an empty string if it's empty
+		return ""
+	}
+	if str[:2] == "--" {
+		return str[2:strings.Index(str, "=")]
+	} else if str[:1] == "-" {
+		return str[1:strings.Index(str, " ")]
+	} else {
+		return ""
+	}
+}
+
+func parseValEqualPtr(str string) *string {
+	val := str[strings.Index(str, "=")+1:]
+	val = val[1 : len(val)-1]
+	return &val
+}
+
+func parseValEqual(str string) string {
+	val := str[strings.Index(str, "=")+1:]
+	val = val[1 : len(val)-1]
+	return val
+}
+
+func parseValSpace(str string) string {
+	val := str[strings.Index(str, " ")+1:]
+	return val
+}
+
+// OverwriteDefaultConfigFlags returns ConfigFlags with default values set when no
+// arg is passed, and the set arg for any passed values. The intent of this is to
+// overwrite the default flags with new defaults from the kuberc config file
+func (f *ConfigFlags) OverwriteDefaultConfigFlags(flags []string, args []string) {
+	// lazy search for flags in user supplied args by just joining all args with a
+	// space, then doing a simple substring search using strings.Contains
+	argsStr := strings.Join(args, " ")
+	for _, flag := range flags {
+		flagName := parseName(flag)
+		switch flagName {
+		case flagKubeconfig:
+			if !strings.Contains(argsStr, "--"+flagKubeconfig) {
+				f.KubeConfig = parseValEqualPtr(flag)
+			}
+		case flagClusterName:
+			if !strings.Contains(argsStr, "--"+flagClusterName) {
+				f.ClusterName = parseValEqualPtr(flag)
+			}
+		case flagAuthInfoName:
+			if !strings.Contains(argsStr, "--"+flagAuthInfoName) {
+				f.AuthInfoName = parseValEqualPtr(flag)
+			}
+		case flagContext:
+			if !strings.Contains(argsStr, "--"+flagContext) {
+				f.Context = parseValEqualPtr(flag)
+			}
+		case flagNamespace:
+			if !strings.Contains(argsStr, "--"+flagNamespace) && !strings.Contains(argsStr, "-"+shortFlagNamespace) {
+				f.Namespace = parseValEqualPtr(flag)
+			}
+		case flagAPIServer:
+			if !strings.Contains(argsStr, "--"+flagAPIServer) && !strings.Contains(argsStr, "-"+shortFlagServer) {
+				f.APIServer = parseValEqualPtr(flag)
+			}
+		case flagTLSServerName:
+			if !strings.Contains(argsStr, "--"+flagTLSServerName) {
+				f.TLSServerName = parseValEqualPtr(flag)
+			}
+		case flagInsecure:
+			if !strings.Contains(argsStr, "--"+flagInsecure) {
+				insecureBool := parseValEqual(flag) == "true"
+				f.Insecure = &insecureBool
+			}
+		case flagCertFile:
+			if !strings.Contains(argsStr, "--"+flagCertFile) {
+				f.CertFile = parseValEqualPtr(flag)
+			}
+		case flagKeyFile:
+			if !strings.Contains(argsStr, "--"+flagKeyFile) {
+				f.KeyFile = parseValEqualPtr(flag)
+			}
+		case flagCAFile:
+			if !strings.Contains(argsStr, "--"+flagCAFile) {
+				f.CAFile = parseValEqualPtr(flag)
+			}
+		case flagBearerToken:
+			if !strings.Contains(argsStr, "--"+flagBearerToken) {
+				f.BearerToken = parseValEqualPtr(flag)
+			}
+		case flagImpersonate:
+			if !strings.Contains(argsStr, "--"+flagImpersonate) {
+				f.Impersonate = parseValEqualPtr(flag)
+			}
+		case flagImpersonateUID:
+			if !strings.Contains(argsStr, "--"+flagImpersonateUID) {
+				f.ImpersonateUID = parseValEqualPtr(flag)
+			}
+		case flagImpersonateGroup:
+			if !strings.Contains(argsStr, "--"+flagImpersonateGroup) {
+				var groups []string
+				for _, val := range strings.Split(parseValEqual(flag), ",") {
+					groups = append(groups, val)
+				}
+				f.ImpersonateGroup = &groups
+			}
+		case flagUsername:
+			if !strings.Contains(argsStr, "--"+flagUsername) {
+				f.Username = parseValEqualPtr(flag)
+			}
+		case flagPassword:
+			if !strings.Contains(argsStr, "--"+flagPassword) {
+				f.Password = parseValEqualPtr(flag)
+			}
+		case flagTimeout:
+			if !strings.Contains(argsStr, "--"+flagTimeout) {
+				f.Timeout = parseValEqualPtr(flag)
+			}
+		case flagCacheDir:
+			if !strings.Contains(argsStr, "--"+flagCacheDir) {
+				f.CacheDir = parseValEqualPtr(flag)
+			}
+		case flagDisableCompression:
+			if !strings.Contains(argsStr, "--"+flagCacheDir) {
+				disableCompressionBool := parseValEqual(flag) == "true"
+				f.DisableCompression = &disableCompressionBool
+			}
+		}
+	}
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -339,7 +473,7 @@ func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 // AddFlags binds client configuration flags to a given flagset
 func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.KubeConfig != nil {
-		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
+		flags.StringVar(f.KubeConfig, flagKubeconfig, *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
 	if f.CacheDir != nil {
 		flags.StringVar(f.CacheDir, flagCacheDir, *f.CacheDir, "Default cache directory")
