@@ -16,7 +16,7 @@ limitations under the License.
 
 package generators
 
-import "k8s.io/gengo/types"
+import "k8s.io/gengo/v2/types"
 
 var (
 	apiScheme                   = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
