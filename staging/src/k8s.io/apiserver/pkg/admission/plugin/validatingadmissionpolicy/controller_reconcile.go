@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,6 +173,12 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		c.definitionInfo[nn] = info
 		// TODO(DangerOnTheRanger): add support for "warn" being a valid enforcementAction
 		celmetrics.Metrics.ObserveDefinition(context.TODO(), "active", "deny")
+	}
+
+	// Skip reconcile if the spec of the definition is unchanged
+	if info.lastReconciledValue != nil && definition != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, definition.Spec) {
+		return nil
 	}
 
 	var paramSource *v1alpha1.ParamKind
@@ -358,6 +365,12 @@ func (c *policyController) reconcilePolicyBinding(namespace, name string, bindin
 	if !ok {
 		info = &bindingInfo{}
 		c.bindingInfos[nn] = info
+	}
+
+	// Skip if the spec of the binding is unchanged.
+	if info.lastReconciledValue != nil && binding != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, binding.Spec) {
+		return nil
 	}
 
 	var oldNamespacedDefinitionName namespacedName
