@@ -17,12 +17,18 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 
 	corev1 "k8s.io/api/core/v1"
@@ -81,7 +87,7 @@ func TestCompile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var c filterCompiler
-			e := c.Compile(tc.validation, false)
+			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false})
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -144,6 +150,7 @@ func TestFilter(t *testing.T) {
 		validations  []ExpressionAccessor
 		results      []EvaluationResult
 		hasParamKind bool
+		authorizer   authorizer.Authorizer
 	}{
 		{
 			name: "valid syntax for object",
@@ -417,12 +424,204 @@ func TestFilter(t *testing.T) {
 			hasParamKind: true,
 			params:       runtime.Object(nilUnstructured),
 		},
+		{
+			name: "test authorizer allow resource check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				Resource:        "endpoints",
+				Verb:            "create",
+				APIVersion:      "*",
+			}),
+		},
+		{
+			name: "test authorizer allow resource check with all fields",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "apps",
+				Resource:        "deployments",
+				Subresource:     "status",
+				Namespace:       "test",
+				Name:            "backend",
+				Verb:            "create",
+				APIVersion:      "*",
+			}),
+		},
+		{
+			name: "test authorizer not allowed resource check one incorrect field",
+			validations: []ExpressionAccessor{
+				&condition{
+
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "apps",
+				Resource:        "deployments-xxxx",
+				Subresource:     "status",
+				Namespace:       "test",
+				Name:            "backend",
+				Verb:            "create",
+				APIVersion:      "*",
+			}),
+		},
+		{
+			name: "test authorizer reason",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').reason() == 'fake reason'",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: denyAll,
+		},
+		{
+			name: "test authorizer allow path check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.path('/healthz').check('get').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				Path: "/healthz",
+				Verb: "get",
+			}),
+		},
+		{
+			name: "test authorizer decision is denied path check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.path('/healthz').check('get').allowed() == false",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: denyAll,
+		},
+		{
+			name: "test request resource authorizer allow check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.requestResource.check('custom-verb').allowed()",
+				},
+			},
+			attributes: endpointCreateAttributes(),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "",
+				Resource:        "endpoints",
+				Subresource:     "",
+				Namespace:       "default",
+				Name:            "endpoints1",
+				Verb:            "custom-verb",
+				APIVersion:      "*",
+			}),
+		},
+		{
+			name: "test subresource request resource authorizer allow check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.requestResource.check('custom-verb').allowed()",
+				},
+			},
+			attributes: endpointStatusUpdateAttributes(),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "",
+				Resource:        "endpoints",
+				Subresource:     "status",
+				Namespace:       "default",
+				Name:            "endpoints1",
+				Verb:            "custom-verb",
+				APIVersion:      "*",
+			}),
+		},
+		{
+			name: "test serviceAccount authorizer allow check",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.serviceAccount('default', 'test-serviceaccount').group('').resource('endpoints').namespace('default').name('endpoints1').check('custom-verb').allowed()",
+				},
+			},
+			attributes: endpointCreateAttributes(),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "system:serviceaccount:default:test-serviceaccount",
+					Groups: []string{"system:serviceaccounts", "system:serviceaccounts:default"},
+				},
+				ResourceRequest: true,
+				APIGroup:        "",
+				Resource:        "endpoints",
+				Namespace:       "default",
+				Name:            "endpoints1",
+				Verb:            "custom-verb",
+				APIVersion:      "*",
+			}),
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := filterCompiler{}
-			f := c.Compile(tc.validations, tc.hasParamKind)
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil})
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -435,7 +634,8 @@ func TestFilter(t *testing.T) {
 				t.Fatalf("unexpected error on conversion: %v", err)
 			}
 
-			evalResults, err := f.ForInput(versionedAttr, tc.params, CreateAdmissionRequest(versionedAttr.Attributes))
+			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
+			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -581,4 +781,75 @@ func TestCompilationErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+var denyAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "fake reason", err: nil}}
+
+func newAuthzAllowMatch(match authorizer.AttributesRecord) fakeAuthorizer {
+	return fakeAuthorizer{
+		match: &authorizerMatch{
+			match:            match,
+			authorizerResult: authorizerResult{decision: authorizer.DecisionAllow, reason: "", err: nil},
+		},
+		defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "", err: nil},
+	}
+}
+
+type fakeAuthorizer struct {
+	match         *authorizerMatch
+	defaultResult authorizerResult
+}
+
+type authorizerResult struct {
+	decision authorizer.Decision
+	reason   string
+	err      error
+}
+
+type authorizerMatch struct {
+	authorizerResult
+	match authorizer.AttributesRecord
+}
+
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	if f.match != nil {
+		other, ok := a.(*authorizer.AttributesRecord)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type: %T", a))
+		}
+		if reflect.DeepEqual(f.match.match, *other) {
+			return f.match.decision, f.match.reason, f.match.err
+		}
+	}
+	return f.defaultResult.decision, f.defaultResult.reason, f.defaultResult.err
+}
+
+func endpointCreateAttributes() admission.Attributes {
+	name := "endpoints1"
+	namespace := "default"
+	var object, oldObject runtime.Object
+	object = &corev1.Endpoints{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},
+			},
+		},
+	}
+	gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}
+	return admission.NewAttributesRecord(object, oldObject, gvk, namespace, name, gvr, "", admission.Create, &metav1.CreateOptions{}, false, nil)
+}
+
+func endpointStatusUpdateAttributes() admission.Attributes {
+	attrs := endpointCreateAttributes()
+	return admission.NewAttributesRecord(
+		attrs.GetObject(), attrs.GetObject(), attrs.GetKind(), attrs.GetNamespace(), attrs.GetName(),
+		attrs.GetResource(), "status", admission.Update, &metav1.UpdateOptions{}, false, nil)
 }

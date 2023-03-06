@@ -18,28 +18,31 @@ package validatingadmissionpolicy
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
 
 	celtypes "github.com/google/cel-go/common/types"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // validator implements the Validator interface
 type validator struct {
 	filter     cel.Filter
 	failPolicy *v1.FailurePolicyType
+	authorizer authorizer.Authorizer
 }
 
-func NewValidator(filter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
+func NewValidator(filter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
 	return &validator{
 		filter:     filter,
 		failPolicy: failPolicy,
+		authorizer: authorizer,
 	}
 }
 
@@ -59,7 +62,8 @@ func (v *validator) Validate(versionedAttr *generic.VersionedAttributes, version
 		f = *v.failPolicy
 	}
 
-	evalResults, err := v.filter.ForInput(versionedAttr, versionedParams, cel.CreateAdmissionRequest(versionedAttr.Attributes))
+	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}
+	evalResults, err := v.filter.ForInput(versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars)
 	if err != nil {
 		return []PolicyDecision{
 			{

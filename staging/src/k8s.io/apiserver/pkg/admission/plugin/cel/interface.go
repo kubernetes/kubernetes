@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 var _ ExpressionAccessor = &MatchCondition{}
@@ -49,19 +50,41 @@ func (v *MatchCondition) GetExpression() string {
 	return v.Expression
 }
 
+// OptionalVariableDeclarations declares which optional CEL variables
+// are declared for an expression.
+type OptionalVariableDeclarations struct {
+	// HasParams specifies if the "params" variable is declared.
+	// The "params" variable may still be bound to "null" when declared.
+	HasParams bool
+	// HasAuthorizer specifies if the"authorizer" and "authorizer.requestResource"
+	// variables are declared. When declared, the authorizer variables are
+	// expected to be non-null.
+	HasAuthorizer bool
+}
+
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
 type FilterCompiler interface {
 	// Compile is used for the cel expression compilation
-	Compile(expressions []ExpressionAccessor, hasParam bool) Filter
+	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations) Filter
+}
+
+// OptionalVariableBindings provides expression bindings for optional CEL variables.
+type OptionalVariableBindings struct {
+	// VersionedParams provides the "params" variable binding. This variable binding may
+	// be set to nil even when OptionalVariableDeclarations.HashParams is set to true.
+	VersionedParams runtime.Object
+	// Authorizer provides the authorizer used for the "authorizer" and
+	// "authorizer.requestResource" variable bindings. If the expression was compiled with
+	// OptionalVariableDeclarations.HasAuthorizer set to true this must be non-nil.
+	Authorizer authorizer.Authorizer
 }
 
 // Filter contains a function to evaluate compiled CEL-typed values
 // It expects the inbound object to already have been converted to the version expected
 // by the underlying CEL code (which is indicated by the match criteria of a policy definition).
-// versionedParams may be nil.
 type Filter interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed values
-	ForInput(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, request *v1.AdmissionRequest) ([]EvaluationResult, error)
+	ForInput(versionedAttr *generic.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings) ([]EvaluationResult, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error

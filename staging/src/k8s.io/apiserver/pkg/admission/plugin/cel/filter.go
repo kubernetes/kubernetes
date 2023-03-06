@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // filterCompiler implement the interface FilterCompiler.
@@ -42,7 +43,7 @@ func NewFilterCompiler() FilterCompiler {
 }
 
 type evaluationActivation struct {
-	object, oldObject, params, request interface{}
+	object, oldObject, params, request, authorizer, requestResourceAuthorizer interface{}
 }
 
 // ResolveName returns a value from the activation by qualified name, or false if the name
@@ -54,9 +55,13 @@ func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
 	case OldObjectVarName:
 		return a.oldObject, true
 	case ParamsVarName:
-		return a.params, true
+		return a.params, true // params may be null
 	case RequestVarName:
 		return a.request, true
+	case AuthorizerVarName:
+		return a.authorizer, a.authorizer != nil
+	case RequestResourceAuthorizerVarName:
+		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
 	default:
 		return nil, false
 	}
@@ -69,13 +74,13 @@ func (a *evaluationActivation) Parent() interpreter.Activation {
 }
 
 // Compile compiles the cel expressions defined in the ExpressionAccessors into a Filter
-func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, hasParam bool) Filter {
+func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations) Filter {
 	if len(expressionAccessors) == 0 {
 		return nil
 	}
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
-		compilationResults[i] = CompileCELExpression(expressionAccessor, hasParam)
+		compilationResults[i] = CompileCELExpression(expressionAccessor, options)
 	}
 	return NewFilter(compilationResults)
 }
@@ -113,9 +118,9 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	return v.Object, nil
 }
 
-// Evaluate evaluates the compiled CEL expressions converting them into CELEvaluations
+// ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
-func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, request *admissionv1.AdmissionRequest) ([]EvaluationResult, error) {
+func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings) ([]EvaluationResult, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
@@ -128,9 +133,17 @@ func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, versionedP
 	if err != nil {
 		return nil, err
 	}
-	paramsVal, err := objectToResolveVal(versionedParams)
-	if err != nil {
-		return nil, err
+	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
+	if inputs.VersionedParams != nil {
+		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if inputs.Authorizer != nil {
+		authorizerVal = library.NewAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer)
+		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
 	requestVal, err := convertObjectToUnstructured(request)
@@ -138,10 +151,12 @@ func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, versionedP
 		return nil, err
 	}
 	va := &evaluationActivation{
-		object:    objectVal,
-		oldObject: oldObjectVal,
-		params:    paramsVal,
-		request:   requestVal.Object,
+		object:                    objectVal,
+		oldObject:                 oldObjectVal,
+		params:                    paramsVal,
+		request:                   requestVal.Object,
+		authorizer:                authorizerVal,
+		requestResourceAuthorizer: requestResourceAuthorizerVal,
 	}
 
 	for i, compilationResult := range f.compilationResults {
