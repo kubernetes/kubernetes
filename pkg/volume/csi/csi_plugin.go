@@ -226,7 +226,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return true
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+			return true
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
