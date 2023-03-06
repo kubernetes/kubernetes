@@ -58282,6 +58282,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"enableSystemLogQuery": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enableSystemLogQuery enables the node log query feature on the /logs endpoint. EnableSystemLogHandler has to be enabled in addition for this feature to work. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"shutdownGracePeriod": {
 						SchemaProps: spec.SchemaProps{
 							Description: "shutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown. Default: \"0s\"",

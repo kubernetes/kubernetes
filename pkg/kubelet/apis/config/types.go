@@ -393,6 +393,11 @@ type KubeletConfiguration struct {
 	Logging logsapi.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
+	// EnableSystemLogQuery enables the node log query feature on the /logs endpoint.
+	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
+	// +featureGate=NodeLogQuery
+	// +optional
+	EnableSystemLogQuery bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
 	// Defaults to 0 seconds.
 	// +featureGate=GracefulNodeShutdown
