@@ -199,38 +199,17 @@ type prepare struct {
 }
 
 func BenchmarkHaveAllNodes(b *testing.B) {
-	tests := []*struct {
-		name      string
-		nodeNames []string
-		nodes     []*v1.Node
-		nodeCount int
-	}{
-		{
-			name:      "have-nodes-10",
-			nodeCount: 10,
-		},
-		{
-			name:      "have-nodes-50",
-			nodeCount: 50,
-		},
-		{
-			name:      "have-nodes-100",
-			nodeCount: 100,
-		},
-		{
-			name:      "have-nodes-500",
-			nodeCount: 500,
-		},
-	}
-	for _, test := range tests {
-		for i := test.nodeCount; i > 0; i-- {
-			test.nodeNames = append(test.nodeNames, "worker-"+strconv.Itoa(i))
-			test.nodes = append(test.nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
+	for nodeCount := 10; nodeCount < 200; nodeCount += 10 {
+		var nodeNames []string
+		var nodes []*v1.Node
+		for i := nodeCount; i > 0; i-- {
+			nodeNames = append(nodeNames, "worker-"+strconv.Itoa(i))
+			nodes = append(nodes, &st.MakeNode().Name("worker-"+strconv.Itoa(i)).Node)
 		}
 		b.ResetTimer()
-		b.Run(test.name, func(b *testing.B) {
+		b.Run(fmt.Sprintf("have-nodes-%d", nodeCount), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				haveAllNodes(test.nodeNames, test.nodes)
+				haveAllNodes(nodeNames, nodes)
 			}
 		})
 	}
