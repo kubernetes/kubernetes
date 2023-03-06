@@ -87,10 +87,15 @@ func updateImageAllowList(ctx context.Context) {
 	} else {
 		e2epod.ImagePrePullList.Insert(gpuDevicePluginImage)
 	}
-	if samplePluginImage, err := getSampleDevicePluginImage(); err != nil {
+	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImage)
+	}
+	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginControlRegistrationDSYAML); err != nil {
+		klog.Errorln(err)
+	} else {
+		e2epod.ImagePrePullList.Insert(samplePluginImageCtrlReg)
 	}
 }
 
@@ -222,19 +227,19 @@ func getGPUDevicePluginImage(ctx context.Context) (string, error) {
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
-func getSampleDevicePluginImage() (string, error) {
-	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
+func getContainerImageFromE2ETestDaemonset(dsYamlPath string) (string, error) {
+	data, err := e2etestfiles.Read(dsYamlPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the sample plugin yaml: %w", err)
+		return "", fmt.Errorf("failed to read the daemonset yaml: %w", err)
 	}
 
 	ds, err := e2emanifest.DaemonSetFromData(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse daemon set for sample plugin: %w", err)
+		return "", fmt.Errorf("failed to parse daemonset yaml: %w", err)
 	}
 
 	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		return "", fmt.Errorf("failed to parse the sample plugin image: cannot extract the container from YAML")
+		return "", fmt.Errorf("failed to parse the container image: cannot extract the container from YAML")
 	}
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
