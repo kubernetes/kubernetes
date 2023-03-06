@@ -126,6 +126,12 @@
         "reason": "reasonValue"
       }
     ],
-    "failurePolicy": "failurePolicyValue"
+    "failurePolicy": "failurePolicyValue",
+    "auditAnnotations": [
+      {
+        "key": "keyValue",
+        "valueExpression": "valueExpressionValue"
+      }
+    ]
   }
 }
