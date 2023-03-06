@@ -617,6 +617,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			skipPlugins.Insert(pl.Name())
 			continue
 		}
+		metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), preFilter, f.profileName).Inc()
 		if !s.IsSuccess() {
 			s.SetFailedPlugin(pl.Name())
 			if s.IsUnschedulable() {
@@ -734,6 +735,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 		if state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
+		metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), Filter, f.profileName).Inc()
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
