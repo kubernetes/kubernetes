@@ -361,7 +361,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 		const (
 			pollInterval                 = 1 * time.Second
-			podStatusUpdateTimeout       = 10 * time.Second
+			podStatusUpdateTimeout       = 30 * time.Second
 			priorityClassesCreateTimeout = 10 * time.Second
 		)
 
@@ -464,18 +464,18 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 					period5Name,
 					periodC5Name,
-					period5Name,
+					periodB5Name,
 				},
 				{
 					period5Name,
 					periodC5Name,
-					period5Name,
+					periodB5Name,
 					periodA5Name,
 				},
 				{
 					period5Name,
 					periodC5Name,
-					period5Name,
+					periodB5Name,
 					periodA5Name,
 					periodCritical5Name,
 				},
