@@ -223,11 +223,26 @@ func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars Op
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	if ast.OutputType() != cel.BoolType {
+	found := false
+	returnTypes := expressionAccessor.ReturnTypes()
+	for _, returnType := range returnTypes {
+		if ast.OutputType() == returnType {
+			found = true
+			break
+		}
+	}
+	if !found {
+		var reason string
+		if len(returnTypes) == 1 {
+			reason = fmt.Sprintf("must evaluate to %v", returnTypes[0].String())
+		} else {
+			reason = fmt.Sprintf("must evaluate to one of %v", returnTypes)
+		}
+
 		return CompilationResult{
 			Error: &apiservercel.Error{
 				Type:   apiservercel.ErrorTypeInvalid,
-				Detail: "cel expression must evaluate to a bool",
+				Detail: reason,
 			},
 			ExpressionAccessor: expressionAccessor,
 		}
