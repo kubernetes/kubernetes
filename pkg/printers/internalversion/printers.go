@@ -638,13 +638,13 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplate)
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplateList)
 
-	podSchedulingColumnDefinitions := []metav1.TableColumnDefinition{
+	podSchedulingCtxColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha2.PodSchedulingSpec{}.SwaggerDoc()["selectedNode"]},
+		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha2.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodScheduling)
-	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodSchedulingList)
+	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
+	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
 }
 
 // Pass ports=nil for all ports.
@@ -2870,7 +2870,7 @@ func printResourceClaimTemplateList(list *resource.ResourceClaimTemplateList, op
 	return rows, nil
 }
 
-func printPodScheduling(obj *resource.PodScheduling, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printPodSchedulingContext(obj *resource.PodSchedulingContext, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -2879,10 +2879,10 @@ func printPodScheduling(obj *resource.PodScheduling, options printers.GenerateOp
 	return []metav1.TableRow{row}, nil
 }
 
-func printPodSchedulingList(list *resource.PodSchedulingList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printPodSchedulingContextList(list *resource.PodSchedulingContextList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printPodScheduling(&list.Items[i], options)
+		r, err := printPodSchedulingContext(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

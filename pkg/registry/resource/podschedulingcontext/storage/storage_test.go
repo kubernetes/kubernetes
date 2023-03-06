@@ -41,7 +41,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "podschedulings",
+		ResourcePrefix:          "podschedulingcontexts",
 	}
 	podSchedulingStorage, statusStorage, err := NewREST(restOptions)
 	if err != nil {
@@ -50,18 +50,18 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 	return podSchedulingStorage, statusStorage, server
 }
 
-func validNewPodScheduling(name, ns string) *resource.PodScheduling {
-	scheduling := &resource.PodScheduling{
+func validNewPodSchedulingContexts(name, ns string) *resource.PodSchedulingContext {
+	schedulingCtx := &resource.PodSchedulingContext{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: resource.PodSchedulingSpec{
+		Spec: resource.PodSchedulingContextSpec{
 			SelectedNode: "worker",
 		},
-		Status: resource.PodSchedulingStatus{},
+		Status: resource.PodSchedulingContextStatus{},
 	}
-	return scheduling
+	return schedulingCtx
 }
 
 func TestCreate(t *testing.T) {
@@ -69,13 +69,13 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	scheduling := validNewPodScheduling("foo", metav1.NamespaceDefault)
-	scheduling.ObjectMeta = metav1.ObjectMeta{}
+	schedulingCtx := validNewPodSchedulingContexts("foo", metav1.NamespaceDefault)
+	schedulingCtx.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		scheduling,
+		schedulingCtx,
 		// invalid
-		&resource.PodScheduling{
+		&resource.PodSchedulingContext{
 			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
@@ -88,10 +88,10 @@ func TestUpdate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
-		validNewPodScheduling("foo", metav1.NamespaceDefault),
+		validNewPodSchedulingContexts("foo", metav1.NamespaceDefault),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*resource.PodScheduling)
+			object := obj.(*resource.PodSchedulingContext)
 			if object.Labels == nil {
 				object.Labels = map[string]string{}
 			}
@@ -106,7 +106,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
-	test.TestDelete(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestDelete(validNewPodSchedulingContexts("foo", metav1.NamespaceDefault))
 }
 
 func TestGet(t *testing.T) {
@@ -114,7 +114,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	test.TestGet(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestGet(validNewPodSchedulingContexts("foo", metav1.NamespaceDefault))
 }
 
 func TestList(t *testing.T) {
@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	test.TestList(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestList(validNewPodSchedulingContexts("foo", metav1.NamespaceDefault))
 }
 
 func TestWatch(t *testing.T) {
@@ -131,7 +131,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewPodScheduling("foo", metav1.NamespaceDefault),
+		validNewPodSchedulingContexts("foo", metav1.NamespaceDefault),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -156,19 +156,19 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
-	schedulingStart := validNewPodScheduling("foo", metav1.NamespaceDefault)
+	schedulingStart := validNewPodSchedulingContexts("foo", metav1.NamespaceDefault)
 	err := storage.Storage.Create(ctx, key, schedulingStart, nil, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	scheduling := schedulingStart.DeepCopy()
-	scheduling.Status.ResourceClaims = append(scheduling.Status.ResourceClaims,
+	schedulingCtx := schedulingStart.DeepCopy()
+	schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
 		resource.ResourceClaimSchedulingStatus{
 			Name: "my-claim",
 		},
 	)
-	_, _, err = statusStorage.Update(ctx, scheduling.Name, rest.DefaultUpdatedObjectInfo(scheduling), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(ctx, schedulingCtx.Name, rest.DefaultUpdatedObjectInfo(schedulingCtx), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -176,9 +176,9 @@ func TestUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	schedulingOut := obj.(*resource.PodScheduling)
+	schedulingOut := obj.(*resource.PodSchedulingContext)
 	// only compare relevant changes b/c of difference in metadata
-	if !apiequality.Semantic.DeepEqual(scheduling.Status, schedulingOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(scheduling.Status, schedulingOut.Status))
+	if !apiequality.Semantic.DeepEqual(schedulingCtx.Status, schedulingOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(schedulingCtx.Status, schedulingOut.Status))
 	}
 }

@@ -173,27 +173,27 @@ type ResourceClaimList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodScheduling objects hold information that is needed to schedule
+// PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
 // mode.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
-type PodScheduling struct {
+type PodSchedulingContext struct {
 	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec describes where resources for the Pod are needed.
-	Spec PodSchedulingSpec
+	Spec PodSchedulingContextSpec
 
 	// Status describes where resources for the Pod can be allocated.
-	Status PodSchedulingStatus
+	Status PodSchedulingContextStatus
 }
 
-// PodSchedulingSpec describes where resources for the Pod are needed.
-type PodSchedulingSpec struct {
+// PodSchedulingContextSpec describes where resources for the Pod are needed.
+type PodSchedulingContextSpec struct {
 	// SelectedNode is the node for which allocation of ResourceClaims that
 	// are referenced by the Pod and that use "WaitForFirstConsumer"
 	// allocation is to be attempted.
@@ -209,8 +209,8 @@ type PodSchedulingSpec struct {
 	PotentialNodes []string
 }
 
-// PodSchedulingStatus describes where resources for the Pod can be allocated.
-type PodSchedulingStatus struct {
+// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
+type PodSchedulingContextStatus struct {
 	// ResourceClaims describes resource availability for each
 	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
 	// uses "WaitForFirstConsumer" allocation mode.
@@ -239,21 +239,21 @@ type ResourceClaimSchedulingStatus struct {
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the
-// node lists that are stored in PodScheduling objects. This limit is part
+// node lists that are stored in PodSchedulingContext objects. This limit is part
 // of the API.
 const PodSchedulingNodeListMaxSize = 128
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodSchedulingList is a collection of Pod scheduling objects.
-type PodSchedulingList struct {
+// PodSchedulingContextList is a collection of Pod scheduling objects.
+type PodSchedulingContextList struct {
 	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta
 
-	// Items is the list of PodScheduling objects.
-	Items []PodScheduling
+	// Items is the list of PodSchedulingContext objects.
+	Items []PodSchedulingContext
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

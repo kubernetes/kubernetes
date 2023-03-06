@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podscheduling
+package podschedulingcontext
 
 import (
 	"testing"
@@ -24,31 +24,31 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-var podScheduling = &resource.PodScheduling{
+var schedulingCtx = &resource.PodSchedulingContext{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-pod",
 		Namespace: "default",
 	},
-	Spec: resource.PodSchedulingSpec{
+	Spec: resource.PodSchedulingContextSpec{
 		SelectedNode: "worker",
 	},
 }
 
 func TestPodSchedulingStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
-		t.Errorf("PodScheduling must be namespace scoped")
+		t.Errorf("PodSchedulingContext must be namespace scoped")
 	}
 	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("PodScheduling should not allow create on update")
+		t.Errorf("PodSchedulingContext should not allow create on update")
 	}
 }
 
 func TestPodSchedulingStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	podScheduling := podScheduling.DeepCopy()
+	schedulingCtx := schedulingCtx.DeepCopy()
 
-	Strategy.PrepareForCreate(ctx, podScheduling)
-	errs := Strategy.Validate(ctx, podScheduling)
+	Strategy.PrepareForCreate(ctx, schedulingCtx)
+	errs := Strategy.Validate(ctx, schedulingCtx)
 	if len(errs) != 0 {
 		t.Errorf("unexpected error validating for create %v", errs)
 	}
@@ -57,12 +57,12 @@ func TestPodSchedulingStrategyCreate(t *testing.T) {
 func TestPodSchedulingStrategyUpdate(t *testing.T) {
 	t.Run("no-changes-okay", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
-		podScheduling := podScheduling.DeepCopy()
-		newPodScheduling := podScheduling.DeepCopy()
-		newPodScheduling.ResourceVersion = "4"
+		schedulingCtx := schedulingCtx.DeepCopy()
+		newSchedulingCtx := schedulingCtx.DeepCopy()
+		newSchedulingCtx.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newPodScheduling, podScheduling)
-		errs := Strategy.ValidateUpdate(ctx, newPodScheduling, podScheduling)
+		Strategy.PrepareForUpdate(ctx, newSchedulingCtx, schedulingCtx)
+		errs := Strategy.ValidateUpdate(ctx, newSchedulingCtx, schedulingCtx)
 		if len(errs) != 0 {
 			t.Errorf("unexpected validation errors: %v", errs)
 		}
@@ -70,13 +70,13 @@ func TestPodSchedulingStrategyUpdate(t *testing.T) {
 
 	t.Run("name-change-not-allowed", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
-		podScheduling := podScheduling.DeepCopy()
-		newPodScheduling := podScheduling.DeepCopy()
-		newPodScheduling.Name = "valid-claim-2"
-		newPodScheduling.ResourceVersion = "4"
+		schedulingCtx := schedulingCtx.DeepCopy()
+		newSchedulingCtx := schedulingCtx.DeepCopy()
+		newSchedulingCtx.Name = "valid-claim-2"
+		newSchedulingCtx.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newPodScheduling, podScheduling)
-		errs := Strategy.ValidateUpdate(ctx, newPodScheduling, podScheduling)
+		Strategy.PrepareForUpdate(ctx, newSchedulingCtx, schedulingCtx)
+		errs := Strategy.ValidateUpdate(ctx, newSchedulingCtx, schedulingCtx)
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
 		}

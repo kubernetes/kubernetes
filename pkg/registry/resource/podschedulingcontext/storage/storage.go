@@ -28,54 +28,54 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/resource/podscheduling"
+	"k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-// REST implements a RESTStorage for PodSchedulings.
+// REST implements a RESTStorage for PodSchedulingContext.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against PodSchedulings.
+// NewREST returns a RESTStorage object that will work against PodSchedulingContext.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &resource.PodScheduling{} },
-		NewListFunc:               func() runtime.Object { return &resource.PodSchedulingList{} },
-		PredicateFunc:             podscheduling.Match,
-		DefaultQualifiedResource:  resource.Resource("podschedulings"),
-		SingularQualifiedResource: resource.Resource("podscheduling"),
+		NewFunc:                   func() runtime.Object { return &resource.PodSchedulingContext{} },
+		NewListFunc:               func() runtime.Object { return &resource.PodSchedulingContextList{} },
+		PredicateFunc:             podschedulingcontext.Match,
+		DefaultQualifiedResource:  resource.Resource("podschedulingcontexts"),
+		SingularQualifiedResource: resource.Resource("podschedulingcontext"),
 
-		CreateStrategy:      podscheduling.Strategy,
-		UpdateStrategy:      podscheduling.Strategy,
-		DeleteStrategy:      podscheduling.Strategy,
+		CreateStrategy:      podschedulingcontext.Strategy,
+		UpdateStrategy:      podschedulingcontext.Strategy,
+		DeleteStrategy:      podschedulingcontext.Strategy,
 		ReturnDeletedObject: true,
-		ResetFieldsStrategy: podscheduling.Strategy,
+		ResetFieldsStrategy: podschedulingcontext.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: podscheduling.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: podschedulingcontext.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = podscheduling.StatusStrategy
-	statusStore.ResetFieldsStrategy = podscheduling.StatusStrategy
+	statusStore.UpdateStrategy = podschedulingcontext.StatusStrategy
+	statusStore.ResetFieldsStrategy = podschedulingcontext.StatusStrategy
 
 	rest := &REST{store}
 
 	return rest, &StatusREST{store: &statusStore}, nil
 }
 
-// StatusREST implements the REST endpoint for changing the status of a PodScheduling.
+// StatusREST implements the REST endpoint for changing the status of a PodSchedulingContext.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
-// New creates a new PodScheduling object.
+// New creates a new PodSchedulingContext object.
 func (r *StatusREST) New() runtime.Object {
-	return &resource.PodScheduling{}
+	return &resource.PodSchedulingContext{}
 }
 
 func (r *StatusREST) Destroy() {
