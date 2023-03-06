@@ -413,25 +413,99 @@ After the initial bump as described above it is possible to update
 to newer released version using `git merge`. To do that follow these steps:
 
 
-1. Verify upstream changes:
+1. Fetch latest upstream changes:
+```
+git fetch upstream
+```
+   where `upstream` points at https://github.com/kubernetes/kubernetes/, and check
+   the incoming changes:
 ```
 git log v1.25.0..v1.25.2 --ancestry-path --reverse --no-merges
 ```
-2. Revert any commits that were merged into kubernetes between previous update and current one.
-3. `git merge <new_version>`, example `git merge v1.25.2`.
-   Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
-   coming from newer versions. Manually verify them, and in most cases pick the
-   newer versions of deps. This will be properly update when re-running
-   `hack/update-vendor.sh` in the next step.
-4. Update `go.mod` dependencies to point to correct release versions.
-   NOTE: When editing `go.mod` manually you'll need to run `go mod tidy`.
-5. Update openshift dependencies and re-run `hack/update-vendor.sh`.
-6. Update kubernetes version in `openshift-hack/images/hyperkube/Dockerfile.rhel`.
-7. Run `make update` see [Updating generated files](#updating-generated-files).
-   NOTE: Starting from 4.10, there's a problem running `make update`, so before
-   running that `podman` command, edit `staging/src/k8s.io/code-generator/go.mod`
-   file removing this line: `k8s.io/code-generator => ../code-generator`.
+2. (optional) Revert any commits that were merged into kubernetes between previous
+   update and current one.
 
+3. Fetch latest state of openshift fork, checkout the appropriate branch and
+   create a new branch for the bump
+```
+git fetch openshift
+git checkout openshift/release-4.12
+git checkout -b bump-1.25.2
+```
+   where `openshift` points at https://github.com/openshift/kubernetes/.
+
+4. Merge the changes from appropriate [released version](https://kubernetes.io/releases/patch-releases/#detailed-release-history-for-active-branches):
+```
+git merge v1.25.2
+```
+   Most likely you'll encounter conflicts, but most are around go.sum and go.mod
+   files, coming from newer versions, but at this point in time leave the conflicts
+   as they are and continue the merge.
+```
+git add --all
+git merge --continue
+```
+   This should create a commit titled `Merge tag 'v1.25.2' into bump-1.25.2`.
+
+5. Now return to the list of conflicts from previous step and fix all the files
+   picking appropriate changes, in most cases picking the newer version.
+   When done, commit all of them as another commit:
+```
+git add --all
+git commit -m "UPSTREAM: <drop>: manually resolve conflicts"
+```
+   This ensures the person reviewing the bump can easily review all the conflicts
+   and their resolution.
+
+6. (optional) Update openshift dependencies and run `go mod tidy` to have the
+   branch names resolved to proper go mod version. Remember to use the released
+   versions matching the branch you're modifying.
+   This is usually required ONLY if you know there has been changes in one of
+   the libraries that need to be applied to our fork, which happens rarely.
+   Also usually, this is done by the team introducing the changes in the libraries.
+
+7. Run `/bin/bash` in a container using the command and image described in [Updating generated files](#updating-generated-files)
+   section:
+```
+podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 /bin/bash
+```
+   In the container run `hack/update-vendor.sh` and `make update OS_RUN_WITHOUT_DOCKER=yes`.
+
+NOTE: Make sure to use the correct version of the image (both openshift and golang
+versions must be appropriate), as a reference check `openshift-hack/images/hyperkube/Dockerfile.rhel`
+file.
+
+NOTE: You might encounter problems when running the above, make sure to check [Potential problems](#potential-problems)
+section below.
+
+
+8. Update kubernetes version in `openshift-hack/images/hyperkube/Dockerfile.rhel`
+   and commit all of that as:
+```
+git commit -m "UPSTREAM: <drop>: hack/update-vendor.sh, make update and update image"
+```
+
+9. Congratulations, you can open a PR with updated k8s patch version!
+
+### Potential problems
+
+While running `make update` in step 7 above, you might encounter one of the following problems:
+
+```
+go: inconsistent vendoring in /go/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/k8s.io/code-generator:
+```
+To solve it, edit `staging/src/k8s.io/code-generator/go.mod` removing this line: `k8s.io/code-generator => ../code-generator`.
+Try re-running `make update`, if the problem re-appears change directory to `staging/src/k8s.io/code-generator`
+and run `go mod tidy` and `go mod vendor`.
+
+NOTE: Make sure to bring back this line: `k8s.io/code-generator => ../code-generator` in `staging/src/k8s.io/code-generator/go.mod`
+after you've run `make update`, otherwise `verify` step will fail during submission.
+
+```
+etcd version 3.5.6 or greater required
+```
+Grab newer version of etcd from https://github.com/etcd-io/etcd/releases/ and place
+it in `/usr/local/bin/etcd`.
 
 ## Updating with `rebase.sh` (experimental)
 
