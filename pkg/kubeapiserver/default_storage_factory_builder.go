@@ -77,7 +77,8 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		resource.Resource("resourceclaims").WithVersion("v1alpha1"),
 		resource.Resource("resourceclaimtemplates").WithVersion("v1alpha1"),
 		resource.Resource("resourceclasses").WithVersion("v1alpha1"),
-		resource.Resource("podschedulings").WithVersion("v1alpha1"),
+		resource.Resource("podschedulings").WithVersion("v1alpha1"), // only available in v1alpha1
+		resource.Resource("podschedulinghints").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{

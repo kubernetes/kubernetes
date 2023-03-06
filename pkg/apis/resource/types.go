@@ -222,6 +222,57 @@ type PodSchedulingStatus struct {
 	// for those other resources.
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingHints objects hold information that is needed to schedule
+// a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
+// mode.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type PodSchedulingHints struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec describes where resources for the Pod are needed.
+	Spec PodSchedulingHintsSpec
+
+	// Status describes where resources for the Pod can be allocated.
+	Status PodSchedulingHintsStatus
+}
+
+// PodSchedulingHintsSpec describes where resources for the Pod are needed.
+type PodSchedulingHintsSpec struct {
+	// SelectedNode is the node for which allocation of ResourceClaims that
+	// are referenced by the Pod and that use "WaitForFirstConsumer"
+	// allocation is to be attempted.
+	SelectedNode string
+
+	// PotentialNodes lists nodes where the Pod might be able to run.
+	//
+	// The size of this field is limited to 128. This is large enough for
+	// many clusters. Larger clusters may need more attempts to find a node
+	// that suits all pending resources. This may get increased in the
+	// future, but not reduced.
+	// +optional
+	PotentialNodes []string
+}
+
+// PodSchedulingHintsStatus describes where resources for the Pod can be allocated.
+type PodSchedulingHintsStatus struct {
+	// ResourceClaims describes resource availability for each
+	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
+	// uses "WaitForFirstConsumer" allocation mode.
+	// +optional
+	ResourceClaims []ResourceClaimSchedulingStatus
+
+	// If there ever is a need to support other kinds of resources
+	// than ResourceClaim, then new fields could get added here
+	// for those other resources.
+}
+
 // ResourceClaimSchedulingStatus contains information about one particular
 // ResourceClaim with "WaitForFirstConsumer" allocation mode.
 type ResourceClaimSchedulingStatus struct {
@@ -239,7 +290,7 @@ type ResourceClaimSchedulingStatus struct {
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the
-// node lists that are stored in PodScheduling objects. This limit is part
+// node lists that are stored in PodSchedulingHints objects. This limit is part
 // of the API.
 const PodSchedulingNodeListMaxSize = 128
 
@@ -254,6 +305,19 @@ type PodSchedulingList struct {
 
 	// Items is the list of PodScheduling objects.
 	Items []PodScheduling
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingHintsList is a collection of Pod scheduling objects.
+type PodSchedulingHintsList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodSchedulingHints objects.
+	Items []PodSchedulingHints
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

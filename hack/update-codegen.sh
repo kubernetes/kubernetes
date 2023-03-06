@@ -38,6 +38,10 @@ PRJ_SRC_PATH="k8s.io/kubernetes"
 BOILERPLATE_FILENAME="vendor/k8s.io/code-generator/hack/boilerplate.go.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
 
+# PLURAL_EXCEPTIONS overrides the default plural exceptions when generating
+# client-go. See https://github.com/kubernetes/kubernetes/blob/7a4c4eaae7a7295d5969734446bc4077d9fe848f/staging/src/k8s.io/code-generator/cmd/client-gen/args/args.go#LL92C89-L92C89
+PLURAL_EXCEPTIONS="Endpoints:Endpoints,PodSchedulingHints:PodSchedulingHints"
+
 # Any time we call sort, we want it in the same locale.
 export LC_ALL="C"
 
@@ -786,6 +790,7 @@ function codegen::clients() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/vendor" \
         --output-package="k8s.io/client-go" \
+        --plural-exceptions="${PLURAL_EXCEPTIONS}" \
         --clientset-name="kubernetes" \
         --input-base="k8s.io/api" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
@@ -829,6 +834,7 @@ function codegen::listers() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/vendor" \
         --output-package "k8s.io/client-go/listers" \
+        --plural-exceptions="${PLURAL_EXCEPTIONS}" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
 
@@ -869,6 +875,7 @@ function codegen::informers() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/vendor" \
         --output-package "k8s.io/client-go/informers" \
+        --plural-exceptions="${PLURAL_EXCEPTIONS}" \
         --single-directory \
         --versioned-clientset-package k8s.io/client-go/kubernetes \
         --listers-package k8s.io/client-go/listers \

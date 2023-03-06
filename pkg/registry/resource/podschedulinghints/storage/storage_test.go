@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -37,12 +36,12 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, schema.GroupResource{Group: resource.GroupName, Resource: "podschedulings"})
+	etcdStorage, server := registrytest.NewEtcdStorage(t, resource.GroupName)
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "podschedulings",
+		ResourcePrefix:          "podschedulinghints",
 	}
 	podSchedulingStorage, statusStorage, err := NewREST(restOptions)
 	if err != nil {
@@ -51,18 +50,18 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 	return podSchedulingStorage, statusStorage, server
 }
 
-func validNewPodScheduling(name, ns string) *resource.PodScheduling {
-	scheduling := &resource.PodScheduling{
+func validNewPodSchedulingHints(name, ns string) *resource.PodSchedulingHints {
+	hints := &resource.PodSchedulingHints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: resource.PodSchedulingSpec{
+		Spec: resource.PodSchedulingHintsSpec{
 			SelectedNode: "worker",
 		},
-		Status: resource.PodSchedulingStatus{},
+		Status: resource.PodSchedulingHintsStatus{},
 	}
-	return scheduling
+	return hints
 }
 
 func TestCreate(t *testing.T) {
@@ -70,13 +69,13 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	scheduling := validNewPodScheduling("foo", metav1.NamespaceDefault)
-	scheduling.ObjectMeta = metav1.ObjectMeta{}
+	hints := validNewPodSchedulingHints("foo", metav1.NamespaceDefault)
+	hints.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		scheduling,
+		hints,
 		// invalid
-		&resource.PodScheduling{
+		&resource.PodSchedulingHints{
 			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
@@ -89,10 +88,10 @@ func TestUpdate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
-		validNewPodScheduling("foo", metav1.NamespaceDefault),
+		validNewPodSchedulingHints("foo", metav1.NamespaceDefault),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*resource.PodScheduling)
+			object := obj.(*resource.PodSchedulingHints)
 			if object.Labels == nil {
 				object.Labels = map[string]string{}
 			}
@@ -107,7 +106,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
-	test.TestDelete(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestDelete(validNewPodSchedulingHints("foo", metav1.NamespaceDefault))
 }
 
 func TestGet(t *testing.T) {
@@ -115,7 +114,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	test.TestGet(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestGet(validNewPodSchedulingHints("foo", metav1.NamespaceDefault))
 }
 
 func TestList(t *testing.T) {
@@ -123,7 +122,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	test.TestList(validNewPodScheduling("foo", metav1.NamespaceDefault))
+	test.TestList(validNewPodSchedulingHints("foo", metav1.NamespaceDefault))
 }
 
 func TestWatch(t *testing.T) {
@@ -132,7 +131,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewPodScheduling("foo", metav1.NamespaceDefault),
+		validNewPodSchedulingHints("foo", metav1.NamespaceDefault),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -157,19 +156,19 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
-	schedulingStart := validNewPodScheduling("foo", metav1.NamespaceDefault)
+	schedulingStart := validNewPodSchedulingHints("foo", metav1.NamespaceDefault)
 	err := storage.Storage.Create(ctx, key, schedulingStart, nil, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	scheduling := schedulingStart.DeepCopy()
-	scheduling.Status.ResourceClaims = append(scheduling.Status.ResourceClaims,
+	hints := schedulingStart.DeepCopy()
+	hints.Status.ResourceClaims = append(hints.Status.ResourceClaims,
 		resource.ResourceClaimSchedulingStatus{
 			Name: "my-claim",
 		},
 	)
-	_, _, err = statusStorage.Update(ctx, scheduling.Name, rest.DefaultUpdatedObjectInfo(scheduling), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(ctx, hints.Name, rest.DefaultUpdatedObjectInfo(hints), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -177,9 +176,9 @@ func TestUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	schedulingOut := obj.(*resource.PodScheduling)
+	schedulingOut := obj.(*resource.PodSchedulingHints)
 	// only compare relevant changes b/c of difference in metadata
-	if !apiequality.Semantic.DeepEqual(scheduling.Status, schedulingOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(scheduling.Status, schedulingOut.Status))
+	if !apiequality.Semantic.DeepEqual(hints.Status, schedulingOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(hints.Status, schedulingOut.Status))
 	}
 }

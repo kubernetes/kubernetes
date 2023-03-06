@@ -58,6 +58,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ResourceClaimList{},
 		&ResourceClaimTemplate{},
 		&ResourceClaimTemplateList{},
+		&PodSchedulingHints{},
+		&PodSchedulingHintsList{},
 		&PodScheduling{},
 		&PodSchedulingList{},
 	)

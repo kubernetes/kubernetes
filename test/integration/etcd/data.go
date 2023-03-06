@@ -475,7 +475,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("resource.k8s.io", "v1alpha1", "podschedulings"): {
 			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
 			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod1name",
-			ExpectedGVK:      gvkP("resource.k8s.io", "v1alpha2", "PodScheduling"),
 		},
 		// --
 
@@ -492,9 +491,9 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			Stub:             `{"metadata": {"name": "claimtemplate2name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate2name",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "podschedulings"): {
+		gvr("resource.k8s.io", "v1alpha2", "podschedulinghints"): {
 			Stub:             `{"metadata": {"name": "pod2name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
-			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod2name",
+			ExpectedEtcdPath: "/registry/podschedulinghints/" + namespace + "/pod2name",
 		},
 		// --
 

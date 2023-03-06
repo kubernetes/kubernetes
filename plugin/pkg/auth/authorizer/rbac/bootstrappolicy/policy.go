@@ -575,8 +575,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		kubeSchedulerRules = append(kubeSchedulerRules,
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
-			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulings").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulings/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulinghints").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulinghints/status").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{

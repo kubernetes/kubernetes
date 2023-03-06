@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podscheduling
+package podschedulinghints
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-// podSchedulingStrategy implements behavior for PodScheduling objects
+// podSchedulingStrategy implements behavior for PodSchedulingHints objects
 type podSchedulingStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
@@ -48,11 +48,14 @@ func (podSchedulingStrategy) NamespaceScoped() bool {
 }
 
 // GetResetFields returns the set of fields that get reset by the strategy and
-// should not be modified by the user. For a new PodScheduling that is the
+// should not be modified by the user. For a new PodSchedulingHints that is the
 // status.
 func (podSchedulingStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -61,14 +64,14 @@ func (podSchedulingStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 }
 
 func (podSchedulingStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	scheduling := obj.(*resource.PodScheduling)
+	scheduling := obj.(*resource.PodSchedulingHints)
 	// Status must not be set by user on create.
-	scheduling.Status = resource.PodSchedulingStatus{}
+	scheduling.Status = resource.PodSchedulingHintsStatus{}
 }
 
 func (podSchedulingStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	scheduling := obj.(*resource.PodScheduling)
-	return validation.ValidatePodScheduling(scheduling)
+	scheduling := obj.(*resource.PodSchedulingHints)
+	return validation.ValidatePodSchedulingHints(scheduling)
 }
 
 func (podSchedulingStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -83,16 +86,16 @@ func (podSchedulingStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (podSchedulingStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newScheduling := obj.(*resource.PodScheduling)
-	oldScheduling := old.(*resource.PodScheduling)
+	newScheduling := obj.(*resource.PodSchedulingHints)
+	oldScheduling := old.(*resource.PodSchedulingHints)
 	newScheduling.Status = oldScheduling.Status
 }
 
 func (podSchedulingStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newScheduling := obj.(*resource.PodScheduling)
-	oldScheduling := old.(*resource.PodScheduling)
-	errorList := validation.ValidatePodScheduling(newScheduling)
-	return append(errorList, validation.ValidatePodSchedulingUpdate(newScheduling, oldScheduling)...)
+	newScheduling := obj.(*resource.PodSchedulingHints)
+	oldScheduling := old.(*resource.PodSchedulingHints)
+	errorList := validation.ValidatePodSchedulingHints(newScheduling)
+	return append(errorList, validation.ValidatePodSchedulingHintsUpdate(newScheduling, oldScheduling)...)
 }
 
 func (podSchedulingStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -116,21 +119,24 @@ func (podSchedulingStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fi
 		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
 	}
 
 	return fields
 }
 
 func (podSchedulingStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newScheduling := obj.(*resource.PodScheduling)
-	oldScheduling := old.(*resource.PodScheduling)
+	newScheduling := obj.(*resource.PodSchedulingHints)
+	oldScheduling := old.(*resource.PodSchedulingHints)
 	newScheduling.Spec = oldScheduling.Spec
 }
 
 func (podSchedulingStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newScheduling := obj.(*resource.PodScheduling)
-	oldScheduling := old.(*resource.PodScheduling)
-	return validation.ValidatePodSchedulingStatusUpdate(newScheduling, oldScheduling)
+	newScheduling := obj.(*resource.PodSchedulingHints)
+	oldScheduling := old.(*resource.PodSchedulingHints)
+	return validation.ValidatePodSchedulingHintsStatusUpdate(newScheduling, oldScheduling)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -149,15 +155,15 @@ func Match(label labels.Selector, field fields.Selector) storage.SelectionPredic
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	scheduling, ok := obj.(*resource.PodScheduling)
+	scheduling, ok := obj.(*resource.PodSchedulingHints)
 	if !ok {
-		return nil, nil, errors.New("not a PodScheduling")
+		return nil, nil, errors.New("not a PodSchedulingHints")
 	}
 	return labels.Set(scheduling.Labels), toSelectableFields(scheduling), nil
 }
 
 // toSelectableFields returns a field set that represents the object
-func toSelectableFields(scheduling *resource.PodScheduling) fields.Set {
+func toSelectableFields(scheduling *resource.PodSchedulingHints) fields.Set {
 	fields := generic.ObjectMetaFieldsSet(&scheduling.ObjectMeta, true)
 	return fields
 }
