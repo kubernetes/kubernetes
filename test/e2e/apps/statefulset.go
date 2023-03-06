@@ -1433,7 +1433,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			// wait for the pod to be recreated
-			e2estatefulset.WaitForStatusCurrentReplicas(c, ss, 1)
+			waitForStatusCurrentReplicas(ctx, c, ss, 1)
 			_, err = c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
