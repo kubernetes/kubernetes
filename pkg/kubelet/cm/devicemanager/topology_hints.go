@@ -39,10 +39,11 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	// Loop through all device resources and generate TopologyHints for them..
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getContainerDeviceRequest(container)
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for resource, requested := range accumulatedResourceRequests {
-		// Only consider devices that actually container topology information.
+		// Only consider devices that actually contain topology information.
 		if aligned := m.deviceHasTopologyAlignment(resource); !aligned {
 			klog.InfoS("Resource does not have a topology preference", "resource", resource)
 			deviceHints[resource] = nil
@@ -93,6 +94,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getPodDeviceRequest(pod)
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for resource, requested := range accumulatedResourceRequests {
