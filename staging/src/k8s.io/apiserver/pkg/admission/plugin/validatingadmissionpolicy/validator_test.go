@@ -28,11 +28,11 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 var _ cel.Filter = &fakeCelFilter{}
@@ -42,7 +42,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(*generic.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, error) {
+func (f *fakeCelFilter) ForInput(*generic.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
 	if f.throwError {
 		return nil, errors.New("test error")
 	}
