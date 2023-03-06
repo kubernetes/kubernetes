@@ -484,7 +484,7 @@ func (r *Resource) Clone() *Resource {
 		EphemeralStorage: r.EphemeralStorage,
 	}
 	if r.ScalarResources != nil {
-		res.ScalarResources = make(map[v1.ResourceName]int64)
+		res.ScalarResources = make(map[v1.ResourceName]int64, len(r.ScalarResources))
 		for k, v := range r.ScalarResources {
 			res.ScalarResources[k] = v
 		}
