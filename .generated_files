@@ -23,3 +23,5 @@ file-name	types_swagger_doc_generated.go
 
 path-prefix	vendor/
 path-prefix	pkg/generated/
+
+# sample code to refer
