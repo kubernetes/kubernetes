@@ -952,8 +952,8 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	if len(plugins) > 0 {
 		// Run Score method for each node in parallel.
 		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+			nodeName := nodes[index].Name
 			for _, pl := range plugins {
-				nodeName := nodes[index].Name
 				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
