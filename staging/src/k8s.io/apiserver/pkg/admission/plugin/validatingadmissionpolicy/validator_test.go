@@ -620,3 +620,22 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestContextCanceled(t *testing.T) {
+	fail := v1.Fail
+
+	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
+	fakeVersionedAttr, _ := generic.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+	fc := cel.NewFilterCompiler()
+	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+	v := validator{
+		failPolicy: &fail,
+		filter:     f,
+	}
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	decisions := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	if len(decisions) != 1 || !strings.Contains(decisions[0].Message, "operation interrupted") {
+		t.Errorf("Expected 'operation interrupted' but got %v", decisions)
+	}
+}
