@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -94,10 +95,12 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 		PluginName:          volume.pluginName,
 		PodUID:              types.UID(volume.podName),
 	}
+	metrics.ForceCleanedFailedVolumeOperationsTotal.Inc()
 	// TODO: Currently cleanupMounts only includes UnmountVolume operation. In the next PR, we will add
 	// to unmount both volume and device in the same routine.
 	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
+		metrics.ForceCleanedFailedVolumeOperationsErrorsTotal.Inc()
 		klog.ErrorS(err, mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
 		return
 	}
@@ -177,7 +180,14 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 }
 
 // Reconstruct volume data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume, error) {
+func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
+	metrics.ReconstructVolumeOperationsTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
+		}
+	}()
+
 	// plugin initializations
 	plugin, err := rc.volumePluginMgr.FindPluginByName(volume.pluginName)
 	if err != nil {
