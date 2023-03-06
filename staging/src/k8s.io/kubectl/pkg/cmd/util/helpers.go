@@ -425,8 +425,9 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	ApplySet         FeatureGate = "KUBECTL_APPLYSET"
-	ExplainOpenapiV3 FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
+	ApplySet              FeatureGate = "KUBECTL_APPLYSET"
+	ExplainOpenapiV3      FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
+	CmdPluginAsSubcommand FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
 )
 
 func (f FeatureGate) IsEnabled() bool {
