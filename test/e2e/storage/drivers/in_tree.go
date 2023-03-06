@@ -40,7 +40,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
@@ -1755,12 +1754,4 @@ func (a *azureFileDriver) CreateVolume(ctx context.Context, config *storageframe
 func (v *azureFileVolume) DeleteVolume(ctx context.Context) {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
 	framework.ExpectNoError(err)
-}
-
-func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
-	timeouts := framework.NewTimeoutContext()
-	timeouts.PodStart = time.Minute * 15
-	timeouts.PodDelete = time.Minute * 15
-	timeouts.PVDelete = time.Minute * 20
-	return timeouts
 }
