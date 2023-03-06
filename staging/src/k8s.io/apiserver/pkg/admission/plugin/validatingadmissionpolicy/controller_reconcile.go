@@ -32,6 +32,7 @@ import (
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -85,9 +86,11 @@ type policyController struct {
 	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
 
 	client kubernetes.Interface
+
+	authz authorizer.Authorizer
 }
 
-type newValidator func(cel.Filter, *v1.FailurePolicyType) Validator
+type newValidator func(cel.Filter, *v1.FailurePolicyType, authorizer.Authorizer) Validator
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
@@ -97,6 +100,7 @@ func newPolicyController(
 	matcher Matcher,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
 	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
+	authz authorizer.Authorizer,
 ) *policyController {
 	res := &policyController{}
 	*res = policyController{
@@ -126,6 +130,7 @@ func newPolicyController(
 		restMapper:    restMapper,
 		dynamicClient: dynamicClient,
 		client:        client,
+		authz:         authz,
 	}
 	return res
 }
@@ -439,9 +444,11 @@ func (c *policyController) latestPolicyData() []policyData {
 				if definitionInfo.lastReconciledValue.Spec.ParamKind != nil {
 					hasParam = true
 				}
+				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 				bindingInfo.validator = c.newValidator(
-					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), hasParam),
+					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars),
 					convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
+					c.authz,
 				)
 			}
 			bindingInfos = append(bindingInfos, *bindingInfo)

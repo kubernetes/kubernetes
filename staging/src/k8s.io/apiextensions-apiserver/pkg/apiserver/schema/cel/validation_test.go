@@ -1751,6 +1751,14 @@ func TestValidationExpressions(t *testing.T) {
 				"oldSelf == self",
 			},
 		},
+		{name: "authorizer is not supported for CRD Validation Rules",
+			obj:    []interface{}{},
+			oldObj: []interface{}{},
+			schema: objectTypePtr(map[string]schema.Structural{}),
+			errors: map[string]string{
+				"authorizer.path('/healthz').check('get').isAllowed()": "undeclared reference to 'authorizer'",
+			},
+		},
 	}
 
 	for i := range tests {

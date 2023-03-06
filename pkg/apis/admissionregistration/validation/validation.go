@@ -18,9 +18,10 @@ package validation
 
 import (
 	"fmt"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"regexp"
 	"strings"
+
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -32,6 +33,7 @@ import (
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
+
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
@@ -738,7 +740,7 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 			Expression: trimmedExpression,
 			Message:    v.Message,
 			Reason:     v.Reason,
-		}, paramKind != nil)
+		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true})
 		if result.Error != nil {
 			switch result.Error.Type {
 			case cel.ErrorTypeRequired:

@@ -36,6 +36,15 @@ type CostEstimator struct {
 
 func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, result ref.Val) *uint64 {
 	switch function {
+	case "check":
+		// An authorization check has a fixed cost
+		// This cost is set to allow for only two authorization checks per expression
+		cost := uint64(350000)
+		return &cost
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+		// All authorization builder and accessor functions have a nominal cost
+		cost := uint64(1)
+		return &cost
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
 		var cost uint64
 		if len(args) > 0 {
@@ -78,6 +87,13 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	// WARNING: Any changes to this code impact API compatibility! The estimated cost is used to determine which CEL rules may be written to a
 	// CRD and any change (cost increases and cost decreases) are breaking.
 	switch function {
+	case "check":
+		// An authorization check has a fixed cost
+		// This cost is set to allow for only two authorization checks per expression
+		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 350000, Max: 350000}}
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+		// All authorization builder and accessor functions have a nominal cost
+		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
 		if target != nil {
 			// Charge 1 cost for comparing each element in the list
@@ -94,7 +110,6 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			} else { // the target is a string, which is supported by indexOf and lastIndexOf
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
-
 		}
 	case "url":
 		if len(args) == 1 {

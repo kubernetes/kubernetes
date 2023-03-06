@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/google/cel-go/cel"
@@ -26,43 +27,35 @@ import (
 )
 
 const (
-	ObjectVarName    = "object"
-	OldObjectVarName = "oldObject"
-	ParamsVarName    = "params"
-	RequestVarName   = "request"
+	ObjectVarName                    = "object"
+	OldObjectVarName                 = "oldObject"
+	ParamsVarName                    = "params"
+	RequestVarName                   = "request"
+	AuthorizerVarName                = "authorizer"
+	RequestResourceAuthorizerVarName = "authorizer.requestResource"
 
 	checkFrequency = 100
 )
 
-type envs struct {
-	noParams   *cel.Env
-	withParams *cel.Env
-}
-
 var (
 	initEnvsOnce sync.Once
-	initEnvs     *envs
+	initEnvs     envs
 	initEnvsErr  error
 )
 
-func getEnvs() (*envs, error) {
+func getEnvs() (envs, error) {
 	initEnvsOnce.Do(func() {
-		base, err := buildBaseEnv()
+		requiredVarsEnv, err := buildRequiredVarsEnv()
 		if err != nil {
 			initEnvsErr = err
 			return
 		}
-		noParams, err := buildNoParamsEnv(base)
+
+		initEnvs, err = buildWithOptionalVarsEnvs(requiredVarsEnv)
 		if err != nil {
 			initEnvsErr = err
 			return
 		}
-		withParams, err := buildWithParamsEnv(noParams)
-		if err != nil {
-			initEnvsErr = err
-			return
-		}
-		initEnvs = &envs{noParams: noParams, withParams: withParams}
 	})
 	return initEnvs, initEnvsErr
 }
@@ -81,7 +74,11 @@ func buildBaseEnv() (*cel.Env, error) {
 	return cel.NewEnv(opts...)
 }
 
-func buildNoParamsEnv(baseEnv *cel.Env) (*cel.Env, error) {
+func buildRequiredVarsEnv() (*cel.Env, error) {
+	baseEnv, err := buildBaseEnv()
+	if err != nil {
+		return nil, err
+	}
 	var propDecls []cel.EnvOption
 	reg := apiservercel.NewRegistry(baseEnv)
 
@@ -109,8 +106,33 @@ func buildNoParamsEnv(baseEnv *cel.Env) (*cel.Env, error) {
 	return env, nil
 }
 
-func buildWithParamsEnv(noParams *cel.Env) (*cel.Env, error) {
-	return noParams.Extend(cel.Variable(ParamsVarName, cel.DynType))
+type envs map[OptionalVariableDeclarations]*cel.Env
+
+func buildEnvWithVars(baseVarsEnv *cel.Env, options OptionalVariableDeclarations) (*cel.Env, error) {
+	var opts []cel.EnvOption
+	if options.HasParams {
+		opts = append(opts, cel.Variable(ParamsVarName, cel.DynType))
+	}
+	if options.HasAuthorizer {
+		opts = append(opts, cel.Variable(AuthorizerVarName, library.AuthorizerType))
+		opts = append(opts, cel.Variable(RequestResourceAuthorizerVarName, library.ResourceCheckType))
+	}
+	return baseVarsEnv.Extend(opts...)
+}
+
+func buildWithOptionalVarsEnvs(requiredVarsEnv *cel.Env) (envs, error) {
+	envs := make(envs, 4) // since the number of variable combinations is small, pre-build a environment for each
+	for _, hasParams := range []bool{false, true} {
+		for _, hasAuthorizer := range []bool{false, true} {
+			opts := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}
+			env, err := buildEnvWithVars(requiredVarsEnv, opts)
+			if err != nil {
+				return nil, err
+			}
+			envs[opts] = env
+		}
+	}
+	return envs, nil
 }
 
 // buildRequestType generates a DeclType for AdmissionRequest. This may be replaced with a utility that
@@ -168,7 +190,7 @@ type CompilationResult struct {
 }
 
 // CompileCELExpression returns a compiled CEL expression.
-func CompileCELExpression(expressionAccessor ExpressionAccessor, hasParams bool) CompilationResult {
+func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars OptionalVariableDeclarations) CompilationResult {
 	var env *cel.Env
 	envs, err := getEnvs()
 	if err != nil {
@@ -180,10 +202,15 @@ func CompileCELExpression(expressionAccessor ExpressionAccessor, hasParams bool)
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	if hasParams {
-		env = envs.withParams
-	} else {
-		env = envs.noParams
+	env, ok := envs[optionalVars]
+	if !ok {
+		return CompilationResult{
+			Error: &apiservercel.Error{
+				Type:   apiservercel.ErrorTypeInvalid,
+				Detail: fmt.Sprintf("compiler initialization failed: failed to load environment for %v", optionalVars),
+			},
+			ExpressionAccessor: expressionAccessor,
+		}
 	}
 
 	ast, issues := env.Compile(expressionAccessor.GetExpression())

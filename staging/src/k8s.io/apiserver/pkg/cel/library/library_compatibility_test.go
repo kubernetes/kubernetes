@@ -29,6 +29,7 @@ func TestLibraryCompatibility(t *testing.T) {
 		urlsLib:  urlLibraryDecls,
 		listsLib: listsLibraryDecls,
 		regexLib: regexLibraryDecls,
+		authzLib: authzLibraryDecls,
 	}
 	if len(k8sExtensionLibs) != len(decls) {
 		t.Errorf("Expected the same number of libraries in the ExtensionLibs as are tested for compatibility")
@@ -46,6 +47,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes 1.24:
 		"isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "find", "findAll", "url", "getScheme", "getHost", "getHostname",
 		"getPort", "getEscapedPath", "getQuery", "isURL",
+		// Kubernetes <1.27>:
+		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "denied", "reason",
 		// Kubernetes <1.??>:
 	}
 	for _, fn := range knownFunctions {
