@@ -1463,15 +1463,7 @@ type awsDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type awsVolume struct {
-	volumeName string
-}
-
 var _ storageframework.TestDriver = &awsDriver{}
-
-var _ storageframework.PreprovisionedVolumeTestDriver = &awsDriver{}
-var _ storageframework.InlineVolumeTestDriver = &awsDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &awsDriver{}
 var _ storageframework.DynamicPVTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
@@ -1520,40 +1512,6 @@ func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("aws")
 }
 
-func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	av, ok := e2evolume.(*awsVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the AWS test volume", e2evolume)
-	}
-	volSource := v1.VolumeSource{
-		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: av.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.AWSElasticBlockStore.FSType = fsType
-	}
-	return &volSource
-}
-
-func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	av, ok := e2evolume.(*awsVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the AWS test volume", e2evolume)
-	}
-	pvSource := v1.PersistentVolumeSource{
-		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: av.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.AWSElasticBlockStore.FSType = fsType
-	}
-	return &pvSource, nil
-}
-
 func (a *awsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/aws-ebs"
 	parameters := map[string]string{}
@@ -1581,29 +1539,6 @@ func (a *awsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *st
 		}
 	}
 	return config
-}
-
-func (a *awsDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(ctx, config.Framework)
-	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
-	}
-	ginkgo.By("creating a test aws volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
-	framework.ExpectNoError(err)
-	return &awsVolume{
-		volumeName: vname,
-	}
-}
-
-func (v *awsVolume) DeleteVolume(ctx context.Context) {
-	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
 }
 
 // local

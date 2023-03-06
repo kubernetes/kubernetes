@@ -108,14 +108,6 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
-	// owner: @leakingtapan
-	// alpha: v1.14
-	// beta: v1.17
-	// GA: v1.25
-	//
-	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
-	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
-
 	// owner: @andyzhangx
 	// alpha: v1.15
 	// beta: v1.19
@@ -884,8 +876,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUManagerPolicyBetaOptions: {Default: true, PreRelease: featuregate.Beta},
 
 	CPUManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
-
-	CSIMigrationAWS: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	CSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 

@@ -89,7 +89,7 @@ func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
 
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		return pm.featureGate.Enabled(features.CSIMigrationAWS)
+		return true
 	case csilibplugins.GCEPDInTreePluginName:
 		return pm.featureGate.Enabled(features.CSIMigrationGCE)
 	case csilibplugins.AzureFileInTreePluginName:

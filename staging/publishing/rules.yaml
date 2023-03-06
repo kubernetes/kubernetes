@@ -1673,8 +1673,6 @@ rules:
       branch: master
     - repository: cloud-provider
       branch: master
-    - repository: csi-translation-lib
-      branch: master
     - repository: apiserver
       branch: master
     - repository: component-base
