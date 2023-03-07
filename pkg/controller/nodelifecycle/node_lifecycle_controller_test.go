@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -2759,6 +2760,10 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 // NodeController is just responsible for enqueuing the node to tainting queue from which taint manager picks up
 // and evicts the pods on the node.
 func TestApplyNoExecuteTaints(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 
