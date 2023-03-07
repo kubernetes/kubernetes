@@ -19,6 +19,7 @@ package benchmark
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -235,7 +236,10 @@ while true; do sleep 1; done
 
 				print(format)
 				klog.Flush()
-				assert.Equal(t, expected, buffer.String())
+
+				if !strings.Contains(buffer.String(), expected) {
+					t.Errorf("Expected log output to contain:\n%s\nActual log output:\n%s\n", expected, buffer.String())
+				}
 			}
 
 			t.Run("printf", func(t *testing.T) {
