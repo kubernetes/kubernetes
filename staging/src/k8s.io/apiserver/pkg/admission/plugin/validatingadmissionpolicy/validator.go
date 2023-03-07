@@ -75,7 +75,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *generic.Version
 	}
 
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}
-	evalResults, err := v.validationFilter.ForInput(ctx context.Context, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, runtimeCELCostBudget)
+	evalResults, err := v.validationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -124,7 +124,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *generic.Version
 	}
 
 	options := cel.OptionalVariableBindings{VersionedParams: versionedParams}
-	auditAnnotationEvalResults, err := v.auditAnnotationFilter.ForInput(versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, runtimeCELCostBudget)
+	auditAnnotationEvalResults, err := v.auditAnnotationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{

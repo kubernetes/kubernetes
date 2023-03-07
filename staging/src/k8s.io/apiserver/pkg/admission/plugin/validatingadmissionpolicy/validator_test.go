@@ -629,13 +629,17 @@ func TestContextCanceled(t *testing.T) {
 	fc := cel.NewFilterCompiler()
 	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
 	v := validator{
-		failPolicy: &fail,
-		filter:     f,
+		failPolicy:       &fail,
+		validationFilter: f,
+		auditAnnotationFilter: &fakeCelFilter{
+			evaluations: nil,
+			throwError:  false,
+		},
 	}
 	ctx, cancel := context.WithCancel(context.TODO())
 	cancel()
-	decisions := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
-	if len(decisions) != 1 || !strings.Contains(decisions[0].Message, "operation interrupted") {
-		t.Errorf("Expected 'operation interrupted' but got %v", decisions)
+	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
+		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}
 }

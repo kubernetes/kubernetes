@@ -1622,7 +1622,7 @@ func TestAuditValidationAction(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1693,7 +1693,7 @@ func TestWarnValidationAction(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1752,7 +1752,7 @@ func TestAllValidationActions(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1823,7 +1823,7 @@ func TestAuditAnnotations(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *whgeneric.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
 		o, err := meta.Accessor(versionedParams)
 		if err != nil {
 			t.Fatal(err)
