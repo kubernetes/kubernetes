@@ -661,7 +661,8 @@ func TestFilter(t *testing.T) {
 			}
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
-			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
+			ctx := context.TODO()
+			evalResults, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -766,7 +767,8 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 				tc.testRuntimeCELCostBudget = celconfig.RuntimeCELCostBudget
 			}
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
-			evalResults, err := f.ForInput(versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
+			ctx := context.TODO()
+			evalResults, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
 			if tc.exceedBudget && err == nil {
 				t.Errorf("Expected RuntimeCELCostBudge to be exceeded but got nil")
 			}

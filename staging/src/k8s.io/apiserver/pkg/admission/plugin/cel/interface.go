@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -93,7 +94,7 @@ type OptionalVariableBindings struct {
 type Filter interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed values
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	ForInput(versionedAttr *generic.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error)
+	ForInput(ctx context.Context, versionedAttr *generic.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error

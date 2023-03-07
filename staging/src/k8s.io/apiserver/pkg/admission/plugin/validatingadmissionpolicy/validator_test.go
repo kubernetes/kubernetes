@@ -17,6 +17,7 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,7 +44,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(*generic.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
+func (f *fakeCelFilter) ForInput(context.Context, *generic.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
 	if f.throwError {
 		return nil, errors.New("test error")
 	}
@@ -586,7 +587,8 @@ func TestValidate(t *testing.T) {
 					throwError:  tc.throwError,
 				},
 			}
-			validateResult := v.Validate(fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+			ctx := context.TODO()
+			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -616,5 +618,28 @@ func TestValidate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestContextCanceled(t *testing.T) {
+	fail := v1.Fail
+
+	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
+	fakeVersionedAttr, _ := generic.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+	fc := cel.NewFilterCompiler()
+	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+	v := validator{
+		failPolicy:       &fail,
+		validationFilter: f,
+		auditAnnotationFilter: &fakeCelFilter{
+			evaluations: nil,
+			throwError:  false,
+		},
+	}
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
+		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}
 }

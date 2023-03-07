@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -119,7 +120,7 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error) {
+func (f *filter) ForInput(ctx context.Context, versionedAttr *generic.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
@@ -171,7 +172,7 @@ func (f *filter) ForInput(versionedAttr *generic.VersionedAttributes, request *a
 			continue
 		}
 		t1 := time.Now()
-		evalResult, evalDetails, err := compilationResult.Program.Eval(va)
+		evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, va)
 		elapsed := time.Since(t1)
 		evaluation.Elapsed = elapsed
 		if evalDetails == nil {
