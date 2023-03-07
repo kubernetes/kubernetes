@@ -103,7 +103,7 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // preScoreState computed at PreScore and used at Score.
 type preScoreState struct {
-	podRequest map[v1.ResourceName]int64
+	podRequests []int64
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -115,7 +115,7 @@ func (s *preScoreState) Clone() framework.StateData {
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
 	state := &preScoreState{
-		podRequest: f.calculatePodResourceRequestMap(pod, f.resources),
+		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 	}
 	cycleState.Write(preScoreStateKey, state)
 	return nil
@@ -378,9 +378,9 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 	s, err := getPreScoreState(state)
 	if err != nil {
 		s = &preScoreState{
-			podRequest: f.calculatePodResourceRequestMap(pod, f.resources),
+			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 		}
 	}
 
-	return f.score(pod, nodeInfo, s.podRequest)
+	return f.score(pod, nodeInfo, s.podRequests)
 }

@@ -50,7 +50,7 @@ const (
 
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
 type balancedAllocationPreScoreState struct {
-	podRequest map[v1.ResourceName]int64
+	podRequests []int64
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -62,7 +62,7 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
 	state := &balancedAllocationPreScoreState{
-		podRequest: ba.calculatePodResourceRequestMap(pod, ba.resources),
+		podRequests: ba.calculatePodResourceRequestList(pod, ba.resources),
 	}
 	cycleState.Write(balancedAllocationPreScoreStateKey, state)
 	return nil
@@ -95,7 +95,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
-		s = &balancedAllocationPreScoreState{podRequest: ba.calculatePodResourceRequestMap(pod, ba.resources)}
+		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
@@ -103,7 +103,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(pod, nodeInfo, s.podRequest)
+	return ba.score(pod, nodeInfo, s.podRequests)
 }
 
 // ScoreExtensions of the Score plugin.
