@@ -54,6 +54,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
 )
 
 type testVersioner struct{}
@@ -1497,7 +1498,7 @@ func TestCacherWatchSemantics(t *testing.T) {
 			resourceVersion:                    "101",
 			storageResourceVersion:             "105",
 			initialPods:                        []*example.Pod{makePod(101), makePod(102)},
-			expectedInitialEventsInRandomOrder: []watch.Event{{Type: watch.Added, Object: makePod(102)}},
+			expectedInitialEventsInRandomOrder: []watch.Event{{Type: watch.Added, Object: makePod(101)}, {Type: watch.Added, Object: makePod(102)}},
 			expectedInitialEventsInStrictOrder: []watch.Event{
 				{Type: watch.Bookmark, Object: &example.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1533,7 +1534,7 @@ func TestCacherWatchSemantics(t *testing.T) {
 			storageResourceVersion: "105",
 			initialPods:            []*example.Pod{makePod(101), makePod(102)},
 			// make sure we only get initial events that are > initial RV (101)
-			expectedInitialEventsInRandomOrder: []watch.Event{{Type: watch.Added, Object: makePod(102)}},
+			expectedInitialEventsInRandomOrder: []watch.Event{{Type: watch.Added, Object: makePod(101)}, {Type: watch.Added, Object: makePod(102)}},
 		},
 		{
 			name:                                 "sendInitialEvents=false, RV=unset, storageRV=103",
@@ -1692,4 +1693,25 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 	currentPodRV, err := versioner.ParseResourceVersion(currentPod.ResourceVersion)
 	require.NoError(t, err)
 	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
+}
+
+func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	forceAllEvents, err := cacher.waitUntilWatchCacheFreshAndForceAllEvents(context.TODO(), 105, storage.ListOptions{SendInitialEvents: pointer.Bool(true)})
+	require.NotNil(t, err, "the target method should return non nil error")
+	require.Equal(t, err.Error(), "Timeout: Too large resource version: 105, current: 100")
+	require.False(t, forceAllEvents, "the target method after returning an error should NOT instruct the caller to ask for all events in the cache (full state)")
+
+	go func() {
+		cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
+	}()
+	forceAllEvents, err = cacher.waitUntilWatchCacheFreshAndForceAllEvents(context.TODO(), 105, storage.ListOptions{SendInitialEvents: pointer.Bool(true)})
+	require.NoError(t, err)
+	require.True(t, forceAllEvents, "the target method should instruct the caller to ask for all events in the cache (full state)")
 }
