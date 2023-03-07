@@ -130,6 +130,84 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						framework.ExpectNoError(err, "checkGCEPD pd-standard")
 					},
 				},
+				// AWS
+				{
+					Name:           "gp2 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type": "gp2",
+						"zone": getRandomClusterZone(ctx, c),
+					},
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+					},
+				},
+				{
+					Name:           "io1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type":      "io1",
+						"iopsPerGB": "50",
+					},
+					ClaimSize:    "3.5Gi",
+					ExpectedSize: "4Gi", // 4 GiB is minimum for io1
+					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+					},
+				},
+				{
+					Name:           "sc1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type": "sc1",
+					},
+					ClaimSize:    "500Gi", // minimum for sc1
+					ExpectedSize: "500Gi",
+					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+					},
+				},
+				{
+					Name:           "st1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type": "st1",
+					},
+					ClaimSize:    "500Gi", // minimum for st1
+					ExpectedSize: "500Gi",
+					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+					},
+				},
+				{
+					Name:           "encrypted EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"encrypted": "true",
+					},
+					ClaimSize:    "1Gi",
+					ExpectedSize: "1Gi",
+					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+					},
+				},
 				// OpenStack generic tests (works on all OpenStack deployments)
 				{
 					Name:           "generic Cinder volume on OpenStack",
