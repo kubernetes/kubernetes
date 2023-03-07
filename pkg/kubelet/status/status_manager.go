@@ -137,9 +137,6 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// State returns a read-only interface to the internal status manager state.
-	State() state.Reader
-
 	// GetContainerResourceAllocation returns checkpointed ResourcesAllocated value for the container
 	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
 
@@ -189,13 +186,13 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 }
 
 func (m *manager) Start() {
-	// Create pod allocation checkpoint manager even if we don't have a client to allow local get/set of ResourcesAllocated & Resize
+	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of ResourcesAllocated & Resize
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
 		if err != nil {
-			//TODO(vinaykul,InPlacePodVerticalScaling): Check if this error should be a critical (stop kubelet) failure
+			// This is a crictical, non-recoverable failure.
 			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
-			return
+			panic(err)
 		}
 		m.state = stateImpl
 	}
@@ -235,20 +232,12 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-// State returns the pod resources checkpoint state of the pod status manager
-func (m *manager) State() state.Reader {
-	return m.state
-}
-
 // GetContainerResourceAllocation returns the last checkpointed ResourcesAllocated values
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	if m.state != nil {
-		return m.state.GetContainerResourceAllocation(podUID, containerName)
-	}
-	return nil, false
+	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
 // GetPodResizeStatus returns the last checkpointed ResizeStaus value
@@ -256,17 +245,11 @@ func (m *manager) GetContainerResourceAllocation(podUID string, containerName st
 func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	if m.state != nil {
-		return m.state.GetPodResizeStatus(podUID)
-	}
-	return "", false
+	return m.state.GetPodResizeStatus(podUID)
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
 func (m *manager) SetPodAllocation(pod *v1.Pod) error {
-	if m.state == nil {
-		return fmt.Errorf("pod allocation checkpoint manager is not initialized")
-	}
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	for _, container := range pod.Spec.Containers {
@@ -283,9 +266,6 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
 func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
-	if m.state == nil {
-		return fmt.Errorf("pod allocation checkpoint manager is not initialized")
-	}
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
@@ -708,9 +688,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if m.state != nil {
-			m.state.Delete(string(uid), "")
-		}
+		m.state.Delete(string(uid), "")
 	}
 }
 
@@ -723,9 +701,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				if m.state != nil {
-					m.state.Delete(string(key), "")
-				}
+				m.state.Delete(string(key), "")
 			}
 		}
 	}

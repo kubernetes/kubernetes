@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
-	state "k8s.io/kubernetes/pkg/kubelet/status/state"
 )
 
 // MockPodStatusProvider is a mock of PodStatusProvider interface.
@@ -320,20 +319,6 @@ func (m *MockManager) Start() {
 func (mr *MockManagerMockRecorder) Start() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockManager)(nil).Start))
-}
-
-// State mocks base method.
-func (m *MockManager) State() state.Reader {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "State")
-	ret0, _ := ret[0].(state.Reader)
-	return ret0
-}
-
-// State indicates an expected call of State.
-func (mr *MockManagerMockRecorder) State() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "State", reflect.TypeOf((*MockManager)(nil).State))
 }
 
 // TerminatePod mocks base method.

@@ -63,11 +63,6 @@ func (m *fakeManager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	return
 }
 
-func (m *fakeManager) State() state.Reader {
-	klog.InfoS("State()")
-	return m.state
-}
-
 func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
 	klog.InfoS("GetContainerResourceAllocation()")
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
