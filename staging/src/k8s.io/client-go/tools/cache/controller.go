@@ -18,6 +18,7 @@ package cache
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -146,6 +147,9 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	r.WatchListPageSize = c.config.WatchListPageSize
 	if c.config.WatchErrorHandler != nil {
 		r.watchErrorHandler = c.config.WatchErrorHandler
+	}
+	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+		r.UseWatchList = true
 	}
 
 	c.reflectorMutex.Lock()
