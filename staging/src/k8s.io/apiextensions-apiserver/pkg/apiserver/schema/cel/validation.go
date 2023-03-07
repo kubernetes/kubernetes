@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
+	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
@@ -34,6 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/metrics"
+	"k8s.io/klog/v2"
+
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // Validator parallels the structure of schema.Structural and includes the compiled CEL programs
@@ -252,14 +257,100 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
-			if len(rule.Message) != 0 {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, rule.Message))
+			if compiled.MessageExpression != nil {
+				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
+				if msgErr != nil {
+					if msgErr.Type == cel.ErrorTypeInternal {
+						errs = append(errs, field.InternalError(fldPath, msgErr))
+						return errs, -1
+					} else if msgErr.Type == cel.ErrorTypeInvalid {
+						errs = append(errs, field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						return errs, -1
+					} else {
+						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
+						errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+						remainingBudget = newRemainingBudget
+					}
+				} else {
+					errs = append(errs, field.Invalid(fldPath, sts.Type, messageExpression))
+					remainingBudget = newRemainingBudget
+				}
 			} else {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("failed rule: %s", ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
 			}
 		}
 	}
 	return errs, remainingBudget
+}
+
+// evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one
+// occurred during evaluation.
+func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation interpreter.Activation, remainingBudget int64) (string, int64, *cel.Error) {
+	evalResult, evalDetails, err := expr.ContextEval(ctx, activation)
+	if evalDetails == nil {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInternal,
+			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
+		}
+	}
+	rtCost := evalDetails.ActualCost()
+	if rtCost == nil {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInternal,
+			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
+		}
+	} else if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInvalid,
+			Detail: "messageExpression evaluation failed due to running out of cost budget, no further validation rules will be run",
+		}
+	}
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "operation cancelled: actual cost limit exceeded") {
+			return "", -1, &cel.Error{
+				Type:   cel.ErrorTypeInvalid,
+				Detail: fmt.Sprintf("no further validation rules will be run due to call cost exceeds limit for messageExpression: %q", exprSrc),
+			}
+		}
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: fmt.Sprintf("messageExpression evaluation failed due to: %v", err.Error()),
+		}
+	}
+	messageStr, ok := evalResult.Value().(string)
+	if !ok {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression failed to convert to string",
+		}
+	}
+	trimmedMsgStr := strings.TrimSpace(messageStr)
+	if len(trimmedMsgStr) > celconfig.MaxEvaluatedMessageExpressionSizeBytes {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: fmt.Sprintf("messageExpression beyond allowable length of %d", celconfig.MaxEvaluatedMessageExpressionSizeBytes),
+		}
+	} else if hasNewlines(trimmedMsgStr) {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression should not contain line breaks",
+		}
+	} else if len(trimmedMsgStr) == 0 {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression should evaluate to a non-empty string",
+		}
+	}
+	return trimmedMsgStr, remainingBudget - int64(*rtCost), nil
+}
+
+var newlineMatcher = regexp.MustCompile(`[\n]+`)
+
+func hasNewlines(s string) bool {
+	return newlineMatcher.MatchString(s)
+}
+
+func ruleMessageOrDefault(rule apiextensions.ValidationRule) string {
+	if len(rule.Message) == 0 {
+		return fmt.Sprintf("failed rule: %s", ruleErrorString(rule))
+	} else {
+		return strings.TrimSpace(rule.Message)
+	}
 }
 
 func ruleErrorString(rule apiextensions.ValidationRule) string {
