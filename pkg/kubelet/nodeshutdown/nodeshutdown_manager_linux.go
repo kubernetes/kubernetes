@@ -92,10 +92,10 @@ type managerImpl struct {
 }
 
 // NewManager returns a new node shutdown manager.
-func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
+func NewManager(conf *Config) Manager {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
-		return m, m
+		return m
 	}
 
 	shutdownGracePeriodByPodPriority := conf.ShutdownGracePeriodByPodPriority
@@ -108,7 +108,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 	// Disable if the configuration is empty
 	if len(shutdownGracePeriodByPodPriority) == 0 {
 		m := managerStub{}
-		return m, m
+		return m
 	}
 
 	// Sort by priority from low to high
@@ -139,7 +139,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		"shutdownGracePeriodCriticalPods", conf.ShutdownGracePeriodCriticalPods,
 		"shutdownGracePeriodByPodPriority", shutdownGracePeriodByPodPriority,
 	)
-	return manager, manager
+	return manager
 }
 
 // Admit rejects all pods if node is shutting

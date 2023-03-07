@@ -337,7 +337,7 @@ func TestManager(t *testing.T) {
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-			manager, _ := NewManager(&Config{
+			manager := NewManager(&Config{
 				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
@@ -442,7 +442,7 @@ func TestFeatureEnabled(t *testing.T) {
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
-			manager, _ := NewManager(&Config{
+			manager := NewManager(&Config{
 				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
@@ -498,7 +498,7 @@ func TestRestart(t *testing.T) {
 	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-	manager, _ := NewManager(&Config{
+	manager := NewManager(&Config{
 		Logger:                          logger,
 		ProbeManager:                    proberManager,
 		Recorder:                        fakeRecorder,
