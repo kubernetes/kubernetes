@@ -814,19 +814,20 @@ func validateStatefulSetStatus(replicas int32, readyReplicas int32, currentRepli
 	// If no invalid inputs are found, return nil (no error)
 	return nil
 }
+
 // TestValidateStatefulSetStatus tests the validateStatefulSetStatus function with various test cases
 func TestValidateStatefulSetStatus(t *testing.T) {
 	// Define the test cases with input parameters and expected output
 	testCases := []struct {
-		name              string  // Name of the test case
-		replicas          int32   // Number of replicas in the StatefulSet
-		readyReplicas     int32   // Number of replicas that are in a ready state
-		currentReplicas   int32   // Number of replicas that are currently running
-		updatedReplicas   int32   // Number of replicas that have been updated
-		availableReplicas int32   // Number of replicas that are available
+		name               string // Name of the test case
+		replicas           int32  // Number of replicas in the StatefulSet
+		readyReplicas      int32  // Number of replicas that are in a ready state
+		currentReplicas    int32  // Number of replicas that are currently running
+		updatedReplicas    int32  // Number of replicas that have been updated
+		availableReplicas  int32  // Number of replicas that are available
 		observedGeneration *int64 // Observed generation of the StatefulSet
-		collisionCount    *int32 // Number of collisions for the StatefulSet
-		expectedErr       bool    // Whether an error is expected for the test case
+		collisionCount     *int32 // Number of collisions for the StatefulSet
+		expectedErr        bool   // Whether an error is expected for the test case
 	}{
 		{"valid status", 3, 3, 2, 1, 0, nil, nil, false},
 		{"invalid replicas", -1, 3, 2, 1, 0, nil, nil, true},
@@ -869,8 +870,9 @@ func int64Ptr(i int64) *int64 {
 }
 
 // int32Ptr is a helper function to create a pointer to an int32 value
-func int32Ptr(i int32
-
+func int32Ptr(i int32) *int32 {
+	return &i
+}
 
 func TestValidateStatefulSetUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
