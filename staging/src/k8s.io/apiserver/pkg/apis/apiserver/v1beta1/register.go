@@ -23,9 +23,13 @@ import (
 )
 
 const GroupName = "apiserver.k8s.io"
+const ConfigGroupName = "apiserver.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
+
+// ConfigSchemeGroupVersion is group version used to register these objects
+var ConfigSchemeGroupVersion = schema.GroupVersion{Group: ConfigGroupName, Version: "v1beta1"}
 
 var (
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
@@ -46,6 +50,9 @@ func init() {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&EgressSelectorConfiguration{},
+	)
+	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
+		&TracingConfiguration{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
