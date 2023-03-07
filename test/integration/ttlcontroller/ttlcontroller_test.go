@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -137,9 +138,10 @@ func TestTTLAnnotations(t *testing.T) {
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()
-	ttlc := ttl.NewTTLController(nodeInformer, testClient)
+	_, ctx := ktesting.NewTestContext(t)
+	ttlc := ttl.NewTTLController(ctx, nodeInformer, testClient)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go nodeInformer.Informer().Run(ctx.Done())
 	go ttlc.Run(ctx, 1)

@@ -490,7 +490,9 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 }
 
 func startTTLController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "ttl"))
 	go ttlcontroller.NewTTLController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-controller"),
 	).Run(ctx, 5)
