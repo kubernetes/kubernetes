@@ -2107,11 +2107,10 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Use allocated resources values from checkpoint store (source of truth) to determine fit
 		otherPods := make([]*v1.Pod, 0, len(pods))
-		checkpointState := kl.statusManager.State()
 		for _, p := range pods {
 			op := p.DeepCopy()
 			for _, c := range op.Spec.Containers {
-				resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(p.UID), c.Name)
+				resourcesAllocated, found := kl.statusManager.GetContainerResourceAllocation(string(p.UID), c.Name)
 				if c.Resources.Requests != nil && found {
 					c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
 					c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
@@ -2406,22 +2405,19 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using ResourcesAllocated values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-				checkpointState := kl.statusManager.State()
 				podCopy := pod.DeepCopy()
 				for _, c := range podCopy.Spec.Containers {
-					resourcesAllocated, found := checkpointState.GetContainerResourceAllocation(string(pod.UID), c.Name)
+					resourcesAllocated, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
 					if c.Resources.Requests != nil && found {
 						c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
 						c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
 					}
 				}
-
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
-
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
 				if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
