@@ -21,11 +21,11 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 type statusStrategy struct {
@@ -113,7 +113,7 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], uNew.Object, oldObject, cel.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], uNew.Object, oldObject, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}

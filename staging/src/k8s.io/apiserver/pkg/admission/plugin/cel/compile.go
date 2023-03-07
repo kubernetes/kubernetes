@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"sync"
 
 	"github.com/google/cel-go/cel"
@@ -33,8 +34,6 @@ const (
 	RequestVarName                   = "request"
 	AuthorizerVarName                = "authorizer"
 	RequestResourceAuthorizerVarName = "authorizer.requestResource"
-
-	checkFrequency = 100
 )
 
 var (
@@ -190,7 +189,8 @@ type CompilationResult struct {
 }
 
 // CompileCELExpression returns a compiled CEL expression.
-func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars OptionalVariableDeclarations) CompilationResult {
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
+func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars OptionalVariableDeclarations, perCallLimit uint64) CompilationResult {
 	var env *cel.Env
 	envs, err := getEnvs()
 	if err != nil {
@@ -245,9 +245,10 @@ func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars Op
 		}
 	}
 	prog, err := env.Program(ast,
-		cel.EvalOptions(cel.OptOptimize),
+		cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
 		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
-		cel.InterruptCheckFrequency(checkFrequency),
+		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
+		cel.CostLimit(perCallLimit),
 	)
 	if err != nil {
 		return CompilationResult{

@@ -27,6 +27,7 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/metrics"
@@ -40,22 +41,6 @@ const (
 	// OldScopedVarName is the variable name assigned to the existing value of the locally scoped data element of a
 	// CEL validation expression.
 	OldScopedVarName = "oldSelf"
-
-	// PerCallLimit specify the actual cost limit per CEL validation call
-	// current PerCallLimit gives roughly 0.1 second for each expression validation call
-	PerCallLimit = 1000000
-
-	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
-	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
-	RuntimeCELCostBudget = 10000000
-
-	// checkFrequency configures the number of iterations within a comprehension to evaluate
-	// before checking whether the function evaluation has been interrupted
-	checkFrequency = 100
-
-	// maxRequestSizeBytes is the maximum size of a request to the API server
-	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
-	maxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
 )
 
 // CompilationResult represents the cel compilation result for one rule
@@ -103,7 +88,7 @@ func getBaseEnv() (*cel.Env, error) {
 //   - nil Program, non-nil Error: Compilation resulted in an error
 //   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 //
-// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()
 	defer func() {
@@ -195,7 +180,7 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		cel.CostLimit(perCallLimit),
 		cel.CostTracking(estimator),
 		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
-		cel.InterruptCheckFrequency(checkFrequency),
+		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "program instantiation failed: " + err.Error()}
@@ -274,5 +259,5 @@ func (c *sizeEstimator) EstimateCallCost(function, overloadID string, target *ch
 // this function.
 func maxCardinality(minSize int64) uint64 {
 	sz := minSize + 1 // assume at least one comma between elements
-	return uint64(maxRequestSizeBytes / sz)
+	return uint64(celconfig.MaxRequestSizeBytes / sz)
 }

@@ -19,6 +19,8 @@ package cel
 import (
 	"strings"
 	"testing"
+
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 func TestCompileValidatingPolicyExpression(t *testing.T) {
@@ -120,7 +122,7 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 			for _, expr := range tc.expressions {
 				result := CompileCELExpression(&fakeExpressionAccessor{
 					expr,
-				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: true})
+				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: true}, celconfig.PerCallLimit)
 				if result.Error != nil {
 					t.Errorf("Unexpected error: %v", result.Error)
 				}
@@ -128,7 +130,7 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 			for expr, expectErr := range tc.errorExpressions {
 				result := CompileCELExpression(&fakeExpressionAccessor{
 					expr,
-				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer})
+				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
 				if result.Error == nil {
 					t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
 					continue
