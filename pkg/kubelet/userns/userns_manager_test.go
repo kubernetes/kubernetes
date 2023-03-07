@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package userns
 
 import (
 	"fmt"
@@ -31,11 +31,11 @@ import (
 type testUserNsPodsManager struct {
 }
 
-func (m *testUserNsPodsManager) getPodDir(podUID types.UID) string {
+func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
 	return "/tmp/non-existant-dir.This-is-not-used-in-tests"
 }
 
-func (m *testUserNsPodsManager) listPodsFromDisk() ([]types.UID, error) {
+func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 	return nil, nil
 }
 

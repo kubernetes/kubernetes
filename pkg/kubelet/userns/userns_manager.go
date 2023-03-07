@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package userns
 
 import (
 	"encoding/json"
@@ -49,11 +49,11 @@ const maxPods = 1024
 const mapReInitializeThreshold = 1000
 
 type userNsPodsManager interface {
-	getPodDir(podUID types.UID) string
-	listPodsFromDisk() ([]types.UID, error)
+	GetPodDir(podUID types.UID) string
+	ListPodsFromDisk() ([]types.UID, error)
 }
 
-type usernsManager struct {
+type UsernsManager struct {
 	used         *allocator.AllocationBitmap
 	usedBy       map[types.UID]uint32 // Map pod.UID to range used
 	removed      int
@@ -86,8 +86,8 @@ const mappingsFile = "userns"
 
 // writeMappingsToFile writes the specified user namespace configuration to the pod
 // directory.
-func (m *usernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace) error {
-	dir := m.kl.getPodDir(pod)
+func (m *UsernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace) error {
+	dir := m.kl.GetPodDir(pod)
 
 	data, err := json.Marshal(userNs)
 	if err != nil {
@@ -119,8 +119,8 @@ func (m *usernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace)
 }
 
 // readMappingsFromFile reads the user namespace configuration from the pod directory.
-func (m *usernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
-	dir := m.kl.getPodDir(pod)
+func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
+	dir := m.kl.GetPodDir(pod)
 	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
 	if err != nil {
 		return nil, err
@@ -128,8 +128,8 @@ func (m *usernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	return fstore.Read(mappingsFile)
 }
 
-func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
-	m := usernsManager{
+func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
+	m := UsernsManager{
 		// Create a bitArray for all the UID space (2^32).
 		// As a by product of that, no index param to bitArray can be out of bounds (index is uint32).
 		used:   allocator.NewAllocationMap((math.MaxUint32+1)/userNsLength, "user namespaces"),
@@ -146,7 +146,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 		return &m, nil
 	}
 
-	found, err := kl.listPodsFromDisk()
+	found, err := kl.ListPodsFromDisk()
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &m, nil
@@ -166,7 +166,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 
 // recordPodMappings registers the range used for the user namespace if the
 // usernsConfFile exists in the pod directory.
-func (m *usernsManager) recordPodMappings(pod types.UID) error {
+func (m *UsernsManager) recordPodMappings(pod types.UID) error {
 	content, err := m.readMappingsFromFile(pod)
 	if err != nil && err != utilstore.ErrKeyNotFound {
 		return err
@@ -182,7 +182,7 @@ func (m *usernsManager) recordPodMappings(pod types.UID) error {
 }
 
 // isSet checks if the specified index is already set.
-func (m *usernsManager) isSet(v uint32) bool {
+func (m *UsernsManager) isSet(v uint32) bool {
 	index := int(v / userNsLength)
 	return m.used.Has(index)
 }
@@ -190,7 +190,7 @@ func (m *usernsManager) isSet(v uint32) bool {
 // allocateOne finds a free user namespace and allocate it to the specified pod.
 // The first return value is the first ID in the user namespace, the second returns
 // the length for the user namespace range.
-func (m *usernsManager) allocateOne(pod types.UID) (firstID uint32, length uint32, err error) {
+func (m *UsernsManager) allocateOne(pod types.UID) (firstID uint32, length uint32, err error) {
 	if m.numAllocated >= maxPods {
 		return 0, 0, fmt.Errorf("limit on count of pods with user namespaces exceeded (limit is %v, current pods with userns: %v)", maxPods, m.numAllocated)
 	}
@@ -217,7 +217,7 @@ func (m *usernsManager) allocateOne(pod types.UID) (firstID uint32, length uint3
 }
 
 // record stores the user namespace [from; from+length] to the specified pod.
-func (m *usernsManager) record(pod types.UID, from, length uint32) (err error) {
+func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
 	if length != userNsLength {
 		return fmt.Errorf("wrong user namespace length %v", length)
 	}
@@ -257,7 +257,7 @@ func (m *usernsManager) record(pod types.UID, from, length uint32) (err error) {
 }
 
 // Release releases the user namespace allocated to the specified pod.
-func (m *usernsManager) Release(podUID types.UID) {
+func (m *UsernsManager) Release(podUID types.UID) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
 		return
 	}
@@ -268,7 +268,7 @@ func (m *usernsManager) Release(podUID types.UID) {
 	m.releaseWithLock(podUID)
 }
 
-func (m *usernsManager) releaseWithLock(pod types.UID) {
+func (m *UsernsManager) releaseWithLock(pod types.UID) {
 	v, ok := m.usedBy[pod]
 	if !ok {
 		klog.V(5).InfoS("pod user namespace allocation not present", "podUID", pod)
@@ -280,7 +280,7 @@ func (m *usernsManager) releaseWithLock(pod types.UID) {
 	m.numAllocated--
 	m.removed++
 
-	_ = os.Remove(filepath.Join(m.kl.getPodDir(pod), mappingsFile))
+	_ = os.Remove(filepath.Join(m.kl.GetPodDir(pod), mappingsFile))
 
 	if m.removed%mapReInitializeThreshold == 0 {
 		n := make(map[types.UID]uint32)
@@ -293,7 +293,7 @@ func (m *usernsManager) releaseWithLock(pod types.UID) {
 	m.used.Release(int(v / userNsLength))
 }
 
-func (m *usernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {
+func (m *UsernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {
 	if err = json.Unmarshal([]byte(content), &userNs); err != nil {
 		err = fmt.Errorf("can't parse file: %w", err)
 		return
@@ -333,7 +333,7 @@ func (m *usernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) 
 	return
 }
 
-func (m *usernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err error) {
+func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err error) {
 	firstID, length, err := m.allocateOne(pod.UID)
 	if err != nil {
 		return
@@ -366,7 +366,7 @@ func (m *usernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (m *usernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
 		return nil, nil
 	}
@@ -426,7 +426,7 @@ func (m *usernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimea
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *usernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
 		return nil
 	}
@@ -443,7 +443,7 @@ func (m *usernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 	}
 
 	allFound := sets.NewString()
-	found, err := m.kl.listPodsFromDisk()
+	found, err := m.kl.ListPodsFromDisk()
 	if err != nil {
 		return err
 	}

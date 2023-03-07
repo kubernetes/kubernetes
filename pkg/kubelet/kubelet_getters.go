@@ -104,6 +104,11 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 	return kl.getPodDir(podUID)
 }
 
+// ListPodsFromDisk gets a list of pods that have data directories.
+func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
+	return kl.listPodsFromDisk()
+}
+
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
