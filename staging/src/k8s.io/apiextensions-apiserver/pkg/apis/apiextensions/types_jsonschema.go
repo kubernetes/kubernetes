@@ -196,6 +196,18 @@ type ValidationRule struct {
 	// If unset, the message is "failed rule: {Rule}".
 	// e.g. "must be a URL with the host matching spec.host"
 	Message string
+	// MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+	// Since messageExpression is used as a failure message, it must evaluate to a string.
+	// If both message and messageExpression are present on a rule, then messageExpression will be used if validation
+	// fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced
+	// as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+	// that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and
+	// the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged.
+	// messageExpression has access to all the same variables as the rule; the only difference is the return type.
+	// Example:
+	// "x must be less than max ("+string(self.max)+")"
+	// +optional
+	MessageExpression string
 }
 
 // JSON represents any valid JSON value.
