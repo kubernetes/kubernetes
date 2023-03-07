@@ -89,8 +89,7 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 
 func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 	// Outer volume spec replacement is needed only when the old volume reconstruction is used
-	// (i.e. with SELinuxMountReadWriteOncePod disabled)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, false)()
 	// create dswp
 	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
 

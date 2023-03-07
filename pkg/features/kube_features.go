@@ -553,6 +553,13 @@ const (
 	// Enables NetworkPolicy status subresource
 	NetworkPolicyStatus featuregate.Feature = "NetworkPolicyStatus"
 
+	// owner: @jsafrane
+	// kep: https://kep.k8s.io/3756
+	// alpha: v1.25 (as part of SELinuxMountReadWriteOncePod)
+	// beta: v1.27
+	// Robust VolumeManager reconstruction after kubelet restart.
+	NewVolumeManagerReconstruction featuregate.Feature = "NewVolumeManagerReconstruction"
+
 	// owner: @xing-yang @sonasingh46
 	// kep: https://kep.k8s.io/2268
 	// alpha: v1.24
@@ -998,6 +1005,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
+
+	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
