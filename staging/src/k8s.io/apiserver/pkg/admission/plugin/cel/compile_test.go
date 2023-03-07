@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	celgo "github.com/google/cel-go/cel"
+
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
@@ -120,34 +122,79 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expr := range tc.expressions {
-				result := CompileCELExpression(&fakeExpressionAccessor{
-					expr,
-				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: true}, celconfig.PerCallLimit)
-				if result.Error != nil {
-					t.Errorf("Unexpected error: %v", result.Error)
-				}
+				t.Run(expr, func(t *testing.T) {
+					t.Run("expression", func(t *testing.T) {
+						result := CompileCELExpression(&fakeValidationCondition{
+							Expression: expr,
+						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						if result.Error != nil {
+							t.Errorf("Unexpected error: %v", result.Error)
+						}
+					})
+					t.Run("auditAnnotation.valueExpression", func(t *testing.T) {
+						// Test audit annotation compilation by casting the result to a string
+						result := CompileCELExpression(&fakeAuditAnnotationCondition{
+							ValueExpression: "string(" + expr + ")",
+						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						if result.Error != nil {
+							t.Errorf("Unexpected error: %v", result.Error)
+						}
+					})
+				})
 			}
 			for expr, expectErr := range tc.errorExpressions {
-				result := CompileCELExpression(&fakeExpressionAccessor{
-					expr,
-				}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
-				if result.Error == nil {
-					t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
-					continue
-				}
-				if !strings.Contains(result.Error.Error(), expectErr) {
-					t.Errorf("Expected compilation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
-				}
-				continue
+				t.Run(expr, func(t *testing.T) {
+					t.Run("expression", func(t *testing.T) {
+						result := CompileCELExpression(&fakeValidationCondition{
+							Expression: expr,
+						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						if result.Error == nil {
+							t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
+							return
+						}
+						if !strings.Contains(result.Error.Error(), expectErr) {
+							t.Errorf("Expected validation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
+						}
+					})
+					t.Run("auditAnnotation.valueExpression", func(t *testing.T) {
+						// Test audit annotation compilation by casting the result to a string
+						result := CompileCELExpression(&fakeAuditAnnotationCondition{
+							ValueExpression: "string(" + expr + ")",
+						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						if result.Error == nil {
+							t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
+							return
+						}
+						if !strings.Contains(result.Error.Error(), expectErr) {
+							t.Errorf("Expected validation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
+						}
+					})
+				})
 			}
 		})
 	}
 }
 
-type fakeExpressionAccessor struct {
-	expression string
+type fakeValidationCondition struct {
+	Expression string
 }
 
-func (f *fakeExpressionAccessor) GetExpression() string {
-	return f.expression
+func (v *fakeValidationCondition) GetExpression() string {
+	return v.Expression
+}
+
+func (v *fakeValidationCondition) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.BoolType}
+}
+
+type fakeAuditAnnotationCondition struct {
+	ValueExpression string
+}
+
+func (v *fakeAuditAnnotationCondition) GetExpression() string {
+	return v.ValueExpression
+}
+
+func (v *fakeAuditAnnotationCondition) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.StringType, celgo.NullType}
 }

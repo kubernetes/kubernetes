@@ -24,13 +24,9 @@ import (
 	"strings"
 	"testing"
 
+	celgo "github.com/google/cel-go/cel"
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
-
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-	apiservercel "k8s.io/apiserver/pkg/cel"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 type condition struct {
@@ -47,6 +47,10 @@ type condition struct {
 
 func (c *condition) GetExpression() string {
 	return c.Expression
+}
+
+func (v *condition) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.BoolType}
 }
 
 func TestCompile(t *testing.T) {

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -127,6 +128,7 @@ func validPolicyBinding() *admissionregistration.ValidatingAdmissionPolicyBindin
 			ParamRef: &admissionregistration.ParamRef{
 				Name: "param-test",
 			},
+			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 			MatchResources: &admissionregistration.MatchResources{
 				MatchPolicy: func() *admissionregistration.MatchPolicyType {
 					r := admissionregistration.MatchPolicyType("Exact")
@@ -166,7 +168,8 @@ func newPolicyBinding(name string) *admissionregistration.ValidatingAdmissionPol
 			ParamRef: &admissionregistration.ParamRef{
 				Name: "param-test",
 			},
-			MatchResources: &admissionregistration.MatchResources{},
+			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			MatchResources:    &admissionregistration.MatchResources{},
 		},
 	}
 }

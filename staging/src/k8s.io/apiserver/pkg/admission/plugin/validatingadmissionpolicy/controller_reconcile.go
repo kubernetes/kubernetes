@@ -92,7 +92,7 @@ type policyController struct {
 	authz authorizer.Authorizer
 }
 
-type newValidator func(cel.Filter, *v1.FailurePolicyType, authorizer.Authorizer) Validator
+type newValidator func(validationFilter cel.Filter, auditAnnotationFilter cel.Filter, failurePolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
@@ -461,6 +461,7 @@ func (c *policyController) latestPolicyData() []policyData {
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 				bindingInfo.validator = c.newValidator(
 					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
 					convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
 					c.authz,
 				)
@@ -507,6 +508,18 @@ func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.Ex
 			Expression: validation.Expression,
 			Message:    validation.Message,
 			Reason:     validation.Reason,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
+}
+
+func convertv1alpha1AuditAnnotations(inputValidations []v1alpha1.AuditAnnotation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := AuditAnnotationCondition{
+			Key:             validation.Key,
+			ValueExpression: validation.ValueExpression,
 		}
 		celExpressionAccessor[i] = &validation
 	}

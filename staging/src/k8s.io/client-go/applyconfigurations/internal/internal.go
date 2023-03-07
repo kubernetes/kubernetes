@@ -225,6 +225,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: valueExpression
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1alpha1.MatchResources
   map:
     fields:
@@ -353,9 +364,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: policyName
       type:
         scalar: string
+    - name: validationActions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec
   map:
     fields:
+    - name: auditAnnotations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation
+          elementRelationship: atomic
     - name: failurePolicy
       type:
         scalar: string

@@ -75,11 +75,7 @@ func (a *evaluationActivation) Parent() interpreter.Activation {
 }
 
 // Compile compiles the cel expressions defined in the ExpressionAccessors into a Filter
-// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, perCallLimit uint64) Filter {
-	if len(expressionAccessors) == 0 {
-		return nil
-	}
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
 		compilationResults[i] = CompileCELExpression(expressionAccessor, options, perCallLimit)

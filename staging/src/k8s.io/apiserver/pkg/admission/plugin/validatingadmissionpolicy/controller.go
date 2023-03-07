@@ -20,16 +20,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,7 +42,9 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -169,6 +174,8 @@ func (c *celAdmissionController) Run(stopCh <-chan struct{}) {
 	wg.Wait()
 }
 
+const maxAuditAnnotationValueLength = 10 * 1024
+
 func (c *celAdmissionController) Validate(
 	ctx context.Context,
 	a admission.Attributes,
@@ -239,6 +246,7 @@ func (c *celAdmissionController) Validate(
 			continue
 		}
 
+		auditAnnotationCollector := newAuditAnnotationCollector()
 		for _, bindingInfo := range definitionInfo.bindings {
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
@@ -321,27 +329,72 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			decisions := bindingInfo.validator.Validate(versionedAttr, param, celconfig.RuntimeCELCostBudget)
+			validationResult := bindingInfo.validator.Validate(versionedAttr, param, celconfig.RuntimeCELCostBudget)
+			if err != nil {
+				// runtime error. Apply failure policy
+				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
+				addConfigError(wrappedError, definition, binding)
+				continue
+			}
 
-			for _, decision := range decisions {
+			for i, decision := range validationResult.Decisions {
 				switch decision.Action {
 				case ActionAdmit:
 					if decision.Evaluation == EvalError {
 						celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 					}
 				case ActionDeny:
-					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
-						Definition:     definition,
-						Binding:        binding,
-						PolicyDecision: decision,
-					})
-					celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+					for _, action := range binding.Spec.ValidationActions {
+						switch action {
+						case v1alpha1.Deny:
+							deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+								Definition:     definition,
+								Binding:        binding,
+								PolicyDecision: decision,
+							})
+							celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+						case v1alpha1.Audit:
+							c.publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
+							celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+						case v1alpha1.Warn:
+							warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
+							celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+						}
+					}
 				default:
 					return fmt.Errorf("unrecognized evaluation decision '%s' for ValidatingAdmissionPolicyBinding '%s' with ValidatingAdmissionPolicy '%s'",
 						decision.Action, binding.Name, definition.Name)
 				}
 			}
+
+			for _, auditAnnotation := range validationResult.AuditAnnotations {
+				switch auditAnnotation.Action {
+				case AuditAnnotationActionPublish:
+					value := auditAnnotation.Value
+					if len(auditAnnotation.Value) > maxAuditAnnotationValueLength {
+						value = value[:maxAuditAnnotationValueLength]
+					}
+					auditAnnotationCollector.add(auditAnnotation.Key, value)
+				case AuditAnnotationActionError:
+					// When failurePolicy=fail, audit annotation errors result in deny
+					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+						Definition: definition,
+						Binding:    binding,
+						PolicyDecision: PolicyDecision{
+							Action:     ActionDeny,
+							Evaluation: EvalError,
+							Message:    auditAnnotation.Error,
+							Elapsed:    auditAnnotation.Elapsed,
+						},
+					})
+					celmetrics.Metrics.ObserveRejection(ctx, auditAnnotation.Elapsed, definition.Name, binding.Name, "active")
+				case AuditAnnotationActionExclude: // skip it
+				default:
+					return fmt.Errorf("unsupported AuditAnnotation Action: %s", auditAnnotation.Action)
+				}
+			}
 		}
+		auditAnnotationCollector.publish(definition.Name, a)
 	}
 
 	if len(deniedDecisions) > 0 {
@@ -366,6 +419,25 @@ func (c *celAdmissionController) Validate(
 	return nil
 }
 
+func (c *celAdmissionController) publishValidationFailureAnnotation(binding *v1alpha1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
+	key := "validation.policy.admission.k8s.io/validation_failure"
+	// Marshal to a list of failures since, in the future, we may need to support multiple failures
+	valueJson, err := utiljson.Marshal([]validationFailureValue{{
+		ExpressionIndex:   expressionIndex,
+		Message:           decision.Message,
+		ValidationActions: binding.Spec.ValidationActions,
+		Binding:           binding.Name,
+		Policy:            binding.Spec.PolicyName,
+	}})
+	if err != nil {
+		klog.Warningf("Failed to set admission audit annotation %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, binding.Spec.PolicyName, binding.Name, err)
+	}
+	value := string(valueJson)
+	if err := attributes.AddAnnotation(key, value); err != nil {
+		klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, value, binding.Spec.PolicyName, binding.Name, err)
+	}
+}
+
 func (c *celAdmissionController) HasSynced() bool {
 	return c.policyController.HasSynced() && c.definitions.Load() != nil
 }
@@ -376,4 +448,49 @@ func (c *celAdmissionController) ValidateInitialization() error {
 
 func (c *celAdmissionController) refreshPolicies() {
 	c.definitions.Store(c.policyController.latestPolicyData())
+}
+
+// validationFailureValue defines the JSON format of a "validation.policy.admission.k8s.io/validation_failure" audit
+// annotation value.
+type validationFailureValue struct {
+	Message           string                      `json:"message"`
+	Policy            string                      `json:"policy"`
+	Binding           string                      `json:"binding"`
+	ExpressionIndex   int                         `json:"expressionIndex"`
+	ValidationActions []v1alpha1.ValidationAction `json:"validationActions"`
+}
+
+type auditAnnotationCollector struct {
+	annotations map[string][]string
+}
+
+func newAuditAnnotationCollector() auditAnnotationCollector {
+	return auditAnnotationCollector{annotations: map[string][]string{}}
+}
+
+func (a auditAnnotationCollector) add(key, value string) {
+	// If multiple bindings produces the exact same key and value for an audit annotation,
+	// ignore the duplicates.
+	for _, v := range a.annotations[key] {
+		if v == value {
+			return
+		}
+	}
+	a.annotations[key] = append(a.annotations[key], value)
+}
+
+func (a auditAnnotationCollector) publish(policyName string, attributes admission.Attributes) {
+	for key, bindingAnnotations := range a.annotations {
+		var value string
+		if len(bindingAnnotations) == 1 {
+			value = bindingAnnotations[0]
+		} else {
+			// Multiple distinct values can exist when binding params are used in the valueExpression of an auditAnnotation.
+			// When this happens, the values are concatenated into a comma-separated list.
+			value = strings.Join(bindingAnnotations, ", ")
+		}
+		if err := attributes.AddAnnotation(policyName+"/"+key, value); err != nil {
+			klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicy %s: %v", key, value, policyName, err)
+		}
+	}
 }
