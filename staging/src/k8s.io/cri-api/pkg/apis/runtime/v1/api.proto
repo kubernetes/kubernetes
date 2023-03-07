@@ -1641,6 +1641,8 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
     // Swap usage gathered from the container.
     SwapUsage swap = 5;
+    // Usage of the Block IO
+    BlockIOUsage block_io = 6;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1716,6 +1718,16 @@ message WindowsMemoryUsage {
     UInt64Value page_faults = 4;
     // Total commit memory in use. Commit memory is total of physical and virtual memory in use.
     UInt64Value commit_memory_bytes = 5;
+}
+
+// BlockIOUsage provides the Block I/O usage information.
+message BlockIOUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Cumulative count of bytes read.
+    UInt64Value read_bytes = 2;
+    // Cumulative count of bytes write.
+    UInt64Value write_bytes = 3;
 }
 
 message ReopenContainerLogRequest {
