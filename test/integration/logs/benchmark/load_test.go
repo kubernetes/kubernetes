@@ -24,18 +24,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1 "k8s.io/api/core/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
+	runtimev1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
 func TestData(t *testing.T) {
-	container := v1.Container{
-		Command:                []string{"sh -c \nf=/restart-count/restartCount\ncount=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})\nif [ $count -eq 1 ]; then\n\texit 1\nfi\nif [ $count -eq 2 ]; then\n\texit 0\nfi\nwhile true; do sleep 1; done\n"},
-		Image:                  "registry.k8s.io/e2e-test-images/busybox:1.29-2",
-		Name:                   "terminate-cmd-rpn",
-		TerminationMessagePath: "/dev/termination-log",
+	versionResponse := &runtimev1.VersionResponse{
+		Version:           "0.1.0",
+		RuntimeName:       "containerd",
+		RuntimeVersion:    "v1.6.18",
+		RuntimeApiVersion: "v1",
 	}
 
 	testcases := map[string]struct {
@@ -142,45 +142,31 @@ func TestData(t *testing.T) {
 				},
 			},
 		},
-		"data/container.log": {
+		"data/versionresponse.log": {
 			messages: []logMessage{
 				{
-					msg: "Creating container in pod",
+					msg:       "[RemoteRuntimeService] Version Response",
+					verbosity: 10,
 					kvs: []interface{}{
-						"container", &container,
+						"apiVersion", versionResponse,
 					},
 				},
 			},
-			printf: `Creating container in pod: [container &Container{Name:terminate-cmd-rpn,Image:registry.k8s.io/e2e-test-images/busybox:1.29-2,Command:[sh -c`,
-			structured: `"Creating container in pod" container=<
-	&Container{Name:terminate-cmd-rpn,Image:registry.k8s.io/e2e-test-images/busybox:1.29-2,Command:[sh -c 
-	f=/restart-count/restartCount
-	count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
-	if [ $count -eq 1 ]; then
-		exit 1
-	fi
-	if [ $count -eq 2 ]; then
-		exit 0
-	fi
-	while true; do sleep 1; done
-	],Args:[],WorkingDir:,Ports:[]ContainerPort{},Env:[]EnvVar{},Resources:ResourceRequirements{Limits:ResourceList{},Requests:ResourceList{},Claims:[]ResourceClaim{},},VolumeMounts:[]VolumeMount{},LivenessProbe:nil,ReadinessProbe:nil,Lifecycle:nil,TerminationMessagePath:/dev/termination-log,ImagePullPolicy:,SecurityContext:nil,Stdin:false,StdinOnce:false,TTY:false,EnvFrom:[]EnvFromSource{},TerminationMessagePolicy:,VolumeDevices:[]VolumeDevice{},StartupProbe:nil,ResizePolicy:[]ContainerResizePolicy{},}
- >`,
-			// This is what the output would look like with JSON object. Because of https://github.com/kubernetes/kubernetes/issues/106652 we get the string instead.
-			// 			json: `{"msg":"Creating container in pod","v":0,"container":{"name":"terminate-cmd-rpn","image":"registry.k8s.io/e2e-test-images/busybox:1.29-2","command":["sh -c \nf=/restart-count/restartCount\ncount=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})\nif [ $count -eq 1 ]; then\n\texit 1\nfi\nif [ $count -eq 2 ]; then\n\texit 0\nfi\nwhile true; do sleep 1; done\n"],"resources":{},"terminationMessagePath":"/dev/termination-log"}}
-			// `,
-			json: `"msg":"Creating container in pod","v":0,"container":"&Container{Name:terminate-cmd-rpn,Image:registry.k8s.io/e2e-test-images/busybox:1.29-2,Command:[sh -c \nf=/restart-count/restartCount\ncount=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})\nif [ $count -eq 1 ]; then\n\texit 1\nfi\nif [ $count -eq 2 ]; then\n\texit 0\nfi\nwhile true; do sleep 1; done\n],Args:[],WorkingDir:,Ports:[]ContainerPort{},Env:[]EnvVar{},Resources:ResourceRequirements{Limits:ResourceList{},Requests:ResourceList{},Claims:[]ResourceClaim{},},VolumeMounts:[]VolumeMount{},LivenessProbe:nil,ReadinessProbe:nil,Lifecycle:nil,TerminationMessagePath:/dev/termination-log,ImagePullPolicy:,SecurityContext:nil,Stdin:false,StdinOnce:false,TTY:false,EnvFrom:[]EnvFromSource{},TerminationMessagePolicy:,VolumeDevices:[]VolumeDevice{},StartupProbe:nil,ResizePolicy:[]ContainerResizePolicy{},}"`,
+			printf:     `[RemoteRuntimeService] Version Response: [apiVersion &VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}]`,
+			structured: `"[RemoteRuntimeService] Version Response" apiVersion="&VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}"`,
+			// Because of
+			// https://github.com/kubernetes/kubernetes/issues/106652
+			// we get the string instead of a JSON struct.
+			json: `"msg":"[RemoteRuntimeService] Version Response","v":0,"apiVersion":"&VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}"`,
 			stats: logStats{
-				TotalLines: 2,
+				TotalLines: 1,
 				JsonLines:  1,
 				ArgCounts: map[string]int{
 					totalArg: 1,
 					otherArg: 1,
 				},
-				OtherLines: []string{
-					"0: # This is a manually created message. See https://github.com/kubernetes/kubernetes/issues/106652 for the real one.",
-				},
 				OtherArgs: []interface{}{
-					&container,
+					versionResponse,
 				},
 			},
 		},

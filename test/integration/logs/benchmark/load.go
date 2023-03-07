@@ -30,6 +30,7 @@ import (
 	"text/template"
 
 	v1 "k8s.io/api/core/v1"
+	runtimev1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -249,6 +250,7 @@ func parseLine(line []byte, stats *logStats) (item logMessage, err error) {
 // fields are an error).
 var objectTypes = []reflect.Type{
 	reflect.TypeOf(klog.ObjectRef{}),
+	reflect.TypeOf(&runtimev1.VersionResponse{}),
 	reflect.TypeOf(&v1.Pod{}),
 	reflect.TypeOf(&v1.Container{}),
 }
