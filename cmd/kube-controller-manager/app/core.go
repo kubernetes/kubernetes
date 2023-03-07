@@ -186,7 +186,6 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
-		controllerContext.ComponentConfig.NodeLifecycleController.PodEvictionTimeout.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
 		controllerContext.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
 		controllerContext.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,

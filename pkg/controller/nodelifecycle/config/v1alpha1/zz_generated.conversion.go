@@ -86,7 +86,7 @@ func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLif
 	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
+	// WARNING: in.PodEvictionTimeout requires manual conversion: does not exist in peer-type
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	return nil
@@ -97,7 +97,6 @@ func autoConvert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLif
 	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	return nil

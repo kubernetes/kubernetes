@@ -95,7 +95,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
-		time.Second, // Pod eviction timeout
 		100,         // Eviction limiter QPS
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold

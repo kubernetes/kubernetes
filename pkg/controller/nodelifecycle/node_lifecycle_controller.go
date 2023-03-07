@@ -273,7 +273,7 @@ type Controller struct {
 	//    post node status/lease. It is pointless to make nodeMonitorGracePeriod
 	//    be less than the node health signal update frequency, since there will
 	//    only be fresh values from Kubelet at an interval of node health signal
-	//    update frequency. The constant must be less than podEvictionTimeout.
+	//    update frequency.
 	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
@@ -282,7 +282,6 @@ type Controller struct {
 	// Defaults to scheduler.UpdateWorkerSize.
 	nodeUpdateWorkerSize int
 
-	podEvictionTimeout          time.Duration
 	evictionLimiterQPS          float32
 	secondaryEvictionLimiterQPS float32
 	largeClusterThreshold       int32
@@ -303,7 +302,6 @@ func NewNodeLifecycleController(
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorGracePeriod time.Duration,
-	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
 	secondaryEvictionLimiterQPS float32,
 	largeClusterThreshold int32,
@@ -332,7 +330,6 @@ func NewNodeLifecycleController(
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
-		podEvictionTimeout:          podEvictionTimeout,
 		evictionLimiterQPS:          evictionLimiterQPS,
 		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
 		largeClusterThreshold:       largeClusterThreshold,

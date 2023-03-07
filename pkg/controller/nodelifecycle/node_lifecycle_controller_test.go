@@ -41,7 +41,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
@@ -89,28 +88,6 @@ type nodeLifecycleController struct {
 	daemonSetInformer appsinformers.DaemonSetInformer
 }
 
-// doEviction does the fake eviction and returns the status of eviction operation.
-func (nc *nodeLifecycleController) doEviction(logger klog.Logger, fakeNodeHandler *testutil.FakeNodeHandler) bool {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	zones := testutil.GetZones(fakeNodeHandler)
-	for _, zone := range zones {
-		nc.zoneNoExecuteTainter[zone].Try(logger, func(value scheduler.TimedValue) (bool, time.Duration) {
-			uid, _ := value.UID.(string)
-			pods, _ := nc.getPodsAssignedToNode(value.Value)
-			controllerutil.DeletePods(context.TODO(), fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
-			return true, 0
-		})
-	}
-
-	for _, action := range fakeNodeHandler.Actions() {
-		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-			return true
-		}
-	}
-	return false
-}
-
 func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease {
 	return &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +125,6 @@ func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeN
 func newNodeLifecycleControllerFromClient(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
 	secondaryEvictionLimiterQPS float32,
 	largeClusterThreshold int32,
@@ -174,7 +150,6 @@ func newNodeLifecycleControllerFromClient(
 		nodeMonitorPeriod,
 		nodeStartupGracePeriod,
 		nodeMonitorGracePeriod,
-		podEvictionTimeout,
 		evictionLimiterQPS,
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
@@ -194,7 +169,6 @@ func newNodeLifecycleControllerFromClient(
 
 func TestMonitorNodeHealthEvictPods(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 	labels := map[string]string{
 		v1.LabelTopologyRegion:          "region1",
 		v1.LabelTopologyZone:            "zone1",
@@ -362,7 +336,6 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
-			timeToPass: evictionTimeout,
 			newNodeStatus: v1.NodeStatus{
 				Conditions: []v1.NodeCondition{
 					{
@@ -593,7 +566,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
-			timeToPass: evictionTimeout - testNodeMonitorGracePeriod,
+			timeToPass: testNodeMonitorGracePeriod,
 			newNodeStatus: v1.NodeStatus{
 				Conditions: []v1.NodeCondition{
 					{
@@ -683,7 +656,6 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			context.TODO(),
 			item.fakeNodeHandler,
-			evictionTimeout,
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
@@ -754,7 +726,6 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 
 func TestPodStatusChange(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
 	// we need second healthy node in tests. Because of how the tests are written we need to update
@@ -853,7 +824,6 @@ func TestPodStatusChange(t *testing.T) {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			context.TODO(),
 			item.fakeNodeHandler,
-			evictionTimeout,
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
@@ -909,574 +879,6 @@ func TestPodStatusChange(t *testing.T) {
 
 		if podReasonUpdate != item.expectedPodUpdate {
 			t.Errorf("expected pod update: %+v, got %+v for %+v", item.expectedPodUpdate, podReasonUpdate, item.description)
-		}
-	}
-}
-
-func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
-	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
-	timeToPass := 60 * time.Minute
-
-	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
-	// we need second healthy node in tests. Because of how the tests are written we need to update
-	// the status of this Node.
-	healthyNodeNewStatus := v1.NodeStatus{
-		Conditions: []v1.NodeCondition{
-			{
-				Type:               v1.NodeReady,
-				Status:             v1.ConditionTrue,
-				LastHeartbeatTime:  metav1.Date(2015, 1, 1, 13, 0, 0, 0, time.UTC),
-				LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-			},
-		},
-	}
-	unhealthyNodeNewStatus := v1.NodeStatus{
-		Conditions: []v1.NodeCondition{
-			{
-				Type:   v1.NodeReady,
-				Status: v1.ConditionUnknown,
-				// Node status was updated by nodecontroller 1hr ago
-				LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-				LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-			},
-		},
-	}
-
-	table := []struct {
-		nodeList                []*v1.Node
-		podList                 []v1.Pod
-		updatedNodeStatuses     []v1.NodeStatus
-		expectedInitialStates   map[string]ZoneState
-		expectedFollowingStates map[string]ZoneState
-		expectedEvictPods       bool
-		description             string
-	}{
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Only zone is down - eviction shouldn't take place
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-			},
-			expectedInitialStates:   map[string]ZoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
-			expectedFollowingStates: map[string]ZoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
-			expectedEvictPods:       false,
-			description:             "Network Disruption: Only zone is down - eviction shouldn't take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Both zones down - eviction shouldn't take place
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region2",
-							v1.LabelTopologyZone:            "zone2",
-							v1.LabelFailureDomainBetaRegion: "region2",
-							v1.LabelFailureDomainBetaZone:   "zone2",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
-			},
-			expectedEvictPods: false,
-			description:       "Network Disruption: Both zones down - eviction shouldn't take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// One zone is down - eviction should take place
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone2",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone2",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionTrue,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedFollowingStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedEvictPods: true,
-			description:       "Network Disruption: One zone is down - eviction should take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period
-		// of on first Node, eviction should stop even though Node with label
-		// node.kubernetes.io/exclude-disruption is healthy.
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node-master",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-							labelNodeDisruptionExclusion:    "",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionTrue,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-			},
-			expectedEvictPods: false,
-			description:       "NetworkDisruption: eviction should stop, only Node with label node.kubernetes.io/exclude-disruption is healthy",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Initially both zones down, one comes back - eviction should take place
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone2",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone2",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region1", "zone2"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
-				testutil.CreateZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedEvictPods: true,
-			description:       "Initially both zones down, one comes back - eviction should take place",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Zone is partially disrupted - eviction should take place
-		{
-			nodeList: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node2",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node3",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionTrue,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node4",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							v1.LabelTopologyRegion:          "region1",
-							v1.LabelTopologyZone:            "zone1",
-							v1.LabelFailureDomainBetaRegion: "region1",
-							v1.LabelFailureDomainBetaZone:   "zone1",
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionTrue,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-
-			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
-			updatedNodeStatuses: []v1.NodeStatus{
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
-			},
-			expectedFollowingStates: map[string]ZoneState{
-				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
-			},
-			expectedEvictPods: true,
-			description:       "Zone is partially disrupted - eviction should take place.",
-		},
-	}
-
-	for _, item := range table {
-		fakeNodeHandler := &testutil.FakeNodeHandler{
-			Existing:  item.nodeList,
-			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
-		}
-		nodeController, _ := newNodeLifecycleControllerFromClient(
-			context.TODO(),
-			fakeNodeHandler,
-			evictionTimeout,
-			testRateLimiterQPS,
-			testRateLimiterQPS,
-			testLargeClusterThreshold,
-			testUnhealthyThreshold,
-			testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod,
-			testNodeMonitorPeriod,
-		)
-		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
-		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
-		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
-			return testRateLimiterQPS
-		}
-		nodeController.enterFullDisruptionFunc = func(nodeNum int) float32 {
-			return testRateLimiterQPS
-		}
-		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err := nodeController.monitorNodeHealth(context.TODO()); err != nil {
-			t.Errorf("%v: unexpected error: %v", item.description, err)
-		}
-
-		for zone, state := range item.expectedInitialStates {
-			if state != nodeController.zoneStates[zone] {
-				t.Errorf("%v: Unexpected zone state: %v: %v instead %v", item.description, zone, nodeController.zoneStates[zone], state)
-			}
-		}
-
-		nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(timeToPass)} }
-		for i := range item.updatedNodeStatuses {
-			fakeNodeHandler.Existing[i].Status = item.updatedNodeStatuses[i]
-		}
-
-		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err := nodeController.monitorNodeHealth(context.TODO()); err != nil {
-			t.Errorf("%v: unexpected error: %v", item.description, err)
-		}
-		for zone, state := range item.expectedFollowingStates {
-			if state != nodeController.zoneStates[zone] {
-				t.Errorf("%v: Unexpected zone state: %v: %v instead %v", item.description, zone, nodeController.zoneStates[zone], state)
-			}
-		}
-		var podEvicted bool
-		start := time.Now()
-		// Infinite loop, used for retrying in case ratelimiter fails to reload for Try function.
-		// this breaks when we have the status that we need for test case or when we don't see the
-		// intended result after 1 minute.
-		logger, _ := ktesting.NewTestContext(t)
-		for {
-			podEvicted = nodeController.doEviction(logger, fakeNodeHandler)
-			if podEvicted == item.expectedEvictPods || time.Since(start) > 1*time.Minute {
-				break
-			}
-		}
-		if item.expectedEvictPods != podEvicted {
-			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
 	}
 }
@@ -1704,7 +1106,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			context.TODO(),
 			item.fakeNodeHandler,
-			5*time.Minute,
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
@@ -2248,7 +1649,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 			nodeController, _ := newNodeLifecycleControllerFromClient(
 				context.TODO(),
 				item.fakeNodeHandler,
-				5*time.Minute,
 				testRateLimiterQPS,
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
@@ -2413,7 +1813,6 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			context.TODO(),
 			item.fakeNodeHandler,
-			5*time.Minute,
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
@@ -2515,7 +1914,6 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			context.TODO(),
 			fakeNodeHandler,
-			5*time.Minute,
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
@@ -2718,7 +2116,6 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 			nodeController, _ := newNodeLifecycleControllerFromClient(
 				context.TODO(),
 				item.fakeNodeHandler,
-				5*time.Minute,
 				testRateLimiterQPS,
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
@@ -2766,7 +2163,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 		t.Skip("Skipping test on Windows.")
 	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -2857,7 +2253,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -2922,7 +2317,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 // TestApplyNoExecuteTaintsToNodesEnqueueTwice ensures we taint every node with NoExecute even if enqueued twice
 func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -3012,7 +2406,6 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -3155,7 +2548,6 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 
 func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -3209,7 +2601,6 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		},
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
-	timeToPass := evictionTimeout
 	newNodeStatus := v1.NodeStatus{
 		Conditions: []v1.NodeCondition{
 			{
@@ -3237,7 +2628,6 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -3272,7 +2662,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		t.Errorf("Can't find taint %v in %v", originalTaint, node0.Spec.Taints)
 	}
 
-	nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(timeToPass)} }
+	nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Time} }
 
 	node0.Status = newNodeStatus
 	node1.Status = healthyNodeNewStatus
@@ -3309,7 +2699,6 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 
 func TestTaintsNodeByCondition(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -3342,7 +2731,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -3545,7 +2933,6 @@ func TestNodeEventGeneration(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		5*time.Minute,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -3586,7 +2973,6 @@ func TestNodeEventGeneration(t *testing.T) {
 
 func TestReconcileNodeLabels(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -3619,7 +3005,6 @@ func TestReconcileNodeLabels(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
@@ -3736,7 +3121,6 @@ func TestReconcileNodeLabels(t *testing.T) {
 func TestTryUpdateNodeHealth(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 	fakeOld := metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -3763,7 +3147,6 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 	nodeController, _ := newNodeLifecycleControllerFromClient(
 		context.TODO(),
 		fakeNodeHandler,
-		evictionTimeout,
 		testRateLimiterQPS,
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
