@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package admission
 
 import (
 	"encoding/json"
@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
@@ -44,7 +43,7 @@ func initiateScheme(t *testing.T) *runtime.Scheme {
 
 func TestConvertToGVK(t *testing.T) {
 	scheme := initiateScheme(t)
-	o := admission.NewObjectInterfacesFromScheme(scheme)
+	o := NewObjectInterfacesFromScheme(scheme)
 	table := map[string]struct {
 		obj         runtime.Object
 		gvk         schema.GroupVersionKind
@@ -165,13 +164,13 @@ func TestRuntimeSchemeConvert(t *testing.T) {
 
 func TestConvertVersionedAttributes(t *testing.T) {
 	scheme := initiateScheme(t)
-	o := admission.NewObjectInterfacesFromScheme(scheme)
+	o := NewObjectInterfacesFromScheme(scheme)
 
 	gvk := func(g, v, k string) schema.GroupVersionKind {
 		return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
 	}
-	attrs := func(obj, oldObj runtime.Object) admission.Attributes {
-		return admission.NewAttributesRecord(obj, oldObj, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
+	attrs := func(obj, oldObj runtime.Object) Attributes {
+		return NewAttributesRecord(obj, oldObj, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
 	}
 	u := func(data string) *unstructured.Unstructured {
 		t.Helper()

@@ -41,7 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
-	whgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
@@ -267,7 +266,7 @@ func (c *celAdmissionController) Validate(
 			// is scoped outside of the param loop so we only convert once. We defer
 			// conversion so that it is only performed when we know a policy matches,
 			// saving the cost of converting non-matching requests.
-			var versionedAttr *whgeneric.VersionedAttributes
+			var versionedAttr *admission.VersionedAttributes
 
 			// If definition has paramKind, paramRef is required in binding.
 			// If definition has no paramKind, paramRef set in binding will be ignored.
@@ -320,7 +319,7 @@ func (c *celAdmissionController) Validate(
 			}
 
 			if versionedAttr == nil {
-				va, err := whgeneric.NewVersionedAttributes(a, matchKind, o)
+				va, err := admission.NewVersionedAttributes(a, matchKind, o)
 				if err != nil {
 					wrappedErr := fmt.Errorf("failed to convert object version: %w", err)
 					addConfigError(wrappedErr, definition, binding)

@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -655,7 +654,7 @@ func TestFilter(t *testing.T) {
 			CompilationResults := f.(*filter).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
-			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
+			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
 			if err != nil {
 				t.Fatalf("unexpected error on conversion: %v", err)
 			}
@@ -758,7 +757,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			CompilationResults := f.(*filter).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
-			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
+			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
 			if err != nil {
 				t.Fatalf("unexpected error on conversion: %v", err)
 			}
