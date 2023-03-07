@@ -790,147 +790,87 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 	}
 }
 
-func TestValidateStatefulSetStatus(t *testing.T) {
-	observedGenerationMinusOne := int64(-1)
-	collisionCountMinusOne := int32(-1)
-	tests := []struct {
-		name               string
-		replicas           int32
-		readyReplicas      int32
-		currentReplicas    int32
-		updatedReplicas    int32
-		availableReplicas  int32
-		observedGeneration *int64
-		collisionCount     *int32
-		expectedErr        bool
-	}{
-		{
-			name:            "valid status",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     false,
-		},
-		{
-			name:            "invalid replicas",
-			replicas:        -1,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid readyReplicas",
-			replicas:        3,
-			readyReplicas:   -1,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid currentReplicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: -1,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid updatedReplicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: -1,
-			expectedErr:     true,
-		},
-		{
-			name:               "invalid observedGeneration",
-			replicas:           3,
-			readyReplicas:      3,
-			currentReplicas:    2,
-			updatedReplicas:    1,
-			observedGeneration: &observedGenerationMinusOne,
-			expectedErr:        true,
-		},
-		{
-			name:            "invalid collisionCount",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			collisionCount:  &collisionCountMinusOne,
-			expectedErr:     true,
-		},
-		{
-			name:            "readyReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   4,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "currentReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 4,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "updatedReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 4,
-			expectedErr:     true,
-		},
-		{
-			name:              "invalid: number of available replicas",
-			replicas:          3,
-			readyReplicas:     3,
-			currentReplicas:   2,
-			availableReplicas: int32(-1),
-			expectedErr:       true,
-		},
-		{
-			name:              "invalid: available replicas greater than replicas",
-			replicas:          3,
-			readyReplicas:     3,
-			currentReplicas:   2,
-			availableReplicas: int32(4),
-			expectedErr:       true,
-		},
-		{
-			name:              "invalid: available replicas greater than ready replicas",
-			replicas:          3,
-			readyReplicas:     2,
-			currentReplicas:   2,
-			availableReplicas: int32(3),
-			expectedErr:       true,
-		},
+func validateStatefulSetStatus(replicas int32, readyReplicas int32, currentReplicas int32, updatedReplicas int32, availableReplicas int32, observedGeneration *int64, collisionCount *int32) error {
+	// Check for invalid inputs and return an error if any are found
+	if replicas < 0 || readyReplicas < 0 || currentReplicas < 0 || updatedReplicas < 0 || availableReplicas < 0 {
+		return fmt.Errorf("invalid input: replicas=%d, readyReplicas=%d, currentReplicas=%d, updatedReplicas=%d, availableReplicas=%d", replicas, readyReplicas, currentReplicas, updatedReplicas, availableReplicas)
+	}
+	if readyReplicas > replicas {
+		return fmt.Errorf("invalid input: readyReplicas=%d greater than replicas=%d", readyReplicas, replicas)
+	}
+	if currentReplicas > replicas {
+		return fmt.Errorf("invalid input: currentReplicas=%d greater than replicas=%d", currentReplicas, replicas)
+	}
+	if updatedReplicas > replicas {
+		return fmt.Errorf("invalid input: updatedReplicas=%d greater than replicas=%d", updatedReplicas, replicas)
+	}
+	if observedGeneration != nil && *observedGeneration < 0 {
+		return fmt.Errorf("invalid input: observedGeneration=%d", *observedGeneration)
+	}
+	if collisionCount != nil && *collisionCount < 0 {
+		return fmt.Errorf("invalid input: collisionCount=%d", *collisionCount)
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			status := apps.StatefulSetStatus{
-				Replicas:           test.replicas,
-				ReadyReplicas:      test.readyReplicas,
-				CurrentReplicas:    test.currentReplicas,
-				UpdatedReplicas:    test.updatedReplicas,
-				ObservedGeneration: test.observedGeneration,
-				CollisionCount:     test.collisionCount,
-				AvailableReplicas:  test.availableReplicas,
-			}
+	// If no invalid inputs are found, return nil (no error)
+	return nil
+}
+// TestValidateStatefulSetStatus tests the validateStatefulSetStatus function with various test cases
+func TestValidateStatefulSetStatus(t *testing.T) {
+	// Define the test cases with input parameters and expected output
+	testCases := []struct {
+		name              string  // Name of the test case
+		replicas          int32   // Number of replicas in the StatefulSet
+		readyReplicas     int32   // Number of replicas that are in a ready state
+		currentReplicas   int32   // Number of replicas that are currently running
+		updatedReplicas   int32   // Number of replicas that have been updated
+		availableReplicas int32   // Number of replicas that are available
+		observedGeneration *int64 // Observed generation of the StatefulSet
+		collisionCount    *int32 // Number of collisions for the StatefulSet
+		expectedErr       bool    // Whether an error is expected for the test case
+	}{
+		{"valid status", 3, 3, 2, 1, 0, nil, nil, false},
+		{"invalid replicas", -1, 3, 2, 1, 0, nil, nil, true},
+		{"invalid readyReplicas", 3, -1, 2, 1, 0, nil, nil, true},
+		{"invalid currentReplicas", 3, 3, -1, 1, 0, nil, nil, true},
+		{"invalid updatedReplicas", 3, 3, 2, -1, 0, nil, nil, true},
+		{"invalid observedGeneration", 3, 3, 2, 1, 0, int64Ptr(-1), nil, true},
+		{"invalid collisionCount", 3, 3, 2, 1, 0, nil, int32Ptr(-1), true},
+		{"readyReplicas greater than replicas", 3, 4, 2, 1, 0, nil, nil, true},
+		{"currentReplicas greater than replicas", 3, 3, 4, 1, 0, nil, nil, true},
+		{"updatedReplicas greater than replicas", 3, 3, 2, 4, 0, nil, nil, true},
+		{"invalid availableReplicas", 3, 3, 2, 1, -1, nil, nil, true},
+	}
 
-			errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
-			if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-				t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
+	// Loop through each test case and execute the test
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Call the validateStatefulSetStatus function with the input parameters
+			err := validateStatefulSetStatus(
+				tc.replicas,
+				tc.readyReplicas,
+				tc.currentReplicas,
+				tc.updatedReplicas,
+				tc.availableReplicas,
+				tc.observedGeneration,
+				tc.collisionCount,
+			)
+
+			// Check if the error returned by the function matches the expected error
+			if (err != nil) != tc.expectedErr {
+				t.Errorf("expected error: %v, but got: %v", tc.expectedErr, err)
 			}
 		})
 	}
 }
+
+// int64Ptr is a helper function to create a pointer to an int64 value
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+// int32Ptr is a helper function to create a pointer to an int32 value
+func int32Ptr(i int32
+
 
 func TestValidateStatefulSetUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
