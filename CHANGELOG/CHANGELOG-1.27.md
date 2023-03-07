@@ -111,35 +111,6 @@ filename | sha512 hash
 [kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-s390x.tar.gz) | dff5a35a352e5a17abad8eaa51b9447ca0a8a52df4b22e325ac7acf70efe3d0fe9bef958e8bb5a1e90d43c4586551d456e2dcf42cd01074605c07d69a52fc5b7
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-windows-amd64.tar.gz) | a2da87f8a7bd25d6efc8c3b7af79e268809e743ce36c187cdc0af3ff423d54f95a5bd03b50494aea8b0c394ca716e5c4225e7e2d49f40f08db6cd302d894eb3b
 
-### Assets
-
-checksums |
--------- |
-[kubernetes.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes.tar.gz) |
-[kubernetes-src.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-src.tar.gz) |
-[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-darwin-amd64.tar.gz) |
-[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-darwin-arm64.tar.gz) |
-[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-386.tar.gz) |
-[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-amd64.tar.gz) |
-[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-arm.tar.gz) |
-[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-arm64.tar.gz) |
-[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-ppc64le.tar.gz) |
-[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-linux-s390x.tar.gz) |
-[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-windows-386.tar.gz) |
-[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-windows-amd64.tar.gz) |
-[kubernetes-client-windows-arm64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-client-windows-arm64.tar.gz) |
-[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-server-linux-amd64.tar.gz) |
-[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-server-linux-arm.tar.gz) |
-[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-server-linux-arm64.tar.gz) |
-[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-server-linux-ppc64le.tar.gz) |
-[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-server-linux-s390x.tar.gz)
-[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-amd64.tar.gz)
-[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-arm.tar.gz)
-[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-arm64.tar.gz)
-[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-ppc64le.tar.gz)
-[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-linux-s390x.tar.gz)
-[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.27.0-alpha.3/kubernetes-node-windows-amd64.tar.gz)
-
 ### Container Images
 
 All container images are available as manifest lists and support the described
