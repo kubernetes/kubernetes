@@ -81,7 +81,7 @@ func buildRequiredVarsEnv() (*cel.Env, error) {
 	var propDecls []cel.EnvOption
 	reg := apiservercel.NewRegistry(baseEnv)
 
-	requestType := buildRequestType()
+	requestType := BuildRequestType()
 	rt, err := apiservercel.NewRuleTypes(requestType.TypeName(), requestType, reg)
 	if err != nil {
 		return nil, err
@@ -134,11 +134,11 @@ func buildWithOptionalVarsEnvs(requiredVarsEnv *cel.Env) (envs, error) {
 	return envs, nil
 }
 
-// buildRequestType generates a DeclType for AdmissionRequest. This may be replaced with a utility that
+// BuildRequestType generates a DeclType for AdmissionRequest. This may be replaced with a utility that
 // converts the native type definition to apiservercel.DeclType once such a utility becomes available.
 // The 'uid' field is omitted since it is not needed for in-process admission review.
 // The 'object' and 'oldObject' fields are omitted since they are exposed as root level CEL variables.
-func buildRequestType() *apiservercel.DeclType {
+func BuildRequestType() *apiservercel.DeclType {
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}
