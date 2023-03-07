@@ -403,7 +403,7 @@ func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (clientset.Inte
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
-	go tokenController.Run(1, ctx.Done())
+	go tokenController.Run(ctx, 1)
 
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
