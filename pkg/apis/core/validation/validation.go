@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -36,6 +37,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -1988,7 +1991,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
 	if oldPv.Spec.NodeAffinity != nil {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		allErrs = append(allErrs, validatePvNodeAffinity(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -7251,5 +7254,46 @@ func ValidatePodAffinityTermSelector(podAffinityTerm core.PodAffinityTerm, allow
 	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: allowInvalidLabelValueInSelector}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, labelSelectorValidationOptions, fldPath.Child("labelSelector"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, labelSelectorValidationOptions, fldPath.Child("namespaceSelector"))...)
+	return allErrs
+}
+
+var betaToGALabel = map[string]string{
+	v1.LabelFailureDomainBetaZone:   v1.LabelTopologyZone,
+	v1.LabelFailureDomainBetaRegion: v1.LabelTopologyRegion,
+	kubeletapis.LabelOS:             v1.LabelOSStable,
+	kubeletapis.LabelArch:           v1.LabelArchStable,
+	v1.LabelInstanceType:            v1.LabelInstanceTypeStable,
+}
+
+var (
+	maskNodeSelectorLabelChangeEqualities     conversion.Equalities
+	initMaskNodeSelectorLabelChangeEqualities sync.Once
+)
+
+func getMaskNodeSelectorLabelChangeEqualities() conversion.Equalities {
+	initMaskNodeSelectorLabelChangeEqualities.Do(func() {
+		var eqs = apiequality.Semantic.Copy()
+		err := eqs.AddFunc(
+			func(newReq, oldReq core.NodeSelectorRequirement) bool {
+				// allow newReq to change to a GA key
+				if oldReq.Key != newReq.Key && betaToGALabel[oldReq.Key] == newReq.Key {
+					oldReq.Key = newReq.Key // +k8s:verify-mutation:reason=clone
+				}
+				return apiequality.Semantic.DeepEqual(newReq, oldReq)
+			},
+		)
+		if err != nil {
+			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
+		}
+		maskNodeSelectorLabelChangeEqualities = eqs
+	})
+	return maskNodeSelectorLabelChangeEqualities
+}
+
+func validatePvNodeAffinity(newPvNodeAffinity, oldPvNodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !getMaskNodeSelectorLabelChangeEqualities().DeepEqual(newPvNodeAffinity, oldPvNodeAffinity) {
+		allErrs = append(allErrs, field.Invalid(fldPath, newPvNodeAffinity, fieldImmutableErrorMsg+", except for updating from beta label to GA"))
+	}
 	return allErrs
 }
