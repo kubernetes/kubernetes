@@ -20,6 +20,7 @@ limitations under the License.
 package nodeipam
 
 import (
+	"context"
 	"net"
 
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -31,11 +32,12 @@ import (
 type fakeController struct {
 }
 
-func (f *fakeController) Run(stopCh <-chan struct{}) {
-	<-stopCh
+func (f *fakeController) Run(ctx context.Context) {
+	<-ctx.Done()
 }
 
 func createLegacyIPAM(
+	logger klog.Logger,
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
@@ -44,6 +46,7 @@ func createLegacyIPAM(
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
 ) *fakeController {
-	klog.Fatal("Error trying to Init(): legacy cloud provider support disabled at build time")
+	logger.Error(nil, "Error trying to Init(): legacy cloud provider support disabled at build time")
+	klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	return &fakeController{}
 }

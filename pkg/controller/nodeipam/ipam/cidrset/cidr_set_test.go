@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
@@ -558,34 +557,35 @@ func TestGetBitforCIDR(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		_, clusterCIDR, err := netutils.ParseCIDRSloppy(tc.clusterCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			_, clusterCIDR, err := netutils.ParseCIDRSloppy(tc.clusterCIDRStr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-		cs, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
-		if err != nil {
-			t.Fatalf("Error allocating CIDRSet for %v", tc.description)
-		}
-		_, subnetCIDR, err := netutils.ParseCIDRSloppy(tc.subNetCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
+			cs, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
+			if err != nil {
+				t.Fatalf("Error allocating CIDRSet")
+			}
+			_, subnetCIDR, err := netutils.ParseCIDRSloppy(tc.subNetCIDRStr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got, err := cs.getIndexForCIDR(subnetCIDR)
+			if err == nil && tc.expectErr {
+				t.Errorf("expected error but got null")
+				return
+			}
 
-		got, err := cs.getIndexForCIDR(subnetCIDR)
-		if err == nil && tc.expectErr {
-			klog.Errorf("expected error but got null for %v", tc.description)
-			continue
-		}
+			if err != nil && !tc.expectErr {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 
-		if err != nil && !tc.expectErr {
-			klog.Errorf("unexpected error: %v for %v", err, tc.description)
-			continue
-		}
-
-		if got != tc.expectedBit {
-			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
-		}
+			if got != tc.expectedBit {
+				t.Errorf("expected %v, but got %v", tc.expectedBit, got)
+			}
+		})
 	}
 }
 

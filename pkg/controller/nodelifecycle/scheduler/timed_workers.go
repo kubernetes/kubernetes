@@ -52,10 +52,11 @@ type TimedWorker struct {
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
+	logger := klog.FromContext(ctx)
 	fWithErrorLogging := func() {
 		err := f(ctx, args)
 		if err != nil {
-			klog.Errorf("NodeLifecycle: timed worker failed with error: %q", err)
+			logger.Error(err, "NodeLifecycle: timed worker failed")
 		}
 	}
 	if delay <= 0 {
@@ -116,12 +117,13 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Con
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
 func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
-	klog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 
 	q.Lock()
 	defer q.Unlock()
 	if _, exists := q.workers[key]; exists {
-		klog.Warningf("Trying to add already existing work for %+v. Skipping.", args)
+		logger.Info("Trying to add already existing work, skipping", "args", args)
 		return
 	}
 	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
@@ -129,13 +131,13 @@ func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdA
 }
 
 // CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
-func (q *TimedWorkerQueue) CancelWork(key string) bool {
+func (q *TimedWorkerQueue) CancelWork(logger klog.Logger, key string) bool {
 	q.Lock()
 	defer q.Unlock()
 	worker, found := q.workers[key]
 	result := false
 	if found {
-		klog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
+		logger.V(4).Info("Cancelling TimedWorkerQueue item", "item", key, "time", time.Now())
 		if worker != nil {
 			result = true
 			worker.Cancel()
