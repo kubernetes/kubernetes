@@ -233,11 +233,9 @@ type KubeletConfiguration struct {
 	// Requires the MemoryManager feature gate to be enabled.
 	MemoryManagerPolicy string
 	// TopologyManagerPolicy is the name of the policy to use.
-	// Policies other than "none" require the TopologyManager feature gate to be enabled.
 	TopologyManagerPolicy string
 	// TopologyManagerScope represents the scope of topology hint generation
 	// that topology manager requests and hint providers generate.
-	// "pod" scope requires the TopologyManager feature gate to be enabled.
 	// Default: "container"
 	// +optional
 	TopologyManagerScope string
