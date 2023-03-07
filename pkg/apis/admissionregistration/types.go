@@ -123,6 +123,52 @@ type ValidatingAdmissionPolicy struct {
 	metav1.ObjectMeta
 	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
 	Spec ValidatingAdmissionPolicySpec
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status ValidatingAdmissionPolicyStatus
+}
+
+// ValidatingAdmissionPolicyStatus represents the status of an admission validation policy.
+type ValidatingAdmissionPolicyStatus struct {
+	// The generation observed by the controller.
+	// +optional
+	ObservedGeneration int64
+	// The results of type checking for each expression.
+	// Presence of this field indicates the completion of the type checking.
+	// +optional
+	TypeChecking *TypeChecking
+	// The conditions represent the latest available observations of a policy's current state.
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
+}
+
+// ValidatingAdmissionPolicyConditionType is the condition type of admission validation policy.
+type ValidatingAdmissionPolicyConditionType string
+
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
+type TypeChecking struct {
+	// The type checking warnings for each expression.
+	// +optional
+	// +listType=atomic
+	ExpressionWarnings []ExpressionWarning
+}
+
+// ExpressionWarning is a warning information that targets a specific expression.
+type ExpressionWarning struct {
+	// The path to the field that refers the expression.
+	// For example, the reference to the expression of the first item of
+	// validations is "spec.validations[0].expression"
+	FieldRef string
+	// The content of type checking information in a human-readable form.
+	// Each line of the warning contains the type that the expression is checked
+	// against, followed by the type check error from the compiler.
+	Warning string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

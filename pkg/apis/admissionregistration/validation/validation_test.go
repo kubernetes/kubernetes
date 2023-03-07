@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
@@ -3451,5 +3452,85 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestValidateValidatingAdmissionPolicyStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		status        *admissionregistration.ValidatingAdmissionPolicyStatus
+		expectedError string
+	}{
+		{
+			name:   "empty",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{},
+		},
+		{
+			name: "type checking",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec.validations[0].expression",
+							Warning:  "message",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "type checking bad json path",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec[foo]",
+							Warning:  "message",
+						},
+					},
+				},
+			},
+			expectedError: "invalid JSONPath: invalid array index foo",
+		},
+		{
+			name: "type checking missing warning",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec.validations[0].expression",
+						},
+					},
+				},
+			},
+			expectedError: "Required value",
+		},
+		{
+			name: "type checking missing fieldRef",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							Warning: "message",
+						},
+					},
+				},
+			},
+			expectedError: "Required value",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateValidatingAdmissionPolicyStatus(tc.status, field.NewPath("status"))
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := tc.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if tc.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", tc.expectedError)
+				}
+			}
+		})
 	}
 }

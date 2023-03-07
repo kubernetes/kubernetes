@@ -33,6 +33,7 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/util/jsonpath"
 
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
@@ -916,7 +917,56 @@ func ValidateValidatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.V
 	return validateValidatingAdmissionPolicy(newC)
 }
 
+// ValidateValidatingAdmissionPolicyStatusUpdate validates update of status of validating admission policy
+func ValidateValidatingAdmissionPolicyStatusUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
+	return validateValidatingAdmissionPolicyStatus(&newC.Status, field.NewPath("status"))
+}
+
 // ValidateValidatingAdmissionPolicyBindingUpdate validates update of validating admission policy
 func ValidateValidatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
 	return validateValidatingAdmissionPolicyBinding(newC)
+}
+
+func validateValidatingAdmissionPolicyStatus(status *admissionregistration.ValidatingAdmissionPolicyStatus, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, validateTypeChecking(status.TypeChecking, fldPath.Child("typeChecking"))...)
+	allErrors = append(allErrors, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
+	return allErrors
+}
+
+func validateTypeChecking(typeChecking *admissionregistration.TypeChecking, fldPath *field.Path) field.ErrorList {
+	if typeChecking == nil {
+		return nil
+	}
+	return validateExpressionWarnings(typeChecking.ExpressionWarnings, fldPath.Child("expressionWarnings"))
+}
+
+func validateExpressionWarnings(expressionWarnings []admissionregistration.ExpressionWarning, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	for i, warning := range expressionWarnings {
+		allErrors = append(allErrors, validateExpressionWarning(&warning, fldPath.Index(i))...)
+	}
+	return allErrors
+}
+
+func validateExpressionWarning(expressionWarning *admissionregistration.ExpressionWarning, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if expressionWarning.Warning == "" {
+		allErrors = append(allErrors, field.Required(fldPath.Child("warning"), ""))
+	}
+	allErrors = append(allErrors, validateFieldRef(expressionWarning.FieldRef, fldPath.Child("fieldRef"))...)
+	return allErrors
+}
+
+func validateFieldRef(fieldRef string, fldPath *field.Path) field.ErrorList {
+	fieldRef = strings.TrimSpace(fieldRef)
+	if fieldRef == "" {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+	jsonPath := jsonpath.New("spec")
+	if err := jsonPath.Parse(fmt.Sprintf("{%s}", fieldRef)); err != nil {
+		return field.ErrorList{field.Invalid(fldPath, fieldRef, fmt.Sprintf("invalid JSONPath: %v", err))}
+	}
+	// no further checks, for an easier upgrade/rollback
+	return nil
 }
