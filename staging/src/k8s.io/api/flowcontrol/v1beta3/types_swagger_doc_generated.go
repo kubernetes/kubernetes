@@ -101,9 +101,10 @@ func (GroupSubject) SwaggerDoc() map[string]string {
 }
 
 var map_LimitResponse = map[string]string{
-	"":        "LimitResponse defines how to handle requests that can not be executed right now.",
-	"type":    "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
-	"queuing": "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+	"":            "LimitResponse defines how to handle requests that can not be executed right now.",
+	"type":        "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
+	"queuing":     "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+	"tokenBucket": "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`.",
 }
 
 func (LimitResponse) SwaggerDoc() map[string]string {
@@ -249,6 +250,16 @@ var map_Subject = map[string]string{
 
 func (Subject) SwaggerDoc() map[string]string {
 	return map_Subject
+}
+
+var map_TokenBucketConfiguration = map[string]string{
+	"":      "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+	"qps":   "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+	"burst": "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+}
+
+func (TokenBucketConfiguration) SwaggerDoc() map[string]string {
+	return map_TokenBucketConfiguration
 }
 
 var map_UserSubject = map[string]string{

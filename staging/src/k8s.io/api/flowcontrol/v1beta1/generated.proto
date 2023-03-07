@@ -135,12 +135,14 @@ message GroupSubject {
 // LimitResponse defines how to handle requests that can not be executed right now.
 // +union
 message LimitResponse {
-  // `type` is "Queue" or "Reject".
+  // `type` is "Queue" or "Reject" or "TokenBucket".
   // "Queue" means that requests that can not be executed upon arrival
   // are held in a queue until they can be executed or a queuing limit
   // is reached.
   // "Reject" means that requests that can not be executed upon arrival
   // are rejected.
+  // "TokenBucket" means that requests that will be processed or rejected
+  // based on token-bucket algorithm.
   // Required.
   // +unionDiscriminator
   optional string type = 1;
@@ -149,6 +151,11 @@ message LimitResponse {
   // This field may be non-empty only if `type` is `"Queue"`.
   // +optional
   optional QueuingConfiguration queuing = 2;
+
+  // `tokenBucket` holds the configuration parameters for token-bucket.
+  // This field may be non-empty only if `type` is `"TokenBucket"`.
+  // +optional
+  optional TokenBucketConfiguration tokenBucket = 3;
 }
 
 // LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits.
@@ -458,6 +465,19 @@ message Subject {
   // `serviceAccount` matches ServiceAccounts.
   // +optional
   optional ServiceAccountSubject serviceAccount = 4;
+}
+
+// TokenBucketConfiguration holds the configuration parameters for token-bucket
+message TokenBucketConfiguration {
+  // `qps` is the number of queries per second allowed for this level. T
+  // This field has a default value of 0, which means reject all requests.
+  // +optional
+  optional float qps = 1;
+
+  // `burst` allows extra requests to accumulate when a client is exceeding qps.
+  // This field has a default value of 0, which means reject all requests
+  // +optional
+  optional int32 burst = 2;
 }
 
 // UserSubject holds detailed information for user-kind subject.

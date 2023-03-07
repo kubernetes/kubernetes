@@ -8470,6 +8470,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: queuing
       type:
         namedType: io.k8s.api.flowcontrol.v1alpha1.QueuingConfiguration
+    - name: tokenBucket
+      type:
+        namedType: io.k8s.api.flowcontrol.v1alpha1.TokenBucketConfiguration
     - name: type
       type:
         scalar: string
@@ -8479,6 +8482,8 @@ var schemaYAML = typed.YAMLObject(`types:
       fields:
       - fieldName: queuing
         discriminatorValue: Queuing
+      - fieldName: tokenBucket
+        discriminatorValue: TokenBucket
 - name: io.k8s.api.flowcontrol.v1alpha1.LimitedPriorityLevelConfiguration
   map:
     fields:
@@ -8686,6 +8691,17 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1alpha1.TokenBucketConfiguration
+  map:
+    fields:
+    - name: burst
+      type:
+        scalar: numeric
+      default: 0
+    - name: qps
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.flowcontrol.v1alpha1.UserSubject
   map:
     fields:
@@ -8784,6 +8800,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: queuing
       type:
         namedType: io.k8s.api.flowcontrol.v1beta1.QueuingConfiguration
+    - name: tokenBucket
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta1.TokenBucketConfiguration
     - name: type
       type:
         scalar: string
@@ -8793,6 +8812,8 @@ var schemaYAML = typed.YAMLObject(`types:
       fields:
       - fieldName: queuing
         discriminatorValue: Queuing
+      - fieldName: tokenBucket
+        discriminatorValue: TokenBucket
 - name: io.k8s.api.flowcontrol.v1beta1.LimitedPriorityLevelConfiguration
   map:
     fields:
@@ -9000,6 +9021,17 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1beta1.TokenBucketConfiguration
+  map:
+    fields:
+    - name: burst
+      type:
+        scalar: numeric
+      default: 0
+    - name: qps
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.flowcontrol.v1beta1.UserSubject
   map:
     fields:
@@ -9098,6 +9130,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: queuing
       type:
         namedType: io.k8s.api.flowcontrol.v1beta2.QueuingConfiguration
+    - name: tokenBucket
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta2.TokenBucketConfiguration
     - name: type
       type:
         scalar: string
@@ -9107,6 +9142,8 @@ var schemaYAML = typed.YAMLObject(`types:
       fields:
       - fieldName: queuing
         discriminatorValue: Queuing
+      - fieldName: tokenBucket
+        discriminatorValue: TokenBucket
 - name: io.k8s.api.flowcontrol.v1beta2.LimitedPriorityLevelConfiguration
   map:
     fields:
@@ -9314,6 +9351,17 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1beta2.TokenBucketConfiguration
+  map:
+    fields:
+    - name: burst
+      type:
+        scalar: numeric
+      default: 0
+    - name: qps
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.flowcontrol.v1beta2.UserSubject
   map:
     fields:
@@ -9412,6 +9460,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: queuing
       type:
         namedType: io.k8s.api.flowcontrol.v1beta3.QueuingConfiguration
+    - name: tokenBucket
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.TokenBucketConfiguration
     - name: type
       type:
         scalar: string
@@ -9421,6 +9472,8 @@ var schemaYAML = typed.YAMLObject(`types:
       fields:
       - fieldName: queuing
         discriminatorValue: Queuing
+      - fieldName: tokenBucket
+        discriminatorValue: TokenBucket
 - name: io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration
   map:
     fields:
@@ -9628,6 +9681,17 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1beta3.TokenBucketConfiguration
+  map:
+    fields:
+    - name: burst
+      type:
+        scalar: numeric
+      default: 0
+    - name: qps
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.flowcontrol.v1beta3.UserSubject
   map:
     fields:

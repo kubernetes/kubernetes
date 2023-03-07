@@ -25,8 +25,9 @@ import (
 // LimitResponseApplyConfiguration represents an declarative configuration of the LimitResponse type for use
 // with apply.
 type LimitResponseApplyConfiguration struct {
-	Type    *v1beta2.LimitResponseType              `json:"type,omitempty"`
-	Queuing *QueuingConfigurationApplyConfiguration `json:"queuing,omitempty"`
+	Type        *v1beta2.LimitResponseType                  `json:"type,omitempty"`
+	Queuing     *QueuingConfigurationApplyConfiguration     `json:"queuing,omitempty"`
+	TokenBucket *TokenBucketConfigurationApplyConfiguration `json:"tokenBucket,omitempty"`
 }
 
 // LimitResponseApplyConfiguration constructs an declarative configuration of the LimitResponse type for use with
@@ -48,5 +49,13 @@ func (b *LimitResponseApplyConfiguration) WithType(value v1beta2.LimitResponseTy
 // If called multiple times, the Queuing field is set to the value of the last call.
 func (b *LimitResponseApplyConfiguration) WithQueuing(value *QueuingConfigurationApplyConfiguration) *LimitResponseApplyConfiguration {
 	b.Queuing = value
+	return b
+}
+
+// WithTokenBucket sets the TokenBucket field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TokenBucket field is set to the value of the last call.
+func (b *LimitResponseApplyConfiguration) WithTokenBucket(value *TokenBucketConfigurationApplyConfiguration) *LimitResponseApplyConfiguration {
+	b.TokenBucket = value
 	return b
 }

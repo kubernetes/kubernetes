@@ -233,9 +233,17 @@
             ],
             "description": "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`."
           },
+          "tokenBucket": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.TokenBucketConfiguration"
+              }
+            ],
+            "description": "`tokenBucket` holds the configuration parameters for token-bucket. This field may be non-empty only if `type` is `\"TokenBucket\"`."
+          },
           "type": {
             "default": "",
-            "description": "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+            "description": "`type` is \"Queue\" or \"Reject\" or \"TokenBucket\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. \"TokenBucket\" means that requests that will be processed or rejected based on token-bucket algorithm. Required.",
             "type": "string"
           }
         },
@@ -247,7 +255,8 @@
           {
             "discriminator": "type",
             "fields-to-discriminateBy": {
-              "queuing": "Queuing"
+              "queuing": "Queuing",
+              "tokenBucket": "TokenBucket"
             }
           }
         ]
@@ -693,6 +702,24 @@
             }
           }
         ]
+      },
+      "io.k8s.api.flowcontrol.v1beta3.TokenBucketConfiguration": {
+        "description": "TokenBucketConfiguration holds the configuration parameters for token-bucket",
+        "properties": {
+          "burst": {
+            "default": 0,
+            "description": "`burst` allows extra requests to accumulate when a client is exceeding qps. This field has a default value of 0, which means reject all requests",
+            "format": "int32",
+            "type": "integer"
+          },
+          "qps": {
+            "default": 0,
+            "description": "`qps` is the number of queries per second allowed for this level. T This field has a default value of 0, which means reject all requests.",
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
       "io.k8s.api.flowcontrol.v1beta3.UserSubject": {
         "description": "UserSubject holds detailed information for user-kind subject.",

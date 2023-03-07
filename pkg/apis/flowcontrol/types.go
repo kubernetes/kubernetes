@@ -450,12 +450,14 @@ type LimitedPriorityLevelConfiguration struct {
 // LimitResponse defines how to handle requests that can not be executed right now.
 // +union
 type LimitResponse struct {
-	// `type` is "Queue" or "Reject".
+	// `type` is "Queue" or "Reject" or "TokenBucket".
 	// "Queue" means that requests that can not be executed upon arrival
 	// are held in a queue until they can be executed or a queuing limit
 	// is reached.
 	// "Reject" means that requests that can not be executed upon arrival
 	// are rejected.
+	// "TokenBucket" means that requests that will be processed or rejected
+	// based on token-bucket algorithm.
 	// Required.
 	// +unionDiscriminator
 	Type LimitResponseType
@@ -464,6 +466,11 @@ type LimitResponse struct {
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
 	Queuing *QueuingConfiguration
+
+	// `tokenBucket` holds the configuration parameters for token-bucket.
+	// This field may be non-empty only if `type` is `"TokenBucket"`.
+	// +optional
+	TokenBucket *TokenBucketConfiguration
 }
 
 // LimitResponseType identifies how a Limited priority level handles a request that can not be executed right now
@@ -476,6 +483,9 @@ const (
 
 	// LimitResponseTypeReject means that requests that can not be executed right now are rejected
 	LimitResponseTypeReject LimitResponseType = "Reject"
+
+	// LimitResponseTypeTokenBucket means that requests will be processed or rejected based on token-bucket algorithm
+	LimitResponseTypeTokenBucket LimitResponseType = "TokenBucket"
 )
 
 // QueuingConfiguration holds the configuration parameters for queuing
@@ -509,6 +519,20 @@ type QueuingConfiguration struct {
 	// not specified, it will be defaulted to 50.
 	// +optional
 	QueueLengthLimit int32
+}
+
+// TokenBucketConfiguration holds the configuration parameters for token-bucket
+type TokenBucketConfiguration struct {
+	// `qps` is the number of queries per second allowed for this level. T
+	// This field has a default value of 0, which means reject all requests.
+	// -1: no limit; 0: reject all
+	// +optional
+	QPS float32
+
+	// `burst` allows extra requests to accumulate when a client is exceeding qps.
+	// This field is zero or positive, and has a default value of 0, which means reject all requests
+	// +optional
+	Burst int32
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type

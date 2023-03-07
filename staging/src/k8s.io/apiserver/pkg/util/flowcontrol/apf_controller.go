@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/time/rate"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -243,6 +244,9 @@ type priorityLevelState struct {
 
 	// currentCL is the dynamically derived concurrency limit to impose for now
 	currentCL int
+
+	// TokenBucket RateLimiter
+	tokenBucketRateLimiter *rate.Limiter
 }
 
 type seatDemandStats struct {
@@ -384,7 +388,7 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 	items := make([]allocProblemItem, 0, len(plStates))
 	plNames := make([]string, 0, len(plStates))
 	for plName, plState := range plStates {
-		if plState.pl.Spec.Limited == nil {
+		if plState.pl.Spec.Limited == nil || plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeTokenBucket {
 			continue
 		}
 		obs := plState.seatDemandIntegrator.Reset()
@@ -424,7 +428,7 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 			continue
 		}
 		if setCompleters {
-			qsCompleter, err := queueSetCompleterForPL(cfgCtlr.queueSetFactory, plState.queues,
+			qsCompleter, _, err := queueSetCompleterForPL(cfgCtlr.queueSetFactory, plState.queues,
 				plState.pl, cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
 				metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
 			if err != nil {
@@ -676,7 +680,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 				seatDemandRatioedGauge: metrics.ApiserverSeatDemands.NewForLabelValuesSafe(0, 1, []string{pl.Name}),
 			}
 		}
-		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues,
+		qsCompleter, limiter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues,
 			pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs,
 			metrics.NewUnionGauge(state.seatDemandIntegrator, state.seatDemandRatioedGauge))
 		if err != nil {
@@ -686,6 +690,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 		meal.newPLStates[pl.Name] = state
 		state.pl = pl
 		state.qsCompleter = qsCompleter
+		state.tokenBucketRateLimiter = limiter
 		if state.quiescing { // it was undesired, but no longer
 			klog.V(3).Infof("Priority level %q was undesired and has become desired again", pl.Name)
 			state.quiescing = false
@@ -782,14 +787,14 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			}
 		}
 		var err error
-		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues,
+		plState.qsCompleter, plState.tokenBucketRateLimiter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues,
 			plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
 			metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
 		if err != nil {
 			// This can not happen because queueSetCompleterForPL already approved this config
 			panic(fmt.Sprintf("%s from name=%q spec=%s", err, plName, fcfmt.Fmt(plState.pl.Spec)))
 		}
-		if plState.pl.Spec.Limited != nil {
+		if plState.pl.Spec.Limited != nil && plState.pl.Spec.Limited.LimitResponse.Type != flowcontrol.LimitResponseTypeTokenBucket {
 			// We deliberately include the lingering priority levels
 			// here so that their queues get some concurrency and they
 			// continue to drain.  During this interim a lingering
@@ -811,6 +816,11 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 	for plName, plState := range meal.newPLStates {
 		if plState.pl.Spec.Limited == nil {
 			klog.V(5).Infof("Using exempt priority level %q: quiescing=%v", plName, plState.quiescing)
+			continue
+		}
+		if plState.tokenBucketRateLimiter != nil {
+			klog.V(5).Infof("Using token-bucket priority level %q: qps=%v, burst=%v", plName, plState.tokenBucketRateLimiter.Limit(),
+				plState.tokenBucketRateLimiter.Burst())
 			continue
 		}
 
@@ -862,19 +872,33 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // given priority level configuration.  Returns nil if that config
 // does not call for limiting.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandGauge metrics.Gauge) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandGauge metrics.Gauge) (fq.QueueSetCompleter, *rate.Limiter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
-		return nil, errors.New("broken union structure at the top")
+		return nil, nil, errors.New("broken union structure at the top")
 	}
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt) {
 		// This package does not attempt to cope with a priority level dynamically switching between exempt and not.
-		return nil, errors.New("non-alignment between name and type")
+		return nil, nil, errors.New("non-alignment between name and type")
 	}
 	if pl.Spec.Limited == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
-	if (pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeReject) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
-		return nil, errors.New("broken union structure for limit response")
+	if (pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeReject ||
+		pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeTokenBucket) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
+		return nil, nil, errors.New("broken union structure for limit response")
+	}
+	if pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeTokenBucket {
+		tokenBucketConfig := pl.Spec.Limited.LimitResponse.TokenBucket
+		if tokenBucketConfig == nil {
+			return nil, nil, errors.New("tokenBucket config is nil for TokenBucket LimitResponse")
+		}
+		qps := float64(tokenBucketConfig.QPS)
+		burst := tokenBucketConfig.Burst
+		if int(qps) == -1 {
+			qps = float64(rate.Inf)
+		}
+		limiter := rate.NewLimiter(rate.Limit(qps), int(burst))
+		return nil, limiter, nil
 	}
 	qcAPI := pl.Spec.Limited.LimitResponse.Queuing
 	qcQS := fq.QueuingConfig{Name: pl.Name}
@@ -896,7 +920,7 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 	if err != nil {
 		err = fmt.Errorf("priority level %q has QueuingConfiguration %#+v, which is invalid: %w", pl.Name, qcAPI, err)
 	}
-	return qsc, err
+	return qsc, nil, err
 }
 
 func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangling bool, plName string) {
@@ -941,7 +965,7 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 	execSeatsObs := meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)
 	seatDemandIntegrator := fq.NewNamedIntegrator(meal.cfgCtlr.clock, proto.Name)
 	seatDemandRatioedGauge := metrics.ApiserverSeatDemands.NewForLabelValuesSafe(0, 1, []string{proto.Name})
-	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto,
+	qsCompleter, limiter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto,
 		requestWaitLimit, reqsGaugePair, execSeatsObs,
 		metrics.NewUnionGauge(seatDemandIntegrator, seatDemandRatioedGauge))
 	if err != nil {
@@ -956,6 +980,7 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 		execSeatsObs:           execSeatsObs,
 		seatDemandIntegrator:   seatDemandIntegrator,
 		seatDemandRatioedGauge: seatDemandRatioedGauge,
+		tokenBucketRateLimiter: limiter,
 	}
 	if proto.Spec.Limited != nil {
 		meal.shareSum += float64(proto.Spec.Limited.NominalConcurrencyShares)
@@ -1011,6 +1036,16 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 		noteFn(selectedFlowSchema, plState.pl, "")
 		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
 		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
+	}
+	// PL with TokenBucket limiter
+	if plState.tokenBucketRateLimiter != nil {
+		noteFn(selectedFlowSchema, plState.pl, "")
+		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, token-bucket", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
+		if plState.tokenBucketRateLimiter.Allow() {
+			return selectedFlowSchema, plState.pl, false, immediateRequest{}, time.Time{}
+		} else {
+			return selectedFlowSchema, plState.pl, false, nil, time.Time{}
+		}
 	}
 	var numQueues int32
 	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
