@@ -958,7 +958,7 @@ func TestTwoControllers(t *testing.T) {
 		}
 		add(t, dc.podStore, pod)
 		dc.sync(ctx, pdbName)
-		if i <= unavailablePods {
+		if i <= unavailablePods { // TODO: ifElseChain: rewrite if-else to switch statement (gocritic)
 			ps.VerifyPdbStatus(t, pdbName, 0, minimumOne+1, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
 		} else if i-unavailablePods <= minimumTwo-(minimumOne+1) {
 			ps.VerifyPdbStatus(t, pdbName, 0, (minimumOne+1)+(i-unavailablePods), minimumTwo, 2*collectionSize, map[string]metav1.Time{})

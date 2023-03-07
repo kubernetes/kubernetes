@@ -80,7 +80,7 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 
 		msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", user.GetName(), user.GetGroups(), strings.Join(missingDescriptions.List(), "\n"))
 		if len(ruleResolutionErrors) > 0 {
-			msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)
+			msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors) // TODO: assignOp: replace `msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)` with `msg += fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)` (gocritic)
 		}
 
 		return errors.New(msg)

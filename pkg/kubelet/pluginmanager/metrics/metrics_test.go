@@ -27,7 +27,7 @@ func TestMetricCollection(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	fakePlugin := cache.PluginInfo{
-		SocketPath: fmt.Sprintf("fake/path/plugin.sock"),
+		SocketPath: fmt.Sprintf("fake/path/plugin.sock"), // TODO: S1039: unnecessary use of fmt.Sprintf (gosimple)
 	}
 	// Add one plugin to DesiredStateOfWorld
 	err := dsw.AddOrUpdatePlugin(fakePlugin.SocketPath)

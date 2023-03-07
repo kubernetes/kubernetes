@@ -489,7 +489,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 		framework.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
 		return false, nil
 	}))
-	framework.ExpectEqual(len(failed), 0)
+	framework.ExpectEqual(len(failed), 0) // TODO: SA1019: framework.ExpectEqual is deprecated: use gomega.Expect().To(gomega.BeEqual()) (staticcheck)
 }
 
 func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string) {
