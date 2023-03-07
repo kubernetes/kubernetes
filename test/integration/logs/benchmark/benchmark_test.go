@@ -18,12 +18,10 @@ package benchmark
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -32,16 +30,18 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	logsjson "k8s.io/component-base/logs/json"
+	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/klog/v2"
 )
 
 func BenchmarkEncoding(b *testing.B) {
+	seen := map[string]bool{}
+
 	// Each "data/(v[0-9]/)?*.log" file is expected to contain JSON log
 	// messages. We generate one sub-benchmark for each file where logging
-	// is tested with the log level from the directory.  Symlinks can be
-	// used to test the same file with different levels.
+	// is tested with the log level from the directory.
 	if err := filepath.Walk("data", func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -53,8 +53,14 @@ func BenchmarkEncoding(b *testing.B) {
 		if err != nil {
 			return err
 		}
-		if info.Mode()&fs.ModeSymlink == 0 {
-			b.Log(path + "\n" + stats.String())
+		// Only print unique file statistics. They get shown for the
+		// first file where new statistics are encountered. The
+		// assumption here is that the there are no files with
+		// different content and exactly the same statistics.
+		statsStr := stats.String()
+		if !seen[statsStr] {
+			b.Log(path + "\n" + statsStr)
+			seen[statsStr] = true
 		}
 		b.Run(strings.TrimSuffix(strings.TrimPrefix(path, "data/"), ".log"), func(b *testing.B) {
 			// Take verbosity threshold from directory, if present.
@@ -63,52 +69,57 @@ func BenchmarkEncoding(b *testing.B) {
 			if vMatch != nil {
 				v, _ = strconv.Atoi(vMatch[1])
 			}
+
 			fileSizes := map[string]int{}
-			b.Run("stats", func(b *testing.B) {
-				// Nothing to do. Use this for "go test -v
-				// -bench=BenchmarkLogging/.*/stats" to print
-				// just the statistics.
-			})
-			b.Run("printf", func(b *testing.B) {
+			test := func(b *testing.B, format string, print func(logger klog.Logger, item logMessage)) {
+				state := klog.CaptureState()
+				defer state.Restore()
+
+				var output bytesWritten
+				c := logsapi.NewLoggingConfiguration()
+				c.Format = format
+				o := logsapi.LoggingOptions{
+					ErrorStream: &output,
+					InfoStream:  &output,
+				}
+				klog.SetOutput(&output)
+				if err := logsapi.ValidateAndApplyWithOptions(c, &o, nil); err != nil {
+					b.Fatalf("Unexpected error configuring logging: %v", err)
+				}
+				logger := klog.Background()
 				b.ResetTimer()
-				output = 0
+				start := time.Now()
+				total := int64(0)
 				for i := 0; i < b.N; i++ {
 					for _, item := range messages {
 						if item.verbosity <= v {
-							printf(item)
+							print(logger, item)
+							total++
 						}
 					}
 				}
-				fileSizes["printf"] = int(output) / b.N
+				end := time.Now()
+				duration := end.Sub(start)
+
+				// Report messages/s instead of ns/op because "op" varies.
+				b.ReportMetric(0, "ns/op")
+				b.ReportMetric(float64(total)/duration.Seconds(), "msgs/s")
+				fileSizes[filepath.Base(b.Name())] = int(output)
+			}
+
+			b.Run("printf", func(b *testing.B) {
+				test(b, "text", func(_ klog.Logger, item logMessage) {
+					printf(item)
+				})
 			})
 			b.Run("structured", func(b *testing.B) {
-				b.ResetTimer()
-				output = 0
-				for i := 0; i < b.N; i++ {
-					for _, item := range messages {
-						if item.verbosity <= v {
-							prints(item)
-						}
-					}
-				}
-				fileSizes["structured"] = int(output) / b.N
+				test(b, "text", prints)
 			})
 			b.Run("JSON", func(b *testing.B) {
-				klog.SetLogger(jsonLogger)
-				defer klog.ClearLogger()
-				b.ResetTimer()
-				output = 0
-				for i := 0; i < b.N; i++ {
-					for _, item := range messages {
-						if item.verbosity <= v {
-							prints(item)
-						}
-					}
-				}
-				fileSizes["JSON"] = int(output) / b.N
+				test(b, "json", prints)
 			})
 
-			b.Log(fmt.Sprintf("file sizes: %v\n", fileSizes))
+			b.Log(fmt.Sprintf("%s: file sizes: %v\n", path, fileSizes))
 		})
 		return nil
 	}); err != nil {
@@ -135,9 +146,6 @@ type loadGeneratorConfig struct {
 // See https://github.com/kubernetes/kubernetes/issues/107029 for the
 // motivation.
 func BenchmarkWriting(b *testing.B) {
-	flag.Set("skip_headers", "false")
-	defer flag.Set("skip_headers", "true")
-
 	// This could be made configurable and/or we could benchmark different
 	// configurations automatically.
 	config := loadGeneratorConfig{
@@ -159,70 +167,92 @@ func benchmarkWriting(b *testing.B, config loadGeneratorConfig) {
 }
 
 func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bool) {
-	tmpDir := b.TempDir()
 	b.Run("structured", func(b *testing.B) {
-		var out *os.File
-		if !discard {
-			var err error
-			out, err = os.Create(path.Join(tmpDir, "all.log"))
-			if err != nil {
-				b.Fatal(err)
-			}
-			klog.SetOutput(out)
-			defer klog.SetOutput(&output)
-		}
-		generateOutput(b, config, nil, out)
+		benchmarkOutputFormat(b, config, discard, "text")
 	})
 	b.Run("JSON", func(b *testing.B) {
-		var out1, out2 *os.File
-		if !discard {
-			var err error
-			out1, err = os.Create(path.Join(tmpDir, "stream-1.log"))
-			if err != nil {
-				b.Fatal(err)
-			}
-			defer out1.Close()
-			out2, err = os.Create(path.Join(tmpDir, "stream-2.log"))
-			if err != nil {
-				b.Fatal(err)
-			}
-			defer out2.Close()
-		}
-		o := logsapi.LoggingOptions{}
-		if discard {
-			o.ErrorStream = io.Discard
-			o.InfoStream = io.Discard
-		} else {
-			o.ErrorStream = out1
-			o.InfoStream = out1
-		}
-
-		b.Run("single-stream", func(b *testing.B) {
-			c := logsapi.NewLoggingConfiguration()
-			logger, control := logsjson.Factory{}.Create(*c, o)
-			klog.SetLogger(logger)
-			defer klog.ClearLogger()
-			generateOutput(b, config, control.Flush, out1)
-		})
-
-		b.Run("split-stream", func(b *testing.B) {
-			c := logsapi.NewLoggingConfiguration()
-			c.Options.JSON.SplitStream = true
-			logger, control := logsjson.Factory{}.Create(*c, o)
-			klog.SetLogger(logger)
-			defer klog.ClearLogger()
-			generateOutput(b, config, control.Flush, out1, out2)
-		})
+		benchmarkOutputFormat(b, config, discard, "json")
 	})
 }
 
-func generateOutput(b *testing.B, config loadGeneratorConfig, flush func(), files ...*os.File) {
+func benchmarkOutputFormat(b *testing.B, config loadGeneratorConfig, discard bool, format string) {
+	b.Run("single-stream", func(b *testing.B) {
+		benchmarkOutputFormatStream(b, config, discard, format, false)
+	})
+	b.Run("split-stream", func(b *testing.B) {
+		benchmarkOutputFormatStream(b, config, discard, format, true)
+	})
+}
+
+func benchmarkOutputFormatStream(b *testing.B, config loadGeneratorConfig, discard bool, format string, splitStreams bool) {
+	tmpDir := b.TempDir()
+	state := klog.CaptureState()
+	defer state.Restore()
+
+	featureGate := featuregate.NewFeatureGate()
+	logsapi.AddFeatureGates(featureGate)
+	if err := featureGate.SetFromMap(map[string]bool{
+		string(logsapi.LoggingAlphaOptions): true,
+		string(logsapi.LoggingBetaOptions):  true,
+	}); err != nil {
+		b.Fatalf("Set feature gates: %v", err)
+	}
+
+	// Create a logging configuration using the exact same code as a normal
+	// component. In order to redirect output, we provide a LoggingOptions
+	// instance.
+	var o logsapi.LoggingOptions
+	c := logsapi.NewLoggingConfiguration()
+	c.Format = format
+	if splitStreams {
+		c.Options.JSON.SplitStream = true
+		if err := c.Options.JSON.InfoBufferSize.Set("64Ki"); err != nil {
+			b.Fatalf("Error setting buffer size: %v", err)
+		}
+	}
+	var files []*os.File
+	if discard {
+		o.ErrorStream = io.Discard
+		o.InfoStream = io.Discard
+	} else {
+		out1, err := os.Create(filepath.Join(tmpDir, "stream-1.log"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer out1.Close()
+		out2, err := os.Create(filepath.Join(tmpDir, "stream-2.log"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer out2.Close()
+
+		if splitStreams {
+			files = append(files, out1, out2)
+			o.ErrorStream = out1
+			o.InfoStream = out2
+		} else {
+			files = append(files, out1)
+			o.ErrorStream = out1
+			o.InfoStream = out1
+		}
+	}
+
+	klog.SetOutput(o.ErrorStream)
+	if err := logsapi.ValidateAndApplyWithOptions(c, &o, featureGate); err != nil {
+		b.Fatalf("Unexpected error configuring logging: %v", err)
+	}
+
+	generateOutput(b, config, files...)
+}
+
+func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File) {
 	msg := strings.Repeat("X", config.messageLength)
 	err := errors.New("fail")
 	start := time.Now()
 
 	// Scale by 1000 because "go test -bench" starts with b.N == 1, which is very low.
 	n := b.N * 1000
+	total := config.workers * n
 
 	b.ResetTimer()
 	var wg sync.WaitGroup
@@ -245,15 +275,15 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, flush func(), file
 	}
 	wg.Wait()
 	klog.Flush()
-	if flush != nil {
-		flush()
-	}
 	b.StopTimer()
-
-	// Print some information about the result.
 	end := time.Now()
 	duration := end.Sub(start)
-	total := n * config.workers
+
+	// Report messages/s instead of ns/op because "op" varies.
+	b.ReportMetric(0, "ns/op")
+	b.ReportMetric(float64(total)/duration.Seconds(), "msgs/s")
+
+	// Print some information about the result.
 	b.Logf("Wrote %d log entries in %s -> %.1f/s", total, duration, float64(total)/duration.Seconds())
 	for i, file := range files {
 		if file != nil {
