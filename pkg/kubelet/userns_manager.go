@@ -141,11 +141,6 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 		return nil, err
 	}
 
-	// Second block will be used for phase II. Don't assign that range for now.
-	if _, err := m.used.Allocate(1); err != nil {
-		return nil, err
-	}
-
 	// do not bother reading the list of pods if user namespaces are not enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
 		return &m, nil
