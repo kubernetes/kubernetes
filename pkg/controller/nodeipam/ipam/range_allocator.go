@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -28,7 +29,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
+
+type nodeUpdateRetryBackoffStrategy func(count int) time.Duration
 
 type rangeAllocator struct {
 	client clientset.Interface
@@ -58,7 +60,9 @@ type rangeAllocator struct {
 	recorder              record.EventRecorder
 	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
-	nodesInProcessing sets.String
+	nodesInProcessing map[string]*nodeProcessingInfo
+	// Configurable backoff strategy for testing
+	nodeUpdateRetryTimeout nodeUpdateRetryBackoffStrategy
 }
 
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDRs for node (one from each of clusterCIDRs)
@@ -67,6 +71,10 @@ type rangeAllocator struct {
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
 func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
+	return newCIDRRangeAllocator(client, nodeInformer, allocatorParams, nodeList, nodeUpdateRetryTimeout)
+}
+
+func newCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList, nodeUpdateRetryTimeout nodeUpdateRetryBackoffStrategy) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
@@ -86,15 +94,16 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	}
 
 	ra := &rangeAllocator{
-		client:                client,
-		clusterCIDRs:          allocatorParams.ClusterCIDRs,
-		cidrSets:              cidrSets,
-		nodeLister:            nodeInformer.Lister(),
-		nodesSynced:           nodeInformer.Informer().HasSynced,
-		nodeCIDRUpdateChannel: make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
-		broadcaster:           eventBroadcaster,
-		recorder:              recorder,
-		nodesInProcessing:     sets.NewString(),
+		client:                 client,
+		clusterCIDRs:           allocatorParams.ClusterCIDRs,
+		cidrSets:               cidrSets,
+		nodeLister:             nodeInformer.Lister(),
+		nodesSynced:            nodeInformer.Informer().HasSynced,
+		nodeCIDRUpdateChannel:  make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
+		broadcaster:            eventBroadcaster,
+		recorder:               recorder,
+		nodesInProcessing:      map[string]*nodeProcessingInfo{},
+		nodeUpdateRetryTimeout: nodeUpdateRetryTimeout,
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -190,10 +199,21 @@ func (r *rangeAllocator) worker(stopChan <-chan struct{}) {
 				klog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := r.updateCIDRsAllocation(workItem); err != nil {
-				// Requeue the failed node for update again.
-				r.nodeCIDRUpdateChannel <- workItem
+			if err := r.updateCIDRsAllocation(workItem); err == nil {
+				klog.V(3).Infof("Updated CIDR for %q", workItem.nodeName)
+			} else {
+				klog.Errorf("Error updating CIDR for %q: %v", workItem.nodeName, err)
+				if canRetry, timeout := r.retryParams(workItem.nodeName); canRetry {
+					klog.V(2).Infof("Retrying update for %q after %v", workItem.nodeName, timeout)
+					time.AfterFunc(timeout, func() {
+						// Requeue the failed node for update again.
+						r.nodeCIDRUpdateChannel <- workItem
+					})
+					continue
+				}
+				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem.nodeName)
 			}
+			r.removeNodeFromProcessing(workItem.nodeName)
 		case <-stopChan:
 			return
 		}
@@ -203,17 +223,36 @@ func (r *rangeAllocator) worker(stopChan <-chan struct{}) {
 func (r *rangeAllocator) insertNodeToProcessing(nodeName string) bool {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	if r.nodesInProcessing.Has(nodeName) {
+	if _, found := r.nodesInProcessing[nodeName]; found {
 		return false
 	}
-	r.nodesInProcessing.Insert(nodeName)
+	r.nodesInProcessing[nodeName] = &nodeProcessingInfo{}
 	return true
+}
+
+func (r *rangeAllocator) retryParams(nodeName string) (bool, time.Duration) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	entry, ok := r.nodesInProcessing[nodeName]
+	if !ok {
+		klog.Errorf("Cannot get retryParams for %q as entry does not exist", nodeName)
+		return false, 0
+	}
+
+	count := entry.retries + 1
+	if count > updateMaxRetries {
+		return false, 0
+	}
+	r.nodesInProcessing[nodeName].retries = count
+
+	return true, r.nodeUpdateRetryTimeout(count)
 }
 
 func (r *rangeAllocator) removeNodeFromProcessing(nodeName string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.nodesInProcessing.Delete(nodeName)
+	delete(r.nodesInProcessing, nodeName)
 }
 
 // marks node.PodCIDRs[...] as used in allocator's tracked cidrSet
@@ -330,7 +369,6 @@ func (r *rangeAllocator) filterOutServiceRange(serviceCIDR *net.IPNet) {
 func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	var err error
 	var node *v1.Node
-	defer r.removeNodeFromProcessing(data.nodeName)
 	cidrsString := ipnetToStringList(data.allocatedCIDRs)
 	node, err = r.nodeLister.Get(data.nodeName)
 	if err != nil {

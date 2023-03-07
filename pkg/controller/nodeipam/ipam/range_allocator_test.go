@@ -667,6 +667,67 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	}
 }
 
+func TestAbortRetryOnMissingNode(t *testing.T) {
+	testCases := []testCase{
+		{
+			description: "When the node is missing, retry should eventually be aborted",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing:  []*v1.Node{},
+				Clientset: fake.NewSimpleClientset(),
+			},
+		},
+	}
+
+	testFunc := func(tc testCase) {
+
+		// Initialize the range allocator.
+		allocator, err := newCIDRRangeAllocator(tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil, func(count int) time.Duration {
+			return time.Nanosecond
+		})
+		if err != nil {
+			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
+		}
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+		rangeAllocator.nodesSynced = test.AlwaysReady
+		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		go allocator.Run(wait.NeverStop)
+
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node0",
+			},
+		}
+		if err := allocator.AllocateOrOccupyCIDR(node); err != nil {
+			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
+		}
+
+		// Wait for node processing to be done
+		startTime := time.Now()
+		for {
+			isNodeInProcessing := func(node string) bool {
+				rangeAllocator.lock.Lock()
+				defer rangeAllocator.lock.Unlock()
+				_, ok := rangeAllocator.nodesInProcessing[node]
+				return ok
+			}
+			if !isNodeInProcessing("node0") {
+				break
+			}
+			if time.Since(startTime) > 5*time.Second {
+				t.Fatalf("Node processing did not finish in time")
+			}
+		}
+	}
+
+	for _, tc := range testCases {
+		testFunc(tc)
+	}
+}
+
 type releaseTestCase struct {
 	description                      string
 	fakeNodeHandler                  *testutil.FakeNodeHandler
