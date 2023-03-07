@@ -85,7 +85,7 @@ const (
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
 		Metrics: map[string]*labelValues{
-			"scheduler_framework_extension_point_duration_seconds": {
+			"scheduler_framework_extension_point_duration": {
 				label:  extensionPointsLabelName,
 				values: []string{"Filter", "Score"},
 			},
