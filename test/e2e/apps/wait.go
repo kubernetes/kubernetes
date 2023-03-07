@@ -97,6 +97,19 @@ func waitForStatus(ctx context.Context, c clientset.Interface, set *appsv1.State
 	return set
 }
 
+// waitForStatus waits for the StatefulSetStatus's CurrentReplicas to be equal to expectedReplicas
+// The returned StatefulSet contains such a StatefulSetStatus
+func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedReplicas int32) *appsv1.StatefulSet {
+	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+		if set2.Status.ObservedGeneration >= set.Generation && set2.Status.CurrentReplicas == expectedReplicas {
+			set = set2
+			return true, nil
+		}
+		return false, nil
+	})
+	return set
+}
+
 // waitForPodNotReady waits for the Pod named podName in set to exist and to not have a Ready condition.
 func waitForPodNotReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList

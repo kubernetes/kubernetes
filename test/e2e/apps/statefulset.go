@@ -1385,7 +1385,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ss.Spec.Template.Spec.NodeSelector = map[string]string{hostLabel: hostLabelVal} // force the pod on a specific node
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			_, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Confirming PVC exists")
@@ -1395,12 +1395,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Confirming Pod is ready")
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
 			podName := getStatefulSetPodNameAtIndex(0, ss)
-			pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			nodeName := pod.Spec.NodeName
 			framework.ExpectEqual(nodeName, readyNode.Name)
-			node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			oldData, err := json.Marshal(node)
@@ -1415,38 +1415,38 @@ var _ = SIGDescribe("StatefulSet", func() {
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 			framework.ExpectNoError(err)
 			ginkgo.By("Cordoning Node")
-			_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+			_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 			framework.ExpectNoError(err)
 			cordoned := true
 
 			defer func() {
 				if cordoned {
-					uncordonNode(c, oldData, newData, nodeName)
+					uncordonNode(ctx, c, oldData, newData, nodeName)
 				}
 			}()
 
 			// wait for the node to be unschedulable
-			e2enode.WaitForNodeSchedulable(c, nodeName, 10*time.Second, false)
+			e2enode.WaitForNodeSchedulable(ctx, c, nodeName, 10*time.Second, false)
 
 			ginkgo.By("Deleting Pod")
-			err = c.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+			err = c.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 
 			// wait for the pod to be recreated
-			e2estatefulset.WaitForStatusCurrentReplicas(c, ss, 1)
-			_, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			waitForStatusCurrentReplicas(ctx, c, ss, 1)
+			_, err = c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+			pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pvcList.Items), 1)
 			pvcName := pvcList.Items[0].Name
 
 			ginkgo.By("Deleting PVC")
-			err = c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
+			err = c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvcName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 
-			uncordonNode(c, oldData, newData, nodeName)
+			uncordonNode(ctx, c, oldData, newData, nodeName)
 			cordoned = false
 
 			ginkgo.By("Confirming PVC recreated")
@@ -1455,19 +1455,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming Pod is ready after being recreated")
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
-			pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			pod, err = c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(pod.Spec.NodeName, readyNode.Name) // confirm the pod was scheduled back to the original node
 		})
 	})
 })
 
-func uncordonNode(c clientset.Interface, oldData, newData []byte, nodeName string) {
+func uncordonNode(ctx context.Context, c clientset.Interface, oldData, newData []byte, nodeName string) {
 	ginkgo.By("Uncordoning Node")
 	// uncordon node, by reverting patch
 	revertPatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
 	framework.ExpectNoError(err)
-	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
+	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
 	framework.ExpectNoError(err)
 }
 
