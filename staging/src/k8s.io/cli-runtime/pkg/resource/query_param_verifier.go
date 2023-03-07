@@ -19,6 +19,7 @@ package resource
 import (
 	"errors"
 	"fmt"
+
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
