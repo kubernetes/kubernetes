@@ -188,6 +188,7 @@ const (
 	// kep: https://kep.k8s.io/3140
 	// alpha: v1.24
 	// beta: v1.25
+	// GA: 1.27
 	//
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
@@ -900,7 +901,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
 
-	CronJobTimeZone: {Default: true, PreRelease: featuregate.Beta},
+	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
