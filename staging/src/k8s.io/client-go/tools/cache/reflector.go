@@ -50,7 +50,6 @@ const defaultExpectedTypeName = "<unspecified>"
 type Reflector struct {
 	// name identifies this reflector. By default it will be a file:line if possible.
 	name string
-
 	// The name of the type we expect to place in the store. The name
 	// will be the stringification of expectedGVK if provided, and the
 	// stringification of expectedType otherwise. It is for display
@@ -67,17 +66,11 @@ type Reflector struct {
 	store Store
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcher
-
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
 	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
 	initConnBackoffManager wait.BackoffManager
-	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
-	MaxInternalErrorRetryDuration time.Duration
-
-	resyncPeriod time.Duration
-	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
-	ShouldResync func() bool
+	resyncPeriod           time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -92,6 +85,8 @@ type Reflector struct {
 	isLastSyncResourceVersionUnavailable bool
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+	// Called whenever the ListAndWatch drops the connection with an error.
+	watchErrorHandler WatchErrorHandler
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
 	// If unset, for consistent reads (RV="") or reads that opt-into arbitrarily old data
 	// (RV="0") it will default to pager.PageSize, for the rest (RV != "" && RV != "0")
@@ -100,8 +95,10 @@ type Reflector struct {
 	// etcd, which is significantly less efficient and may lead to serious performance and
 	// scalability problems.
 	WatchListPageSize int64
-	// Called whenever the ListAndWatch drops the connection with an error.
-	watchErrorHandler WatchErrorHandler
+	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
+	ShouldResync func() bool
+	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
+	MaxInternalErrorRetryDuration time.Duration
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -324,7 +321,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	cancelCh := make(chan struct{})
 	defer close(cancelCh)
 	go r.startResync(stopCh, cancelCh, resyncerrc)
-	return r.watch(stopCh, resyncerrc)
+	return r.watch(nil, stopCh, resyncerrc)
 }
 
 // startResync periodically calls r.store.Resync() method.
@@ -356,8 +353,10 @@ func (r *Reflector) startResync(stopCh <-chan struct{}, cancelCh <-chan struct{}
 }
 
 // watch simply starts a watch request with the server.
-func (r *Reflector) watch(stopCh <-chan struct{}, resyncerrc chan error) error {
+func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc chan error) error {
+	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
+
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
@@ -366,35 +365,36 @@ func (r *Reflector) watch(stopCh <-chan struct{}, resyncerrc chan error) error {
 		default:
 		}
 
-		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
-		options := metav1.ListOptions{
-			ResourceVersion: r.LastSyncResourceVersion(),
-			// We want to avoid situations of hanging watchers. Stop any watchers that do not
-			// receive any events within the timeout window.
-			TimeoutSeconds: &timeoutSeconds,
-			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
-			// Reflector doesn't assume bookmarks are returned at all (if the server do not support
-			// watch bookmarks, it will ignore this field).
-			AllowWatchBookmarks: true,
-		}
-
 		// start the clock before sending the request, since some proxies won't flush headers until after the first watch event is sent
 		start := r.clock.Now()
-		w, err := r.listerWatcher.Watch(options)
-		if err != nil {
-			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
-			// It doesn't make sense to re-list all objects because most likely we will be able to restart
-			// watch where we ended.
-			// If that's the case begin exponentially backing off and resend watch request.
-			// Do the same for "429" errors.
-			if utilnet.IsConnectionRefused(err) || apierrors.IsTooManyRequests(err) {
-				<-r.initConnBackoffManager.Backoff().C()
-				continue
+
+		if w == nil {
+			timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+			options := metav1.ListOptions{
+				ResourceVersion: r.LastSyncResourceVersion(),
+				// We want to avoid situations of hanging watchers. Stop any watchers that do not
+				// receive any events within the timeout window.
+				TimeoutSeconds: &timeoutSeconds,
+				// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
+				// Reflector doesn't assume bookmarks are returned at all (if the server do not support
+				// watch bookmarks, it will ignore this field).
+				AllowWatchBookmarks: true,
 			}
-			return err
+
+			w, err = r.listerWatcher.Watch(options)
+			if err != nil {
+				if canRetry := isWatchErrorRetriable(err); canRetry {
+					klog.V(4).Infof("%s: watch of %v returned %v - backing off", r.name, r.typeDescription, err)
+					<-r.initConnBackoffManager.Backoff().C()
+					continue
+				}
+				return err
+			}
 		}
 
 		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, r.clock, resyncerrc, stopCh)
+		// Ensure that watch will not be reused across iterations.
+		w = nil
 		retry.After(err)
 		if err != nil {
 			if err != errorStopRequested {
@@ -709,5 +709,19 @@ func isTooLargeResourceVersionError(err error) bool {
 		return true
 	}
 
+	return false
+}
+
+// isWatchErrorRetriable determines if it is safe to retry
+// a watch error retrieved from the server.
+func isWatchErrorRetriable(err error) bool {
+	// If this is "connection refused" error, it means that most likely apiserver is not responsive.
+	// It doesn't make sense to re-list all objects because most likely we will be able to restart
+	// watch where we ended.
+	// If that's the case begin exponentially backing off and resend watch request.
+	// Do the same for "429" errors.
+	if utilnet.IsConnectionRefused(err) || apierrors.IsTooManyRequests(err) {
+		return true
+	}
 	return false
 }
