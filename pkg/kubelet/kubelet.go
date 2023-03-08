@@ -2777,7 +2777,7 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 
 // ListenAndServePodResources runs the kubelet podresources grpc service
 func (kl *Kubelet) ListenAndServePodResources() {
-	socket, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
+	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
 	if err != nil {
 		klog.V(2).InfoS("Failed to get local endpoint for PodResources endpoint", "err", err)
 		return
@@ -2791,7 +2791,7 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		DynamicResources: kl.containerManager,
 	}
 
-	server.ListenAndServePodResources(socket, providers)
+	server.ListenAndServePodResources(endpoint, providers)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
