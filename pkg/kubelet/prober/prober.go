@@ -117,9 +117,9 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	} else {
 		switch result {
 		case probe.Success:
-			pb.recordContainerEvent(pod, &container, v1.EventTypeNormal, events.ContainerProbeSucceeded, "%s probe succeeded", probeType)
+			pb.recordContainerEvent(pod, &container, v1.EventTypeNormal, events.ContainerHealthy, "%s probe succeeded", probeType)
 		case probe.Failure:
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeFailed, "%s probe failed: %s", probeType, output)
+			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 		default:
 			// log the unknown status
 			klog.Warningf("Unknown probe result: %s", result)
