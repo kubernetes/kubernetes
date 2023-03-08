@@ -78,6 +78,7 @@ require (
 	go.uber.org/goleak v1.2.1
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.1.0
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833
 	golang.org/x/net v0.7.0
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 	golang.org/x/sync v0.1.0

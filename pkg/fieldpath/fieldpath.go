@@ -18,9 +18,10 @@ package fieldpath
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -36,7 +37,7 @@ func FormatMap(m map[string]string) (fmtStr string) {
 		// why add 4: (for =, \n, " and ")
 		grow += len(k) + len(v) + 4
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	// allocate space to avoid expansion
 	dst := make([]byte, 0, grow)
 	for _, key := range keys {

@@ -17,7 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
-	"sort"
+	"golang.org/x/exp/slices"
 
 	discovery "k8s.io/api/discovery/v1"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
@@ -35,7 +35,7 @@ type endpointHashObj struct {
 }
 
 func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
-	sort.Strings(endpoint.Addresses)
+	slices.Sort(endpoint.Addresses)
 	hashObj := endpointHashObj{Addresses: endpoint.Addresses}
 	if endpoint.Hostname != nil {
 		hashObj.Hostname = *endpoint.Hostname

@@ -18,8 +18,9 @@ package config
 
 import (
 	"fmt"
-	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -253,11 +254,11 @@ func (m *LocalMode) Type() string {
 type ConfigurationMap map[string]string
 
 func (m *ConfigurationMap) String() string {
-	pairs := []string{}
+	pairs := make([]string, 0, len(*m))
 	for k, v := range *m {
 		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
 	}
-	sort.Strings(pairs)
+	slices.Sort(pairs)
 	return strings.Join(pairs, ",")
 }
 

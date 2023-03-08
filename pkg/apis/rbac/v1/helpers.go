@@ -19,10 +19,9 @@ package v1
 import (
 	"fmt"
 
+	"golang.org/x/exp/slices"
+
 	rbacv1 "k8s.io/api/rbac/v1"
-
-	"sort"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -91,11 +90,11 @@ func (r *PolicyRuleBuilder) Rule() (rbacv1.PolicyRule, error) {
 		return rbacv1.PolicyRule{}, fmt.Errorf("a rule must have either nonResourceURLs or resources: %#v", r.PolicyRule)
 	}
 
-	sort.Strings(r.PolicyRule.Resources)
-	sort.Strings(r.PolicyRule.ResourceNames)
-	sort.Strings(r.PolicyRule.APIGroups)
-	sort.Strings(r.PolicyRule.NonResourceURLs)
-	sort.Strings(r.PolicyRule.Verbs)
+	slices.Sort(r.PolicyRule.Resources)
+	slices.Sort(r.PolicyRule.ResourceNames)
+	slices.Sort(r.PolicyRule.APIGroups)
+	slices.Sort(r.PolicyRule.NonResourceURLs)
+	slices.Sort(r.PolicyRule.Verbs)
 	return r.PolicyRule, nil
 }
 
