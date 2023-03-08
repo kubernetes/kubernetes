@@ -666,6 +666,9 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
 		}
 	}
+	for i, matchCondition := range spec.MatchConditions {
+		allErrors = append(allErrors, validateMatchCondition(&matchCondition, fldPath.Child("matchConditions").Index(i))...)
+	}
 	if len(spec.Validations) == 0 && len(spec.AuditAnnotations) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), "validations or auditAnnotations must contain at least one item"))
 		allErrors = append(allErrors, field.Required(fldPath.Child("auditAnnotations"), "validations or auditAnnotations must contain at least one item"))

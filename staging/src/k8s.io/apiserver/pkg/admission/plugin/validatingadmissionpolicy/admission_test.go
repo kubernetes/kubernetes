@@ -28,8 +28,6 @@ import (
 	celgo "github.com/google/cel-go/cel"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/klog/v2"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionRegistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -47,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
@@ -57,6 +56,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -418,7 +418,7 @@ func setupTestCommon(t *testing.T, compiler cel.FilterCompiler, matcher Matcher,
 	// Override compiler used by controller for tests
 	controller = handler.evaluator.(*celAdmissionController)
 	controller.policyController.filterCompiler = compiler
-	controller.policyController.newValidator = func(validationFilter, auditAnnotationFilter, messageFilter cel.Filter, fail *admissionRegistrationv1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+	controller.policyController.newValidator = func(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, fail *admissionRegistrationv1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
 		f := validationFilter.(*fakeFilter)
 		v := validatorMap[f.keyId]
 		v.validationFilter = f

@@ -3150,6 +3150,22 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			},
 			expectedError: `spec.auditAnnotations[0].valueExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>`,
 		},
+		{
+			name: "single match condition must have a name",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+				},
+			},
+			expectedError: `spec.matchConditions[0].name: Required value`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

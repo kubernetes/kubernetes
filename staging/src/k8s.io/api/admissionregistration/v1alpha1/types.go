@@ -179,6 +179,48 @@ type ValidatingAdmissionPolicySpec struct {
 	// +listType=atomic
 	// +optional
 	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// Match conditions filter requests that have already been matched by the rules, 
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. 
+	// There are a maximum of 64 match conditions allowed. 
+	// 
+	// The exact matching logic is (in order): 
+	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped. 
+	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated. 
+	//   3. If any matchCondition evaluates to an error (but none are FALSE): 
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the policy is skipped 
+	// 
+	// +patchMergeKey=name 
+	// +patchStrategy=merge 
+	// +listType=map 
+	// +listMapKey=name 
+	// +optional 
+	MatchConditions []MatchCondition `json:"matchConditions" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
+}
+
+// MatchCondition represents a condition which must be fulfilled for a request to be sent to a webhook.
+type MatchCondition struct {
+	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// as well as providing an identifier for logging purposes. A good name should be descriptive of
+	// the associated expression.
+	// Name must be a valid RFC 1123 DNS subdomain, and unique in a set of MatchConditions.
+	// Required.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+	//
+	// Expression represents the expression which will be evaluated by CEL.
+	// ref: https://github.com/google/cel-spec
+	// CEL expressions have access to the contents of the AdmissionRequest, organized into CEL variables:
+	//
+	// 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// 'oldObject' - The existing object. The value is null for CREATE requests.
+	// 'request' - Attributes of the admission request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	//
+	// Required.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=expression"`
 }
 
 // ParamKind is a tuple of Group Kind and Version.
