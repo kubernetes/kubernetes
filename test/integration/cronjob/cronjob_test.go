@@ -152,6 +152,10 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	closeFn, cjc, jc, informerSet, clientSet := setup(ctx, t)
 	defer closeFn()
 
+	// When shutting down, cancel must be called before closeFn.
+	// We simply call it multiple times.
+	defer cancel()
+
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"
 
