@@ -83,7 +83,6 @@ const (
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
 func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
-	// When feature VolumeScheduling enabled,
 	// Scheduler signal to the PV controller to start dynamic
 	// provisioning by setting the "AnnSelectedNode" annotation
 	// in the PVC
