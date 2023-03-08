@@ -24,6 +24,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kubernetes/utils/blob/master/pointer/pointer.go"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -826,33 +827,6 @@ func (s *StatefulSet) Validate() error {
 	// If no invalid inputs are found, return nil (no error)
 	return nil
 }
-
-/* NOTE:
-
-To use the StatefulSet struct, you would create an instance of the struct and call the Validate method:
-
-func main() {
-    // Create a sample StatefulSet instance
-    myStatefulSet := StatefulSet{
-        Replicas:          3,
-        ReadyReplicas:     3,
-        CurrentReplicas:   3,
-        UpdatedReplicas:   3,
-        AvailableReplicas: 3,
-        ObservedGeneration: nil,
-        CollisionCount:    nil,
-    }
-
-    // Validate the StatefulSet instance
-    err := myStatefulSet.Validate()
-    if err != nil {
-        fmt.Println("Validation failed:", err)
-    } else {
-        fmt.Println("Validation succeeded!")
-    }
-}
-
-*/
 
 // TestValidateStatefulSetStatus tests the validateStatefulSetStatus function with various test cases
 func TestValidateStatefulSetStatus(t *testing.T) {
