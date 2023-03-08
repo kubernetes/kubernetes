@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -107,26 +110,31 @@ func TestExec(t *testing.T) {
 	elevenKilobyte := strings.Repeat("logs-123", 8*128*11) // 8*128*11=11264 = 11KB of text.
 
 	tests := []struct {
-		expectedStatus probe.Result
-		expectError    bool
-		input          string
-		output         string
-		err            error
+		expectedStatus   probe.Result
+		expectError      bool
+		execProbeTimeout bool
+		input            string
+		output           string
+		err              error
 	}{
 		// Ok
-		{probe.Success, false, "OK", "OK", nil},
+		{probe.Success, false, true, "OK", "OK", nil},
 		// Ok
-		{probe.Success, false, "OK", "OK", &fakeExitError{true, 0}},
+		{probe.Success, false, true, "OK", "OK", &fakeExitError{true, 0}},
 		// Ok - truncated output
-		{probe.Success, false, elevenKilobyte, tenKilobyte, nil},
+		{probe.Success, false, true, elevenKilobyte, tenKilobyte, nil},
 		// Run returns error
-		{probe.Unknown, true, "", "", fmt.Errorf("test error")},
+		{probe.Unknown, true, true, "", "", fmt.Errorf("test error")},
 		// Unhealthy
-		{probe.Failure, false, "Fail", "", &fakeExitError{true, 1}},
+		{probe.Failure, false, true, "Fail", "", &fakeExitError{true, 1}},
 		// Timeout
-		{probe.Failure, false, "", "command testcmd timed out", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
+		{probe.Failure, false, true, "", "command testcmd timed out", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
+		// ExecProbeTimeout
+		{probe.Unknown, true, false, "", "", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
 	}
+
 	for i, test := range tests {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)()
 		fake := FakeCmd{
 			out: []byte(test.output),
 			err: test.err,
