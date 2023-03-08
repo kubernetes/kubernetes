@@ -19,6 +19,7 @@ package apparmor
 import (
 	"errors"
 	"fmt"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,7 +33,18 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Validator is a interface for validating that a pod with an AppArmor profile can be run by a Node.
+// Shim interface allows injection of bad host configuration for testing purposes
+type Shim interface {
+	IsEnabled() bool
+}
+
+type shim struct{}
+
+func (s shim) IsEnabled() bool {
+	return apparmor.IsEnabled()
+}
+
+// Validator is an interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
 	ValidateHost() error
