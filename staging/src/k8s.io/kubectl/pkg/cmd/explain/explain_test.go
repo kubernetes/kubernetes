@@ -22,7 +22,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -276,23 +275,5 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 		})
 
 		buf.Reset()
-	}
-}
-
-func TestAlphaEnablement(t *testing.T) {
-	alphas := map[cmdutil.FeatureGate]string{
-		cmdutil.ExplainOpenapiV3: "output",
-	}
-	for feature, flag := range alphas {
-		f := cmdtesting.NewTestFactory()
-		defer f.Cleanup()
-
-		cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
-
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
-			cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
-		})
 	}
 }
