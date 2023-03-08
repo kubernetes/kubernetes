@@ -19,7 +19,6 @@ require (
 	github.com/Microsoft/hcsshim v0.8.25
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/aws/aws-sdk-go v1.44.147
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/coredns/corefile-migration v1.0.20
@@ -183,7 +182,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
