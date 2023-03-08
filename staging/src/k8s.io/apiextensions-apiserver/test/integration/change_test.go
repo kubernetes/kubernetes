@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -140,7 +141,8 @@ func TestChangeCRD(t *testing.T) {
 						case watch.Added, watch.Modified, watch.Deleted:
 							// all expected
 						default:
-							t.Errorf("unexpected watch event: %#v", event)
+							data, _ := json.Marshal(event.Object)
+							t.Errorf("unexpected watch event: %s, %s", event.Type, string(data))
 						}
 					}
 				}
