@@ -17,597 +17,628 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/stretchr/testify/require"
 
+	celtypes "github.com/google/cel-go/common/types"
+
+	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
-func TestCompile(t *testing.T) {
-	cases := []struct {
-		name             string
-		policy           *v1alpha1.ValidatingAdmissionPolicy
-		errorExpressions map[string]string
-	}{
-		{
-			name: "invalid syntax",
-			policy: &v1alpha1.ValidatingAdmissionPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					FailurePolicy: func() *v1alpha1.FailurePolicyType {
-						r := v1alpha1.FailurePolicyType("Fail")
-						return &r
-					}(),
-					ParamKind: &v1alpha1.ParamKind{
-						APIVersion: "rules.example.com/v1",
-						Kind:       "ReplicaLimit",
-					},
-					Validations: []v1alpha1.Validation{
-						{
-							Expression: "1 < 'asdf'",
-						},
-						{
-							Expression: "1 < 2",
-						},
-					},
-					MatchConstraints: &v1alpha1.MatchResources{
-						MatchPolicy: func() *v1alpha1.MatchPolicyType {
-							r := v1alpha1.MatchPolicyType("Exact")
-							return &r
-						}(),
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
-							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Operations: []v1.OperationType{"CREATE"},
-									Rule: v1.Rule{
-										APIGroups:   []string{"a"},
-										APIVersions: []string{"a"},
-										Resources:   []string{"a"},
-									},
-								},
-							},
-						},
-						ObjectSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{"a": "b"},
-						},
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{"a": "b"},
-						},
-					},
-				},
-			},
-			errorExpressions: map[string]string{
-				"1 < 'asdf'": "found no matching overload for '_<_' applied to '(int, string)",
-			},
-		},
-		{
-			name: "valid syntax",
-			policy: &v1alpha1.ValidatingAdmissionPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					FailurePolicy: func() *v1alpha1.FailurePolicyType {
-						r := v1alpha1.FailurePolicyType("Fail")
-						return &r
-					}(),
-					Validations: []v1alpha1.Validation{
-						{
-							Expression: "1 < 2",
-						},
-						{
-							Expression: "object.spec.string.matches('[0-9]+')",
-						},
-						{
-							Expression: "request.kind.group == 'example.com' && request.kind.version == 'v1' && request.kind.kind == 'Fake'",
-						},
-					},
-					MatchConstraints: &v1alpha1.MatchResources{
-						MatchPolicy: func() *v1alpha1.MatchPolicyType {
-							r := v1alpha1.MatchPolicyType("Exact")
-							return &r
-						}(),
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
-							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Operations: []v1.OperationType{"CREATE"},
-									Rule: v1.Rule{
-										APIGroups:   []string{"a"},
-										APIVersions: []string{"a"},
-										Resources:   []string{"a"},
-									},
-								},
-							},
-						},
-						ObjectSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{"a": "b"},
-						},
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{"a": "b"},
-						},
-					},
-				},
-			},
-		},
-	}
+var _ cel.Filter = &fakeCelFilter{}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var c CELValidatorCompiler
-			validator := c.Compile(tc.policy)
-			if validator == nil {
-				t.Fatalf("unexpected nil validator")
-			}
-			validations := tc.policy.Spec.Validations
-			CompilationResults := validator.(*CELValidator).compilationResults
-			require.Equal(t, len(validations), len(CompilationResults))
-
-			meets := make([]bool, len(validations))
-			for expr, expectErr := range tc.errorExpressions {
-				for i, result := range CompilationResults {
-					if validations[i].Expression == expr {
-						if result.Error == nil {
-							t.Errorf("Expect expression '%s' to contain error '%v' but got no error", expr, expectErr)
-						} else if !strings.Contains(result.Error.Error(), expectErr) {
-							t.Errorf("Expected validation '%s' error to contain '%v' but got: %v", expr, expectErr, result.Error)
-						}
-						meets[i] = true
-					}
-				}
-			}
-			for i, meet := range meets {
-				if !meet && CompilationResults[i].Error != nil {
-					t.Errorf("Unexpected err '%v' for expression '%s'", CompilationResults[i].Error, validations[i].Expression)
-				}
-			}
-		})
-	}
+type fakeCelFilter struct {
+	evaluations []cel.EvaluationResult
+	throwError  bool
 }
 
-func getValidPolicy(validations []v1alpha1.Validation, params *v1alpha1.ParamKind, fp *v1alpha1.FailurePolicyType) *v1alpha1.ValidatingAdmissionPolicy {
-	if fp == nil {
-		fp = func() *v1alpha1.FailurePolicyType {
-			r := v1alpha1.FailurePolicyType("Fail")
-			return &r
-		}()
+func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
+	if f.throwError {
+		return nil, errors.New("test error")
 	}
-	return &v1alpha1.ValidatingAdmissionPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-			FailurePolicy: fp,
-			Validations:   validations,
-			ParamKind:     params,
-			MatchConstraints: &v1alpha1.MatchResources{
-				MatchPolicy: func() *v1alpha1.MatchPolicyType {
-					r := v1alpha1.MatchPolicyType("Exact")
-					return &r
-				}(),
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{
-					{
-						RuleWithOperations: v1alpha1.RuleWithOperations{
-							Operations: []v1.OperationType{"CREATE"},
-							Rule: v1.Rule{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a"},
-							},
-						},
-					},
-				},
-				ObjectSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-			},
-		},
-	}
+	return f.evaluations, nil
 }
 
-func generatedDecision(k PolicyDecisionAction, m string, r metav1.StatusReason) PolicyDecision {
-	return PolicyDecision{Action: k, Message: m, Reason: r}
+func (f *fakeCelFilter) CompilationErrors() []error {
+	return []error{}
 }
 
 func TestValidate(t *testing.T) {
-	// we fake the paramKind in ValidatingAdmissionPolicy for testing since the params is directly passed from cel admission
-	// Inside validator.go, we only check if paramKind exists
-	hasParamKind := &v1alpha1.ParamKind{
-		APIVersion: "v1",
-		Kind:       "ConfigMap",
-	}
-	ignorePolicy := func() *v1alpha1.FailurePolicyType {
-		r := v1alpha1.FailurePolicyType("Ignore")
-		return &r
-	}()
-	forbiddenReason := func() *metav1.StatusReason {
-		r := metav1.StatusReasonForbidden
-		return &r
-	}()
+	ignore := v1.Ignore
+	fail := v1.Fail
 
-	configMapParams := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Data: map[string]string{
-			"fakeString": "fake",
-		},
-	}
-	crdParams := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"testSize": 10,
-			},
-		},
-	}
-	podObject := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: corev1.PodSpec{
-			NodeName: "testnode",
-		},
-	}
+	forbiddenReason := metav1.StatusReasonForbidden
+	unauthorizedReason := metav1.StatusReasonUnauthorized
 
-	var nilUnstructured *unstructured.Unstructured
+	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
+	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
 
 	cases := []struct {
-		name            string
-		policy          *v1alpha1.ValidatingAdmissionPolicy
-		attributes      admission.Attributes
-		params          runtime.Object
-		policyDecisions []PolicyDecision
+		name             string
+		failPolicy       *v1.FailurePolicyType
+		evaluations      []cel.EvaluationResult
+		auditEvaluations []cel.EvaluationResult
+		policyDecision   []PolicyDecision
+		auditAnnotations []PolicyAuditAnnotation
+		throwError       bool
 	}{
 		{
-			name: "valid syntax for object",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test pass",
+			evaluations: []cel.EvaluationResult{
 				{
-					Expression: "has(object.subsets) && object.subsets.size() < 2",
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
 				},
-			}, nil, nil),
-			attributes: newValidAttribute(nil, false),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
 			},
 		},
 		{
-			name: "valid syntax for metadata",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test multiple pass",
+			evaluations: []cel.EvaluationResult{
 				{
-					Expression: "object.metadata.name == 'endpoints1'",
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
 				},
-			}, nil, nil),
-			attributes: newValidAttribute(nil, false),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+				{
+					Action: ActionAdmit,
+				},
 			},
 		},
 		{
-			name: "valid syntax for oldObject",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test error with failurepolicy ignore",
+			evaluations: []cel.EvaluationResult{
 				{
-					Expression: "oldObject == null",
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
 				},
+			},
+			policyDecision: []PolicyDecision{
 				{
-					Expression: "object != null",
+					Action: ActionAdmit,
 				},
-			}, nil, nil),
-			attributes: newValidAttribute(nil, false),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-				generatedDecision(ActionAdmit, "", ""),
+			},
+			failPolicy: &ignore,
+		},
+		{
+			name: "test error with failurepolicy nil",
+			evaluations: []cel.EvaluationResult{
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionDeny,
+				},
 			},
 		},
 		{
-			name: "valid syntax for request",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{Expression: "request.operation == 'CREATE'"},
-			}, nil, nil),
-			attributes: newValidAttribute(nil, false),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
+			name: "test fail with failurepolicy fail",
+			evaluations: []cel.EvaluationResult{
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionDeny,
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test fail with failurepolicy ignore with multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
+				},
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+				{
+					Action: ActionAdmit,
+				},
+			},
+			failPolicy: &ignore,
+		},
+		{
+			name: "test fail with failurepolicy nil with multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
+				},
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+				{
+					Action: ActionDeny,
+				},
 			},
 		},
 		{
-			name: "valid syntax for configMap",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{Expression: "request.namespace != params.data.fakeString"},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, false),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
+			name: "test fail with failurepolicy fail with multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &ValidationCondition{},
+				},
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+				{
+					Action: ActionDeny,
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test fail with failurepolicy ignore with multiple failed validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+				{
+					Action: ActionAdmit,
+				},
+			},
+			failPolicy: &ignore,
+		},
+		{
+			name: "test fail with failurepolicy nil with multiple failed validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionDeny,
+				},
+				{
+					Action: ActionDeny,
+				},
 			},
 		},
 		{
-			name: "test failure policy with Ignore",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{Expression: "object.subsets.size() > 2"},
-			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(nil, false),
-			params: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+			name: "test fail with failurepolicy fail with multiple failed validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
 				},
-				Data: map[string]string{
-					"fakeString": "fake",
+				{
+					Error:              errors.New(""),
+					ExpressionAccessor: &ValidationCondition{},
 				},
 			},
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionDeny,
+				},
+				{
+					Action: ActionDeny,
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test reason for fail no reason set",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Expression: "this.expression == unit.test",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonInvalid,
+					Message: "failed expression: this.expression == unit.test",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test reason for fail reason set",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonForbidden,
+					Message: "failed expression: this.expression == unit.test",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test reason for failed validations multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+					},
+				},
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &unauthorizedReason,
+						Expression: "this.expression.2 == unit.test.2",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonForbidden,
+					Message: "failed expression: this.expression == unit.test",
+				},
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonUnauthorized,
+					Message: "failed expression: this.expression.2 == unit.test.2",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test message for failed validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonForbidden,
+					Message: "test",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test message for failed validations multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test2",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonForbidden,
+					Message: "test1",
+				},
+				{
+					Action:  ActionDeny,
+					Reason:  metav1.StatusReasonForbidden,
+					Message: "test2",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test filter error",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test error",
+				},
+			},
+			failPolicy: &fail,
+			throwError: true,
+		},
+		{
+			name: "test filter error multiple evaluations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test2",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test error",
+				},
+			},
+			failPolicy: &fail,
+			throwError: true,
+		},
+		{
+			name: "test empty validations with non-empty audit annotations",
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
+				},
+			},
+			failPolicy: &fail,
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
 			},
 		},
 		{
-			name: "test failure policy with multiple validations",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test non-empty validations with non-empty audit annotations",
+			evaluations: []cel.EvaluationResult{
 				{
-					Expression: "has(object.subsets)",
+					EvalResult: celtypes.True,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
 				},
-				{
-					Expression: "object.subsets.size() > 2",
-				},
-			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(nil, false),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
+			},
+			failPolicy: &fail,
 		},
 		{
-			name: "test failure policy with multiple failed validations",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test audit annotations with null return",
+			auditEvaluations: []cel.EvaluationResult{
 				{
-					Expression: "oldObject != null",
+					EvalResult: celtypes.NullValue,
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "null",
+					},
 				},
 				{
-					Expression: "object.subsets.size() > 2",
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
 				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, false),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "failed expression: oldObject != null", metav1.StatusReasonInvalid),
-				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionExclude,
+				},
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
+			},
+			failPolicy: &fail,
 		},
 		{
-			name: "test Object nul in delete",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test audit annotations with failPolicy=fail",
+			auditEvaluations: []cel.EvaluationResult{
 				{
-					Expression: "oldObject != null",
+					Error: fmt.Errorf("valueExpression ''this is not valid CEL' resulted in error: <nil>"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'this is not valid CEL",
+					},
 				},
-				{
-					Expression: "object == null",
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-				generatedDecision(ActionAdmit, "", ""),
 			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionError,
+					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+				},
+			},
+			failPolicy: &fail,
 		},
 		{
-			name: "test reason for failed validation",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			name: "test audit annotations with failPolicy=ignore",
+			auditEvaluations: []cel.EvaluationResult{
 				{
-					Expression: "oldObject == null",
-					Reason:     forbiddenReason,
+					Error: fmt.Errorf("valueExpression ''this is not valid CEL' resulted in error: <nil>"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'this is not valid CEL",
+					},
 				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "failed expression: oldObject == null", metav1.StatusReasonForbidden),
 			},
-		},
-		{
-			name: "test message for failed validation",
-			policy: getValidPolicy([]v1alpha1.Validation{
+			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Expression: "oldObject == null",
-					Reason:     forbiddenReason,
-					Message:    "old object should be present",
+					Action: AuditAnnotationActionExclude, // TODO: is this right?
+					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
 				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "old object should be present", metav1.StatusReasonForbidden),
 			},
-		},
-		{
-			name: "test runtime error",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "oldObject.x == 100",
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			params:     configMapParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "resulted in error", ""),
-			},
-		},
-		{
-			name: "test against crd param",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "object.subsets.size() < params.spec.testSize",
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, false),
-			params:     crdParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-			},
-		},
-		{
-			name: "test compile failure with FailurePolicy Fail",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "fail to compile test",
-				},
-				{
-					Expression: "object.subsets.size() > params.spec.testSize",
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, false),
-			params:     crdParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "compilation error: compilation failed: ERROR: <input>:1:6: Syntax error:", ""),
-				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
-			},
-		},
-		{
-			name: "test compile failure with FailurePolicy Ignore",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "fail to compile test",
-				},
-				{
-					Expression: "object.subsets.size() > params.spec.testSize",
-				},
-			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(nil, false),
-			params:     crdParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "compilation error: compilation failed: ERROR:", ""),
-				generatedDecision(ActionDeny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
-			},
-		},
-		{
-			name: "test pod",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "object.spec.nodeName == 'testnode'",
-				},
-			}, nil, nil),
-			attributes: newValidAttribute(&podObject, false),
-			params:     crdParams,
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-			},
-		},
-		{
-			name: "test deny paramKind without paramRef",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "params != null",
-					Reason:     forbiddenReason,
-					Message:    "params as required",
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
-			// if paramRef is unset on a binding
-			params: runtime.Object(nilUnstructured),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionDeny, "params as required", metav1.StatusReasonForbidden),
-			},
-		},
-		{
-			name: "test allow paramKind without paramRef",
-			policy: getValidPolicy([]v1alpha1.Validation{
-				{
-					Expression: "params == null",
-					Reason:     forbiddenReason,
-				},
-			}, hasParamKind, nil),
-			attributes: newValidAttribute(nil, true),
-			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
-			// if paramRef is unset on a binding
-			params: runtime.Object(nilUnstructured),
-			policyDecisions: []PolicyDecision{
-				generatedDecision(ActionAdmit, "", ""),
-			},
+			failPolicy: &ignore,
 		},
 	}
-
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := CELValidatorCompiler{}
-			validator := c.Compile(tc.policy)
-			if validator == nil {
-				t.Fatalf("unexpected nil validator")
+			v := validator{
+				failPolicy: tc.failPolicy,
+				validationFilter: &fakeCelFilter{
+					evaluations: tc.evaluations,
+					throwError:  tc.throwError,
+				},
+				auditAnnotationFilter: &fakeCelFilter{
+					evaluations: tc.auditEvaluations,
+					throwError:  tc.throwError,
+				},
 			}
-			validations := tc.policy.Spec.Validations
-			CompilationResults := validator.(*CELValidator).compilationResults
-			require.Equal(t, len(validations), len(CompilationResults))
+			ctx := context.TODO()
+			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
 
-			versionedAttr, err := generic.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
-			if err != nil {
-				t.Fatalf("unexpected error on conversion: %v", err)
-			}
+			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
-			policyResults, err := validator.Validate(versionedAttr, tc.params)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			for i, policyDecision := range tc.policyDecision {
+				if policyDecision.Action != validateResult.Decisions[i].Action {
+					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.Action, validateResult.Decisions[i].Action)
+				}
+				if !strings.Contains(validateResult.Decisions[i].Message, policyDecision.Message) {
+					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.Message, validateResult.Decisions[i].Message)
+				}
+				if policyDecision.Reason != validateResult.Decisions[i].Reason {
+					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, validateResult.Decisions[i].Reason)
+				}
 			}
-			require.Equal(t, len(policyResults), len(tc.policyDecisions))
-			for i, policyDecision := range tc.policyDecisions {
-				if policyDecision.Action != policyResults[i].Action {
-					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.Action, policyResults[i].Action)
+			require.Equal(t, len(tc.auditEvaluations), len(validateResult.AuditAnnotations))
+
+			for i, auditAnnotation := range tc.auditAnnotations {
+				actual := validateResult.AuditAnnotations[i]
+				if auditAnnotation.Action != actual.Action {
+					t.Errorf("Expected policy audit annotation action '%v' but got '%v'", auditAnnotation.Action, actual.Action)
 				}
-				if !strings.Contains(policyResults[i].Message, policyDecision.Message) {
-					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.Message, policyResults[i].Message)
+				if auditAnnotation.Error != actual.Error {
+					t.Errorf("Expected audit annotation error '%v' but got '%v'", auditAnnotation.Error, actual.Error)
 				}
-				if policyDecision.Reason != policyResults[i].Reason {
-					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, policyResults[i].Reason)
+				if auditAnnotation.Value != actual.Value {
+					t.Errorf("Expected policy audit annotation value '%v' but got '%v'", auditAnnotation.Value, actual.Value)
 				}
 			}
 		})
 	}
 }
 
-// newObjectInterfacesForTest returns an ObjectInterfaces appropriate for test cases in this file.
-func newObjectInterfacesForTest() admission.ObjectInterfaces {
-	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	return admission.NewObjectInterfacesFromScheme(scheme)
-}
+func TestContextCanceled(t *testing.T) {
+	fail := v1.Fail
 
-func newValidAttribute(object runtime.Object, isDelete bool) admission.Attributes {
-	var oldObject runtime.Object
-	if !isDelete {
-		if object == nil {
-			object = &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "endpoints1",
-				},
-				Subsets: []corev1.EndpointSubset{
-					{
-						Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},
-					},
-				},
-			}
-		}
-	} else {
-		object = nil
-		oldObject = &corev1.Endpoints{
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},
-				},
-			},
-		}
+	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
+	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+	fc := cel.NewFilterCompiler()
+	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+	v := validator{
+		failPolicy:       &fail,
+		validationFilter: f,
+		auditAnnotationFilter: &fakeCelFilter{
+			evaluations: nil,
+			throwError:  false,
+		},
 	}
-	return admission.NewAttributesRecord(object, oldObject, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, &metav1.CreateOptions{}, false, nil)
-
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
+		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
+	}
 }

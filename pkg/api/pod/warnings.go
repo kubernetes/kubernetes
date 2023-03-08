@@ -250,5 +250,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		return true
 	})
 
+	// warn if the terminationGracePeriodSeconds is negative.
+	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds < 0 {
+		warnings = append(warnings, fmt.Sprintf("%s: must be >= 0; negative values are invalid and will be treated as 1", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
+	}
 	return warnings
 }

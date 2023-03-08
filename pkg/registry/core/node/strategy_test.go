@@ -298,6 +298,14 @@ func TestWarningOnUpdateAndCreate(t *testing.T) {
 			"spec.configSource"},
 		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
 			api.Node{}, ""},
+		{api.Node{},
+			api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			"spec.externalID"},
+		{api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			"spec.externalID"},
+		{api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			api.Node{}, ""},
 	}
 	for i, test := range tests {
 		warnings := (nodeStrategy{}).WarningsOnUpdate(context.Background(), &test.node, &test.oldNode)

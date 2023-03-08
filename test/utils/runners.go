@@ -49,6 +49,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
 )
@@ -318,7 +319,7 @@ func (config *DeploymentConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Replicas: pointer.Int32(int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -404,7 +405,7 @@ func (config *ReplicaSetConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Replicas: pointer.Int32(int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -486,8 +487,8 @@ func (config *JobConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: batch.JobSpec{
-			Parallelism: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
-			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Parallelism: pointer.Int32(int32(config.Replicas)),
+			Completions: pointer.Int32(int32(config.Replicas)),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"name": config.Name},
@@ -598,7 +599,7 @@ func (config *RCConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Replicas: pointer.Int32(int32(config.Replicas)),
 			Selector: map[string]string{
 				"name": config.Name,
 			},
@@ -1346,7 +1347,10 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
-		if err := makeCreatePod(client, namespace, podTemplate); err != nil {
+		// client-go writes into the object that is passed to Create,
+		// causing a data race unless we create a new copy for each
+		// parallel call.
+		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy()); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
@@ -1455,7 +1459,7 @@ func createController(client clientset.Interface, controllerName, namespace stri
 			Name: controllerName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int) *int32 { x := int32(i); return &x }(podCount),
+			Replicas: pointer.Int32(int32(podCount)),
 			Selector: map[string]string{"name": controllerName},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

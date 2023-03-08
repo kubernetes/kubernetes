@@ -166,8 +166,6 @@ type GCEImage struct {
 	Metadata        string    `json:"metadata"`
 	Machine         string    `json:"machine,omitempty"`
 	Resources       Resources `json:"resources,omitempty"`
-	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
-	Tests []string `json:"tests,omitempty"`
 }
 
 type internalImageConfig struct {
@@ -185,7 +183,6 @@ type internalGCEImage struct {
 	resources       Resources
 	metadata        *compute.Metadata
 	machine         string
-	tests           []string
 }
 
 func main() {
@@ -225,6 +222,10 @@ func main() {
 		return
 	}
 
+	// Append some default ginkgo flags. We use similar defaults here as hack/ginkgo-e2e.sh
+	allGinkgoFlags := fmt.Sprintf("%s --no-color -v", *ginkgoFlags)
+	fmt.Printf("Will use ginkgo flags as: %s", allGinkgoFlags)
+
 	var gceImages *internalImageConfig
 	if *mode == "gce" {
 		if *hosts == "" && *imageConfigFile == "" && *images == "" {
@@ -263,8 +264,9 @@ func main() {
 			imageConfig := gceImages.images[shortName]
 			fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
 			running++
+
 			go func(image *internalGCEImage, junitFileName string) {
-				results <- testImage(image, junitFileName)
+				results <- testImage(image, junitFileName, allGinkgoFlags)
 			}(&imageConfig, shortName)
 		}
 	}
@@ -273,7 +275,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFileName string) {
-				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
+				results <- testHost(host, *cleanup, "", junitFileName, allGinkgoFlags)
 			}(host, host)
 		}
 	}
@@ -292,9 +294,9 @@ func main() {
 		fmt.Printf("%s\n", tr.output)
 		if tr.err != nil {
 			errCount++
-			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
+			fmt.Printf("Failure Finished Test Suite on Host %s. Refer to artifacts directory for ginkgo log for this host.\n%v\n", host, tr.err)
 		} else {
-			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
+			fmt.Printf("Success Finished Test Suite on Host %s. Refer to artifacts directory for ginkgo log for this host.\n", host)
 		}
 		exitOk = exitOk && tr.exitOk
 		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
@@ -359,7 +361,6 @@ func prepareGceImages() (*internalImageConfig, error) {
 				metadata:        getImageMetadata(metadata),
 				kernelArguments: imageConfig.KernelArguments,
 				machine:         imageConfig.Machine,
-				tests:           imageConfig.Tests,
 				resources:       imageConfig.Resources,
 			}
 			if gceImage.imageDesc == "" {
@@ -536,18 +537,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult {
-	ginkgoFlagsStr := *ginkgoFlags
-	// Check whether the test is for benchmark.
-	if len(imageConfig.tests) > 0 {
-		// Benchmark needs machine type non-empty.
-		if imageConfig.machine == "" {
-			imageConfig.machine = defaultMachine
-		}
-		// Use the Ginkgo focus in benchmark config.
-		ginkgoFlagsStr += (" " + testsToGinkgoFocus(imageConfig.tests))
-	}
-
+func testImage(imageConfig *internalGCEImage, junitFileName string, ginkgoFlagsStr string) *TestResult {
 	host, err := createInstance(imageConfig)
 	if *deleteInstances {
 		defer deleteInstance(host)
@@ -962,17 +952,4 @@ func machineType(machine string) string {
 		machine = defaultMachine
 	}
 	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
-}
-
-// testsToGinkgoFocus converts the test string list to Ginkgo focus
-func testsToGinkgoFocus(tests []string) string {
-	focus := "--focus=\""
-	for i, test := range tests {
-		if i == 0 {
-			focus += test
-		} else {
-			focus += ("|" + test)
-		}
-	}
-	return focus + "\""
 }

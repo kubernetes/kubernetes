@@ -225,6 +225,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: valueExpression
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1alpha1.MatchResources
   map:
     fields:
@@ -353,9 +364,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: policyName
       type:
         scalar: string
+    - name: validationActions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec
   map:
     fields:
+    - name: auditAnnotations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation
+          elementRelationship: atomic
     - name: failurePolicy
       type:
         scalar: string
@@ -4129,6 +4152,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
+    - name: resizePolicy
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ContainerResizePolicy
+          elementRelationship: atomic
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -4205,6 +4234,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: TCP
+- name: io.k8s.api.core.v1.ContainerResizePolicy
+  map:
+    fields:
+    - name: policy
+      type:
+        scalar: string
+      default: ""
+    - name: resourceName
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.ContainerState
   map:
     fields:
@@ -4286,6 +4326,14 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: boolean
       default: false
+    - name: resources
+      type:
+        namedType: io.k8s.api.core.v1.ResourceRequirements
+    - name: resourcesAllocated
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
     - name: restartCount
       type:
         scalar: numeric
@@ -4521,6 +4569,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
+    - name: resizePolicy
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ContainerResizePolicy
+          elementRelationship: atomic
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -6183,6 +6237,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
     - name: reason
+      type:
+        scalar: string
+    - name: resize
       type:
         scalar: string
     - name: startTime

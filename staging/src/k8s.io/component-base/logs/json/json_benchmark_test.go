@@ -43,7 +43,7 @@ func BenchmarkInfoLoggerInfo(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,
@@ -73,7 +73,7 @@ func BenchmarkZapLoggerError(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,
@@ -102,7 +102,7 @@ func BenchmarkZapLoggerV(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,

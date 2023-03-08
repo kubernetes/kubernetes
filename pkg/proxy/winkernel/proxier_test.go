@@ -790,6 +790,90 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	}
 }
 
+// TestClusterIPLBInCreateDsrLoadBalancer tests, if the available endpoints are remote,
+// syncproxyrules only creates ClusterIP Loadbalancer and no NodePort, External IP or IngressIP
+// loadbalancers will be created.
+func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+	lbIP := "11.21.31.41"
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: lbIP,
+			}}
+		}),
+	)
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+				NodeName:  pointer.StringPtr("testhost2"), // This will make this endpoint as a remote endpoint
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     pointer.StringPtr(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		// Checking ClusterIP Loadbalancer is created
+		if svcInfo.hnsID != guid {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
+		}
+		// Verifying NodePort Loadbalancer is not created
+		if svcInfo.nodePorthnsID != "" {
+			t.Errorf("NodePortHnsID %v is not empty.", svcInfo.nodePorthnsID)
+		}
+		// Verifying ExternalIP Loadbalancer is not created
+		for _, externalIP := range svcInfo.externalIPs {
+			if externalIP.hnsID != "" {
+				t.Errorf("ExternalLBID %v is not empty.", externalIP.hnsID)
+			}
+		}
+		// Verifying IngressIP Loadbalancer is not created
+		for _, ingressIP := range svcInfo.loadBalancerIngressIPs {
+			if ingressIP.hnsID != "" {
+				t.Errorf("IngressLBID %v is not empty.", ingressIP.hnsID)
+			}
+		}
+	}
+}
+
 func TestEndpointSlice(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)

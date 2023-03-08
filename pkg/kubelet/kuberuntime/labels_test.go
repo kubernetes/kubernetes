@@ -23,6 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -152,11 +155,13 @@ func TestContainerAnnotations(t *testing.T) {
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Hash:                      kubecontainer.HashContainer(container),
+		HashWithoutResources:      kubecontainer.HashContainerWithoutResources(container),
 		RestartCount:              restartCount,
 		TerminationMessagePath:    container.TerminationMessagePath,
 		PreStopHandler:            container.Lifecycle.PreStop,
 	}
 
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	// Test whether we can get right information from label
 	annotations := newContainerAnnotations(container, pod, restartCount, opts)
 	containerInfo := getContainerInfoFromAnnotations(annotations)
@@ -177,6 +182,7 @@ func TestContainerAnnotations(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = kubecontainer.HashContainer(container)
+	expected.HashWithoutResources = kubecontainer.HashContainerWithoutResources(container)
 	annotations = newContainerAnnotations(container, pod, restartCount, opts)
 	containerInfo = getContainerInfoFromAnnotations(annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {

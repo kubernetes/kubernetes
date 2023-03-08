@@ -190,7 +190,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", or "restricted".`))
+	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", "netadmin", or "restricted".`))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.

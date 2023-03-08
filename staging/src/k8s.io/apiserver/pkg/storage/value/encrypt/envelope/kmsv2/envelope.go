@@ -30,33 +30,46 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/value"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 	"k8s.io/utils/clock"
 )
+
+func init() {
+	value.RegisterMetrics()
+	metrics.RegisterMetrics()
+}
 
 const (
 	// KMSAPIVersion is the version of the KMS API.
 	KMSAPIVersion = "v2alpha1"
 	// annotationsMaxSize is the maximum size of the annotations.
 	annotationsMaxSize = 32 * 1024 // 32 kB
-	// keyIDMaxSize is the maximum size of the keyID.
-	keyIDMaxSize = 1 * 1024 // 1 kB
+	// KeyIDMaxSize is the maximum size of the keyID.
+	KeyIDMaxSize = 1 * 1024 // 1 kB
 	// encryptedDEKMaxSize is the maximum size of the encrypted DEK.
 	encryptedDEKMaxSize = 1 * 1024 // 1 kB
 	// cacheTTL is the default time-to-live for the cache entry.
 	cacheTTL = 1 * time.Hour
+	// error code
+	errKeyIDOKCode      ErrCodeKeyID = "ok"
+	errKeyIDEmptyCode   ErrCodeKeyID = "empty"
+	errKeyIDTooLongCode ErrCodeKeyID = "too_long"
 )
 
 type KeyIDGetterFunc func(context.Context) (keyID string, err error)
+type ProbeHealthzCheckFunc func(context.Context) (err error)
+type ErrCodeKeyID string
 
 type envelopeTransformer struct {
-	envelopeService kmsservice.Service
-
-	keyIDGetter KeyIDGetterFunc
+	envelopeService   kmsservice.Service
+	providerName      string
+	keyIDGetter       KeyIDGetterFunc
+	probeHealthzCheck ProbeHealthzCheckFunc
 
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
@@ -67,14 +80,16 @@ type envelopeTransformer struct {
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt.
-func NewEnvelopeTransformer(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
-	return newEnvelopeTransformerWithClock(envelopeService, keyIDGetter, baseTransformerFunc, cacheTTL, clock.RealClock{})
+func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
+	return newEnvelopeTransformerWithClock(envelopeService, providerName, keyIDGetter, probeHealthzCheck, baseTransformerFunc, cacheTTL, clock.RealClock{})
 }
 
-func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
+func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
+		providerName:        providerName,
 		keyIDGetter:         keyIDGetter,
+		probeHealthzCheck:   probeHealthzCheck,
 		cache:               newSimpleCache(clock, cacheTTL),
 		baseTransformerFunc: baseTransformerFunc,
 	}
@@ -82,8 +97,6 @@ func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, keyIDGe
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
 func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	metrics.RecordArrival(metrics.FromStorageLabel, time.Now())
-
 	// Deserialize the EncryptedObject from the data.
 	encryptedObject, err := t.doDecode(data)
 	if err != nil {
@@ -95,8 +108,12 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	if transformer == nil {
 		value.RecordCacheMiss()
 
+		requestInfo := getRequestInfoFromContext(ctx)
 		uid := string(uuid.NewUUID())
-		klog.V(6).InfoS("Decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
+		klog.V(6).InfoS("decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()),
+			"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
+			"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
+
 		key, err := t.envelopeService.Decrypt(ctx, uid, &kmsservice.DecryptRequest{
 			Ciphertext:  encryptedObject.EncryptedDEK,
 			KeyID:       encryptedObject.KeyID,
@@ -111,6 +128,8 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			return nil, false, err
 		}
 	}
+	// It's possible to record empty keyID
+	metrics.RecordKeyID(metrics.FromStorageLabel, t.providerName, encryptedObject.KeyID)
 
 	out, stale, err := transformer.TransformFromStorage(ctx, encryptedObject.EncryptedData, dataCtx)
 	if err != nil {
@@ -125,20 +144,23 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	if err != nil {
 		return nil, false, err
 	}
+
 	return out, encryptedObject.KeyID != keyID, nil
 
 }
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.
 func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	metrics.RecordArrival(metrics.ToStorageLabel, time.Now())
 	newKey, err := generateKey(32)
 	if err != nil {
 		return nil, err
 	}
 
+	requestInfo := getRequestInfoFromContext(ctx)
 	uid := string(uuid.NewUUID())
-	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
+	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()),
+		"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
+		"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
 	resp, err := t.envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
@@ -154,6 +176,8 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 
+	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, resp.KeyID)
+
 	encObject := &kmstypes.EncryptedObject{
 		KeyID:         resp.KeyID,
 		EncryptedDEK:  resp.Ciphertext,
@@ -164,7 +188,12 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	// Check keyID freshness and write to log if key IDs are different
 	statusKeyID, err := t.keyIDGetter(ctx)
 	if err == nil && encObject.KeyID != statusKeyID {
-		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "objectKeyID", encObject.KeyID, "statusKeyID", statusKeyID)
+		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "objectKeyID", encObject.KeyID, "statusKeyID", statusKeyID, "providerName", t.providerName)
+
+		// trigger health probe check immediately to ensure keyID freshness
+		if err := t.probeHealthzCheck(ctx); err != nil {
+			klog.V(2).ErrorS(err, "kms plugin failed health check probe", "name", t.providerName)
+		}
 	}
 
 	// Serialize the EncryptedObject to a byte array.
@@ -228,7 +257,7 @@ func validateEncryptedObject(o *kmstypes.EncryptedObject) error {
 	if err := validateEncryptedDEK(o.EncryptedDEK); err != nil {
 		return fmt.Errorf("failed to validate encrypted DEK: %w", err)
 	}
-	if err := ValidateKeyID(o.KeyID); err != nil {
+	if _, err := ValidateKeyID(o.KeyID); err != nil {
 		return fmt.Errorf("failed to validate key id: %w", err)
 	}
 	if err := validateAnnotations(o.Annotations); err != nil {
@@ -271,12 +300,19 @@ func validateAnnotations(annotations map[string][]byte) error {
 // ValidateKeyID tests the following:
 // 1. The keyID is not empty.
 // 2. The size of keyID is less than 1 kB.
-func ValidateKeyID(keyID string) error {
+func ValidateKeyID(keyID string) (ErrCodeKeyID, error) {
 	if len(keyID) == 0 {
-		return fmt.Errorf("keyID is empty")
+		return errKeyIDEmptyCode, fmt.Errorf("keyID is empty")
 	}
-	if len(keyID) > keyIDMaxSize {
-		return fmt.Errorf("keyID is %d bytes, which exceeds the max size of %d", len(keyID), keyIDMaxSize)
+	if len(keyID) > KeyIDMaxSize {
+		return errKeyIDTooLongCode, fmt.Errorf("keyID is %d bytes, which exceeds the max size of %d", len(keyID), KeyIDMaxSize)
 	}
-	return nil
+	return errKeyIDOKCode, nil
+}
+
+func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestInfo {
+	if reqInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return reqInfo
+	}
+	return &genericapirequest.RequestInfo{}
 }

@@ -27,6 +27,6 @@ func loggerHelper(logger logr.Logger, msg string, kv []interface{}) {
 	logger.Info(msg, kv...)
 }
 
-func klogHelper(msg string, kv []interface{}) {
-	klog.InfoSDepth(1, msg, kv...)
+func klogHelper(level klog.Level, msg string, kv []interface{}) {
+	klog.V(level).InfoSDepth(1, msg, kv...)
 }

@@ -240,7 +240,7 @@ type ValidationRule struct {
 // JSON represents any valid JSON value.
 // These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
 type JSON struct {
-	Raw []byte `protobuf:"bytes,1,opt,name=raw"`
+	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=raw"`
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing

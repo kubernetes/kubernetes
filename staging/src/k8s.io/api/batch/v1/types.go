@@ -277,6 +277,7 @@ type JobSpec struct {
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
@@ -516,7 +517,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 

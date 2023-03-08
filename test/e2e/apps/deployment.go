@@ -832,7 +832,7 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	}
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
-	revisionHistoryLimit := utilpointer.Int32Ptr(0)
+	revisionHistoryLimit := utilpointer.Int32(0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -1338,7 +1338,7 @@ func listDeploymentReplicaSets(ctx context.Context, c clientset.Interface, ns st
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(len(rsList.Items)).To(gomega.BeNumerically(">", 0))
+	gomega.Expect(rsList.Items).ToNot(gomega.BeEmpty())
 	return rsList
 }
 

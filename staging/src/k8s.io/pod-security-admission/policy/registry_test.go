@@ -149,7 +149,7 @@ type registryTestCase struct {
 
 func (tc *registryTestCase) Run(t *testing.T, registry Evaluator) {
 	t.Run(fmt.Sprintf("%s:%s", tc.level, tc.version), func(t *testing.T) {
-		results := registry.EvaluatePod(api.LevelVersion{tc.level, versionOrPanic(tc.version)}, nil, nil)
+		results := registry.EvaluatePod(api.LevelVersion{Level: tc.level, Version: versionOrPanic(tc.version)}, nil, nil)
 
 		// Set extract the ForbiddenReasons from the results.
 		var actualReasons []string

@@ -46,6 +46,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	"k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
@@ -369,7 +370,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 			framework.ExpectNoError(err, "failed to list ReplicationController")
-			gomega.Expect(len(rcs.Items)).To(gomega.BeNumerically(">", 0), "Expected to find a ReplicationController but none was found")
+			gomega.Expect(rcs.Items).ToNot(gomega.BeEmpty(), "Expected to find a ReplicationController but none was found")
 
 			ginkgo.By("checking that ReplicationController has expected values")
 			foundRc := false
@@ -458,7 +459,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Replicas: pointer.Int32(replicas),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,

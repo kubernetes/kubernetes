@@ -67,7 +67,7 @@ var _ generic.Dispatcher = &validatingDispatcher{}
 func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
-	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
+	versionedAttrs := map[schema.GroupVersionKind]*admission.VersionedAttributes{}
 	for _, hook := range hooks {
 		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
 		if statusError != nil {
@@ -81,7 +81,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		if _, ok := versionedAttrs[invocation.Kind]; ok {
 			continue
 		}
-		versionedAttr, err := generic.NewVersionedAttributes(attr, invocation.Kind, o)
+		versionedAttr, err := admission.NewVersionedAttributes(attr, invocation.Kind, o)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
@@ -215,7 +215,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes) error {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil"), Status: apierrors.NewBadRequest("Webhook SideEffects is nil")}

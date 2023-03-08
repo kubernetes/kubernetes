@@ -753,7 +753,7 @@ metadata:
 					return strings.Contains(logOutput, content), nil
 				})
 
-				gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("unexpected error waiting for '%v' output", content))
+				framework.ExpectNoError(err, "waiting for '%v' output", content)
 				return logOutput
 			}
 
@@ -768,7 +768,7 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach without stdin")
 			// There is a race on this scenario described in #73099
@@ -784,7 +784,7 @@ metadata:
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
 			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -800,7 +800,7 @@ metadata:
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, runTestPod.Name, ns, time.Minute))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{}))
 		})
 
 		ginkgo.It("should contain last line of the log", func(ctx context.Context) {

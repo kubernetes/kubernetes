@@ -21,10 +21,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/openapi"
 )
 
@@ -148,5 +150,23 @@ func TestExplain(t *testing.T) {
 	cmd.Run(cmd, []string{"cronjobs"})
 	if !strings.Contains(buf.String(), "VERSION:  batch/v1beta1") {
 		t.Fatalf("expected output should include pod batch/v1beta1")
+	}
+}
+
+func TestAlphaEnablement(t *testing.T) {
+	alphas := map[cmdutil.FeatureGate]string{
+		cmdutil.ExplainOpenapiV3: "output",
+	}
+	for feature, flag := range alphas {
+		f := cmdtesting.NewTestFactory()
+		defer f.Cleanup()
+
+		cmd := NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
+		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
+
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
+			cmd := NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
+			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
+		})
 	}
 }

@@ -122,7 +122,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do(ctx).Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
-		gomega.Expect(len(pagedTable.Rows)).To(gomega.BeNumerically(">", 0))
+		gomega.Expect(pagedTable.Rows).ToNot(gomega.BeEmpty())
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
 	})
 
@@ -135,7 +135,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">=", 2))
-		gomega.Expect(len(table.Rows)).To(gomega.BeNumerically(">=", 1))
+		gomega.Expect(table.Rows).ToNot(gomega.BeEmpty())
 		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
 		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
 		framework.ExpectNotEqual(table.ResourceVersion, "")

@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	netutils "k8s.io/utils/net"
@@ -200,7 +201,8 @@ func TestNodeSyncUpdate(t *testing.T) {
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
-		go sync.Loop(doneChan)
+		logger, _ := ktesting.NewTestContext(t)
+		go sync.Loop(logger, doneChan)
 		sync.Update(tc.node)
 		close(sync.opChan)
 		<-doneChan
@@ -230,8 +232,8 @@ func TestNodeSyncResync(t *testing.T) {
 	cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
 	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)
 	doneChan := make(chan struct{})
-
-	go sync.Loop(doneChan)
+	logger, _ := ktesting.NewTestContext(t)
+	go sync.Loop(logger, doneChan)
 	<-fake.reportChan
 	close(sync.opChan)
 	// Unblock loop().
@@ -275,7 +277,8 @@ func TestNodeSyncDelete(t *testing.T) {
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
-		go sync.Loop(doneChan)
+		logger, _ := ktesting.NewTestContext(t)
+		go sync.Loop(logger, doneChan)
 		sync.Delete(tc.node)
 		<-doneChan
 		tc.fake.dumpTrace()

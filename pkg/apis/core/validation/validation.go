@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -36,6 +37,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,9 +45,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -1044,10 +1048,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 		}
 	} else if file.ResourceFieldRef != nil {
-		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixes
-		if opts.AllowDownwardAPIHugePages {
-			localValidContainerResourceFieldPathPrefixes = validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
-		}
+		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
 		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), true)...)
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
@@ -1990,7 +1991,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
 	if oldPv.Spec.NodeAffinity != nil {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		allErrs = append(allErrs, validatePvNodeAffinity(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -2404,8 +2405,6 @@ var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
 
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
-// NOTE: this is only valid with DownwardAPIHugePages enabled
-var validContainerResourceFieldPathPrefixes = sets.NewString()
 var validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages = sets.NewString(hugepagesRequestsPrefixDownwardAPI, hugepagesLimitsPrefixDownwardAPI)
 
 const hugepagesRequestsPrefixDownwardAPI string = `requests.hugepages-`
@@ -2426,10 +2425,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
-		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixes
-		if opts.AllowDownwardAPIHugePages {
-			localValidContainerResourceFieldPathPrefixes = validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
-		}
+		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
 		allErrs = append(allErrs, validateContainerResourceFieldSelector(ev.ValueFrom.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), false)...)
 	}
 	if ev.ValueFrom.ConfigMapKeyRef != nil {
@@ -3019,6 +3015,37 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 	return allErrors
 }
 
+var supportedResizeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+var supportedResizePolicies = sets.NewString(string(core.RestartNotRequired), string(core.RestartRequired))
+
+func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	// validate that resource name is not repeated, supported resource names and policy values are specified
+	resources := make(map[core.ResourceName]bool)
+	for i, p := range policyList {
+		if _, found := resources[p.ResourceName]; found {
+			allErrors = append(allErrors, field.Duplicate(fldPath.Index(i), p.ResourceName))
+		}
+		resources[p.ResourceName] = true
+		switch p.ResourceName {
+		case core.ResourceCPU, core.ResourceMemory:
+		case "":
+			allErrors = append(allErrors, field.Required(fldPath, ""))
+		default:
+			allErrors = append(allErrors, field.NotSupported(fldPath, p.ResourceName, supportedResizeResources.List()))
+		}
+		switch p.Policy {
+		case core.RestartNotRequired, core.RestartRequired:
+		case "":
+			allErrors = append(allErrors, field.Required(fldPath, ""))
+		default:
+			allErrors = append(allErrors, field.NotSupported(fldPath, p.Policy, supportedResizePolicies.List()))
+		}
+	}
+	return allErrors
+}
+
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
 func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
@@ -3140,6 +3167,9 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		}
 		if ctr.StartupProbe != nil {
 			allErrs = append(allErrs, field.Forbidden(idxPath.Child("startupProbe"), "may not be set for init containers"))
+		}
+		if len(ctr.ResizePolicy) > 0 {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("resizePolicy"), ctr.ResizePolicy, "must not be set for init containers"))
 		}
 	}
 
@@ -3365,9 +3395,7 @@ func validateSchedulingGates(schedulingGates []core.PodSchedulingGate, fldPath *
 	// There should be no duplicates in the list of scheduling gates.
 	seen := sets.String{}
 	for i, schedulingGate := range schedulingGates {
-		if schedulingGate.Name == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i), "must not be empty"))
-		}
+		allErrs = append(allErrs, ValidateQualifiedName(schedulingGate.Name, fldPath.Index(i))...)
 		if seen.Has(schedulingGate.Name) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), schedulingGate.Name))
 		}
@@ -3627,8 +3655,6 @@ func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.Er
 
 // PodValidationOptions contains the different settings for pod validation
 type PodValidationOptions struct {
-	// Allow pod spec to use hugepages in downward API
-	AllowDownwardAPIHugePages bool
 	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
 	AllowInvalidPodDeletionCost bool
 	// Allow invalid label-value in LabelSelector
@@ -4491,6 +4517,24 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 	return nil
 }
 
+var updatablePodSpecFields = []string{
+	"`spec.containers[*].image`",
+	"`spec.initContainers[*].image`",
+	"`spec.activeDeadlineSeconds`",
+	"`spec.tolerations` (only additions to existing tolerations)",
+	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+	"`spec.containers[*].resources` (for CPU/memory only)",
+}
+
+// TODO(vinaykul,InPlacePodVerticalScaling): Drop this var once InPlacePodVerticalScaling goes GA and featuregate is gone.
+var updatablePodSpecFieldsNoResources = []string{
+	"`spec.containers[*].image`",
+	"`spec.initContainers[*].image`",
+	"`spec.activeDeadlineSeconds`",
+	"`spec.tolerations` (only additions to existing tolerations)",
+	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+}
+
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
@@ -4550,12 +4594,56 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		return allErrs
 	}
 
+	//TODO(vinaykul,InPlacePodVerticalScaling): With KEP 2527, we can rely on persistence of PodStatus.QOSClass
+	// We can use PodStatus.QOSClass instead of GetPodQOS here, in kubelet, and elsewhere, as PodStatus.QOSClass
+	// does not change once it is bootstrapped in podCreate. This needs to be addressed before beta as a
+	// separate PR covering all uses of GetPodQOS. With that change, we can drop the below block.
+	// Ref: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r1093790446
+	// Ref: https://github.com/kubernetes/kubernetes/pull/102884/#discussion_r663280487
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// reject attempts to change pod qos
+		oldQoS := qos.GetPodQOS(oldPod)
+		newQoS := qos.GetPodQOS(newPod)
+		if newQoS != oldQoS {
+			allErrs = append(allErrs, field.Invalid(fldPath, newQoS, "Pod QoS is immutable"))
+		}
+	}
+
 	// handle updateable fields by munging those fields prior to deep equal comparison.
 	mungedPodSpec := *newPod.Spec.DeepCopy()
 	// munge spec.containers[*].image
 	var newContainers []core.Container
 	for ix, container := range mungedPodSpec.Containers {
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
+		// When the feature-gate is turned off, any new requests attempting to update CPU or memory
+		// resource values will result in validation failure.
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// Resources are mutable for CPU & memory only
+			//   - user can now modify Resources to express new desired Resources
+			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+				if oldResourceList == nil {
+					return nil
+				}
+				var mungedResourceList core.ResourceList
+				if resourceList == nil {
+					mungedResourceList = make(core.ResourceList)
+				} else {
+					mungedResourceList = resourceList.DeepCopy()
+				}
+				delete(mungedResourceList, core.ResourceCPU)
+				delete(mungedResourceList, core.ResourceMemory)
+				if cpu, found := oldResourceList[core.ResourceCPU]; found {
+					mungedResourceList[core.ResourceCPU] = cpu
+				}
+				if mem, found := oldResourceList[core.ResourceMemory]; found {
+					mungedResourceList[core.ResourceMemory] = mem
+				}
+				return mungedResourceList
+			}
+			lim := mungeCpuMemResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
+			req := mungeCpuMemResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
+			container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+		}
 		newContainers = append(newContainers, container)
 	}
 	mungedPodSpec.Containers = newContainers
@@ -4587,7 +4675,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
-		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds`, `spec.tolerations` (only additions to existing tolerations) or `spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)\n%v", specDiff)))
+		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFieldsNoResources, ","), specDiff))
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			errs = field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFields, ","), specDiff))
+		}
+		allErrs = append(allErrs, errs)
 	}
 
 	return allErrs
@@ -7162,5 +7254,46 @@ func ValidatePodAffinityTermSelector(podAffinityTerm core.PodAffinityTerm, allow
 	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: allowInvalidLabelValueInSelector}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, labelSelectorValidationOptions, fldPath.Child("labelSelector"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, labelSelectorValidationOptions, fldPath.Child("namespaceSelector"))...)
+	return allErrs
+}
+
+var betaToGALabel = map[string]string{
+	v1.LabelFailureDomainBetaZone:   v1.LabelTopologyZone,
+	v1.LabelFailureDomainBetaRegion: v1.LabelTopologyRegion,
+	kubeletapis.LabelOS:             v1.LabelOSStable,
+	kubeletapis.LabelArch:           v1.LabelArchStable,
+	v1.LabelInstanceType:            v1.LabelInstanceTypeStable,
+}
+
+var (
+	maskNodeSelectorLabelChangeEqualities     conversion.Equalities
+	initMaskNodeSelectorLabelChangeEqualities sync.Once
+)
+
+func getMaskNodeSelectorLabelChangeEqualities() conversion.Equalities {
+	initMaskNodeSelectorLabelChangeEqualities.Do(func() {
+		var eqs = apiequality.Semantic.Copy()
+		err := eqs.AddFunc(
+			func(newReq, oldReq core.NodeSelectorRequirement) bool {
+				// allow newReq to change to a GA key
+				if oldReq.Key != newReq.Key && betaToGALabel[oldReq.Key] == newReq.Key {
+					oldReq.Key = newReq.Key // +k8s:verify-mutation:reason=clone
+				}
+				return apiequality.Semantic.DeepEqual(newReq, oldReq)
+			},
+		)
+		if err != nil {
+			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
+		}
+		maskNodeSelectorLabelChangeEqualities = eqs
+	})
+	return maskNodeSelectorLabelChangeEqualities
+}
+
+func validatePvNodeAffinity(newPvNodeAffinity, oldPvNodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !getMaskNodeSelectorLabelChangeEqualities().DeepEqual(newPvNodeAffinity, oldPvNodeAffinity) {
+		allErrs = append(allErrs, field.Invalid(fldPath, newPvNodeAffinity, fieldImmutableErrorMsg+", except for updating from beta label to GA"))
+	}
 	return allErrs
 }

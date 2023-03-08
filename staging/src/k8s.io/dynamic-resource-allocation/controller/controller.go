@@ -160,6 +160,10 @@ func New(
 	podSchedulingInformer := informerFactory.Resource().V1alpha1().PodSchedulings()
 
 	eventBroadcaster := record.NewBroadcaster()
+	go func() {
+		<-ctx.Done()
+		eventBroadcaster.Shutdown()
+	}()
 	// TODO: use contextual logging in eventBroadcaster once it
 	// supports it. There is a StartStructuredLogging API, but it
 	// uses the global klog, which is worse than redirecting an unstructured

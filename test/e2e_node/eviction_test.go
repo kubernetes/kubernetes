@@ -778,7 +778,7 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 				"reason":                   eviction.Reason,
 			}.AsSelector().String()
 			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{FieldSelector: selector})
-			gomega.Expect(err).To(gomega.BeNil(), "Unexpected error getting events during eviction test: %v", err)
+			framework.ExpectNoError(err, "getting events")
 			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]
 
@@ -811,7 +811,7 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 					framework.ExpectEqual(len(offendingContainersUsage), 1, "Expected to find the offending container's usage in the %s annotation, but found %+v",
 						eviction.OffendingContainersUsageKey, offendingContainersUsage)
 					usageQuantity, err := resource.ParseQuantity(offendingContainersUsage[0])
-					gomega.Expect(err).To(gomega.BeNil(), "Expected to be able to parse pod %s's %s annotation as a quantity, but got err: %v", pod.Name, eviction.OffendingContainersUsageKey, err)
+					framework.ExpectNoError(err, "parsing pod %s's %s annotation as a quantity", pod.Name, eviction.OffendingContainersUsageKey)
 					request := pod.Spec.Containers[0].Resources.Requests[starvedResource]
 					framework.ExpectEqual(usageQuantity.Cmp(request), 1, "Expected usage of offending container: %s in pod %s to exceed its request %s",
 						usageQuantity.String(), pod.Name, request.String())

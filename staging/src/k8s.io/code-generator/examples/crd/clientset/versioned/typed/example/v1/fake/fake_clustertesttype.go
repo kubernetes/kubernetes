@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +30,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
+	examplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 )
 
 // FakeClusterTestTypes implements ClusterTestTypeInterface
@@ -126,6 +129,49 @@ func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts metav1
 func (c *FakeClusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, pt, data, subresources...), &v1.ClusterTestType{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterTestType), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterTestType.
+func (c *FakeClusterTestTypes) Apply(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
+	if clusterTestType == nil {
+		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterTestType)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterTestType.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data), &v1.ClusterTestType{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterTestType), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
+	if clusterTestType == nil {
+		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterTestType)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterTestType.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data, "status"), &v1.ClusterTestType{})
 	if obj == nil {
 		return nil, err
 	}

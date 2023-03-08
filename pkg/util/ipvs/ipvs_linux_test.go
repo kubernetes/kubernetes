@@ -44,7 +44,7 @@ func Test_toVirtualServer(t *testing.T) {
 			},
 			VirtualServer{},
 			true,
-			fmt.Sprintf("IPVS Service Flags should be >= %d, got 0x0", FlagHashed),
+			fmt.Sprintf("IPVS Service Flags should include %x, got 0x0", FlagHashed),
 		},
 		{
 			libipvs.Service{
@@ -52,7 +52,7 @@ func Test_toVirtualServer(t *testing.T) {
 			},
 			VirtualServer{},
 			true,
-			fmt.Sprintf("IPVS Service Flags should be >= %d, got 0x1", FlagHashed),
+			fmt.Sprintf("IPVS Service Flags should include %x, got 0x1", FlagHashed),
 		},
 		{
 			libipvs.Service{
@@ -145,6 +145,30 @@ func Test_toVirtualServer(t *testing.T) {
 				Port:      0,
 				Scheduler: "wrr",
 				Flags:     ServiceFlags(FlagPersistent),
+				Timeout:   0,
+			},
+			false,
+			"",
+		},
+		{
+			libipvs.Service{
+				Protocol:      0,
+				Port:          0,
+				FWMark:        0,
+				SchedName:     "mh",
+				Flags:         uint32(FlagPersistent + FlagHashed + FlagSourceHash),
+				Timeout:       0,
+				Netmask:       0xffffffff,
+				AddressFamily: unix.AF_INET,
+				Address:       netutils.ParseIPSloppy("1.2.3.4"),
+				PEName:        "",
+			},
+			VirtualServer{
+				Address:   netutils.ParseIPSloppy("1.2.3.4"),
+				Protocol:  "",
+				Port:      0,
+				Scheduler: "mh",
+				Flags:     ServiceFlags(FlagPersistent + FlagSourceHash),
 				Timeout:   0,
 			},
 			false,

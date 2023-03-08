@@ -53,3 +53,23 @@ func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 func (m *podContainerManagerStub) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
 }
+
+func (m *podContainerManagerStub) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerStub) GetPodCgroupMemoryLimit(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerStub) GetPodCgroupCpuLimit(_ *v1.Pod) (int64, uint64, uint64, error) {
+	return 0, 0, 0, nil
+}
+
+func (m *podContainerManagerStub) SetPodCgroupMemoryLimit(_ *v1.Pod, _ int64) error {
+	return nil
+}
+
+func (m *podContainerManagerStub) SetPodCgroupCpuLimit(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+	return nil
+}

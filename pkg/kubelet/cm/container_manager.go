@@ -152,7 +152,7 @@ type NodeConfig struct {
 	CPUManagerReconcilePeriod                time.Duration
 	ExperimentalMemoryManagerPolicy          string
 	ExperimentalMemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
-	ExperimentalPodPidsLimit                 int64
+	PodPidsLimit                             int64
 	EnforceCPULimits                         bool
 	CPUCFSQuotaPeriod                        time.Duration
 	ExperimentalTopologyManagerPolicy        string

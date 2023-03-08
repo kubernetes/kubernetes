@@ -43,7 +43,7 @@ import (
 
 const (
 	// total time to wait for cloudprovider or file system resize to finish
-	totalResizeWaitPeriod = 5 * time.Minute
+	totalResizeWaitPeriod = 10 * time.Minute
 )
 
 var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]", func() {

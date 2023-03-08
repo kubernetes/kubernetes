@@ -31,9 +31,12 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -744,7 +747,7 @@ func TestParallelJob(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(5),
+					Parallelism: pointer.Int32(5),
 				},
 			})
 			if err != nil {
@@ -752,7 +755,7 @@ func TestParallelJob(t *testing.T) {
 			}
 			want := podsByStatus{Active: 5}
 			if tc.enableReadyPods {
-				want.Ready = pointer.Int32Ptr(0)
+				want.Ready = pointer.Int32(0)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
@@ -830,7 +833,7 @@ func TestParallelJobParallelism(t *testing.T) {
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
 			BackoffLimit: pointer.Int32(2),
-			Parallelism:  pointer.Int32Ptr(5),
+			Parallelism:  pointer.Int32(5),
 		},
 	})
 	if err != nil {
@@ -898,8 +901,8 @@ func TestParallelJobWithCompletions(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(54),
-					Completions: pointer.Int32Ptr(56),
+					Parallelism: pointer.Int32(54),
+					Completions: pointer.Int32(56),
 				},
 			})
 			if err != nil {
@@ -907,7 +910,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			}
 			want := podsByStatus{Active: 54}
 			if tc.enableReadyPods {
-				want.Ready = pointer.Int32Ptr(0)
+				want.Ready = pointer.Int32(0)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 
@@ -973,8 +976,8 @@ func TestIndexedJob(t *testing.T) {
 	mode := batchv1.IndexedCompletion
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism:    pointer.Int32Ptr(3),
-			Completions:    pointer.Int32Ptr(4),
+			Parallelism:    pointer.Int32(3),
+			Completions:    pointer.Int32(4),
 			CompletionMode: &mode,
 		},
 	})
@@ -1026,6 +1029,182 @@ func TestIndexedJob(t *testing.T) {
 	validateTerminatedPodsTrackingFinalizerMetric(t, 5)
 }
 
+func TestElasticIndexedJob(t *testing.T) {
+	const initialCompletions int32 = 3
+	type jobUpdate struct {
+		completions          *int32
+		succeedIndexes       []int
+		failIndexes          []int
+		wantSucceededIndexes string
+		wantFailed           int
+		wantRemainingIndexes sets.Int
+		wantActivePods       int
+	}
+	cases := map[string]struct {
+		featureGate bool
+		jobUpdates  []jobUpdate
+		wantErr     *apierrors.StatusError
+	}{
+		"feature flag off, mutation not allowed": {
+			jobUpdates: []jobUpdate{
+				{
+					completions: pointer.Int32Ptr(4),
+				},
+			},
+			wantErr: apierrors.NewInvalid(
+				schema.GroupKind{Group: "batch", Kind: "Job"},
+				"test-job",
+				field.ErrorList{field.Invalid(field.NewPath("spec", "completions"), 4, "field is immutable")},
+			),
+		},
+		"scale up": {
+			featureGate: true,
+			jobUpdates: []jobUpdate{
+				{
+					// Scale up completions 3->4 then succeed indexes 0-3
+					completions:          pointer.Int32Ptr(4),
+					succeedIndexes:       []int{0, 1, 2, 3},
+					wantSucceededIndexes: "0-3",
+				},
+			},
+		},
+		"scale down": {
+			featureGate: true,
+			jobUpdates: []jobUpdate{
+				// First succeed index 1 and fail index 2 while completions is still original value (3).
+				{
+					succeedIndexes:       []int{1},
+					failIndexes:          []int{2},
+					wantSucceededIndexes: "1",
+					wantFailed:           1,
+					wantRemainingIndexes: sets.NewInt(0, 2),
+					wantActivePods:       2,
+				},
+				// Scale down completions 3->1, verify prev failure out of range still counts
+				// but succeeded out of range does not.
+				{
+					completions:          pointer.Int32Ptr(1),
+					succeedIndexes:       []int{0},
+					wantSucceededIndexes: "0",
+					wantFailed:           1,
+				},
+			},
+		},
+		"index finishes successfully, scale down, scale up": {
+			featureGate: true,
+			jobUpdates: []jobUpdate{
+				// First succeed index 2 while completions is still original value (3).
+				{
+					succeedIndexes:       []int{2},
+					wantSucceededIndexes: "2",
+					wantRemainingIndexes: sets.NewInt(0, 1),
+					wantActivePods:       2,
+				},
+				// Scale completions down 3->2 to exclude previously succeeded index.
+				{
+					completions:          pointer.Int32Ptr(2),
+					wantRemainingIndexes: sets.NewInt(0, 1),
+					wantActivePods:       2,
+				},
+				// Scale completions back up to include previously succeeded index that was temporarily out of range.
+				{
+					completions:          pointer.Int32Ptr(3),
+					succeedIndexes:       []int{0, 1, 2},
+					wantSucceededIndexes: "0-2",
+				},
+			},
+		},
+		"scale down to 0, verify that the job succeeds": {
+			featureGate: true,
+			jobUpdates: []jobUpdate{
+				{
+					completions: pointer.Int32Ptr(0),
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, tc.featureGate)()
+			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
+			defer closeFn()
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+			defer cancel()
+			resetMetrics()
+
+			// Set up initial Job in Indexed completion mode.
+			mode := batchv1.IndexedCompletion
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    pointer.Int32Ptr(initialCompletions),
+					Completions:    pointer.Int32Ptr(initialCompletions),
+					CompletionMode: &mode,
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+			// Wait for pods to start up.
+			err = wait.PollImmediate(5*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+				job, err := jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if job.Status.Active == int32(initialCompletions) {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Fatalf("Error waiting for Job pods to become active: %v", err)
+			}
+
+			for _, update := range tc.jobUpdates {
+				// Update Job spec if necessary.
+				if update.completions != nil {
+					if jobObj, err = updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+						j.Spec.Completions = update.completions
+						j.Spec.Parallelism = update.completions
+					}); err != nil {
+						if diff := cmp.Diff(tc.wantErr, err); diff != "" {
+							t.Fatalf("Unexpected or missing errors (-want/+got): %s", diff)
+						}
+						return
+					}
+				}
+
+				// Succeed specified indexes.
+				for _, idx := range update.succeedIndexes {
+					if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, idx); err != nil {
+						t.Fatalf("Failed trying to succeed pod with index %d: %v", idx, err)
+					}
+				}
+
+				// Fail specified indexes.
+				for _, idx := range update.failIndexes {
+					if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, idx); err != nil {
+						t.Fatalf("Failed trying to fail pod with index %d: %v", idx, err)
+					}
+				}
+
+				validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+					Active:    update.wantActivePods,
+					Succeeded: len(update.succeedIndexes),
+					Failed:    update.wantFailed,
+					Ready:     pointer.Int32(0),
+				})
+				validateIndexedJobPods(ctx, t, clientSet, jobObj, update.wantRemainingIndexes, update.wantSucceededIndexes)
+			}
+
+			validateJobSucceeded(ctx, t, clientSet, jobObj)
+		})
+	}
+}
+
 // BenchmarkLargeIndexedJob benchmarks the completion of an Indexed Job.
 // We expect that large jobs are more commonly used as Indexed. And they are
 // also faster to track, as they need less API calls.
@@ -1052,8 +1231,8 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 						Name: fmt.Sprintf("npods-%d-%d", nPods, n),
 					},
 					Spec: batchv1.JobSpec{
-						Parallelism:    pointer.Int32Ptr(nPods),
-						Completions:    pointer.Int32Ptr(nPods),
+						Parallelism:    pointer.Int32(nPods),
+						Completions:    pointer.Int32(nPods),
 						CompletionMode: &mode,
 					},
 				})
@@ -1125,7 +1304,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(2),
+					Parallelism: pointer.Int32(2),
 				},
 			})
 			if err != nil {
@@ -1271,7 +1450,7 @@ func TestOrphanPodsFinalizersClearedOnRestart(t *testing.T) {
 
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism: pointer.Int32Ptr(1),
+			Parallelism: pointer.Int32(1),
 		},
 	})
 	if err != nil {
@@ -1335,8 +1514,8 @@ func TestSuspendJob(t *testing.T) {
 			parallelism := int32(2)
 			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(parallelism),
-					Completions: pointer.Int32Ptr(4),
+					Parallelism: pointer.Int32(parallelism),
+					Completions: pointer.Int32(4),
 					Suspend:     pointer.BoolPtr(tc.create.flag),
 				},
 			})
@@ -1380,8 +1559,8 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
-			Parallelism: pointer.Int32Ptr(2),
-			Completions: pointer.Int32Ptr(4),
+			Parallelism: pointer.Int32(2),
+			Completions: pointer.Int32(4),
 			Suspend:     pointer.BoolPtr(true),
 		},
 	})
@@ -1395,78 +1574,63 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 }
 
 func TestNodeSelectorUpdate(t *testing.T) {
-	for name, featureGate := range map[string]bool{
-		"feature gate disabled": false,
-		"feature gate enabled":  true,
-	} {
-		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, featureGate)()
+	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+	defer cancel()
 
-			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
-			defer closeFn()
-			ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
-			defer cancel()
-
-			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{Spec: batchv1.JobSpec{
-				Parallelism: pointer.Int32Ptr(1),
-				Suspend:     pointer.BoolPtr(true),
-			}})
-			if err != nil {
-				t.Fatalf("Failed to create Job: %v", err)
-			}
-			jobName := job.Name
-			jobNamespace := job.Namespace
-			jobClient := clientSet.BatchV1().Jobs(jobNamespace)
-
-			// (1) Unsuspend and set node selector in the same update.
-			nodeSelector := map[string]string{"foo": "bar"}
-			_, err = updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
-				j.Spec.Template.Spec.NodeSelector = nodeSelector
-				j.Spec.Suspend = pointer.BoolPtr(false)
-			})
-			if !featureGate {
-				if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
-					t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
-				}
-			} else if featureGate && err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-
-			// (2) Check that the pod was created using the expected node selector.
-			if featureGate {
-				var pod *v1.Pod
-				if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
-					pods, err := clientSet.CoreV1().Pods(jobNamespace).List(ctx, metav1.ListOptions{})
-					if err != nil {
-						t.Fatalf("Failed to list Job Pods: %v", err)
-					}
-					if len(pods.Items) == 0 {
-						return false, nil
-					}
-					pod = &pods.Items[0]
-					return true, nil
-				}); err != nil || pod == nil {
-					t.Fatalf("pod not found: %v", err)
-				}
-
-				// if the feature gate is enabled, then the job should now be unsuspended and
-				// the pod has the node selector.
-				if diff := cmp.Diff(nodeSelector, pod.Spec.NodeSelector); diff != "" {
-					t.Errorf("Unexpected nodeSelector (-want,+got):\n%s", diff)
-				}
-			}
-
-			// (3) Update node selector again. It should fail since the job is unsuspended.
-			_, err = updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
-				j.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "baz"}
-			})
-
-			if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
-				t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
-			}
-
-		})
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{Spec: batchv1.JobSpec{
+		Parallelism: pointer.Int32(1),
+		Suspend:     pointer.BoolPtr(true),
+	}})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
 	}
+	jobName := job.Name
+	jobNamespace := job.Namespace
+	jobClient := clientSet.BatchV1().Jobs(jobNamespace)
+
+	// (1) Unsuspend and set node selector in the same update.
+	nodeSelector := map[string]string{"foo": "bar"}
+	if _, err := updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
+		j.Spec.Template.Spec.NodeSelector = nodeSelector
+		j.Spec.Suspend = pointer.BoolPtr(false)
+	}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// (2) Check that the pod was created using the expected node selector.
+
+	var pod *v1.Pod
+	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+		pods, err := clientSet.CoreV1().Pods(jobNamespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Failed to list Job Pods: %v", err)
+		}
+		if len(pods.Items) == 0 {
+			return false, nil
+		}
+		pod = &pods.Items[0]
+		return true, nil
+	}); err != nil || pod == nil {
+		t.Fatalf("pod not found: %v", err)
+	}
+
+	// if the feature gate is enabled, then the job should now be unsuspended and
+	// the pod has the node selector.
+	if diff := cmp.Diff(nodeSelector, pod.Spec.NodeSelector); diff != "" {
+		t.Errorf("Unexpected nodeSelector (-want,+got):\n%s", diff)
+	}
+
+	// (3) Update node selector again. It should fail since the job is unsuspended.
+	_, err = updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
+		j.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "baz"}
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
+		t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
+	}
+
 }
 
 type podsByStatus struct {

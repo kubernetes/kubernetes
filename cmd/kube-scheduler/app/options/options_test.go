@@ -1438,37 +1438,23 @@ profiles:
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
 					{
 						SchedulerName: "foo-profile",
-						Plugins: &kubeschedulerconfig.Plugins{
-							QueueSort:  defaults.PluginsV1beta2.QueueSort,
-							PreFilter:  defaults.PluginsV1beta2.PreFilter,
-							Filter:     defaults.PluginsV1beta2.Filter,
-							PostFilter: defaults.PluginsV1beta2.PostFilter,
-							PreScore:   defaults.PluginsV1beta2.PreScore,
-							Score:      defaults.PluginsV1beta2.Score,
-							Bind:       defaults.PluginsV1beta2.Bind,
-							PreBind:    defaults.PluginsV1beta2.PreBind,
-							Reserve: kubeschedulerconfig.PluginSet{
-								Enabled: []kubeschedulerconfig.Plugin{
-									{Name: "foo"},
-									{Name: names.VolumeBinding},
-								},
-							},
-						},
+						Plugins: func() *kubeschedulerconfig.Plugins {
+							plugins := defaults.PluginsV1beta2.DeepCopy()
+							plugins.Reserve.Enabled = []kubeschedulerconfig.Plugin{
+								{Name: "foo"},
+								{Name: names.VolumeBinding},
+							}
+							return plugins
+						}(),
 						PluginConfig: defaults.PluginConfigsV1beta2,
 					},
 					{
 						SchedulerName: "bar-profile",
-						Plugins: &kubeschedulerconfig.Plugins{
-							PreEnqueue: defaults.PluginsV1beta2.PreEnqueue,
-							QueueSort:  defaults.PluginsV1beta2.QueueSort,
-							PreFilter:  defaults.PluginsV1beta2.PreFilter,
-							Filter:     defaults.PluginsV1beta2.Filter,
-							PostFilter: defaults.PluginsV1beta2.PostFilter,
-							PreScore:   defaults.PluginsV1beta2.PreScore,
-							Score:      defaults.PluginsV1beta2.Score,
-							Bind:       defaults.PluginsV1beta2.Bind,
-							Reserve:    defaults.PluginsV1beta2.Reserve,
-						},
+						Plugins: func() *kubeschedulerconfig.Plugins {
+							plugins := defaults.PluginsV1beta2.DeepCopy()
+							plugins.PreBind.Enabled = nil
+							return plugins
+						}(),
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
 								Name: "foo",

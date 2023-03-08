@@ -76,9 +76,10 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources      sets.String
-	ignoredResourceGroups sets.String
-	handle                framework.Handle
+	ignoredResources                sets.String
+	ignoredResourceGroups           sets.String
+	enableInPlacePodVerticalScaling bool
+	handle                          framework.Handle
 	resourceAllocationScorer
 }
 
@@ -123,10 +124,11 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	}
 
 	return &Fit{
-		ignoredResources:         sets.NewString(args.IgnoredResources...),
-		ignoredResourceGroups:    sets.NewString(args.IgnoredResourceGroups...),
-		handle:                   h,
-		resourceAllocationScorer: *scorePlugin(args),
+		ignoredResources:                sets.NewString(args.IgnoredResources...),
+		ignoredResourceGroups:           sets.NewString(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+		handle:                          h,
+		resourceAllocationScorer:        *scorePlugin(args),
 	}, nil
 }
 
@@ -202,12 +204,15 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-// NOTE: if in-place-update (KEP 1287) gets implemented, then PodUpdate event
-// should be registered for this plugin since a Pod update may free up resources
-// that make other Pods schedulable.
 func (f *Fit) EventsToRegister() []framework.ClusterEvent {
+	podActionType := framework.Delete
+	if f.enableInPlacePodVerticalScaling {
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
+		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
+		podActionType |= framework.Update
+	}
 	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: framework.Delete},
+		{Resource: framework.Pod, ActionType: podActionType},
 		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }

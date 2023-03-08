@@ -28,11 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
@@ -130,11 +128,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if spec.Ordinals != nil {
-			replicaStartOrdinal := spec.Ordinals.Start
-			allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
-		}
+	if spec.Ordinals != nil {
+		replicaStartOrdinal := spec.Ordinals.Start
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
 	}
 
 	if spec.Selector == nil {
@@ -189,17 +185,11 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template               // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy   // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals // +k8s:verify-mutation:reason=clone
-	}
+	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals               // +k8s:verify-mutation:reason=clone
 
 	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
-		} else {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
-		}
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 	}
 
 	return allErrs

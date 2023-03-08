@@ -174,7 +174,7 @@ func CreateStorageServer(ctx context.Context, cs clientset.Interface, config Tes
 	pod = startVolumeServer(ctx, cs, config)
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
-	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
+	gomega.Expect(ip).NotTo(gomega.BeEmpty(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
 	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
 }
@@ -371,7 +371,7 @@ func TestServerCleanup(ctx context.Context, f *framework.Framework, config TestC
 	}
 
 	err := e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, config.Prefix+"-server", config.Namespace)
-	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
+	framework.ExpectNoError(err, "delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
 func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {

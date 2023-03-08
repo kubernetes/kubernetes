@@ -75,7 +75,11 @@ func TestPodSecurity(t *testing.T) {
 func TestPodSecurityGAOnly(t *testing.T) {
 	// Disable all alpha and beta features
 	for k, v := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
-		if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
+		if k == "AllAlpha" || k == "AllBeta" {
+			// Skip special features. When processed first, special features may
+			// erroneously disable other features.
+			continue
+		} else if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k, false)()
 		}
 	}

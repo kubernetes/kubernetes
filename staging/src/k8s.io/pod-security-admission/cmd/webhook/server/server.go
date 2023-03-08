@@ -171,7 +171,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	if r.Body == nil {
+	if r.Body == nil || r.Body == http.NoBody {
 		err = errors.New("request body is empty")
 		klog.ErrorS(err, "bad request")
 		http.Error(w, err.Error(), http.StatusBadRequest)

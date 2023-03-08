@@ -95,6 +95,14 @@ func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceLi
 	return cm.extendedPluginResources, cm.extendedPluginResources, []string{}
 }
 
+func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+
+func (m *podContainerManagerStub) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+	return nil
+}
+
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }

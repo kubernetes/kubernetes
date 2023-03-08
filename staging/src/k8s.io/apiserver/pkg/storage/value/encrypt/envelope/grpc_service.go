@@ -28,9 +28,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
 	"k8s.io/klog/v2"
 	kmsapi "k8s.io/kms/apis/v1beta1"
+	"k8s.io/kms/pkg/util"
 )
 
 const (

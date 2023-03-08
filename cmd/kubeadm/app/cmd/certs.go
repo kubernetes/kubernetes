@@ -274,7 +274,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 				return err
 			}
 
-			// Get a renewal manager for a actual Cluster configuration
+			// Get a renewal manager for an actual Cluster configuration
 			rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 			if err != nil {
 				return err
@@ -352,7 +352,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 		}
 	}
 
-	// Otherwise read config from --config if provided, otherwise use default configuration
+	// Read config from --config if provided. Otherwise, use the default configuration
 	return configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), &cfg)
 }
 

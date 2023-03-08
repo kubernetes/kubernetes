@@ -17,17 +17,20 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	semver "github.com/blang/semver/v4"
 )
@@ -77,4 +80,22 @@ func getRandomUserGrounName() string {
 	}
 
 	return "hpc-" + string(s)
+}
+
+func skipUnlessContainerdOneSevenOrGreater(ctx context.Context, f *framework.Framework) {
+	ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+	windowsNode, err := findWindowsNode(ctx, f)
+	framework.ExpectNoError(err, "error finding Windows node")
+	r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+	framework.ExpectNoError(err, "error getting node container runtime and version")
+	framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+	if !strings.EqualFold(r, "containerd") {
+		e2eskipper.Skipf("container runtime is not containerd")
+	}
+
+	v1dot7 := semver.MustParse("1.7.0-alpha.1")
+	if v.LT(v1dot7) {
+		e2eskipper.Skipf("container runtime is < 1.7.0")
+	}
 }

@@ -39,6 +39,7 @@ type PodStatusApplyConfiguration struct {
 	ContainerStatuses          []ContainerStatusApplyConfiguration `json:"containerStatuses,omitempty"`
 	QOSClass                   *v1.PodQOSClass                     `json:"qosClass,omitempty"`
 	EphemeralContainerStatuses []ContainerStatusApplyConfiguration `json:"ephemeralContainerStatuses,omitempty"`
+	Resize                     *v1.PodResizeStatus                 `json:"resize,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs an declarative configuration of the PodStatus type for use with
@@ -173,5 +174,13 @@ func (b *PodStatusApplyConfiguration) WithEphemeralContainerStatuses(values ...*
 		}
 		b.EphemeralContainerStatuses = append(b.EphemeralContainerStatuses, *values[i])
 	}
+	return b
+}
+
+// WithResize sets the Resize field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resize field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithResize(value v1.PodResizeStatus) *PodStatusApplyConfiguration {
+	b.Resize = &value
 	return b
 }

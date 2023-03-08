@@ -48,11 +48,8 @@
         "sigs.k8s.io/kustomize/kustomize/v4",
         "sigs.k8s.io/kustomize/kyaml"
       ],
-      "github.com/form3tech-oss/jwt-go": [
-        "go.etcd.io/etcd/server/v3"
-      ],
       "github.com/getsentry/raven-go": [
-        "github.com/cockroachdb/datadriven"
+        "go.etcd.io/etcd/raft/v3"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -62,7 +59,6 @@
       ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
-        "github.com/cockroachdb/datadriven",
         "github.com/containerd/cgroups",
         "github.com/containerd/ttrpc",
         "github.com/containerd/typeurl",
@@ -70,6 +66,7 @@
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
+        "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/raft/v3",
         "go.etcd.io/etcd/server/v3"
       ],
@@ -79,11 +76,13 @@
       ],
       "github.com/gorilla/websocket": [
         "github.com/moby/spdystream",
-        "github.com/tmc/grpc-websocket-proxy"
+        "github.com/tmc/grpc-websocket-proxy",
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
         "go.etcd.io/etcd/client/v2",
+        "go.etcd.io/etcd/server/v3",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
@@ -92,7 +91,6 @@
         "github.com/Microsoft/go-winio",
         "github.com/Microsoft/hcsshim",
         "github.com/aws/aws-sdk-go",
-        "github.com/cockroachdb/datadriven",
         "github.com/containerd/cgroups",
         "github.com/containerd/continuity",
         "github.com/containerd/fifo",

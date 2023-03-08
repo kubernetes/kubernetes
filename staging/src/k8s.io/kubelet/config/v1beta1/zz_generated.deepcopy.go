@@ -311,6 +311,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.MaxParallelImagePulls != nil {
+		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls
+		*out = new(int32)
+		**out = **in
+	}
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard
 		*out = make(map[string]string, len(*in))

@@ -20,6 +20,8 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -46,6 +49,7 @@ type FischerInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error)
+	Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error)
 	FischerExpansion
 }
 
@@ -161,6 +165,31 @@ func (c *fischers) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied fischer.
+func (c *fischers) Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error) {
+	if fischer == nil {
+		return nil, fmt.Errorf("fischer provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(fischer)
+	if err != nil {
+		return nil, err
+	}
+	name := fischer.Name
+	if name == nil {
+		return nil, fmt.Errorf("fischer.Name must be provided to Apply")
+	}
+	result = &v1alpha1.Fischer{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("fischers").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

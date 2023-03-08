@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/openapi"
 	cachedopenapi "k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 type cacheEntry struct {
@@ -60,6 +61,15 @@ type memCacheClient struct {
 var (
 	ErrCacheNotFound = errors.New("not found")
 )
+
+// Server returning empty ResourceList for Group/Version.
+type emptyResponseError struct {
+	gv string
+}
+
+func (e *emptyResponseError) Error() string {
+	return fmt.Sprintf("received empty response for: %s", e.gv)
+}
 
 var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 
@@ -103,7 +113,13 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 	if cachedVal.err != nil && isTransientError(cachedVal.err) {
 		r, err := d.serverResourcesForGroupVersion(groupVersion)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+			// Don't log "empty response" as an error; it is a common response for metrics.
+			if _, emptyErr := err.(*emptyResponseError); emptyErr {
+				// Log at same verbosity as disk cache.
+				klog.V(3).Infof("%v", err)
+			} else {
+				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+			}
 		}
 		cachedVal = &cacheEntry{r, err}
 		d.groupToServerResources[groupVersion] = cachedVal
@@ -252,7 +268,13 @@ func (d *memCacheClient) refreshLocked() error {
 
 				r, err := d.serverResourcesForGroupVersion(gv)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+					// Don't log "empty response" as an error; it is a common response for metrics.
+					if _, emptyErr := err.(*emptyResponseError); emptyErr {
+						// Log at same verbosity as disk cache.
+						klog.V(3).Infof("%v", err)
+					} else {
+						utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+					}
 				}
 
 				resultLock.Lock()
@@ -274,7 +296,7 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 		return r, err
 	}
 	if len(r.APIResources) == 0 {
-		return r, fmt.Errorf("Got empty response for: %v", groupVersion)
+		return r, &emptyResponseError{gv: groupVersion}
 	}
 	return r, nil
 }

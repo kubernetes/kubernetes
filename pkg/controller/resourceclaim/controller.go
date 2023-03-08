@@ -118,11 +118,6 @@ func NewController(
 
 	metrics.RegisterMetrics()
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
-
 	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(obj, false)
@@ -235,6 +230,12 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	klog.Infof("Starting ephemeral volume controller")
 	defer klog.Infof("Shutting down ephemeral volume controller")
 
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ec.kubeClient.CoreV1().Events("")})
+	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
+	defer eventBroadcaster.Shutdown()
+
 	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.claimsSynced) {
 		return
 	}
@@ -314,7 +315,9 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		if err := ec.handleClaim(ctx, pod, podClaim); err != nil {
-			ec.recorder.Event(pod, v1.EventTypeWarning, "FailedResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
+			if ec.recorder != nil {
+				ec.recorder.Event(pod, v1.EventTypeWarning, "FailedResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
+			}
 			return fmt.Errorf("pod %s/%s, PodResourceClaim %s: %v", namespace, name, podClaim.Name, err)
 		}
 	}

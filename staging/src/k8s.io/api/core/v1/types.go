@@ -2263,6 +2263,33 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// ResourceResizePolicy specifies how Kubernetes should handle resource resize.
+type ResourceResizePolicy string
+
+// These are the valid resource resize policy values:
+const (
+	// RestartNotRequired tells Kubernetes to resize the container in-place
+	// without restarting it, if possible. Kubernetes may however choose to
+	// restart the container if it is unable to actuate resize without a
+	// restart. For e.g. the runtime doesn't support restart-free resizing.
+	RestartNotRequired ResourceResizePolicy = "RestartNotRequired"
+	// 'RestartRequired' tells Kubernetes to resize the container in-place
+	// by stopping and starting the container when new resources are applied.
+	// This is needed for legacy applications. For e.g. java apps using the
+	// -xmxN flag which are unable to use resized memory without restarting.
+	RestartRequired ResourceResizePolicy = "RestartRequired"
+)
+
+// ContainerResizePolicy represents resource resize policy for a single container.
+type ContainerResizePolicy struct {
+	// Name of the resource type to which this resource resize policy applies.
+	// Supported values: cpu, memory.
+	ResourceName ResourceName `json:"resourceName" protobuf:"bytes,1,opt,name=resourceName,casttype=ResourceName"`
+	// Resource resize policy applicable to the specified resource name.
+	// If not specified, it defaults to RestartNotRequired.
+	Policy ResourceResizePolicy `json:"policy" protobuf:"bytes,2,opt,name=policy,casttype=ResourceResizePolicy"`
+}
+
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
 // +enum
 type PreemptionPolicy string
@@ -2319,7 +2346,7 @@ type ResourceRequirements struct {
 	// This is an alpha field and requires enabling the
 	// DynamicResourceAllocation feature gate.
 	//
-	// This field is immutable.
+	// This field is immutable. It can only be set for containers.
 	//
 	// +listType=map
 	// +listMapKey=name
@@ -2412,6 +2439,11 @@ type Container struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
+	// Resources resize policy for the container.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	// +listType=atomic
+	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// Pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
 	// +optional
@@ -2516,8 +2548,6 @@ type ProbeHandler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 
 	// GRPC specifies an action involving a GRPC port.
-	// This is a beta field and requires enabling GRPCContainerProbe feature gate.
-	// +featureGate=GRPCContainerProbe
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
 }
@@ -2631,33 +2661,66 @@ type ContainerState struct {
 
 // ContainerStatus contains details for the current status of this container.
 type ContainerStatus struct {
-	// This must be a DNS_LABEL. Each container in a pod must have a unique name.
+	// Name is a DNS_LABEL representing the unique name of the container.
+	// Each container in a pod must have a unique name across all container types.
 	// Cannot be updated.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// Details about the container's current condition.
+	// State holds details about the container's current condition.
 	// +optional
 	State ContainerState `json:"state,omitempty" protobuf:"bytes,2,opt,name=state"`
-	// Details about the container's last termination condition.
+	// LastTerminationState holds the last termination state of the container to
+	// help debug container crashes and restarts. This field is not
+	// populated if the container is still running and RestartCount is 0.
 	// +optional
 	LastTerminationState ContainerState `json:"lastState,omitempty" protobuf:"bytes,3,opt,name=lastState"`
-	// Specifies whether the container has passed its readiness probe.
+	// Ready specifies whether the container is currently passing its readiness check.
+	// The value will change as readiness probes keep executing. If no readiness
+	// probes are specified, this field defaults to true once the container is
+	// fully started (see Started field).
+	//
+	// The value is typically used to determine whether a container is ready to
+	// accept traffic.
 	Ready bool `json:"ready" protobuf:"varint,4,opt,name=ready"`
-	// The number of times the container has been restarted.
+	// RestartCount holds the number of times the container has been restarted.
+	// Kubelet makes an effort to always increment the value, but there
+	// are cases when the state may be lost due to node restarts and then the value
+	// may be reset to 0. The value is never negative.
 	RestartCount int32 `json:"restartCount" protobuf:"varint,5,opt,name=restartCount"`
-	// The image the container is running.
+	// Image is the name of container image that the container is running.
+	// The container image may not match the image used in the PodSpec,
+	// as it may have been resolved by the runtime.
 	// More info: https://kubernetes.io/docs/concepts/containers/images.
 	Image string `json:"image" protobuf:"bytes,6,opt,name=image"`
-	// ImageID of the container's image.
+	// ImageID is the image ID of the container's image. The image ID may not
+	// match the image ID of the image used in the PodSpec, as it may have been
+	// resolved by the runtime.
 	ImageID string `json:"imageID" protobuf:"bytes,7,opt,name=imageID"`
-	// Container's ID in the format '<type>://<container_id>'.
+	// ContainerID is the ID of the container in the format '<type>://<container_id>'.
+	// Where type is a container runtime identifier, returned from Version call of CRI API
+	// (for example "containerd").
 	// +optional
 	ContainerID string `json:"containerID,omitempty" protobuf:"bytes,8,opt,name=containerID"`
-	// Specifies whether the container has passed its startup probe.
-	// Initialized as false, becomes true after startupProbe is considered successful.
-	// Resets to false when the container is restarted, or if kubelet loses state temporarily.
-	// Is always true when no startupProbe is defined.
+	// Started indicates whether the container has finished its postStart lifecycle hook
+	// and passed its startup probe.
+	// Initialized as false, becomes true after startupProbe is considered
+	// successful. Resets to false when the container is restarted, or if kubelet
+	// loses state temporarily. In both cases, startup probes will run again.
+	// Is always true when no startupProbe is defined and container is running and
+	// has passed the postStart lifecycle hook. The null value must be treated the
+	// same as false.
 	// +optional
 	Started *bool `json:"started,omitempty" protobuf:"varint,9,opt,name=started"`
+	// ResourcesAllocated represents the compute resources allocated for this container by the
+	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
+	// and after successfully admitting desired pod resize.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	ResourcesAllocated ResourceList `json:"resourcesAllocated,omitempty" protobuf:"bytes,10,rep,name=resourcesAllocated,casttype=ResourceList,castkey=ResourceName"`
+	// Resources represents the compute resource requests and limits that have been successfully
+	// enacted on the running container after it has been started or has been successfully resized.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2749,6 +2812,20 @@ type PodCondition struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
+
+// PodResizeStatus shows status of desired resize of a pod's containers.
+type PodResizeStatus string
+
+const (
+	// Pod resources resize has been requested and will be evaluated by node.
+	PodResizeStatusProposed PodResizeStatus = "Proposed"
+	// Pod resources resize has been accepted by node and is being actuated.
+	PodResizeStatusInProgress PodResizeStatus = "InProgress"
+	// Node cannot resize the pod at this time and will keep retrying.
+	PodResizeStatusDeferred PodResizeStatus = "Deferred"
+	// Requested pod resize is not feasible and will not be re-evaluated.
+	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
+)
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -3160,7 +3237,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,34,rep,name=ephemeralContainers"`
 	// Restart policy for all containers within the pod.
-	// One of Always, OnFailure, Never.
+	// One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
 	// Default to Always.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
@@ -3386,14 +3463,19 @@ type PodSpec struct {
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
-	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
+	// scheduler will not attempt to schedule the pod.
 	//
-	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
-	// +optional
+	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+	//
+	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
+	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +featureGate=PodSchedulingReadiness
+	// +optional
 	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
 	// ResourceClaims defines which ResourceClaims must be allocated
 	// and reserved before the Pod is allowed to start. The resources
@@ -3883,6 +3965,11 @@ type EphemeralContainerCommon struct {
 	// already allocated to the pod.
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
+	// Resources resize policy for the container.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	// +listType=atomic
+	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// Cannot be updated.
 	// +optional
@@ -4068,12 +4155,19 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
-	// More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#quality-of-service-classes
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 	// Status for any ephemeral containers that have run in this pod.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus `json:"ephemeralContainerStatuses,omitempty" protobuf:"bytes,13,rep,name=ephemeralContainerStatuses"`
+
+	// Status of resources resize desired for pod's containers.
+	// It is empty if no resources resize is pending.
+	// Any changes to container resources will automatically set this to "Proposed"
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4212,6 +4306,7 @@ type ReplicationControllerSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +optional
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`

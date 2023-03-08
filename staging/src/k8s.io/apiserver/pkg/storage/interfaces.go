@@ -268,4 +268,10 @@ type ListOptions struct {
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.
 	ProgressNotify bool
+	// SendInitialEvents, when set together with Watch option,
+	// begin the watch stream with synthetic init events to build the
+	// whole state of all resources followed by a synthetic "Bookmark"
+	// event containing a ResourceVersion after which the server
+	// continues streaming events.
+	SendInitialEvents *bool
 }

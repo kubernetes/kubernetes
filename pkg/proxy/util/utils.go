@@ -199,8 +199,8 @@ func ShouldSkipService(service *v1.Service) bool {
 
 // AddressSet validates the addresses in the slice using the "isValid" function.
 // Addresses that pass the validation are returned as a string Set.
-func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.String {
-	ips := sets.NewString()
+func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string] {
+	ips := sets.New[string]()
 	for _, a := range addrs {
 		var ip net.IP
 		switch v := a.(type) {

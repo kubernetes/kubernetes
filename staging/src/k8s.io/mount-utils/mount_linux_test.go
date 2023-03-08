@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"sync"
@@ -603,6 +604,47 @@ func TestDetectSafeNotMountedBehavior(t *testing.T) {
 				adj = "unsafe"
 			}
 			t.Errorf("Expected to detect %s umount behavior, but did not", adj)
+		}
+	}
+}
+
+func TestCheckUmountError(t *testing.T) {
+	target := "/test/path"
+	withSafeNotMountedBehavior := true
+	command := exec.Command("uname", "-r") // dummy command return status 0
+
+	if err := command.Run(); err != nil {
+		t.Errorf("Faild to exec dummy command. err: %s", err)
+	}
+
+	testcases := []struct {
+		output   []byte
+		err      error
+		expected bool
+	}{
+		{
+			err:      errors.New("wait: no child processes"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: not mounted."),
+			err:      errors.New("exit status 1"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: No such file or directory"),
+			err:      errors.New("exit status 1"),
+			expected: false,
+		},
+	}
+
+	for _, v := range testcases {
+		if err := checkUmountError(target, command, v.output, v.err, withSafeNotMountedBehavior); (err == nil) != v.expected {
+			if v.expected {
+				t.Errorf("Expected to return nil, but did not. err: %s", err)
+			} else {
+				t.Errorf("Expected to return error, but did not.")
+			}
 		}
 	}
 }

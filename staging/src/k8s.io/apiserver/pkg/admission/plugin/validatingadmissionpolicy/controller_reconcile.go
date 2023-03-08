@@ -22,14 +22,19 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -48,7 +53,11 @@ type policyController struct {
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	ValidatorCompiler
+	filterCompiler cel.FilterCompiler
+
+	matcher Matcher
+
+	newValidator
 
 	// Lock which protects:
 	//  - cachedPolicies
@@ -79,23 +88,31 @@ type policyController struct {
 	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
 
 	client kubernetes.Interface
+
+	authz authorizer.Authorizer
 }
+
+type newValidator func(validationFilter cel.Filter, auditAnnotationFilter cel.Filter, failurePolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
 	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	validatorCompiler ValidatorCompiler,
+	filterCompiler cel.FilterCompiler,
+	matcher Matcher,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
 	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
+	authz authorizer.Authorizer,
 ) *policyController {
 	res := &policyController{}
 	*res = policyController{
-		ValidatorCompiler:     validatorCompiler,
+		filterCompiler:        filterCompiler,
 		definitionInfo:        make(map[namespacedName]*definitionInfo),
 		bindingInfos:          make(map[namespacedName]*bindingInfo),
 		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
+		matcher:               matcher,
+		newValidator:          NewValidator,
 		policyDefinitionsController: generic.NewController(
 			policiesInformer,
 			res.reconcilePolicyDefinition,
@@ -115,6 +132,7 @@ func newPolicyController(
 		restMapper:    restMapper,
 		dynamicClient: dynamicClient,
 		client:        client,
+		authz:         authz,
 	}
 	return res
 }
@@ -161,6 +179,12 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		c.definitionInfo[nn] = info
 		// TODO(DangerOnTheRanger): add support for "warn" being a valid enforcementAction
 		celmetrics.Metrics.ObserveDefinition(context.TODO(), "active", "deny")
+	}
+
+	// Skip reconcile if the spec of the definition is unchanged
+	if info.lastReconciledValue != nil && definition != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, definition.Spec) {
+		return nil
 	}
 
 	var paramSource *v1alpha1.ParamKind
@@ -349,6 +373,12 @@ func (c *policyController) reconcilePolicyBinding(namespace, name string, bindin
 		c.bindingInfos[nn] = info
 	}
 
+	// Skip if the spec of the binding is unchanged.
+	if info.lastReconciledValue != nil && binding != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, binding.Spec) {
+		return nil
+	}
+
 	var oldNamespacedDefinitionName namespacedName
 	if info.lastReconciledValue != nil {
 		// All validating policies are cluster-scoped so have empty namespace
@@ -424,7 +454,17 @@ func (c *policyController) latestPolicyData() []policyData {
 		for bindingNN := range c.definitionsToBindings[definitionNN] {
 			bindingInfo := c.bindingInfos[bindingNN]
 			if bindingInfo.validator == nil && definitionInfo.configurationError == nil {
-				bindingInfo.validator = c.ValidatorCompiler.Compile(definitionInfo.lastReconciledValue)
+				hasParam := false
+				if definitionInfo.lastReconciledValue.Spec.ParamKind != nil {
+					hasParam = true
+				}
+				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
+				bindingInfo.validator = c.newValidator(
+					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
+					convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
+					c.authz,
+				)
 			}
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
@@ -445,6 +485,45 @@ func (c *policyController) latestPolicyData() []policyData {
 
 	c.cachedPolicies = res
 	return res
+}
+
+func convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(policyType *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+	if policyType == nil {
+		return nil
+	}
+
+	var v1FailPolicy v1.FailurePolicyType
+	if *policyType == v1alpha1.Fail {
+		v1FailPolicy = v1.Fail
+	} else if *policyType == v1alpha1.Ignore {
+		v1FailPolicy = v1.Ignore
+	}
+	return &v1FailPolicy
+}
+
+func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := ValidationCondition{
+			Expression: validation.Expression,
+			Message:    validation.Message,
+			Reason:     validation.Reason,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
+}
+
+func convertv1alpha1AuditAnnotations(inputValidations []v1alpha1.AuditAnnotation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := AuditAnnotationCondition{
+			Key:             validation.Key,
+			ValueExpression: validation.ValueExpression,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
 }
 
 func getNamespaceName(namespace, name string) namespacedName {

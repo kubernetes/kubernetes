@@ -748,7 +748,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
-				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				PodPidsLimit:                             s.PodPidsLimit,
 				EnforceCPULimits:                         s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
 				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
@@ -1148,10 +1148,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
-	}
-
-	if kubeServer.KubeletConfiguration.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
-		return fmt.Errorf("the SeccompDefault feature gate must be enabled in order to use the SeccompDefault configuration")
 	}
 
 	k, err := createAndInitKubelet(kubeServer,

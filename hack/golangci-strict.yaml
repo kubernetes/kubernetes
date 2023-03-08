@@ -1,0 +1,42 @@
+# This file configures checks that all new code for Kubernetes is meant to
+# pass, in contrast to .golangci.yaml which defines checks that also the
+# existing code passes.
+
+run:
+  timeout: 30m
+  skip-files:
+    - "^zz_generated.*"
+
+issues:
+  max-same-issues: 0
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # exclude ineffassign linter for generated files for conversion
+    - path: conversion\.go
+      linters:
+        - ineffassign
+
+linters:
+  disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
+  enable: # please keep this alphabetized and in sync with golangci.yaml
+    - ginkgolinter
+    - gocritic
+    - govet
+    - ineffassign
+    - logcheck
+    - staticcheck
+    - stylecheck
+    - unused
+
+linters-settings: # please keep this alphabetized
+  custom:
+    logcheck:
+      # Installed there by hack/verify-golangci-lint.sh.
+      path: ../_output/local/bin/logcheck.so
+      description: structured logging checker
+      original-url: k8s.io/logtools/logcheck
+  gocritic:
+  staticcheck:
+    checks:
+      - "all"
+  stylecheck:

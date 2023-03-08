@@ -1112,13 +1112,13 @@ func TestAddressSet(t *testing.T) {
 		name      string
 		validator func(ip net.IP) bool
 		input     []net.Addr
-		expected  sets.String
+		expected  sets.Set[string]
 	}{
 		{
 			"Empty",
 			func(ip net.IP) bool { return false },
 			nil,
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Reject IPAddr x 2",
@@ -1127,7 +1127,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("8.8.8.8"),
 				mustParseIPAddr("1000::"),
 			},
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Accept IPAddr x 2",
@@ -1136,7 +1136,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("8.8.8.8"),
 				mustParseIPAddr("1000::"),
 			},
-			sets.NewString("8.8.8.8", "1000::"),
+			sets.New("8.8.8.8", "1000::"),
 		},
 		{
 			"Accept IPNet x 2",
@@ -1145,7 +1145,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPNet("8.8.8.8/32"),
 				mustParseIPNet("1000::/128"),
 			},
-			sets.NewString("8.8.8.8", "1000::"),
+			sets.New("8.8.8.8", "1000::"),
 		},
 		{
 			"Accept Unix x 2",
@@ -1154,7 +1154,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseUnix("/tmp/sock1"),
 				mustParseUnix("/tmp/sock2"),
 			},
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Cidr IPv4",
@@ -1164,7 +1164,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("1000::"),
 				mustParseIPAddr("192.168.1.1"),
 			},
-			sets.NewString("192.168.1.1"),
+			sets.New("192.168.1.1"),
 		},
 		{
 			"Cidr IPv6",
@@ -1174,7 +1174,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("1000::"),
 				mustParseIPAddr("192.168.1.1"),
 			},
-			sets.NewString("1000::"),
+			sets.New("1000::"),
 		},
 	}
 

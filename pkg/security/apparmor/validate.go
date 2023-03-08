@@ -17,11 +17,8 @@ limitations under the License.
 package apparmor
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
@@ -30,7 +27,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	utilpath "k8s.io/utils/path"
 )
 
 // Whether AppArmor should be disabled by default.
@@ -48,20 +44,11 @@ func NewValidator() Validator {
 	if err := validateHost(); err != nil {
 		return &validator{validateHostErr: err}
 	}
-	appArmorFS, err := getAppArmorFS()
-	if err != nil {
-		return &validator{
-			validateHostErr: fmt.Errorf("error finding AppArmor FS: %v", err),
-		}
-	}
-	return &validator{
-		appArmorFS: appArmorFS,
-	}
+	return &validator{}
 }
 
 type validator struct {
 	validateHostErr error
-	appArmorFS      string
 }
 
 func (v *validator) Validate(pod *v1.Pod) error {
@@ -116,37 +103,4 @@ func validateHost() error {
 	}
 
 	return nil
-}
-
-func getAppArmorFS() (string, error) {
-	mountsFile, err := os.Open("/proc/mounts")
-	if err != nil {
-		return "", fmt.Errorf("could not open /proc/mounts: %v", err)
-	}
-	defer mountsFile.Close()
-
-	scanner := bufio.NewScanner(mountsFile)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 3 {
-			// Unknown line format; skip it.
-			continue
-		}
-		if fields[2] == "securityfs" {
-			appArmorFS := path.Join(fields[1], "apparmor")
-			if ok, err := utilpath.Exists(utilpath.CheckFollowSymlink, appArmorFS); !ok {
-				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
-				if err != nil {
-					return "", fmt.Errorf("%s: %v", msg, err)
-				}
-				return "", errors.New(msg)
-			}
-			return appArmorFS, nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error scanning mounts: %v", err)
-	}
-
-	return "", errors.New("securityfs not found")
 }

@@ -57,6 +57,7 @@ var (
 		ReadOnlyPort:                    0,
 		RegistryBurst:                   10,
 		RegistryPullQPS:                 5,
+		MaxParallelImagePulls:           nil,
 		HairpinMode:                     kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:        1,
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 25 * time.Millisecond},
@@ -64,7 +65,7 @@ var (
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
-		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.8),
+		MemoryThrottlingFactor:          utilpointer.Float64(0.8),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
@@ -297,6 +298,31 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: registryPullQPS (--registry-qps) -1 must not be a negative number",
+		},
+		{
+			name: "invalid MaxParallelImagePulls",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MaxParallelImagePulls = utilpointer.Int32(0)
+				return conf
+			},
+			errMsg: "invalid configuration: maxParallelImagePulls 0 must be a positive number",
+		},
+		{
+			name: "invalid MaxParallelImagePulls and SerializeImagePulls combination",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MaxParallelImagePulls = utilpointer.Int32(3)
+				conf.SerializeImagePulls = true
+				return conf
+			},
+			errMsg: "invalid configuration: maxParallelImagePulls cannot be larger than 1 unless SerializeImagePulls (--serialize-image-pulls) is set to false",
+		},
+		{
+			name: "valid MaxParallelImagePulls and SerializeImagePulls combination",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MaxParallelImagePulls = utilpointer.Int32(1)
+				conf.SerializeImagePulls = true
+				return conf
+			},
 		},
 		{
 			name: "specify ServerTLSBootstrap without enabling RotateKubeletServerCertificate",

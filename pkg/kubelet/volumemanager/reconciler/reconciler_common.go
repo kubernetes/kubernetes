@@ -146,7 +146,7 @@ type reconciler struct {
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
 		rc.runNew(stopCh)
 		return
 	}

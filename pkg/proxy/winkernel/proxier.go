@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
@@ -698,7 +699,10 @@ func NewProxier(
 		klog.InfoS("ClusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, []string{} /* windows listen to all node addresses */)
+	// windows listens to all node addresses
+	nodePortAddresses := utilproxy.NewNodePortAddresses(nil)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+
 	hns, supportedFeatures := newHostNetworkService()
 	hnsNetworkName, err := getNetworkName(config.NetworkName)
 	if err != nil {
@@ -1467,14 +1471,14 @@ func (proxier *Proxier) syncProxyRules() {
 		endpointsAvailableForLB := !allEndpointsTerminating && !allEndpointsNonServing
 		proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
-		if endpointsAvailableForLB {
+		// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
+		clusterIPEndpoints := hnsEndpoints
+		if svcInfo.internalTrafficLocal {
+			// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
+			clusterIPEndpoints = hnsLocalEndpoints
+		}
 
-			// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
-			clusterIPEndpoints := hnsEndpoints
-			if svcInfo.internalTrafficLocal {
-				// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
-				clusterIPEndpoints = hnsLocalEndpoints
-			}
+		if len(clusterIPEndpoints) > 0 {
 
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation

@@ -58,7 +58,12 @@ type FakeRuntime struct {
 	Err               error
 	InspectErr        error
 	StatusErr         error
-	T                 *testing.T
+	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
+	// UnblockImagePulls() is called. This is used to simulate image pull latency
+	// from container runtime.
+	BlockImagePulls      bool
+	imagePullTokenBucket chan bool
+	T                    *testing.T
 }
 
 const FakeHost = "localhost:12345"
@@ -129,6 +134,17 @@ func (f *FakeRuntime) ClearCalls() {
 	f.Err = nil
 	f.InspectErr = nil
 	f.StatusErr = nil
+	f.BlockImagePulls = false
+	if f.imagePullTokenBucket != nil {
+		for {
+			select {
+			case f.imagePullTokenBucket <- true:
+			default:
+				f.imagePullTokenBucket = nil
+				return
+			}
+		}
+	}
 }
 
 // UpdatePodCIDR fulfills the cri interface.
@@ -149,6 +165,23 @@ func (f *FakeRuntime) AssertCalls(calls []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(calls, f.CalledFunctions)
+}
+
+// AssertCallCounts checks if a certain call is called for a certain of numbers
+func (f *FakeRuntime) AssertCallCounts(funcName string, expectedCount int) bool {
+	f.Lock()
+	defer f.Unlock()
+	actualCount := 0
+	for _, c := range f.CalledFunctions {
+		if funcName == c {
+			actualCount += 1
+		}
+	}
+	if expectedCount != actualCount {
+		f.T.Errorf("AssertCallCounts: expected %s to be called %d times, but was actually called %d times.", funcName, expectedCount, actualCount)
+		return false
+	}
+	return true
 }
 
 func (f *FakeRuntime) AssertStartedPods(pods []string) bool {
@@ -302,10 +335,8 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(_ context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
-	defer f.Unlock()
-
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 	if f.Err == nil {
 		i := kubecontainer.Image{
@@ -314,7 +345,35 @@ func (f *FakeRuntime) PullImage(_ context.Context, image kubecontainer.ImageSpec
 		}
 		f.ImageList = append(f.ImageList, i)
 	}
-	return image.Image, f.Err
+
+	if !f.BlockImagePulls {
+		f.Unlock()
+		return image.Image, f.Err
+	}
+
+	retErr := f.Err
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
+	f.Unlock()
+	select {
+	case <-ctx.Done():
+	case <-f.imagePullTokenBucket:
+	}
+	return image.Image, retErr
+}
+
+// UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
+func (f *FakeRuntime) UnblockImagePulls(count int) {
+	if f.imagePullTokenBucket != nil {
+		for i := 0; i < count; i++ {
+			select {
+			case f.imagePullTokenBucket <- true:
+			default:
+			}
+		}
+	}
 }
 
 func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSpec) (string, error) {

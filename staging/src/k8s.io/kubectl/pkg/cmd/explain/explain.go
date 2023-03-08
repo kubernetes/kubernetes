@@ -18,7 +18,6 @@ package explain
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -82,7 +81,7 @@ func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *Expl
 	return &ExplainOptions{
 		IOStreams:       streams,
 		CmdParent:       parent,
-		EnableOpenAPIV3: os.Getenv("KUBECTL_EXPLAIN_OPENAPIV3") == "true",
+		EnableOpenAPIV3: cmdutil.ExplainOpenapiV3.IsEnabled(),
 		OutputFormat:    "plaintext",
 	}
 }
