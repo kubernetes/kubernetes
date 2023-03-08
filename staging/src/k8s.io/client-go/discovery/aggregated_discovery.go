@@ -24,18 +24,35 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// StaleGroupVersionError encasulates failed GroupVersion marked "stale"
+// in the returned AggregatedDiscovery format.
+type StaleGroupVersionError struct {
+	gv schema.GroupVersion
+}
+
+func (s StaleGroupVersionError) Error() string {
+	return fmt.Sprintf("stale GroupVersion discovery: %v", s.gv)
+}
+
 // SplitGroupsAndResources transforms "aggregated" discovery top-level structure into
 // the previous "unaggregated" discovery groups and resources.
-func SplitGroupsAndResources(aggregatedGroups apidiscovery.APIGroupDiscoveryList) (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList) {
+func SplitGroupsAndResources(aggregatedGroups apidiscovery.APIGroupDiscoveryList) (
+	*metav1.APIGroupList,
+	map[schema.GroupVersion]*metav1.APIResourceList,
+	map[schema.GroupVersion]error) {
 	// Aggregated group list will contain the entirety of discovery, including
-	// groups, versions, and resources.
+	// groups, versions, and resources. GroupVersions marked "stale" are failed.
 	groups := []*metav1.APIGroup{}
+	failedGVs := map[schema.GroupVersion]error{}
 	resourcesByGV := map[schema.GroupVersion]*metav1.APIResourceList{}
 	for _, aggGroup := range aggregatedGroups.Items {
-		group, resources := convertAPIGroup(aggGroup)
+		group, resources, failed := convertAPIGroup(aggGroup)
 		groups = append(groups, group)
 		for gv, resourceList := range resources {
 			resourcesByGV[gv] = resourceList
+		}
+		for gv, err := range failed {
+			failedGVs[gv] = err
 		}
 	}
 	// Transform slice of groups to group list before returning.
@@ -44,23 +61,32 @@ func SplitGroupsAndResources(aggregatedGroups apidiscovery.APIGroupDiscoveryList
 	for _, group := range groups {
 		groupList.Groups = append(groupList.Groups, *group)
 	}
-	return groupList, resourcesByGV
+	return groupList, resourcesByGV, failedGVs
 }
 
 // convertAPIGroup tranforms an "aggregated" APIGroupDiscovery to an "legacy" APIGroup,
 // also returning the map of APIResourceList for resources within GroupVersions.
-func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (*metav1.APIGroup, map[schema.GroupVersion]*metav1.APIResourceList) {
+func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
+	*metav1.APIGroup,
+	map[schema.GroupVersion]*metav1.APIResourceList,
+	map[schema.GroupVersion]error) {
 	// Iterate through versions to convert to group and resources.
 	group := &metav1.APIGroup{}
 	gvResources := map[schema.GroupVersion]*metav1.APIResourceList{}
+	failedGVs := map[schema.GroupVersion]error{}
 	group.Name = g.ObjectMeta.Name
-	for i, v := range g.Versions {
-		version := metav1.GroupVersionForDiscovery{}
+	for _, v := range g.Versions {
 		gv := schema.GroupVersion{Group: g.Name, Version: v.Version}
+		if v.Freshness == apidiscovery.DiscoveryFreshnessStale {
+			failedGVs[gv] = StaleGroupVersionError{gv: gv}
+			continue
+		}
+		version := metav1.GroupVersionForDiscovery{}
 		version.GroupVersion = gv.String()
 		version.Version = v.Version
 		group.Versions = append(group.Versions, version)
-		if i == 0 {
+		// PreferredVersion is first non-stale Version
+		if group.PreferredVersion == (metav1.GroupVersionForDiscovery{}) {
 			group.PreferredVersion = version
 		}
 		resourceList := &metav1.APIResourceList{}
@@ -76,7 +102,7 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (*metav1.APIGroup, map[sc
 		}
 		gvResources[gv] = resourceList
 	}
-	return group, gvResources
+	return group, gvResources, failedGVs
 }
 
 // convertAPIResource tranforms a APIResourceDiscovery to an APIResource.
