@@ -192,18 +192,27 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		ginkgo.Context(ctxString, func() {
 			var testVol *localTestVolume
 
-			ginkgo.BeforeEach(func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				if testVolType == GCELocalSSDVolumeType {
-					SkipUnlessLocalSSDExists(config, "scsi", "fs", config.randomNode)
+					SkipUnlessLocalSSDExists(ctx, config, "scsi", "fs", config.randomNode)
 				}
-				setupStorageClass(config, &testMode)
-				testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.randomNode, 1, testMode)
-				testVol = testVols[0]
+				setupStorageClass(ctx, config, &testMode)
+				testVols := setupLocalVolumesPVCsPVs(ctx, config, testVolType, config.randomNode, 1, testMode)
+				if len(testVols) > 0 {
+					testVol = testVols[0]
+				} else {
+					ginkgo.By("setupLocalVolumesPVCsPVs fail")
+					os.Exit(0)
+				}
 			})
 
-			ginkgo.AfterEach(func() {
-				cleanupLocalVolumes(config, []*localTestVolume{testVol})
-				cleanupStorageClass(config)
+			ginkgo.AfterEach(func(ctx context.Context) {
+				if testVol != nil {
+					cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
+					cleanupStorageClass(ctx, config)
+				} else {
+					os.Exit(0)
+				}
 			})
 
 			ginkgo.Context("One pod requesting one prebound PVC", func() {
