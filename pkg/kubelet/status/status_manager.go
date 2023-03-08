@@ -186,6 +186,9 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 }
 
 func (m *manager) Start() {
+	// Initialize m.state to no-op state checkpoint manager
+	m.state = state.NewNoopStateCheckpoint()
+
 	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of AllocatedResources & Resize
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
