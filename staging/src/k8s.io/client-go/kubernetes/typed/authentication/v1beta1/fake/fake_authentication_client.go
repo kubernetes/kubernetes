@@ -28,6 +28,10 @@ type FakeAuthenticationV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAuthenticationV1beta1) SelfSubjectReviews() v1beta1.SelfSubjectReviewInterface {
+	return &FakeSelfSubjectReviews{c}
+}
+
 func (c *FakeAuthenticationV1beta1) TokenReviews() v1beta1.TokenReviewInterface {
 	return &FakeTokenReviews{c}
 }
