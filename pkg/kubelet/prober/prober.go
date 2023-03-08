@@ -128,7 +128,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		}
 		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 	}
-	return result, nil
+	return results.Success, nil
 	
 }
 
