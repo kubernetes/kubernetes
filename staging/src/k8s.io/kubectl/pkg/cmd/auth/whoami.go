@@ -168,31 +168,23 @@ func (o WhoAmIOptions) Run() error {
 	res, err = o.authV1beta1Client.
 		SelfSubjectReviews().
 		Create(context.TODO(), &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		// Fallback to Alpha API if Beta is not enabled
+		res, err = o.authV1alpha1Client.
+			SelfSubjectReviews().
+			Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+	}
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Fallback to Alpha API if Beta is not enabled
-			res, err = o.authV1alpha1Client.
-				SelfSubjectReviews().
-				Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
-			if err != nil {
-				return checkEnabledOrForbidden(err)
-			}
-		} else {
-			return checkEnabledOrForbidden(err)
+		switch {
+		case errors.IsForbidden(err):
+			return forbiddenErr
+		case errors.IsNotFound(err):
+			return notEnabledErr
+		default:
+			return err
 		}
 	}
 	return o.resourcePrinterFunc(res, o.Out)
-}
-
-func checkEnabledOrForbidden(err error) error {
-	switch {
-	case errors.IsForbidden(err):
-		return forbiddenErr
-	case errors.IsNotFound(err):
-		return notEnabledErr
-	default:
-		return err
-	}
 }
 
 func getUserInfo(obj runtime.Object) (authenticationv1.UserInfo, error) {
@@ -202,7 +194,7 @@ func getUserInfo(obj runtime.Object) (authenticationv1.UserInfo, error) {
 	case *authenticationv1beta1.SelfSubjectReview:
 		return obj.(*authenticationv1beta1.SelfSubjectReview).Status.UserInfo, nil
 	default:
-		return authenticationv1.UserInfo{}, fmt.Errorf("object is not SelfSubjectReview")
+		return authenticationv1.UserInfo{}, fmt.Errorf("unexpected response type %T, expected SelfSubjectReview", obj)
 	}
 }
 

@@ -51,6 +51,7 @@ const (
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
 	// owner: @nabokihms
+	// alpha: v1.26
 	// beta: v1.27
 	//
 	// Enables API to get self subject attributes after authentication.
