@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -201,12 +202,21 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				}
 				setupStorageClass(ctx, config, &testMode)
 				testVols := setupLocalVolumesPVCsPVs(ctx, config, testVolType, config.randomNode, 1, testMode)
-				testVol = testVols[0]
+				if len(testVols) > 0 {
+					testVol = testVols[0]
+				} else {
+					ginkgo.By("setupLocalVolumesPVCsPVs fail")
+					os.Exit(0)
+				}
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {
-				cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
-				cleanupStorageClass(ctx, config)
+				if testVol != nil {
+					cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
+					cleanupStorageClass(ctx, config)
+				} else {
+					os.Exit(0)
+				}
 			})
 
 			ginkgo.Context("One pod requesting one prebound PVC", func() {
