@@ -11,18 +11,21 @@ issues:
   max-same-issues: 0
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
-    # exclude ineffassing linter for generated files for conversion
+    # exclude ineffassign linter for generated files for conversion
     - path: conversion\.go
       linters:
         - ineffassign
 
 linters:
-  enable: # please keep this alphabetized
+  disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
+  enable: # please keep this alphabetized and in sync with golangci.yaml
+    - ginkgolinter
     - gocritic
     - govet
     - ineffassign
     - logcheck
     - staticcheck
+    - stylecheck
     - unused
 
 linters-settings: # please keep this alphabetized
@@ -32,7 +35,8 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
+  gocritic:
   staticcheck:
-    checks: [
-      "all",
-    ]
+    checks:
+      - "all"
+  stylecheck:
