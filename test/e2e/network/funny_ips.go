@@ -117,7 +117,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		ip := netutils.ParseIPSloppy(clusterIPZero)
 		cmd := fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", ip.String(), servicePort)
-		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (bool, error) {
 			stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
@@ -129,6 +129,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 			}
 			return false, nil
 		})
+
 		// Service is working on the expected IP.
 		if err == nil {
 			return
@@ -136,7 +137,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		// It may happen that the component implementing Services discard the IP.
 		// We have to check that the Service is not reachable in the address interpreted as decimal.
 		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", clusterIPOctal, servicePort)
-		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (bool, error) {
 			stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
@@ -148,6 +149,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 			}
 			return false, nil
 		})
+
 		// Ouch, Service has worked on IP interpreted as octal.
 		if err == nil {
 			framework.Failf("WARNING: Your Cluster interprets Service ClusterIP %s as %s, please see https://nvd.nist.gov/vuln/detail/CVE-2021-29923", clusterIPZero, clusterIPOctal)

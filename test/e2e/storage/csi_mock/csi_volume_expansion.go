@@ -299,7 +299,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
-				err = wait.Poll(time.Second, csiResizeWaitPeriod, func() (done bool, err error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, csiResizeWaitPeriod, false, func(ctx context.Context) (done bool, err error) {
 					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
@@ -314,6 +314,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					}
 					return false, nil
 				})
+
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 
 				ginkgo.By("Waiting for PVC resize to finish")
@@ -535,7 +536,7 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 
 func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedStates ...v1.PersistentVolumeClaimResizeStatus) error {
 	var actualResizeStatus *v1.PersistentVolumeClaimResizeStatus
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
@@ -553,6 +554,7 @@ func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, e
 		}
 		return false, nil
 	})
+
 	if waitErr != nil {
 		return fmt.Errorf("error while waiting for resize status to sync to %+v, actualStatus %s: %v", expectedStates, *actualResizeStatus, waitErr)
 	}
@@ -561,7 +563,7 @@ func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, e
 
 func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
 	expectedQuantity := resource.MustParse(expectedSize)
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
@@ -573,8 +575,8 @@ func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup,
 			return true, nil
 		}
 		return false, nil
-
 	})
+
 	if waitErr != nil {
 		return fmt.Errorf("error while waiting for allocatedSize to sync to %s: %v", expectedSize, waitErr)
 	}

@@ -150,7 +150,7 @@ func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, al
 	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
 		timeout, ns)
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		dsList, err := c.AppsV1().DaemonSets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
@@ -163,14 +163,13 @@ func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, al
 				notReadyDaemonSets = append(notReadyDaemonSets, ds.ObjectMeta.Name)
 			}
 		}
-
 		if len(notReadyDaemonSets) > 0 {
 			framework.Logf("there are not ready daemonsets: %v", notReadyDaemonSets)
 			return false, nil
 		}
-
 		return true, nil
 	})
+
 }
 
 // setupSuite is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
@@ -429,7 +428,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
 		}
 		framework.Logf("Waiting for %s", imgPuller.Name)
-		err := wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkDaemonset)
 		framework.ExpectNoError(err, "error waiting for image to be pulled")
 	}
 }

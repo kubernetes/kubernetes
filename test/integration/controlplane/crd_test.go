@@ -262,7 +262,7 @@ func TestCRDOpenAPI(t *testing.T) {
 	waitForSpec := func(crd *apiextensionsv1.CustomResourceDefinition, expectedType string) {
 		t.Logf(`Waiting for {properties: {"foo": {"type":"%s"}}} to show up in schema`, expectedType)
 		lastMsg := ""
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			lastMsg = ""
 			defName := crdDefinitionName(crd)
 			schema, err := getPublishedSchema(defName)

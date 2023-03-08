@@ -311,7 +311,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Poll kubelet metrics waiting for the volume to be picked up
 		// by the volume stats collector
 		var kubeMetrics e2emetrics.KubeletMetrics
-		waitErr := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+		waitErr := wait.PollUntilContextTimeout(context.Background(), 30*time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 			framework.Logf("Grabbing Kubelet metrics")
 			// Grab kubelet metrics from the node the pod was scheduled on
 			var err error
@@ -325,6 +325,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(waitErr, "Unable to find metric %s for PVC %s/%s", kubeletKeyName, pvcNamespace, pvcName)
 
 		for _, key := range volumeStatKeys {

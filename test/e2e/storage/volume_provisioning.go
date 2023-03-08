@@ -658,7 +658,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// Event delivery is not reliable and it's used only as a quick way how to check if volume with wrong KMS
 			// key was not provisioned. If the event is not delivered, we check that the volume is not Bound for whole
 			// ClaimProvisionTimeout in the very same loop.
-			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, framework.ClaimProvisionTimeout, false, func(ctx context.Context) (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("could not list PVC events in %s: %w", claim.Namespace, err)
@@ -680,7 +680,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 				return false, nil
 			})
-			if err == wait.ErrWaitTimeout {
+
+			if wait.Interrupted(err) {
 				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
 				err = nil
 			}
@@ -799,7 +800,7 @@ func getStorageClass(
 func waitForProvisionedVolumesDeleted(ctx context.Context, c clientset.Interface, scName string) ([]*v1.PersistentVolume, error) {
 	var remainingPVs []*v1.PersistentVolume
 
-	err := wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 300*time.Second, false, func(ctx context.Context) (bool, error) {
 		remainingPVs = []*v1.PersistentVolume{}
 
 		allPVs, err := c.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
@@ -815,8 +816,11 @@ func waitForProvisionedVolumesDeleted(ctx context.Context, c clientset.Interface
 		if len(remainingPVs) > 0 {
 			return false, nil // Poll until no PVs remain
 		}
-		return true, nil // No PVs remain
+		return true, nil
 	})
+
+	// No PVs remain
+
 	if err != nil {
 		return remainingPVs, fmt.Errorf("Error waiting for PVs to be deleted: %w", err)
 	}

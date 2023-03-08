@@ -181,12 +181,12 @@ func testClientCA(t *testing.T, recreate bool) {
 	defer tearDownFn()
 
 	// wait for request header info
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// wait for client cert info
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,20 +226,20 @@ func testClientCA(t *testing.T, recreate bool) {
 	}
 
 	// wait for updated request header info that contains both
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
 	if err != nil {
 		t.Error(err)
 	}
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", string(frontProxyCA.CACert), 1))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", string(frontProxyCA.CACert), 1))
 	if err != nil {
 		t.Error(err)
 	}
 	// wait for updated client cert info that contains both
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
 	if err != nil {
 		t.Error(err)
 	}
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", string(clientCA.CACert), 1))
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", string(clientCA.CACert), 1))
 	if err != nil {
 		t.Error(err)
 	}

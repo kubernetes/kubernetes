@@ -124,7 +124,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 
 	// Make sure reset happens on patch requests
 	// wait until new webhook is called
-	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		defer recordedWarnings.Reset()
 		pod, err = client.CoreV1().Pods("default").Patch(context.TODO(), invalidManagedFieldsMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil {

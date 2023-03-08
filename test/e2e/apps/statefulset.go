@@ -1666,7 +1666,7 @@ func lastLine(out string) string {
 }
 
 func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, statefulPodNumber int, key, expectedVal string) error {
-	err := wait.PollImmediateWithContext(ctx, time.Second, readTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, readTimeout, true, func(ctx context.Context) (bool, error) {
 		val := statefulPod.read(statefulPodNumber, key)
 		if val == "" {
 			return false, nil
@@ -1676,7 +1676,7 @@ func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, sta
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return fmt.Errorf("timed out when trying to read value for key %v from stateful pod %d", key, statefulPodNumber)
 	}
 	return err
@@ -1898,7 +1898,7 @@ func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, na
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr
@@ -1919,7 +1919,7 @@ func verifyStatefulSetPVCsExist(ctx context.Context, c clientset.Interface, ss *
 	for _, id := range claimIds {
 		idSet[id] = struct{}{}
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
@@ -1951,6 +1951,7 @@ func verifyStatefulSetPVCsExist(ctx context.Context, c clientset.Interface, ss *
 		}
 		return true, nil
 	})
+
 }
 
 // verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
@@ -1964,7 +1965,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 	if setUID == "" {
 		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
@@ -2019,4 +2020,5 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 		}
 		return true, nil
 	})
+
 }

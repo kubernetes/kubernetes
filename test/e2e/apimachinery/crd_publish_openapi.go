@@ -648,14 +648,13 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
-	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
-		// download spec with etag support
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 60*time.Second, false, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
 		spec := &spec.Swagger{}
 		req, err := http.NewRequest("GET", url.String(), nil)
 		if err != nil {
 			return false, err
 		}
-		req.Close = true // enforce a new connection to hit different HA API servers
+		req.Close = true
 		if len(etag) > 0 {
 			req.Header.Set("If-None-Match", fmt.Sprintf(`"%s"`, etag))
 		}
@@ -676,11 +675,15 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 			etag = strings.Trim(resp.Header.Get("ETag"), `"`)
 			etagSpec = spec
 		}
-
 		var ok bool
 		ok, lastMsg = pred(spec)
 		return ok, nil
-	})); err != nil {
+	}));
+	// download spec with etag support
+
+	// enforce a new connection to hit different HA API servers
+
+	err != nil {
 		return fmt.Errorf("failed to wait for OpenAPI spec validating condition: %v; lastMsg: %s", err, lastMsg)
 	}
 	return nil

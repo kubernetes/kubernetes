@@ -975,7 +975,7 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *trans
 	// generate a random int to be used in secret name
 	idx := rand.Intn(100000)
 
-	pollErr := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		// create secret
 		secretName := fmt.Sprintf("secret-%d", idx)
 		_, err := test.createSecret(secretName, "default")
@@ -1000,7 +1000,8 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *trans
 
 		return true, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(pollErr) {
 		t.Fatalf("failed to verify if kms transformers swapped, err: %v", swapErr)
 	}
 }

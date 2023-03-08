@@ -152,7 +152,7 @@ const (
 )
 
 func waitForCertificateRequestApproved(client clientset.Interface, name string) error {
-	if err := wait.Poll(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, false, func(ctx context.Context) (bool, error) {
 		csr, err := client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -172,7 +172,7 @@ func ensureCertificateRequestNotApproved(client clientset.Interface, name string
 	// There is currently no way to explicitly check if the CSR has been rejected for auto-approval.
 	err := waitForCertificateRequestApproved(client, name)
 	switch {
-	case err == wait.ErrWaitTimeout:
+	case wait.Interrupted(err):
 		return nil
 	case err == nil:
 		return fmt.Errorf("CertificateSigningRequest was auto-approved")

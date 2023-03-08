@@ -103,7 +103,7 @@ func (r *ResourceCollector) Start() {
 		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
-	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		var err error
 		r.client, err = cadvisorclient.NewClient(fmt.Sprintf("http://localhost:%d/", cadvisorPort))
 		if err == nil {

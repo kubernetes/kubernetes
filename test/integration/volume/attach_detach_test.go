@@ -366,7 +366,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
@@ -379,7 +379,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 
 // wait for pods to be observed in desired state of world
 func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
-	if err := wait.Poll(time.Millisecond*500, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*500, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pods := dswp.GetPodToAdd()
 		if len(pods) > 0 {
 			return true, nil
@@ -392,7 +392,7 @@ func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
 
 // wait for pods to be observed in desired state of world
 func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, checkTimeout time.Duration, failMessage string, podCount int) {
-	if err := wait.Poll(time.Millisecond*500, checkTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*500, checkTimeout, false, func(ctx context.Context) (bool, error) {
 		pods := dswp.GetPodToAdd()
 		if len(pods) == podCount {
 			return true, nil

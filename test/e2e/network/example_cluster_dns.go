@@ -171,20 +171,15 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 func waitForServiceResponding(ctx context.Context, c clientset.Interface, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, RespondingTimeout, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, RespondingTimeout, true, func(ctx context.Context) (done bool, err error) {
 		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("Failed to get services proxy request: %v:", errProxy)
 			return false, nil
 		}
-
 		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 		defer cancel()
-
-		body, err := proxyRequest.Namespace(ns).
-			Name(name).
-			Do(ctx).
-			Raw()
+		body, err := proxyRequest.Namespace(ns).Name(name).Do(ctx).Raw()
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Failed to GET from service %s: %v", name, err)
@@ -196,9 +191,12 @@ func waitForServiceResponding(ctx context.Context, c clientset.Interface, ns, na
 		got := string(body)
 		if len(got) == 0 {
 			framework.Logf("Service %s: expected non-empty response", name)
-			return false, err // stop polling
+			return false, err
 		}
 		framework.Logf("Service %s: found nonempty answer: %s", name, got)
 		return true, nil
 	})
+
+	// stop polling
+
 }

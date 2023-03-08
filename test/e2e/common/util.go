@@ -192,7 +192,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Wait for their boot IDs to change.
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 30*time.Second, framework.RestartNodeReadyAgainTimeout, false, func(ctx context.Context) (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %w", err)

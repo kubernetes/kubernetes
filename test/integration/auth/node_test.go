@@ -571,7 +571,7 @@ func TestNodeAuthorizer(t *testing.T) {
 // out and the last error returned by the method.
 func expect(t *testing.T, f func() error, wantErr func(error) bool) (timeout bool, lastErr error) {
 	t.Helper()
-	err := wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		t.Helper()
 		lastErr = f()
 		if wantErr(lastErr) {
@@ -580,6 +580,7 @@ func expect(t *testing.T, f func() error, wantErr func(error) bool) (timeout boo
 		t.Logf("unexpected response, will retry: %v", lastErr)
 		return false, nil
 	})
+
 	return err == nil, lastErr
 }
 

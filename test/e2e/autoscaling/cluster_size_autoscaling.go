@@ -1711,13 +1711,14 @@ func runReplicatedPodOnEachNode(ctx context.Context, f *framework.Framework, nod
 			}
 		}
 
-		err = wait.PollImmediate(5*time.Second, podTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, podTimeout, true, func(ctx context.Context) (bool, error) {
 			rc, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Get(ctx, id, metav1.GetOptions{})
 			if err != nil || rc.Status.ReadyReplicas < int32((i+1)*podsPerNode) {
 				return false, nil
 			}
 			return true, nil
 		})
+
 		if err != nil {
 			return fmt.Errorf("failed to coerce RC into spawning a pod on node %s within timeout", node.Name)
 		}
@@ -1859,18 +1860,20 @@ func getScaleUpStatus(ctx context.Context, c clientset.Interface) (*scaleUpStatu
 func waitForScaleUpStatus(ctx context.Context, c clientset.Interface, cond func(s *scaleUpStatus) bool, timeout time.Duration) (*scaleUpStatus, error) {
 	var finalErr error
 	var status *scaleUpStatus
-	err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		status, finalErr = getScaleUpStatus(ctx, c)
 		if finalErr != nil {
 			return false, nil
 		}
 		if status.timestamp.Add(freshStatusLimit).Before(time.Now()) {
-			// stale status
 			finalErr = fmt.Errorf("Status too old")
 			return false, nil
 		}
 		return cond(status), nil
 	})
+
+	// stale status
+
 	if err != nil {
 		err = fmt.Errorf("Failed to find expected scale up status: %v, last status: %v, final err: %v", err, status, finalErr)
 	}

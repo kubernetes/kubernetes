@@ -795,7 +795,7 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				podReady := podutils.IsPodReady(pod)
@@ -805,6 +805,7 @@ var _ = SIGDescribe("Pods", func() {
 				}
 				return res, nil
 			})
+
 			framework.ExpectNoError(err)
 		}
 
@@ -883,7 +884,7 @@ var _ = SIGDescribe("Pods", func() {
 
 		// wait for all pods to be deleted
 		ginkgo.By("waiting for all pods to be deleted")
-		err = wait.PollImmediateWithContext(ctx, podRetryPeriod, f.Timeouts.PodDelete, checkPodListQuantity(f, "type=Testing", 0))
+		err = wait.PollUntilContextTimeout(ctx, podRetryPeriod, f.Timeouts.PodDelete, true, checkPodListQuantity(f, "type=Testing", 0))
 		framework.ExpectNoError(err, "found a pod(s)")
 	})
 

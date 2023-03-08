@@ -1798,7 +1798,7 @@ func (config *DaemonConfig) Run(ctx context.Context) error {
 	}
 	defer ps.Stop()
 
-	err = wait.Poll(time.Second, timeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		pods := ps.List()
 
 		nodeHasDaemon := sets.NewString()
@@ -1813,6 +1813,7 @@ func (config *DaemonConfig) Run(ctx context.Context) error {
 		config.LogFunc("Found %v/%v Daemons %v running", running, config.Name, len(nodes.Items))
 		return running == len(nodes.Items), nil
 	})
+
 	if err != nil {
 		config.LogFunc("Timed out while waiting for DaemonSet %v/%v to be running.", config.Namespace, config.Name)
 	} else {

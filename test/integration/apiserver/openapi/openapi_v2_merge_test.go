@@ -170,7 +170,7 @@ func TestOpenAPIV2CRDMergeNoDuplicateTypes(t *testing.T) {
 
 	var openAPISpec spec.Swagger
 	// Poll for the OpenAPI to be updated with the new CRD
-	wait.Poll(time.Second*1, wait.ForeverTestTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		jsonData, err := clientset.RESTClient().Get().AbsPath("/openapi/v2").Do(context.TODO()).Raw()
 		if err != nil {
 			t.Fatal(err)

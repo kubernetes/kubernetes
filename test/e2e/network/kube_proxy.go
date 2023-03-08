@@ -218,7 +218,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, epsilonSeconds*time.Second, true, func(ctx context.Context) (bool, error) {
 			result, err := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {

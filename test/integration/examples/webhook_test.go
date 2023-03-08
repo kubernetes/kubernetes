@@ -87,7 +87,7 @@ func TestWebhookLoopback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		_, err = client.CoreV1().ConfigMaps("default").Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "webhook-test"},
 			Data:       map[string]string{"invalid key": "value"},
@@ -102,6 +102,7 @@ func TestWebhookLoopback(t *testing.T) {
 		t.Logf("webhook not called yet, continuing...")
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}

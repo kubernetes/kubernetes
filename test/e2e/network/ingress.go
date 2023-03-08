@@ -248,7 +248,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
 					framework.ExpectNoError(err)
 				}
-				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
+				err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, negUpdateTimeout, false, func(ctx context.Context) (bool, error) {
 					res, err := jig.GetDistinctResponseFromIngress(ctx)
 					if err != nil {
 						return false, nil
@@ -256,6 +256,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 					framework.Logf("Expecting %d backends, got %d", num, res.Len())
 					return res.Len() == num, nil
 				})
+
 				framework.ExpectNoError(err)
 			}
 
@@ -300,13 +301,14 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 
 			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, f.ClientSet)
-			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, propagationTimeout, false, func(ctx context.Context) (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress(ctx)
 				if err != nil {
 					return false, nil
 				}
 				return res.Len() == replicas, nil
 			})
+
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Trigger rolling update and observe service disruption")
@@ -317,7 +319,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
 			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(ctx, deploy, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
-			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, propagationTimeout, false, func(ctx context.Context) (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress(ctx)
 				if err != nil {
 					return false, err
@@ -337,6 +339,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
 				return false, nil
 			})
+
 			framework.ExpectNoError(err)
 		})
 
@@ -353,7 +356,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
 					framework.ExpectNoError(err)
 				}
-				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
+				err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, negUpdateTimeout, false, func(ctx context.Context) (bool, error) {
 					svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, name, metav1.GetOptions{})
 					framework.ExpectNoError(err)
 
@@ -400,6 +403,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 					return true, nil
 				})
+
 				framework.ExpectNoError(err)
 			}
 
@@ -482,7 +486,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 })
 
 func detectNegAnnotation(ctx context.Context, f *framework.Framework, jig *e2eingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
-	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, negUpdateTimeout, false, func(ctx context.Context) (bool, error) {
 		svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil

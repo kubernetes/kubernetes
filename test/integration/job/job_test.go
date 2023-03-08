@@ -291,7 +291,7 @@ func TestJobFinishedNumReasonMetric(t *testing.T) {
 func validateCounterMetric(t *testing.T, counterVec *basemetrics.CounterVec, wantMetric metricLabelsWithValue) {
 	t.Helper()
 	var cmpErr error
-	err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		cmpErr = nil
 		value, err := testutil.GetCounterMetricValue(counterVec.WithLabelValues(wantMetric.Labels...))
 		if err != nil {
@@ -303,6 +303,7 @@ func validateCounterMetric(t *testing.T, counterVec *basemetrics.CounterVec, wan
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Errorf("Failed waiting for expected metric: %q", err)
 	}
@@ -413,7 +414,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 	// appending the FailureTarget condition to the job to mark it as targeted
 	// for failure.
 	go func() {
-		err := wait.PollImmediate(10*time.Millisecond, time.Minute, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
 			failedPodUpdated, err := cs.CoreV1().Pods(jobObj.Namespace).Get(ctx, jobPods[failedIndex].Name, metav1.GetOptions{})
 			if err != nil {
 				return true, err
@@ -423,6 +424,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 			}
 			return false, nil
 		})
+
 		if err != nil {
 			t.Logf("Failed awaiting for the finalizer removal for pod %v", klog.KObj(jobPods[failedIndex]))
 		}
@@ -1149,7 +1151,7 @@ func TestElasticIndexedJob(t *testing.T) {
 			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
 
 			// Wait for pods to start up.
-			err = wait.PollImmediate(5*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 				job, err := jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -1159,6 +1161,7 @@ func TestElasticIndexedJob(t *testing.T) {
 				}
 				return false, nil
 			})
+
 			if err != nil {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
 			}
@@ -1352,12 +1355,13 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	}
 
 	// Fail a pod ASAP.
-	err = wait.PollImmediate(time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 		if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
 			return false, nil
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Could not fail pod: %v", err)
 	}
@@ -1400,7 +1404,7 @@ func TestJobFailedWithInterrupts(t *testing.T) {
 		t.Fatalf("Could not fail a pod: %v", err)
 	}
 	remaining := 9
-	if err := wait.PollImmediate(5*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 		if err, succ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, remaining); err != nil {
 			remaining -= succ
 			t.Logf("Transient failure succeeding pods: %v", err)
@@ -1419,7 +1423,7 @@ func TestJobFailedWithInterrupts(t *testing.T) {
 func validateNoOrphanPodsWithFinalizers(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
 	t.Helper()
 	orphanPods := 0
-	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
 		})
@@ -1602,7 +1606,7 @@ func TestNodeSelectorUpdate(t *testing.T) {
 	// (2) Check that the pod was created using the expected node selector.
 
 	var pod *v1.Pod
-	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := clientSet.CoreV1().Pods(jobNamespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list Job Pods: %v", err)
@@ -1643,7 +1647,7 @@ type podsByStatus struct {
 func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus) {
 	t.Helper()
 	var actualCounts podsByStatus
-	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get updated Job: %v", err)
@@ -1660,7 +1664,7 @@ func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientse
 		t.Errorf("Waiting for Job Status: %v\nPods (-want,+got):\n%s", err, diff)
 	}
 	var active []*v1.Pod
-	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list Job Pods: %v", err)
@@ -1762,7 +1766,7 @@ func waitForEvent(events watch.Interface, uid types.UID, reason string) error {
 	if reason == "" {
 		return nil
 	}
-	return wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		for {
 			var ev watch.Event
 			select {
@@ -1780,6 +1784,7 @@ func waitForEvent(events watch.Interface, uid types.UID, reason string) error {
 			}
 		}
 	})
+
 }
 
 func getJobConditionStatus(ctx context.Context, job *batchv1.Job, cType batchv1.JobConditionType) v1.ConditionStatus {
@@ -1803,7 +1808,7 @@ func validateJobSucceeded(ctx context.Context, t testing.TB, clientSet clientset
 
 func validateJobCondition(ctx context.Context, t testing.TB, clientSet clientset.Interface, jobObj *batchv1.Job, cond batchv1.JobConditionType) {
 	t.Helper()
-	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		j, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to obtain updated Job: %v", err)

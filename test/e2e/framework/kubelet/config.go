@@ -90,27 +90,25 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 	req.Header.Add("Accept", "application/json")
 
 	var respBody []byte
-	err = wait.PollImmediateWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		resp, err := client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false, nil
 		}
 		defer resp.Body.Close()
-
 		if resp.StatusCode != 200 {
 			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false, nil
 		}
-
 		respBody, err = io.ReadAll(resp.Body)
 		if err != nil {
 			framework.Logf("failed to read body from /configz response, retrying. Error: %v", err)
 			return false, nil
 		}
-
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Failed to get successful response from /configz")
 
 	return respBody

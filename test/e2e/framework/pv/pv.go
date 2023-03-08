@@ -297,23 +297,24 @@ func DeletePVCandValidatePVGroup(ctx context.Context, c clientset.Interface, tim
 func createPV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var resultPV *v1.PersistentVolume
 	var lastCreateErr error
-	err := wait.PollImmediateWithContext(ctx, 29*time.Second, timeouts.PVCreate, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, 29*time.Second, timeouts.PVCreate, true, func(ctx context.Context) (done bool, err error) {
 		resultPV, lastCreateErr = c.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 		if lastCreateErr != nil {
-			// If we hit a quota problem, we are not done and should retry again.  This happens to be the quota failure string for GCP.
-			// If quota failure strings are found for other platforms, they can be added to improve reliability when running
-			// many parallel test jobs in a single cloud account.  This corresponds to controller-like behavior and
-			// to what we would recommend for general clients.
 			if strings.Contains(lastCreateErr.Error(), `googleapi: Error 403: Quota exceeded for quota group`) {
 				return false, nil
 			}
-
-			// if it was not a quota failure, fail immediately
 			return false, lastCreateErr
 		}
-
 		return true, nil
 	})
+
+	// If we hit a quota problem, we are not done and should retry again.  This happens to be the quota failure string for GCP.
+	// If quota failure strings are found for other platforms, they can be added to improve reliability when running
+	// many parallel test jobs in a single cloud account.  This corresponds to controller-like behavior and
+	// to what we would recommend for general clients.
+
+	// if it was not a quota failure, fail immediately
+
 	// if we have an error from creating the PV, use that instead of a timeout error
 	if lastCreateErr != nil {
 		return nil, fmt.Errorf("PV Create API error: %w", err)

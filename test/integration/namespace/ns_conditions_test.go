@@ -84,7 +84,7 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(1*time.Second, 60*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		curr, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -112,6 +112,7 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Log(spew.Sdump(curr))
 		return conditionsFound == 5, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}

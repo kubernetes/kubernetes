@@ -32,28 +32,28 @@ import (
 // WaitForRunning waits for numPodsRunning in ss to be Running and for the first
 // numPodsReady ordinals to be Ready.
 func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, numPodsReady int32, ss *appsv1.StatefulSet) {
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
-		func(ctx context.Context) (bool, error) {
-			podList := GetPodList(ctx, c, ss)
-			SortStatefulPods(podList)
-			if int32(len(podList.Items)) < numPodsRunning {
-				framework.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		podList := GetPodList(ctx, c, ss)
+		SortStatefulPods(podList)
+		if int32(len(podList.Items)) < numPodsRunning {
+			framework.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+			return false, nil
+		}
+		if int32(len(podList.Items)) > numPodsRunning {
+			return false, fmt.Errorf("too many pods scheduled, expected %d got %d", numPodsRunning, len(podList.Items))
+		}
+		for _, p := range podList.Items {
+			shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
+			isReady := podutils.IsPodReady(&p)
+			desiredReadiness := shouldBeReady == isReady
+			framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+			if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 				return false, nil
 			}
-			if int32(len(podList.Items)) > numPodsRunning {
-				return false, fmt.Errorf("too many pods scheduled, expected %d got %d", numPodsRunning, len(podList.Items))
-			}
-			for _, p := range podList.Items {
-				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
-				isReady := podutils.IsPodReady(&p)
-				desiredReadiness := shouldBeReady == isReady
-				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
-				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
-					return false, nil
-				}
-			}
-			return true, nil
-		})
+		}
+		return true, nil
+	})
+
 	if pollErr != nil {
 		framework.Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
@@ -61,15 +61,15 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
 func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
-		func(ctx context.Context) (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			podList := GetPodList(ctx, c, ssGet)
-			return until(ssGet, podList)
-		})
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		podList := GetPodList(ctx, c, ssGet)
+		return until(ssGet, podList)
+	})
+
 	if pollErr != nil {
 		framework.Failf("Failed waiting for state update: %v", pollErr)
 	}
@@ -101,21 +101,21 @@ func WaitForStatusReadyReplicas(ctx context.Context, c clientset.Interface, ss *
 	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
-		func(ctx context.Context) (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if ssGet.Status.ObservedGeneration < ss.Generation {
-				return false, nil
-			}
-			if ssGet.Status.ReadyReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
-				return false, nil
-			}
-			return true, nil
-		})
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if ssGet.Status.ObservedGeneration < ss.Generation {
+			return false, nil
+		}
+		if ssGet.Status.ReadyReplicas != expectedReplicas {
+			framework.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	if pollErr != nil {
 		framework.Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
@@ -126,21 +126,21 @@ func WaitForStatusAvailableReplicas(ctx context.Context, c clientset.Interface, 
 	framework.Logf("Waiting for statefulset status.AvailableReplicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
-		func(ctx context.Context) (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if ssGet.Status.ObservedGeneration < ss.Generation {
-				return false, nil
-			}
-			if ssGet.Status.AvailableReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
-				return false, nil
-			}
-			return true, nil
-		})
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if ssGet.Status.ObservedGeneration < ss.Generation {
+			return false, nil
+		}
+		if ssGet.Status.AvailableReplicas != expectedReplicas {
+			framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	if pollErr != nil {
 		framework.Failf("Failed waiting for stateful set status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
@@ -151,21 +151,21 @@ func WaitForStatusReplicas(ctx context.Context, c clientset.Interface, ss *appsv
 	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
-		func(ctx context.Context) (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if ssGet.Status.ObservedGeneration < ss.Generation {
-				return false, nil
-			}
-			if ssGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
-				return false, nil
-			}
-			return true, nil
-		})
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if ssGet.Status.ObservedGeneration < ss.Generation {
+			return false, nil
+		}
+		if ssGet.Status.Replicas != expectedReplicas {
+			framework.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	if pollErr != nil {
 		framework.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}

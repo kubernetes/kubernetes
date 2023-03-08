@@ -44,7 +44,7 @@ const secondNodePortSvcName = "second-node-port-service"
 // GetHTTPContent returns the content of the given url by HTTP.
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) (string, error) {
 	var body bytes.Buffer
-	pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, url, nil)
 		if result.Status == e2enetwork.HTTPSuccess {
 			body.Write(result.Body)
@@ -52,6 +52,7 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 		}
 		return false, nil
 	})
+
 	if pollErr != nil {
 		framework.Logf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
@@ -69,7 +70,7 @@ func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.Net
 		body = resp.Responses[0]
 		return true, nil
 	}
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, pollFn); pollErr != nil {
+	if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollFn); pollErr != nil {
 		return "", pollErr
 	}
 	return body, nil
@@ -232,7 +233,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
@@ -244,6 +245,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s %d over %s protocol", timeout, endpoint, port, protocol)
 	}

@@ -117,7 +117,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			podName := fmt.Sprintf(podNameFormat, id)
 			eviction := newV1Eviction(ns.Name, podName, deleteOption)
 
-			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
+			err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 				e := clientSet.PolicyV1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 				switch {
 				case apierrors.IsTooManyRequests(e):
@@ -220,7 +220,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	}
 	oldPdb := pdbList.Items[0]
 	eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
-	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		e := clientSet.PolicyV1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 		switch {
 		case apierrors.IsTooManyRequests(e):
@@ -233,6 +233,7 @@ func TestTerminalPodEviction(t *testing.T) {
 			return false, e
 		}
 	})
+
 	if err != nil {
 		t.Fatalf("Eviction of pod failed %v", err)
 	}
@@ -599,7 +600,7 @@ func rmSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *disruption.Disru
 // running the RS controller to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int, phase v1.PodPhase) {
-	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != podNum {
 			return false, nil
@@ -623,7 +624,7 @@ func waitPDBStable(t *testing.T, clientSet clientset.Interface, ns, pdbName stri
 }
 
 func waitPDB(t *testing.T, clientSet clientset.Interface, ns, pdbName string, condition func(budget *policyv1.PodDisruptionBudget) bool) {
-	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

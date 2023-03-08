@@ -358,7 +358,7 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 
 	// Expect the probe CRD path to show up in the OpenAPI spec
 	// TODO(roycaihw): expose response header in rest client and utilize etag here
-	if err := wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		_, exist, err := getOpenAPIPath(apiextensionsclient, fmt.Sprintf(`/apis/%s/v1/%ss/{name}`, group, name))
 		if err != nil {
 			return false, err
@@ -458,7 +458,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	wg.Wait()
 
 	// 2. verify API Server count servers have registered
-	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 3*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		client, err := kubernetes.NewForConfig(apiServerCountServers[0].ClientConfig)
 		if err != nil {
 			t.Logf("error creating client: %v", err)
@@ -502,7 +502,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	}
 
 	// 5. verify only leaseEndpoint servers left
-	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 3*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		client, err := kubernetes.NewForConfig(leaseServers[0].ClientConfig)
 		if err != nil {
 			t.Logf("create client error: %v", err)
@@ -548,7 +548,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 		kubeAPIServers = append(kubeAPIServers, server)
 
 		// verify kube API servers have registered and create a client
-		if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 3*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 			client, err := kubernetes.NewForConfig(kubeAPIServers[i].ClientConfig)
 			if err != nil {
 				t.Logf("create client error: %v", err)

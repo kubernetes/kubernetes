@@ -68,7 +68,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		gcThreshold := 100
 
 		ginkgo.By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
-		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
+		pollErr := wait.PollUntilContextTimeout(context.Background(), 1*time.Minute, timeout, false, func(ctx context.Context) (bool, error) {
 			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
@@ -80,6 +80,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 			}
 			return true, nil
 		})
+
 		if pollErr != nil {
 			framework.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
 		}

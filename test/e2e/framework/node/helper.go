@@ -45,12 +45,8 @@ func WaitForAllNodesSchedulable(ctx context.Context, c clientset.Interface, time
 	}
 
 	framework.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, framework.TestContext.AllowedNotReadyNodes)
-	return wait.PollImmediateWithContext(
-		ctx,
-		30*time.Second,
-		timeout,
-		CheckReadyForTests(ctx, c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
-	)
+	return wait.PollUntilContextTimeout(ctx, 30*time.Second, timeout, true, CheckReadyForTests(ctx, c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold))
+
 }
 
 // AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
@@ -120,9 +116,8 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 	framework.Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, framework.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		notReady = nil
-		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -133,15 +128,18 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 				notReady = append(notReady, node)
 			}
 		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
 		return len(notReady) <= framework.TestContext.AllowedNotReadyNodes, nil
 	})
 
-	if err != nil && err != wait.ErrWaitTimeout {
+	// It should be OK to list unschedulable Nodes here.
+
+	// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+	// to make it possible e.g. for incorrect deployment of some small percentage
+	// of nodes (which we allow in cluster validation). Some nodes that are not
+	// provisioned correctly at startup will never become ready (e.g. when something
+	// won't install correctly), so we can't expect them to be ready at any point.
+
+	if err != nil && !wait.Interrupted(err) {
 		return err
 	}
 

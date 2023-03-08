@@ -33,7 +33,7 @@ type UpdateReplicaSetFunc func(d *apps.ReplicaSet)
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
 	var rs *apps.ReplicaSet
 	var updateErr error
-	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		if rs, err = c.AppsV1().ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
@@ -47,7 +47,8 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q: %v", name, updateErr)
 	}
 	return rs, pollErr
@@ -56,7 +57,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 // Verify .Status.Replicas is equal to .Spec.Replicas
 func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -71,7 +72,7 @@ func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaS
 func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
 	var rs *apps.ReplicaSet
 	var updateErr error
-	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		if rs, err = c.AppsV1().ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
@@ -85,7 +86,8 @@ func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name st
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided update to replicaset %q: %v", name, updateErr)
 	}
 	return rs, pollErr

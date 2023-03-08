@@ -174,7 +174,7 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	}
 
 	// Wait for the daemon set controller to kill all the daemon pods.
-	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		updatedDS, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
@@ -270,7 +270,7 @@ func validateDaemonSetPodsAndMarkReady(
 	numberPods int,
 	t *testing.T,
 ) {
-	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -331,7 +331,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 // waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
 func waitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, podUnschedulable(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, podUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
 // waitForPodUnschedule waits for a pod to fail scheduling and returns
@@ -342,14 +342,15 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 
 // waitForPodsCreated waits for number of pods are created.
 func waitForPodsCreated(podInformer cache.SharedIndexInformer, num int) error {
-	return wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		return len(objects) == num, nil
 	})
+
 }
 
 func waitForDaemonSetAndControllerRevisionCreated(c clientset.Interface, name string, namespace string) error {
-	return wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		ds, err := c.AppsV1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -375,6 +376,7 @@ func waitForDaemonSetAndControllerRevisionCreated(c clientset.Interface, name st
 		}
 		return false, nil
 	})
+
 }
 
 func hashAndNameForDaemonSet(ds *apps.DaemonSet) (string, string) {
@@ -399,7 +401,7 @@ func validateDaemonSetStatus(
 	dsName string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		ds, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -743,7 +745,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	})
 
 	// Wait for any pod with the latest Spec to exist
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
@@ -753,6 +755,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Failed to wait for Pods with the latest Spec to be created: %v", err)
 	}
@@ -845,7 +848,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	}
 
 	// check whether the pod label is updated after controllerrevision is created
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
@@ -860,11 +863,12 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Failed to update the pod label after new controllerrevision is created: %v", err)
 	}
 
-	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		revs, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to list controllerrevision: %v", err)
@@ -886,6 +890,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Failed to check that duplicate controllerrevision is not deleted: %v", err)
 	}

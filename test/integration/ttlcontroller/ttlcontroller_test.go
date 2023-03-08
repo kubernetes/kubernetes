@@ -107,7 +107,7 @@ func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 }
 
 func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, numNodes, ttlSeconds int) {
-	if err := wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		nodes, err := nodeLister.List(labels.Everything())
 		if err != nil || len(nodes) != numNodes {
 			return false, nil

@@ -134,7 +134,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		defer cancel()
 
 		// the admission controller may take a few seconds to observe both ingress classes
-		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			classes, err := cs.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, nil

@@ -424,7 +424,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
 			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err == nil {
@@ -449,7 +449,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Updating validating webhook configuration")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
 			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -462,6 +462,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			framework.ExpectNoError(err, "Deleting successfully created configMap")
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be allowed creation since webhook was updated to not validate create", f.Namespace.Name)
 
 		ginkgo.By("Patching a validating webhook configuration's rules to include the create operation")
@@ -471,7 +472,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Patching validating webhook configuration")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
 			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err == nil {
@@ -484,6 +485,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be denied creation by validating webhook", f.Namespace.Name)
 	})
 
@@ -526,7 +528,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Updating mutating webhook configuration")
 
 		ginkgo.By("Creating a configMap that should not be mutated")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedToBeMutatedConfigMap(string(uuid.NewUUID()), f)
 			created, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -537,6 +539,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			_, ok := created.Data["mutation-stage-1"]
 			return !ok, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s this is not mutated", f.Namespace.Name)
 
 		ginkgo.By("Patching a mutating webhook configuration's rules to include the create operation")
@@ -546,7 +549,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Patching mutating webhook configuration")
 
 		ginkgo.By("Creating a configMap that should be mutated")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedToBeMutatedConfigMap(string(uuid.NewUUID()), f)
 			created, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -557,6 +560,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			_, ok := created.Data["mutation-stage-1"]
 			return ok, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be mutated", f.Namespace.Name)
 	})
 
@@ -598,7 +602,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
 			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err == nil {
@@ -611,6 +615,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be denied creation by validating webhook", f.Namespace.Name)
 
 		ginkgo.By("Deleting the collection of validation webhooks")
@@ -618,7 +623,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Deleting collection of validating webhook configurations")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
 			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -631,6 +636,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			framework.ExpectNoError(err, "Deleting successfully created configMap")
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be allowed creation since there are no webhooks", f.Namespace.Name)
 	})
 
@@ -672,7 +678,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
 		ginkgo.By("Creating a configMap that should be mutated")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedToBeMutatedConfigMap(string(uuid.NewUUID()), f)
 			created, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -683,6 +689,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			_, ok := created.Data["mutation-stage-1"]
 			return ok, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be mutated", f.Namespace.Name)
 
 		ginkgo.By("Deleting the collection of validation webhooks")
@@ -690,7 +697,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Deleting collection of mutating webhook configurations")
 
 		ginkgo.By("Creating a configMap that should not be mutated")
-		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			cm := namedToBeMutatedConfigMap(string(uuid.NewUUID()), f)
 			created, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
 			if err != nil {
@@ -701,6 +708,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			_, ok := created.Data["mutation-stage-1"]
 			return !ok, nil
 		})
+
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s this is not mutated", f.Namespace.Name)
 	})
 })
@@ -1589,7 +1597,7 @@ type updateConfigMapFn func(cm *v1.ConfigMap)
 
 func updateConfigMap(ctx context.Context, c clientset.Interface, ns, name string, update updateConfigMapFn) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
-	pollErr := wait.PollImmediate(2*time.Second, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		var err error
 		if cm, err = c.CoreV1().ConfigMaps(ns).Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
@@ -1604,6 +1612,7 @@ func updateConfigMap(ctx context.Context, c clientset.Interface, ns, name string
 		}
 		return false, nil
 	})
+
 	return cm, pollErr
 }
 
@@ -1611,7 +1620,7 @@ type updateCustomResourceFn func(cm *unstructured.Unstructured)
 
 func updateCustomResource(ctx context.Context, c dynamic.ResourceInterface, ns, name string, update updateCustomResourceFn) (*unstructured.Unstructured, error) {
 	var cr *unstructured.Unstructured
-	pollErr := wait.PollImmediate(2*time.Second, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		var err error
 		if cr, err = c.Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
@@ -1626,6 +1635,7 @@ func updateCustomResource(ctx context.Context, c dynamic.ResourceInterface, ns, 
 		}
 		return false, nil
 	})
+
 	return cr, pollErr
 }
 
@@ -2340,7 +2350,7 @@ func createWebhookConfigurationReadyNamespace(ctx context.Context, f *framework.
 // the webhook configuration.
 func waitWebhookConfigurationReady(ctx context.Context, f *framework.Framework, markersNamespaceName string) error {
 	cmClient := f.ClientSet.CoreV1().ConfigMaps(markersNamespaceName)
-	return wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		marker := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: string(uuid.NewUUID()),
@@ -2362,6 +2372,7 @@ func waitWebhookConfigurationReady(ctx context.Context, f *framework.Framework, 
 		framework.Logf("Waiting for webhook configuration to be ready...")
 		return false, nil
 	})
+
 }
 
 // newValidatingIsReadyWebhookFixture creates a validating webhook that can be added to a webhook configuration and then probed

@@ -229,10 +229,9 @@ func getVolumeHandle(ctx context.Context, cs clientset.Interface, claimName stri
 
 // WaitForVolumeAttachmentTerminated waits for the VolumeAttachment with the passed in attachmentName to be terminated.
 func WaitForVolumeAttachmentTerminated(ctx context.Context, attachmentName string, cs clientset.Interface, timeout time.Duration) error {
-	waitErr := wait.PollImmediateWithContext(ctx, 10*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := cs.StorageV1().VolumeAttachments().Get(ctx, attachmentName, metav1.GetOptions{})
 		if err != nil {
-			// if the volumeattachment object is not found, it means it has been terminated.
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -240,6 +239,9 @@ func WaitForVolumeAttachmentTerminated(ctx context.Context, attachmentName strin
 		}
 		return false, nil
 	})
+
+	// if the volumeattachment object is not found, it means it has been terminated.
+
 	if waitErr != nil {
 		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
 	}

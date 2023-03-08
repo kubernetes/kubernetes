@@ -136,7 +136,7 @@ func TestSchedulingGates(t *testing.T) {
 			}
 
 			// Wait for the pods to be present in the scheduling queue.
-			if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 				return len(pendingPods) == len(tt.pods), nil
 			}); err != nil {
@@ -214,7 +214,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	}
 
 	// Wait for the three pods to be present in the scheduling queue.
-	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 		return len(pendingPods) == 3, nil
 	}); err != nil {
@@ -390,7 +390,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Wait for the testing Pod to be present in the scheduling queue.
-	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 		return len(pendingPods) == 1, nil
 	}); err != nil {

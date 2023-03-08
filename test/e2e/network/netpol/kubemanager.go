@@ -19,6 +19,11 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,10 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	netutils "k8s.io/utils/net"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // defaultPollIntervalSeconds [seconds] is the default value for which the Prober will wait before attempting next attempt.
@@ -224,11 +225,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	}
 
 	// ignore the result of PollImmediate, we are only concerned with probeError.
-	_ = wait.PollImmediate(
-		time.Duration(args.pollIntervalSeconds)*time.Second,
-		time.Duration(args.pollTimeoutSeconds)*time.Second,
-		conditionFunc,
-	)
+	_ = wait.PollUntilContextTimeout(context.Background(), time.Duration(args.pollIntervalSeconds)*time.Second, time.Duration(args.pollTimeoutSeconds)*time.Second, true, conditionFunc)
 
 	if probeError != nil {
 		return false, commandDebugString, nil

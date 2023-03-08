@@ -83,7 +83,7 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		}
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
-		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			pods, err := pc.List(ctx, metav1.ListOptions{LabelSelector: noSNATTestName})
 			if err != nil {
 				return false, err
@@ -98,8 +98,11 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 					return false, nil // pod is still pending
 				}
 			}
-			return true, nil // all pods are running
+			return true, nil
 		})
+
+		// all pods are running
+
 		framework.ExpectNoError(err)
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")

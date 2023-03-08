@@ -149,7 +149,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving the second page until the token expires")
 		opts.Continue = firstToken
 		var inconsistentToken string
-		wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
+		wait.PollUntilContextTimeout(context.Background(), 20*time.Second, 2*storagebackend.DefaultCompactInterval, false, func(ctx context.Context) (bool, error) {
 			_, err := client.List(ctx, opts)
 			if err == nil {
 				framework.Logf("Token %s has not expired yet", firstToken)

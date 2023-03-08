@@ -180,7 +180,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 		t.Fatalf("could not delete token: %v", err)
 	}
 	// wait for delete to be observed and reacted to via watch
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := roClient.CoreV1().Secrets(myns).List(context.TODO(), metav1.ListOptions{})
 		if err == nil {
 			t.Logf("token is still valid, waiting")
@@ -192,6 +192,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("waiting for token to be invalidated: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 	}
 
 	// configmap should exist with 'since' timestamp.
-	if err = wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		dateBefore := time.Now().UTC().Format("2006-01-02")
 		configMap, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), legacytokentracking.ConfigMapName, metav1.GetOptions{})
 		if err != nil {
@@ -433,7 +434,7 @@ func getServiceAccount(c clientset.Interface, ns string, name string, shouldWait
 
 	var user *v1.ServiceAccount
 	var err error
-	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		user, err = c.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
@@ -443,6 +444,7 @@ func getServiceAccount(c clientset.Interface, ns string, name string, shouldWait
 		}
 		return true, nil
 	})
+
 	return user, err
 }
 
@@ -463,7 +465,7 @@ func createServiceAccountToken(c clientset.Interface, sa *v1.ServiceAccount, ns 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret (%s:%s) %+v, err: %v", ns, secret.Name, *secret, err)
 	}
-	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		if len(secret.Data[v1.ServiceAccountTokenKey]) != 0 {
 			return false, nil
 		}
@@ -473,6 +475,7 @@ func createServiceAccountToken(c clientset.Interface, sa *v1.ServiceAccount, ns 
 		}
 		return true, nil
 	})
+
 	return secret, nil
 }
 

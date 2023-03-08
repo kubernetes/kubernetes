@@ -1332,7 +1332,7 @@ func validateProvisionAnn(claim *v1.PersistentVolumeClaim, volIsProvisioned bool
 }
 
 func waitForProvisionAnn(client clientset.Interface, pvc *v1.PersistentVolumeClaim, annShouldExist bool) error {
-	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1342,6 +1342,7 @@ func waitForProvisionAnn(client clientset.Interface, pvc *v1.PersistentVolumeCla
 		}
 		return false, nil
 	})
+
 }
 
 func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) {
@@ -1356,7 +1357,7 @@ func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, ph
 }
 
 func waitForPVPhase(client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) error {
-	return wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1367,10 +1368,11 @@ func waitForPVPhase(client clientset.Interface, pvName string, phase v1.Persiste
 		}
 		return false, nil
 	})
+
 }
 
 func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) error {
-	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1380,6 +1382,7 @@ func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) 
 		}
 		return false, nil
 	})
+
 }
 
 func markNodeAffinity(pod *v1.Pod, node string) {

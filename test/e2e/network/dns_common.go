@@ -92,16 +92,14 @@ func (t *dnsTestCommon) init(ctx context.Context) {
 func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string) bool, target string, timeout time.Duration) {
 	var actual []string
 
-	err := wait.PollImmediate(
-		time.Duration(1)*time.Second,
-		timeout,
-		func() (bool, error) {
-			actual = t.runDig(name, target)
-			if predicate(actual) {
-				return true, nil
-			}
-			return false, nil
-		})
+	err := wait.PollUntilContextTimeout(context.Background(), time.Duration(1)*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+
+		actual = t.runDig(name, target)
+		if predicate(actual) {
+			return true, nil
+		}
+		return false, nil
+	})
 
 	if err != nil {
 		framework.Failf("dig result did not match: %#v after %v",
@@ -456,21 +454,12 @@ func assertFilesExist(ctx context.Context, fileNames []string, fileDir string, p
 func assertFilesContain(ctx context.Context, fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.PollImmediateWithContext(ctx, time.Second*5, time.Second*600, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second*5, time.Second*600, true, func(ctx context.Context) (bool, error) {
 		failed = []string{}
-
 		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 		defer cancel()
-
 		for _, fileName := range fileNames {
-			contents, err := client.CoreV1().RESTClient().Get().
-				Namespace(pod.Namespace).
-				Resource("pods").
-				SubResource("proxy").
-				Name(pod.Name).
-				Suffix(fileDir, fileName).
-				Do(ctx).Raw()
-
+			contents, err := client.CoreV1().RESTClient().Get().Namespace(pod.Namespace).Resource("pods").SubResource("proxy").Name(pod.Name).Suffix(fileDir, fileName).Do(ctx).Raw()
 			if err != nil {
 				if ctx.Err() != nil {
 					framework.Failf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)

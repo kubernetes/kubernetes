@@ -290,7 +290,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 	// Wait for the PVs to be deleted. It includes also pod and PVC deletion because of PVC protection.
 	// We use PVs to make sure that the test does not leave orphan PVs when a CSI driver is destroyed
 	// just after the test ends.
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		existing := 0
 		for _, pvName := range pvNames.UnsortedList() {
 			_, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
@@ -310,6 +310,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		cleanupErrors = append(cleanupErrors, fmt.Sprintf("timed out waiting for PVs to be deleted: %s", err))
 	}
@@ -322,7 +323,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 // waitForAllPVCsBound waits until the given PVCs are all bound. It then returns the bound PVC names as a set.
 func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout time.Duration, ns string, pvcNames []string) (sets.String, error) {
 	pvNames := sets.NewString()
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		unbound := 0
 		for _, pvcName := range pvcNames {
 			pvc, err := cs.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvcName, metav1.GetOptions{})
@@ -341,6 +342,7 @@ func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout ti
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error waiting for all PVCs to be bound: %w", err)
 	}
@@ -384,7 +386,7 @@ func getInTreeNodeLimits(ctx context.Context, cs clientset.Interface, nodeName s
 func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName string, driverInfo *storageframework.DriverInfo) (int, error) {
 	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
-	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, csiNodeInfoTimeout, true, func(ctx context.Context) (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)
@@ -410,6 +412,7 @@ func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *stora
 		limit = int(*csiDriver.Allocatable.Count)
 		return true, nil
 	})
+
 	if err != nil {
 		return 0, fmt.Errorf("could not get CSINode limit for driver %s: %w", driverInfo.Name, err)
 	}

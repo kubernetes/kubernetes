@@ -176,11 +176,12 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying LimitRange updating is effective")
-		err = wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second*2, time.Second*20, false, func(ctx context.Context) (bool, error) {
 			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, limitRange.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
 		})
+
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Pod with less than former min resources")
@@ -198,7 +199,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second*5, e2eservice.RespondingTimeout, false, func(ctx context.Context) (bool, error) {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 
 			if err != nil {
@@ -218,6 +219,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 			return false, nil
 		})
+
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Pod with more than former max resources")
@@ -325,7 +327,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "failed to delete the LimitRange by Collection")
 
 		ginkgo.By(fmt.Sprintf("Confirm that the limitRange %q has been deleted", lrName))
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
 		framework.ExpectNoError(err, "failed to count the required limitRanges")
 		framework.Logf("LimitRange %q has been deleted.", lrName)
 

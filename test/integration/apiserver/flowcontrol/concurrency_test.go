@@ -293,7 +293,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 		return nil, nil, err
 	}
 
-	return pl, fs, wait.Poll(time.Second, timeout, func() (bool, error) {
+	return pl, fs, wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		fs, err := c.FlowcontrolV1beta3().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -307,6 +307,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 		}
 		return false, nil
 	})
+
 }
 
 func streamRequests(parallel int, request func(), wg *sync.WaitGroup, stopCh <-chan struct{}) {

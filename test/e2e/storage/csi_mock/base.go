@@ -941,7 +941,7 @@ func anyOf(conditions ...wait.ConditionFunc) wait.ConditionFunc {
 }
 
 func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
-	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, csiPodUnschedulableTimeout, true, func(ctx context.Context) (bool, error) {
 		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -955,6 +955,7 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 		}
 		return false, nil
 	})
+
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
 	}

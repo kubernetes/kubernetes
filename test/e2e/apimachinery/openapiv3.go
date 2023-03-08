@@ -108,7 +108,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
 		var openAPISpec *spec3.OpenAPI
 		// Poll for the OpenAPI to be updated with the new CRD
-		wait.Poll(time.Second*1, wait.ForeverTestTimeout, func() (bool, error) {
+		wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			openAPISpec, err = c.GVSpec(gv)
 			if err == nil {
 				return true, nil
@@ -145,7 +145,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		gv := schema.GroupVersion{Group: "wardle.example.com", Version: "v1alpha1"}
 		var openAPISpec *spec3.OpenAPI
 		// Poll for the OpenAPI to be updated with the new aggregated apiserver.
-		wait.Poll(time.Second*1, wait.ForeverTestTimeout, func() (bool, error) {
+		wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			openAPISpec, err = c.GVSpec(gv)
 			if err == nil {
 				return true, nil

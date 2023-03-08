@@ -91,7 +91,7 @@ func waitForVSphereDisksToDetach(ctx context.Context, nodeVolumes map[string][]s
 		return true, nil
 	})
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return fmt.Errorf("volumes have not detached after %v: %v", detachTimeout, waitErr)
 		}
 		return fmt.Errorf("error waiting for volumes to detach: %v", waitErr)
@@ -132,7 +132,7 @@ func waitForVSphereDiskStatus(ctx context.Context, volumePath string, nodeName s
 		return false, nil
 	})
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return fmt.Errorf("volume %q is not %s %q after %v: %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout, waitErr)
 		}
 		return fmt.Errorf("error waiting for volume %q to be %s %q: %v", volumePath, attachedStateMsg[expectedState], nodeName, waitErr)

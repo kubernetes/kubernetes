@@ -351,12 +351,11 @@ func CreateTestingNS(ctx context.Context, baseName string, c clientset.Interface
 	}
 	// Be robust about making the namespace creation call.
 	var got *v1.Namespace
-	if err := wait.PollImmediateWithContext(ctx, Poll, 30*time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, Poll, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(ctx, namespaceObj, metav1.CreateOptions{})
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				// regenerate on conflict
 				Logf("Namespace name %q was already taken, generate a new name and retry", namespaceObj.Name)
 				namespaceObj.Name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
 			} else {
@@ -365,7 +364,11 @@ func CreateTestingNS(ctx context.Context, baseName string, c clientset.Interface
 			return false, nil
 		}
 		return true, nil
-	}); err != nil {
+	});
+
+	// regenerate on conflict
+
+	err != nil {
 		return nil, err
 	}
 

@@ -117,7 +117,7 @@ func TestClusterScopedOwners(t *testing.T) {
 	}
 
 	// wait for deletable children to go away
-	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 300*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-missing", metav1.GetOptions{})
 		switch {
 		case apierrors.IsNotFound(err):

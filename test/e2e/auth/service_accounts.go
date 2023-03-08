@@ -498,7 +498,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.Logf("pod is ready")
 
 		var logs string
-		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Minute, 20*time.Minute, false, func(ctx context.Context) (done bool, err error) {
 			framework.Logf("polling logs")
 			logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
 			if err != nil {
@@ -618,7 +618,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// Get the logs before calling ExpectNoError, so we can debug any errors.
 		var logs string
-		if err := wait.Poll(30*time.Second, 2*time.Minute, func() (done bool, err error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 30*time.Second, 2*time.Minute, false, func(ctx context.Context) (done bool, err error) {
 			framework.Logf("polling logs")
 			logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 			if err != nil {
@@ -738,7 +738,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			3. Reconciled if modified
 	*/
 	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func(ctx context.Context) {
-		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
@@ -754,7 +754,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
 		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			ginkgo.By("waiting for a new root ca configmap created")
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
@@ -779,7 +779,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			ginkgo.By("waiting for the root ca configmap reconciled")
 			cm, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
 			if err != nil {

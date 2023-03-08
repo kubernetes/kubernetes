@@ -106,7 +106,7 @@ func TestEndpointUpdates(t *testing.T) {
 
 	// Obtain ResourceVersion of the new endpoint created
 	var resVersion string
-	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
@@ -135,7 +135,7 @@ func TestEndpointUpdates(t *testing.T) {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
 
-	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc2.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
@@ -230,7 +230,7 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
 
-	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
 		if err == nil {
 			t.Errorf("expected no endpoints for externalName service, got: %v", endpoints)
@@ -238,6 +238,7 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err == nil {
 		t.Errorf("expected error waiting for endpoints")
 	}
@@ -249,7 +250,7 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		t.Fatalf("Failed to update service %s: %v", svc1.Name, err)
 	}
 
-	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		ep, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc1.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("no endpoints found, error: %v", err)
@@ -372,7 +373,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	}
 
 	// poll until associated Endpoints to the previously created Service exists
-	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
@@ -398,7 +399,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	}
 
 	// poll until endpoint for deleted Pod is no longer in Endpoints.
-	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		// Ensure that the recently deleted Pod exists but with a deletion timestamp. If the Pod does not exist,
 		// we should fail the test since it is no longer validating against a terminating pod.
 		pod, err := client.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})

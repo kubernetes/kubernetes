@@ -163,7 +163,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	lastHealth := ""
 	attempt := 0
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -351,15 +351,13 @@ func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCr
 		}
 		return
 	}
-	if err := wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		return CrdExistsInDiscovery(client, crd), nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) { return CrdExistsInDiscovery(client, crd), nil }); err != nil {
 		t.Fatalf("Failed to see %s in discovery: %v", crd.Name, err)
 	}
 }
 
 func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
-	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		crd, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -374,6 +372,7 @@ func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string)
 		}
 		return false, nil
 	})
+
 }
 
 // CrdExistsInDiscovery checks to see if the given CRD exists in discovery at all served versions.

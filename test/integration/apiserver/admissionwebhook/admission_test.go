@@ -739,7 +739,7 @@ func testResourceDelete(c *testContext) {
 	c.admissionHolder.verify(c.t)
 
 	// wait for the item to be gone
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -750,6 +750,7 @@ func testResourceDelete(c *testContext) {
 		}
 		return false, err
 	})
+
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -784,7 +785,7 @@ func testResourceDelete(c *testContext) {
 	c.admissionHolder.verify(c.t)
 
 	// wait other finalizers (e.g., crd's customresourcecleanup finalizer) to be removed.
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -799,6 +800,7 @@ func testResourceDelete(c *testContext) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -816,7 +818,7 @@ func testResourceDelete(c *testContext) {
 		return
 	}
 	// wait for the item to be gone
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -827,6 +829,7 @@ func testResourceDelete(c *testContext) {
 		}
 		return false, err
 	})
+
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -865,7 +868,7 @@ func testResourceDeletecollection(c *testContext) {
 	}
 
 	// wait for the item to be gone
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -876,6 +879,7 @@ func testResourceDeletecollection(c *testContext) {
 		}
 		return false, err
 	})
+
 	if err != nil {
 		c.t.Error(err)
 		return

@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -280,13 +281,15 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods aren't created for job")
-		framework.ExpectEqual(wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectEqual(wait.PollUntilContextTimeout(context.Background(), framework.Poll, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 			pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 			if err != nil {
 				return false, err
 			}
 			return len(pods.Items) > 0, nil
-		}), wait.ErrWaitTimeout)
+		}),
+
+			wait.ErrorInterrupted(errors.New("TODO")))
 
 		ginkgo.By("Checking Job status to observe Suspended state")
 		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
@@ -324,7 +327,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
 		ginkgo.By("Updating the job with suspend=true")
-		err = wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), framework.Poll, framework.SingleCallTimeout, true, func(ctx context.Context) (bool, error) {
 			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 			if err != nil {
 				return false, err
@@ -340,6 +343,7 @@ var _ = SIGDescribe("Job", func() {
 			}
 			return false, err
 		})
+
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods are deleted")
@@ -864,7 +868,7 @@ func waitForJobEvent(ctx context.Context, config watchEventConfig) {
 
 // waitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
 func waitForJobFailure(ctx context.Context, c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
-	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -878,4 +882,5 @@ func waitForJobFailure(ctx context.Context, c clientset.Interface, ns, jobName s
 		}
 		return false, nil
 	})
+
 }

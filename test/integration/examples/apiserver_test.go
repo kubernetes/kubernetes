@@ -165,7 +165,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 
 	// wait for the API service to be available
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.wardle.example.com", metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -211,6 +211,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,25 +259,27 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
 	var firstKubeCANames []string
-	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		firstKubeCANames, err = cert.GetClientCANamesForURL(kubeClientConfig.Host)
 		if err != nil {
 			return false, err
 		}
 		return len(firstKubeCANames) != 0, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(firstKubeCANames)
 	var firstWardleCANames []string
-	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		firstWardleCANames, err = cert.GetClientCANamesForURL(directWardleClientConfig.Host)
 		if err != nil {
 			return false, err
 		}
 		return len(firstWardleCANames) != 0, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +349,7 @@ func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConf
 	var wardleClient client.Interface
 	lastHealthContent := []byte{}
 	var lastHealthErr error
-	err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		if _, err := os.Stat(directWardleClientConfig.CAFile); os.IsNotExist(err) { // wait until the file trust is created
 			lastHealthErr = err
 			return false, nil
@@ -366,6 +369,7 @@ func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConf
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Log(string(lastHealthContent))
 		t.Log(lastHealthErr)
@@ -453,7 +457,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	}
 
 	// wait for the API service to be available
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.reject.redirect.example.com", metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -471,6 +475,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 		}
 		return available, nil
 	})
+
 	if err != nil {
 		t.Errorf("%v", err)
 	}

@@ -96,7 +96,7 @@ func cleanupCronJobs(t *testing.T, cjClient clientbatchv1.CronJobInterface, name
 }
 
 func validateJobAndPod(t *testing.T, clientSet clientset.Interface, namespace string) {
-	if err := wait.PollImmediate(1*time.Second, 120*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 120*time.Second, true, func(ctx context.Context) (bool, error) {
 		jobs, err := clientSet.BatchV1().Jobs(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list jobs: %v", err)

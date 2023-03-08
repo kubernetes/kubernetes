@@ -363,10 +363,8 @@ func createBalancedPodForNodes(ctx context.Context, f *framework.Framework, cs c
 		if err != nil {
 			framework.Logf("Failed to delete memory balanced pods: %v.", err)
 		} else {
-			err := wait.PollImmediateWithContext(ctx, 2*time.Second, time.Minute, func(ctx context.Context) (bool, error) {
-				podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.SelectorFromSet(labels.Set(balancePodLabel)).String(),
-				})
+			err := wait.PollUntilContextTimeout(ctx, 2*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
+				podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(balancePodLabel)).String()})
 				if err != nil {
 					framework.Logf("Failed to list memory balanced pods: %v.", err)
 					return false, nil
@@ -376,6 +374,7 @@ func createBalancedPodForNodes(ctx context.Context, f *framework.Framework, cs c
 				}
 				return true, nil
 			})
+
 			if err != nil {
 				framework.Logf("Failed to wait until all memory balanced pods are deleted: %v.", err)
 			}

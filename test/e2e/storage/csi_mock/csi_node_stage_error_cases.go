@@ -185,7 +185,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
-				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, csiUnstageWaitTimeout, false, func(ctx context.Context) (done bool, err error) {
 					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
@@ -200,6 +200,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 					}
 					return false, nil
 				})
+
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}
@@ -307,7 +308,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				framework.ExpectNoError(err, "while deleting the second pod")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
-				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, csiUnstageWaitTimeout, false, func(ctx context.Context) (done bool, err error) {
 					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
@@ -322,6 +323,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 					}
 					return false, nil
 				})
+
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}

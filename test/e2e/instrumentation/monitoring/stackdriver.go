@@ -111,7 +111,7 @@ func testStackdriverMonitoring(ctx context.Context, f *framework.Framework, pods
 
 	metricsMap := map[string]bool{}
 	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
-	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
+	err = wait.PollUntilContextTimeout(context.Background(), pollFrequency, pollTimeout, false, pollingFunction)
 	if err != nil {
 		framework.Logf("Missing metrics: %+v\n", metricsMap)
 	}

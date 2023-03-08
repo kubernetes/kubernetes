@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
 	var attachLimit int32
 
-	waitErr := wait.PollImmediate(10*time.Second, csiNodeLimitUpdateTimeout, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, csiNodeLimitUpdateTimeout, true, func(ctx context.Context) (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -140,6 +140,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 		}
 		return false, nil
 	})
+
 	if waitErr != nil {
 		return 0, fmt.Errorf("error waiting for non-zero volume limit of driver %s on node %s: %v", driverName, nodeName, waitErr)
 	}

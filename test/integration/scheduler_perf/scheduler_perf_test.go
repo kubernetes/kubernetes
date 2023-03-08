@@ -1072,7 +1072,7 @@ func createPods(ctx context.Context, b *testing.B, namespace string, cpo *create
 // namespace are scheduled. Times out after 10 minutes because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
 func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
-	return wait.PollImmediate(1*time.Second, 10*time.Minute, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return true, ctx.Err()
@@ -1089,6 +1089,7 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInf
 		b.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
 		return false, nil
 	})
+
 }
 
 // waitUntilPodsScheduled blocks until the all pods in the given namespaces are

@@ -630,13 +630,14 @@ func TestListResourceVersion0(t *testing.T) {
 
 			if tc.watchCacheEnabled {
 				// poll until the watch cache has the full list in memory
-				err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+				err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 					list, err := clientSet.AppsV1().ReplicaSets(ns.Name).List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
 					if err != nil {
 						return false, err
 					}
 					return len(list.Items) == 10, nil
 				})
+
 				if err != nil {
 					t.Fatalf("error waiting for watch cache to observe the full list: %v", err)
 				}

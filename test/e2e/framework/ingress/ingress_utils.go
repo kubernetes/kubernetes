@@ -196,7 +196,7 @@ func SimpleGET(ctx context.Context, c *http.Client, url, host string) (string, e
 // expectUnreachable is true, it breaks on first non-healthy http code instead.
 func PollURL(ctx context.Context, route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
 	var lastBody string
-	pollErr := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		lastBody, err = SimpleGET(ctx, httpClient, route, host)
 		if err != nil {
@@ -206,6 +206,7 @@ func PollURL(ctx context.Context, route, host string, timeout time.Duration, int
 		framework.Logf("host %v path %v: reached", host, route)
 		return !expectUnreachable, nil
 	})
+
 	if pollErr != nil {
 		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
 			timeout, route, host, lastBody, pollErr)
@@ -733,7 +734,7 @@ func getIngressAddress(ctx context.Context, client clientset.Interface, ns, name
 // WaitForIngressAddress waits for the Ingress to acquire an address.
 func (j *TestJig) WaitForIngressAddress(ctx context.Context, c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
-	err := wait.PollImmediateWithContext(ctx, 10*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		ipOrNameList, err := getIngressAddress(ctx, c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %s/%s to acquire IP, error: %v, ipOrNameList: %v", ns, ingName, err, ipOrNameList)
@@ -743,6 +744,7 @@ func (j *TestJig) WaitForIngressAddress(ctx context.Context, c clientset.Interfa
 		j.Logger.Infof("Found address %s for ingress %s/%s", address, ns, ingName)
 		return true, nil
 	})
+
 	return address, err
 }
 
@@ -889,15 +891,14 @@ func getPortURL(ctx context.Context, client clientset.Interface, ns, name string
 	// unschedulable, since control plane nodes don't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
-	if wait.PollImmediateWithContext(ctx, poll, framework.SingleCallTimeout, func(ctx context.Context) (bool, error) {
-		nodes, err = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector().String()})
+	if wait.PollUntilContextTimeout(ctx, poll, framework.SingleCallTimeout, true, func(ctx context.Context) (bool, error) {
+		nodes, err = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if err != nil {
 			return false, err
 		}
 		return true, nil
-	}) != nil {
+	}) !=
+		nil {
 		return "", err
 	}
 	if len(nodes.Items) == 0 {

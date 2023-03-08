@@ -170,7 +170,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 
 func waitForDeploymentToRecreatePod(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
-	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 		if err != nil {
 			return false, fmt.Errorf("failed to get pods for deployment: %w", err)
@@ -186,6 +186,7 @@ func waitForDeploymentToRecreatePod(ctx context.Context, client clientset.Interf
 		}
 		return false, nil
 	})
+
 	if waitErr != nil {
 		return runningPod, fmt.Errorf("error waiting for recreated pod: %v", waitErr)
 	}

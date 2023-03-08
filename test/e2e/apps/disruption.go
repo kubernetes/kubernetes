@@ -146,13 +146,14 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
-		err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 			pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, defaultName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return pdb.Status.DisruptionsAllowed > 0, nil
 		})
+
 		framework.ExpectNoError(err)
 	})
 
@@ -329,13 +330,14 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
-				err = wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 					err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
 					if err != nil {
 						return false, nil
 					}
 					return true, nil
 				})
+
 				framework.ExpectNoError(err)
 			}
 		})
@@ -519,7 +521,7 @@ func deletePDBCollection(ctx context.Context, cs kubernetes.Interface, ns string
 
 func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -529,6 +531,7 @@ func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interfac
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Waiting for the PDB collection to be deleted in namespace %s", ns)
 }
 
@@ -558,7 +561,7 @@ func createPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n 
 
 func waitForPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n int) {
 	ginkgo.By("Waiting for all pods to be running")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
@@ -583,6 +586,7 @@ func waitForPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
 }
 
@@ -624,12 +628,11 @@ func createReplicaSetOrDie(ctx context.Context, cs kubernetes.Interface, ns stri
 
 func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (pod *v1.Pod, err error) {
 	ginkgo.By("locating a running pod")
-	err = wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-
 		for i := range podList.Items {
 			p := podList.Items[i]
 			if podutil.IsPodReady(&p) && p.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -637,15 +640,15 @@ func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (
 				return true, nil
 			}
 		}
-
 		return false, nil
 	})
+
 	return pod, err
 }
 
 func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be processed")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -655,27 +658,31 @@ func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns st
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Waiting for the pdb to be processed in namespace %s", ns)
 }
 
 func waitForPdbToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			return true, nil // done
+			return true, nil
 		}
 		if err != nil {
 			return false, err
 		}
 		return false, nil
 	})
+
+	// done
+
 	framework.ExpectNoError(err, "Waiting for the pdb to be deleted in namespace %s", ns)
 }
 
 func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface, ns string, healthyCount int32) {
 	ginkgo.By("Waiting for the pdb to observed all healthy pods")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, wait.ForeverTestTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, "foo", metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -685,6 +692,7 @@ func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Waiting for the pdb in namespace %s to observed %d healthy pods", ns, healthyCount)
 }
 

@@ -72,7 +72,7 @@ func TestEventCompatibility(t *testing.T) {
 	newRecorder := newBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
-	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 20*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		v1Events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -92,6 +92,7 @@ func TestEventCompatibility(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

@@ -132,7 +132,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Wait until it is established
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -203,7 +203,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Make sure the CRD deletion succeeds
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -295,7 +295,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Wait until it is established
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -354,7 +354,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Make sure the CRD deletion succeeds
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil

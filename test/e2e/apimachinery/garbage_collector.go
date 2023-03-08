@@ -322,7 +322,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create some pods
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 			pods, err := podClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list pods: %w", err)
@@ -335,7 +335,6 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return true, nil
 			}
 			return false, nil
-
 		}); err != nil {
 			framework.Failf("failed to wait for the rc to create some pods: %v", err)
 		}
@@ -502,14 +501,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %w", err)
 			}
 			return len(rsList.Items) > 0, nil
-
 		})
+
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
@@ -521,10 +520,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for all rs to be garbage collected")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, true, func(ctx context.Context) (bool, error) {
 			objects := map[string]int{"Deployments": 0, "ReplicaSets": 0, "Pods": 0}
 			return verifyRemainingObjects(ctx, f, objects)
 		})
+
 		if err != nil {
 			errList := make([]error, 0)
 			errList = append(errList, err)
@@ -562,7 +562,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
 		var replicaset appsv1.ReplicaSet
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %w", err)
@@ -572,14 +572,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return true, nil
 			}
 			return false, nil
-
 		})
+
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		desiredGeneration := replicaset.Generation
-		if err := wait.PollImmediateWithContext(ctx, 100*time.Millisecond, 60*time.Second, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 			newRS, err := clientSet.AppsV1().ReplicaSets(replicaset.Namespace).Get(ctx, replicaset.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -596,13 +596,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, true, func(ctx context.Context) (bool, error) {
 			dList, err := deployClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %w", err)
 			}
 			return len(dList.Items) == 0, nil
 		})
+
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to be deleted: %v", err)
 		}
@@ -1005,7 +1006,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		// Wait for the canary foreground finalization to complete, which means GC is aware of our new custom resource type
 		var lastCanary *unstructured.Unstructured
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, 3*time.Minute, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			lastCanary, err = resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		}); err != nil {
@@ -1137,7 +1138,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
 			_, err := resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
 			return false, err
-		}); err != nil && err != wait.ErrWaitTimeout {
+		}); err != nil && !wait.Interrupted(err) {
 			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
 		}
 	})
@@ -1150,13 +1151,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 2*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list jobs: %w", err)
 			}
 			return len(jobs.Items) > 0, nil
 		})
+
 		if err != nil {
 			framework.Failf("Failed to wait for the CronJob to create some Jobs: %v", err)
 		}
@@ -1166,10 +1168,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to delete the CronJob: %v", err)
 		}
 		ginkgo.By("Verify if cronjob does not leave jobs nor pods behind")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			objects := map[string]int{"CronJobs": 0, "Jobs": 0, "Pods": 0}
 			return verifyRemainingObjects(ctx, f, objects)
 		})
+
 		if err != nil {
 			framework.Failf("Failed to wait for all jobs and pods to be deleted: %v", err)
 		}

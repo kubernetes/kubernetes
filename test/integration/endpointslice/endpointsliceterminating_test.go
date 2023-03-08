@@ -204,7 +204,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			}
 
 			// first check that endpoints are included, test should always have 1 initial endpoint
-			err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discovery.LabelServiceName + "=" + svc.Name,
 				})
@@ -228,6 +228,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 
 				return false, nil
 			})
+
 			if err != nil {
 				t.Errorf("Error waiting for endpoint slices: %v", err)
 			}
@@ -241,7 +242,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			// Validate that terminating the endpoint will result in the expected endpoints in EndpointSlice.
 			// Use a stricter timeout value here since we should try to catch regressions in the time it takes to remove terminated endpoints.
 			var endpoints []discovery.Endpoint
-			err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discovery.LabelServiceName + "=" + svc.Name,
 				})
@@ -273,6 +274,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 
 				return true, nil
 			})
+
 			if err != nil {
 				t.Logf("actual endpoints: %v", endpoints)
 				t.Logf("expected endpoints: %v", testcase.expectedEndpoints)

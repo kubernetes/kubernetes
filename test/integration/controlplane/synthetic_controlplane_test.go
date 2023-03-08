@@ -94,7 +94,7 @@ func TestKubernetesService(t *testing.T) {
 	defer server.TearDownFn()
 
 	coreClient := clientset.NewForConfigOrDie(server.ClientConfig)
-	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
@@ -102,6 +102,7 @@ func TestKubernetesService(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Expected kubernetes service to exist, got: %v", err)
 	}
@@ -665,7 +666,7 @@ func TestAPIServerService(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(server.ClientConfig)
 
-	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -690,6 +691,7 @@ func TestAPIServerService(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -721,7 +723,7 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err

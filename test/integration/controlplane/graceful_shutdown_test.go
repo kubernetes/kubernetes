@@ -17,6 +17,7 @@ limitations under the License.
 package controlplane
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"sync"
@@ -80,7 +81,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}()
 
 	t.Logf("server should fail new requests")
-	if err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		resp, err := client.Get(server.ClientConfig.Host + "/")
 		if err != nil {
 			return true, nil

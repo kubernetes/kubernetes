@@ -188,7 +188,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 	}
 
 	var tracker affinityTracker
-	if pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		hosts := getHosts()
 		for _, host := range hosts {
 			if len(host) > 0 {
@@ -210,7 +210,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 		return false, nil
 	}); pollErr != nil {
 		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
-		if pollErr != wait.ErrWaitTimeout {
+		if !wait.Interrupted(pollErr) {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
 		}
@@ -435,7 +435,7 @@ func testNotReachableHTTP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
@@ -450,7 +450,7 @@ func testRejectedHTTP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
@@ -598,7 +598,7 @@ func testReachableUDP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
@@ -612,7 +612,7 @@ func testNotReachableUDP(host string, port int, timeout time.Duration) {
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
@@ -626,7 +626,7 @@ func testRejectedUDP(host string, port int, timeout time.Duration) {
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
@@ -646,7 +646,7 @@ func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout 
 		return false, nil
 	}
 
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
 	}
 	return nil
@@ -700,7 +700,7 @@ func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e
 		}
 		return count >= threshold, nil
 	}
-	err := wait.PollImmediate(time.Second, timeout, pollFn)
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, pollFn)
 	if err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v:%v/healthz, got %d", threshold, expectSucceed, host, port, count)
 	}
@@ -1174,7 +1174,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the service " + serviceName + " in namespace " + ns + " to disappear")
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.RespondingTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.RespondingTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -1729,7 +1729,7 @@ var _ = common.SIGDescribe("Services", func() {
 		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
@@ -1822,7 +1822,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execPodName := execPod.Name
 		cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		var stdout string
-		if pollErr := wait.PollImmediateWithContext(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -1845,7 +1845,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("Check if pod is unreachable")
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -1865,7 +1865,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("Check if terminating pod is available through service")
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -2121,7 +2121,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// Wait the change has been propagated and the service start to fail
 		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			if err != nil {
 				return true, nil
@@ -2357,7 +2357,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
@@ -2413,7 +2413,7 @@ var _ = common.SIGDescribe("Services", func() {
 			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 		})
 
-		if epErr := wait.PollImmediate(framework.Poll, e2eservice.ServiceEndpointsTimeout, func() (bool, error) {
+		if epErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.ServiceEndpointsTimeout, true, func(ctx context.Context) (bool, error) {
 			endpoints, err := cs.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error fetching '%s/%s' Endpoints: %s", namespace, serviceName, err.Error())
@@ -2448,7 +2448,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v expected to be refused", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
@@ -2753,7 +2753,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodeIPs := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
 		healthCheckNodePortAddr := net.JoinHostPort(nodeIPs[0], strconv.Itoa(int(svc.Spec.HealthCheckNodePort)))
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
-		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
@@ -2766,6 +2766,7 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err)
 
 		// webserver should continue to serve traffic through the Service after deletion, even though the health check node port should return 503
@@ -2774,7 +2775,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		// validate that the health check node port from kube-proxy returns 503 when there are no ready endpoints
-		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
@@ -2787,6 +2788,7 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err)
 
 		// also verify that while health check node port indicates 0 endpoints and returns 503, the endpoint still serves traffic.
@@ -4115,7 +4117,7 @@ func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name
 // checkReachabilityFromPod checks reachability from the specified pod.
 func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
@@ -4128,6 +4130,7 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err)
 }
 
@@ -4198,7 +4201,7 @@ func validateEndpointsPortsOrFail(ctx context.Context, c clientset.Interface, na
 		pollErr error
 		i       = 0
 	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
+	if pollErr = wait.PollUntilContextTimeout(context.Background(), time.Second, framework.ServiceStartTimeout, true, func(ctx context.Context) (bool, error) {
 		i++
 
 		ep, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
@@ -4291,7 +4294,7 @@ func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace,
 		pollErr error
 		i       = 0
 	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
+	if pollErr = wait.PollUntilContextTimeout(context.Background(), time.Second, framework.ServiceStartTimeout, true, func(ctx context.Context) (bool, error) {
 		i++
 
 		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})

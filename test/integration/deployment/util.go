@@ -196,7 +196,7 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ns := d.deployment.Namespace
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		// We're done when the deployment is complete
 		if completed, err := d.deploymentComplete(); err != nil {
 			return false, err
@@ -221,6 +221,7 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		d.t.Errorf("failed to mark updated Deployment pods to ready: %v", err)
 	}
@@ -402,7 +403,7 @@ func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
 
 // waitForReadyReplicas waits for number of ready replicas to equal number of replicas.
 func (d *deploymentTester) waitForReadyReplicas() error {
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
@@ -416,7 +417,7 @@ func (d *deploymentTester) waitForReadyReplicas() error {
 
 // markUpdatedPodsReadyWithoutComplete marks updated Deployment pods as ready without waiting for deployment to complete.
 func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := d.listUpdatedPods()
 		if err != nil {
 			return false, err

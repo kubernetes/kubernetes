@@ -239,7 +239,7 @@ func TestStorageVersionBootstrap(t *testing.T) {
 	t.Run("after storage version manager complete", func(t *testing.T) {
 		// wait until healthz endpoint returns ok
 		client := clientset.NewForConfigOrDie(cfg)
-		err := wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 			result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 			status := 0
 			result.StatusCode(&status)
@@ -248,6 +248,7 @@ func TestStorageVersionBootstrap(t *testing.T) {
 			}
 			return false, nil
 		})
+
 		if err != nil {
 			t.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}

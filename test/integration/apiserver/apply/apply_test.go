@@ -662,7 +662,7 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 
 	// Should be able to update a small object to be near the object size limit.
 	var updateErr error
-	pollErr := wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		updateCfg, err := client.CoreV1().ConfigMaps(cfg.Namespace).Get(context.TODO(), cfg.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -680,7 +680,8 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(pollErr) {
 		t.Errorf("unable to update configMap: %v", updateErr)
 	}
 

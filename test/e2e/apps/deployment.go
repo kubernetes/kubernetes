@@ -695,7 +695,7 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	gomega.Expect(rss.Items).Should(gomega.HaveLen(0))
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
-	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		pods, err = c.CoreV1().Pods(ns).List(ctx, options)
 		if err != nil {
 			return false, err
@@ -1551,7 +1551,7 @@ func watchRecreateDeployment(ctx context.Context, c clientset.Interface, d *apps
 	ctxUntil, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_, err := watchtools.Until(ctxUntil, d.ResourceVersion, w, condition)
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
 	}
 	return err
@@ -1562,7 +1562,7 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 	var oldRSs []*appsv1.ReplicaSet
 	var d *appsv1.Deployment
 
-	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), poll, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1575,7 +1575,8 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 		}
 		return len(oldRSs) == desiredRSNum, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
 		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
 	}
@@ -1585,14 +1586,15 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 // waitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
 func waitForReplicaSetDesiredReplicas(ctx context.Context, rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, framework.PollShortTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
 	})
-	if err == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
 	}
 	return err
@@ -1601,14 +1603,15 @@ func waitForReplicaSetDesiredReplicas(ctx context.Context, rsClient appsclient.R
 // waitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
 func waitForReplicaSetTargetSpecReplicas(ctx context.Context, c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, framework.PollShortTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
 	})
-	if err == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
 	}
 	return err

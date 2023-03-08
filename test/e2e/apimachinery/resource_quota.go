@@ -1184,20 +1184,18 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		})
 		framework.ExpectNoError(err, "failed to locate ResourceQuota %q in namespace %q", patchedResourceQuota.Name, ns)
 
-		err = wait.PollImmediateWithContext(ctx, 5*time.Second, 5*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 			resourceQuotaResult, err := rqClient.Get(ctx, rqName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-
 			if apiequality.Semantic.DeepEqual(resourceQuotaResult.Spec.Hard.Cpu(), resourceQuotaResult.Status.Hard.Cpu()) {
 				framework.ExpectEqual(*resourceQuotaResult.Status.Hard.Cpu(), resource.MustParse("1"), "Hard cpu value for ResourceQuota %q is %s not 1.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
 				framework.ExpectEqual(*resourceQuotaResult.Status.Hard.Memory(), resource.MustParse("1Gi"), "Hard memory value for ResourceQuota %q is %s not 1Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
 				framework.Logf("ResourceQuota %q Spec was unchanged and /status reset", resourceQuotaResult.Name)
-
 				return true, nil
 			}
-
 			return false, nil
 		})
+
 		framework.ExpectNoError(err)
 	})
 })

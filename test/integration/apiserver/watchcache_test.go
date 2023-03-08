@@ -75,7 +75,7 @@ func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) 
 	// waiting for post start hooks, so we just wait for default service to exist.
 	// TODO(wojtek-t): Figure out less fragile way.
 	ctx := context.Background()
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		_, err := clientSet.CoreV1().Services("default").Get(ctx, "kubernetes", metav1.GetOptions{})
 		return err == nil, nil
 	}); err != nil {
@@ -117,7 +117,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 	// Wait until listing from cache returns resource version of corresponding
 	// resources (being the last updates).
 	t.Logf("Waiting for configmaps watchcache synced to %s", cm.ResourceVersion)
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		res, err := c.CoreV1().ConfigMaps("default").List(ctx, listOptions)
 		if err != nil {
 			return false, nil
@@ -127,7 +127,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 		t.Errorf("Failed to wait for configmaps watchcache synced: %v", err)
 	}
 	t.Logf("Waiting for events watchcache synced to %s", ev.ResourceVersion)
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		res, err := c.CoreV1().Events("default").List(ctx, listOptions)
 		if err != nil {
 			return false, nil
@@ -145,7 +145,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 	}
 
 	t.Logf("Waiting for configmaps watchcache synced to %s", se.ResourceVersion)
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		res, err := c.CoreV1().ConfigMaps("default").List(ctx, listOptions)
 		if err != nil {
 			return false, nil
@@ -155,13 +155,13 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 		t.Errorf("Failed to wait for configmaps watchcache synced: %v", err)
 	}
 	t.Logf("Waiting for events watchcache NOT synced to %s", se.ResourceVersion)
-	if err := wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 		res, err := c.CoreV1().Events("default").List(ctx, listOptions)
 		if err != nil {
 			return false, nil
 		}
 		return res.ResourceVersion == se.ResourceVersion, nil
-	}); err == nil || err != wait.ErrWaitTimeout {
+	}); err == nil || !wait.Interrupted(err) {
 		t.Errorf("Events watchcache unexpected synced: %v", err)
 	}
 }

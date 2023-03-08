@@ -185,7 +185,7 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 	kubeAPIServerClientConfig.ServerName = ""
 
 	// wait for health
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -217,6 +217,7 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}

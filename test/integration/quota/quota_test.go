@@ -174,7 +174,7 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 
 // waitForUsedResourceQuota polls a ResourceQuota status for an expected used value
 func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
-	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -200,6 +200,7 @@ func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Errorf("error waiting or ResourceQuota status: %v", err)
 	}
@@ -382,13 +383,14 @@ plugins:
 	waitForQuota(t, quota, clientset)
 
 	// attempt to create a new pod once the quota is propagated
-	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
 		if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
 			return true, nil
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -558,7 +560,7 @@ plugins:
 
 // testServiceForbidden attempts to create a Service expecting 403 Forbidden due to resource quota limits being exceeded.
 func testServiceForbidden(clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
-	pollErr := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := clientset.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 		if apierrors.IsForbidden(err) {
 			return true, nil
@@ -569,8 +571,8 @@ func testServiceForbidden(clientset clientset.Interface, namespace string, servi
 		}
 
 		return false, nil
-
 	})
+
 	if pollErr != nil {
 		t.Errorf("creating Service should return Forbidden due to resource quota limits but got: %v", pollErr)
 	}

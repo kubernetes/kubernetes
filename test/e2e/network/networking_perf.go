@@ -169,7 +169,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 
 		// Make sure the server is ready to go
 		framework.Logf("waiting for iperf2 server endpoints")
-		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 2*time.Second, largeClusterTimeout, false, func(ctx context.Context) (done bool, err error) {
 			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serverServiceName)}
 			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, listOptions)
 			framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
@@ -180,6 +180,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "unable to wait for endpoints for the iperf service")
 		framework.Logf("found iperf2 server endpoints")
 
@@ -189,7 +190,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 
 		framework.Logf("waiting for client pods to be running")
 		var clientPodList *v1.PodList
-		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 2*time.Second, largeClusterTimeout, false, func(ctx context.Context) (done bool, err error) {
 			clientPodList, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, clientPodsListOptions)
 			if err != nil {
 				return false, err
@@ -204,6 +205,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "unable to wait for client pods to come up")
 		framework.Logf("all client pods are ready: %d pods", len(clientPodList.Items))
 

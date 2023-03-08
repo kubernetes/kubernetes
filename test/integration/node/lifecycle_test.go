@@ -160,7 +160,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Errorf("Failed to taint node in test %s <%s>, err: %v", name, nodes[nodeIndex].Name, err)
 			}
 
-			err = wait.PollImmediate(time.Second, time.Second*20, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*20, true, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
 			if err != nil {
 				t.Fatalf("Error %q in test %q when waiting for terminating pod: %q", err, name, klog.KObj(testPod))
 			}
@@ -352,7 +352,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			if test.pod != nil {
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*15, true, func(ctx context.Context) (bool, error) {
 					pod, err := cs.CoreV1().Pods(test.pod.Namespace).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
@@ -367,6 +367,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					}
 					return false, nil
 				})
+
 				if err != nil {
 					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
 					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.expectedWaitForPodCondition, pod)

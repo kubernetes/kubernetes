@@ -52,7 +52,7 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	defer tearDownFn()
 
 	// verify client is working
-	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
@@ -141,7 +141,7 @@ func TestServiceCIDR28bits(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			return false, err

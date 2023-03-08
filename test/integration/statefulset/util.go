@@ -233,7 +233,7 @@ func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.
 func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.StatefulSet) {
 	stsClient := clientSet.AppsV1().StatefulSets(sts.Namespace)
 	desiredGeneration := sts.Generation
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

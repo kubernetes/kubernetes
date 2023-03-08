@@ -172,7 +172,7 @@ func waitForPodToFailover(ctx context.Context, client clientset.Interface, deplo
 	})
 
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return "", fmt.Errorf("pod has not failed over after %v: %v", timeout, waitErr)
 		}
 		return "", fmt.Errorf("pod did not fail over from %q: %v", oldNode, waitErr)

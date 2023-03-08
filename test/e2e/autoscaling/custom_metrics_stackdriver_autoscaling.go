@@ -599,15 +599,18 @@ func hpa(name, namespace, deploymentName string, minReplicas, maxReplicas int32,
 
 func waitForReplicas(ctx context.Context, deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
-		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
+		return replicas == desiredReplicas, nil
 	})
+
+	// Expected number of replicas found. Exit.
+
 	if err != nil {
 		framework.Failf("Timeout waiting %v for %v replicas", timeout, desiredReplicas)
 	}
@@ -615,7 +618,7 @@ func waitForReplicas(ctx context.Context, deploymentName, namespace string, cs c
 
 func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace string, cs clientset.Interface, minDesiredReplicas, maxDesiredReplicas int, timeout time.Duration) {
 	interval := 60 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
@@ -627,11 +630,14 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 		} else if replicas > maxDesiredReplicas {
 			return false, fmt.Errorf("number of replicas above target")
 		} else {
-			return false, nil // Expected number of replicas found. Continue polling until timeout.
+			return false, nil
 		}
 	})
+
+	// Expected number of replicas found. Continue polling until timeout.
+
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		framework.Logf("Number of replicas was stable over %v", timeout)
 		return
 	}

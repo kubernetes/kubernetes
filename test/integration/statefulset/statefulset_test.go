@@ -156,7 +156,7 @@ func TestSpecReplicasChange(t *testing.T) {
 		t.Fatalf("failed to verify .Generation has incremented for sts %s", sts.Name)
 	}
 
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -205,7 +205,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 		pod.Status.Phase = v1.PodFailed
 	})
 
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		// Verify only 2 pods exist: deleting pod and new pod replacing failed pod
 		pods = getPods(t, podClient, labelMap)
 		if len(pods.Items) != 2 {
@@ -231,7 +231,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 		pod.Finalizers = []string{}
 	})
 
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		// Verify only 2 pods exist: new non-deleting pod replacing deleting pod and the non-failed pod
 		pods = getPods(t, podClient, labelMap)
 		if len(pods.Items) != 2 {
@@ -297,7 +297,7 @@ func TestStatefulSetAvailable(t *testing.T) {
 			setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
 
 			stsClient := c.AppsV1().StatefulSets(ns.Name)
-			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 				newSts, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -314,7 +314,7 @@ func TestStatefulSetAvailable(t *testing.T) {
 func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1.PodList, conditionStatus v1.ConditionStatus, lastTransitionTime time.Time) {
 	replicas := int32(len(pods.Items))
 	var readyPods int32
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		readyPods = 0
 		for i := range pods.Items {
 			pod := &pods.Items[i]
@@ -344,6 +344,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 		}
 		return readyPods >= replicas, nil
 	})
+
 	if err != nil {
 		t.Fatalf("failed to mark all StatefulSet pods to ready: %v", err)
 	}
@@ -389,7 +390,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 
 	wantReplicas := limitedPodNumber
 	var gotReplicas int32
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

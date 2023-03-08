@@ -116,7 +116,7 @@ func testPreStop(ctx context.Context, c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, fmt.Sprintf("deleting pod: %s", preStopDescr.Name))
 
 	// Validate that the server received the web poke.
-	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second*5, time.Second*60, false, func(ctx context.Context) (bool, error) {
 
 		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 		defer cancel()
@@ -150,6 +150,7 @@ func testPreStop(ctx context.Context, c clientset.Interface, ns string) {
 		}
 		return false, nil
 	})
+
 	framework.ExpectNoError(err, "validating pre-stop.")
 }
 
@@ -196,7 +197,7 @@ var _ = SIGDescribe("PreStop", func() {
 
 		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
-		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second*5, time.Second*60, false, func(ctx context.Context) (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(ctx, f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
 			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)

@@ -53,7 +53,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -281,7 +281,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -496,7 +496,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -760,7 +760,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -771,7 +771,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	}
 
 	// verify client is working
-	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
@@ -978,7 +978,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1081,7 +1081,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1162,7 +1162,7 @@ func TestPreferDualStack(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1235,7 +1235,7 @@ func TestServiceUpdate(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1397,7 +1397,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	})
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1456,7 +1456,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1491,7 +1491,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	})
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -1546,7 +1546,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err

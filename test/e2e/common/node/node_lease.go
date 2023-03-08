@@ -136,7 +136,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			// (the same as nodeMonitorGracePeriod), or it doesn't change for at least leaseDuration
 			lastHeartbeatTime, lastStatus := getHeartbeatTimeAndStatus(ctx, f.ClientSet, nodeName)
 			lastObserved := time.Now()
-			err = wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 				currentHeartbeatTime, currentStatus := getHeartbeatTimeAndStatus(ctx, f.ClientSet, nodeName)
 				currentObserved := time.Now()
 
@@ -169,8 +169,9 @@ var _ = SIGDescribe("NodeLease", func() {
 				// heartbeat time changed, with no other status changes, in less time than we expected, so fail.
 				return false, fmt.Errorf("node status heartbeat changed in %s (with no other status changes), was waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
 			})
+
 			// a timeout is acceptable, since it means we waited 5 minutes and didn't see any unwarranted node status updates
-			if err != nil && err != wait.ErrWaitTimeout {
+			if err != nil && !wait.Interrupted(err) {
 				framework.ExpectNoError(err, "error waiting for infrequent nodestatus update")
 			}
 

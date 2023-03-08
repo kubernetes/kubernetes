@@ -108,7 +108,7 @@ func TestWatchBasedManager(t *testing.T) {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
 				store.AddReference(testNamespace, name)
-				err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
+				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 					obj, err := store.Get(testNamespace, name)
 					if err != nil {
 						t.Logf("failed on %s, retrying: %v", name, err)
@@ -119,6 +119,7 @@ func TestWatchBasedManager(t *testing.T) {
 					}
 					return true, nil
 				})
+
 				if err != nil {
 					select {
 					case errCh <- fmt.Errorf("failed on :%s: %v", name, err):

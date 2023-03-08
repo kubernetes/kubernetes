@@ -125,7 +125,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		}()
 
 		framework.Logf("approving CSR")
-		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			csr.Status.Conditions = []certificatesv1.CertificateSigningRequestCondition{
 				{
 					Type:    certificatesv1.CertificateApproved,
@@ -144,7 +144,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		}))
 
 		framework.Logf("waiting for CSR to be signed")
-		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			csr, err = csrClient.Get(ctx, csr.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting csr: %v", err)

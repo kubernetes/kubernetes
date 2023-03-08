@@ -63,13 +63,14 @@ func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testing.TB)
 func waitListAllNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
+	if wait.PollUntilContextTimeout(context.Background(), poll, singleCallTimeout, true, func(ctx context.Context) (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
 		return true, nil
-	}) != nil {
+	}) !=
+		nil {
 		return nodes, err
 	}
 	return nodes, nil

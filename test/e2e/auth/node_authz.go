@@ -170,7 +170,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		ginkgo.By("The node should able to access the secret")
 		itv := framework.Poll
 		dur := 1 * time.Minute
-		err = wait.Poll(itv, dur, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), itv, dur, false, func(ctx context.Context) (bool, error) {
 			_, err = c.CoreV1().Secrets(ns).Get(ctx, secret.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Failed to get secret %v, err: %v", secret.Name, err)
@@ -178,6 +178,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			}
 			return true, nil
 		})
+
 		framework.ExpectNoError(err, "failed to get secret after trying every %v for %v (%s:%s)", itv, dur, ns, secret.Name)
 	})
 

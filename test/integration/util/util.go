@@ -224,8 +224,7 @@ func CleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 		}
 	}
 	for _, p := range pods {
-		if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout,
-			PodDeleted(cs, p.Namespace, p.Name)); err != nil {
+		if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, false, PodDeleted(cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}
 	}
@@ -262,7 +261,7 @@ func RemoveTaintOffNode(cs clientset.Interface, nodeName string, taint v1.Taint)
 // WaitForNodeTaints waits for a node to have the target taints and returns
 // an error if it does not have taints within the given timeout.
 func WaitForNodeTaints(cs clientset.Interface, node *v1.Node, taints []v1.Taint) error {
-	return wait.Poll(100*time.Millisecond, 30*time.Second, NodeTainted(cs, node.Name, taints))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, false, NodeTainted(cs, node.Name, taints))
 }
 
 // NodeTainted return a condition function that returns true if the given node contains
@@ -366,7 +365,7 @@ func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}
 
-	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, schedulerCacheIsEmpty); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, false, schedulerCacheIsEmpty); err != nil {
 		t.Errorf("Failed to wait for scheduler cache cleanup: %v", err)
 	}
 }
@@ -428,7 +427,7 @@ func InitTestSchedulerWithOptions(
 // WaitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.
 func WaitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, PodScheduled(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, PodScheduled(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPodToSchedule waits for a pod to get scheduled and returns an error if
@@ -523,7 +522,7 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 func WaitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
 	var nodes []*v1.Node
-	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		n, err := nodeLister.Get(key)
 
 		switch {
@@ -539,6 +538,7 @@ func WaitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 
 		return false, nil
 	})
+
 	if err != nil {
 		t.Logf("Logging consecutive node versions received from store:")
 		for i, n := range nodes {
@@ -583,9 +583,8 @@ func CreateAndWaitForNodesInCache(testCtx *TestContext, prefix string, wrapper *
 // WaitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
 // within 30 seconds; otherwise returns false.
 func WaitForNodesInCache(sched *scheduler.Scheduler, nodeCount int) error {
-	err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		return sched.Cache.NodeCount() >= nodeCount, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) { return sched.Cache.NodeCount() >= nodeCount, nil })
+
 	if err != nil {
 		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %v", err)
 	}
@@ -828,7 +827,7 @@ func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wai
 // WaitForPodUnschedulableWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
 func WaitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, PodUnschedulable(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, PodUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPodUnschedulable waits for a pod to fail scheduling and returns
@@ -840,13 +839,13 @@ func WaitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 // WaitForPodSchedulingGated waits for a pod to be in scheduling gated state
 // and returns an error if it does not fall into this state within the given timeout.
 func WaitForPodSchedulingGated(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, PodSchedulingGated(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, PodSchedulingGated(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
 func WaitForPDBsStable(testCtx *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
-	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -870,11 +869,12 @@ func WaitForPDBsStable(testCtx *TestContext, pdbs []*policy.PodDisruptionBudget,
 		}
 		return true, nil
 	})
+
 }
 
 // WaitCachedPodsStable waits until scheduler cache has the given pods.
 func WaitCachedPodsStable(testCtx *TestContext, pods []*v1.Pod) error {
-	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		cachedPods, err := testCtx.Scheduler.Cache.PodCount()
 		if err != nil {
 			return false, err
@@ -894,6 +894,7 @@ func WaitCachedPodsStable(testCtx *TestContext, pods []*v1.Pod) error {
 		}
 		return true, nil
 	})
+
 }
 
 // DeletePod deletes the given pod in the given namespace.

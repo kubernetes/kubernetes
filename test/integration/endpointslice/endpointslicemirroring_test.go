@@ -271,7 +271,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}
 			}
 
-			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + resourceName
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
@@ -300,6 +300,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 				return true, nil
 			})
+
 			if err != nil {
 				t.Fatalf("Timed out waiting for conditions: %v", err)
 			}
@@ -418,7 +419,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 			}
 
 			// verify the endpoint updates were mirrored
-			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + service.Name
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
@@ -476,6 +477,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 				}
 				return true, nil
 			})
+
 			if err != nil {
 				t.Fatalf("Timed out waiting for conditions: %v", err)
 			}
@@ -608,7 +610,7 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 
 func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, svcName string, num int) error {
 	t.Helper()
-	return wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		lSelector := discovery.LabelServiceName + "=" + svcName
 		lSelector += "," + discovery.LabelManagedBy + "=endpointslicemirroring-controller.k8s.io"
 		esList, err := client.DiscoveryV1().EndpointSlices(nsName).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
@@ -624,6 +626,7 @@ func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, sv
 
 		return true, nil
 	})
+
 }
 
 // isSubset check if all the elements in a exist in b

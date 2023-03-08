@@ -196,7 +196,7 @@ func startPodSecurityWebhook(t *testing.T, testServer *kubeapiservertesting.Test
 		Host:   c.InsecureServing.Listener.Addr().String(),
 		Path:   "/readyz",
 	}).String()
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		resp, err := http.Get(readyz)
 		if err != nil {
 			return false, err
@@ -281,7 +281,7 @@ func installWebhook(t *testing.T, clientConfig *rest.Config, addr string) error 
 		},
 	}
 	// Wait for the invalid namespace to be rejected.
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Namespaces().Create(context.TODO(), invalidNamespace, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 		if err != nil && apierrors.IsInvalid(err) {
 			return true, nil // An Invalid error indicates the webhook rejected the invalid level.

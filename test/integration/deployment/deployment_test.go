@@ -464,7 +464,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 	}
 
 	// Expect deployment collision counter to increment
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		d, err := c.AppsV1().Deployments(ns.Name).Get(context.TODO(), tester.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
@@ -985,7 +985,7 @@ func testRSControllerRefPatch(t *testing.T, tester *deploymentTester, rs *apps.R
 		t.Fatalf("failed to update replicaset %q: %v", rs.Name, err)
 	}
 
-	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1203,7 +1203,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 
 	// Wait for the controllerRef of the replicaset to become nil
 	rsClient := tester.c.AppsV1().ReplicaSets(ns.Name)
-	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err = rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1217,7 +1217,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// This will trigger collision avoidance due to deterministic nature of replicaset name
 	// i.e., the new replicaset will have a name with different hash to preserve name uniqueness
 	var newRS *apps.ReplicaSet
-	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		newRS, err = testutil.GetNewReplicaSet(tester.deployment, c)
 		if err != nil {
 			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
@@ -1241,7 +1241,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 
 	// Wait for the deployment to adopt the old replicaset
-	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	if err = wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

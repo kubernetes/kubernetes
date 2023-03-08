@@ -280,7 +280,7 @@ func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 		return false, nil
 	}
 
-	if err := wait.Poll(time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, false, condition); err != nil {
 		return fmt.Errorf("error waiting for expectedHosts: %v, hittedHosts: %v, count: %v, expected count: %v",
 			expectedHosts, hittedHosts, count, countToSucceed)
 	}

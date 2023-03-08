@@ -49,7 +49,7 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 		},
 	}
 
-	if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		response, err := c.SubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err

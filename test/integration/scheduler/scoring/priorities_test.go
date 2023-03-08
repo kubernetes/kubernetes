@@ -625,7 +625,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+				err = wait.PollUntilContextTimeout(context.Background(), pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
 				}
@@ -637,9 +637,9 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			}
 
 			if tt.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want))
+				err = wait.PollUntilContextTimeout(context.Background(), pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want))
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(context.Background(), pollInterval, wait.ForeverTestTimeout, false, podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
 				t.Errorf("Test Failed: %v", err)
@@ -706,7 +706,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			}
 			var pods []v1.Pod
 			// Wait for all Pods scheduled.
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), pollInterval, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				podList, err := cs.CoreV1().Pods(ns).List(testCtx.Ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("Cannot list pods to verify scheduling: %v", err)
@@ -719,6 +719,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 				pods = podList.Items
 				return true, nil
 			})
+
 			// Verify zone spreading.
 			zoneCnts := make(map[string]int)
 			for _, p := range pods {

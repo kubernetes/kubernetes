@@ -364,7 +364,7 @@ func waitForReplicationControllerwithSelectorInAddonTest(ctx context.Context, c 
 
 // waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func waitForReplicationController(ctx context.Context, c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
@@ -373,6 +373,7 @@ func waitForReplicationController(ctx context.Context, c clientset.Interface, na
 		framework.Logf("ReplicationController %s in namespace %s found.", name, namespace)
 		return exist, nil
 	})
+
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %w", namespace, name, stateMsg[exist], err)
@@ -383,7 +384,7 @@ func waitForReplicationController(ctx context.Context, c clientset.Interface, na
 // waitForServiceWithSelector waits until any service with given selector appears (exist == true), or disappears (exist == false)
 func waitForServiceWithSelector(ctx context.Context, c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		services, err := c.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(services.Items) != 0:
@@ -400,6 +401,7 @@ func waitForServiceWithSelector(ctx context.Context, c clientset.Interface, name
 			return false, nil
 		}
 	})
+
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for service with %s in namespace %s %s: %w", selector.String(), namespace, stateMsg[exist], err)
@@ -410,7 +412,7 @@ func waitForServiceWithSelector(ctx context.Context, c clientset.Interface, name
 // waitForReplicationControllerWithSelector waits until any RC with given selector appears (exist == true), or disappears (exist == false)
 func waitForReplicationControllerWithSelector(ctx context.Context, c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
@@ -424,6 +426,7 @@ func waitForReplicationControllerWithSelector(ctx context.Context, c clientset.I
 			return false, nil
 		}
 	})
+
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for ReplicationControllers with %s in namespace %s %s: %w", selector.String(), namespace, stateMsg[exist], err)

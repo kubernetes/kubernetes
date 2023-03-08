@@ -88,7 +88,7 @@ func TestCRDExponentialRecursionBug(t *testing.T) {
 	}
 
 	// Wait until the CRD exist in discovery
-	err = wait.PollImmediate(100*time.Millisecond, 15*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		groupResource, err := apiExtensionClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + crd.Spec.Versions[0].Name)
 		if err != nil {
 			return false, nil
@@ -100,6 +100,7 @@ func TestCRDExponentialRecursionBug(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}

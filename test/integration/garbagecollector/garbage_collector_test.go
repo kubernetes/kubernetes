@@ -393,7 +393,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	testServer = nil
 
 	// Wait for the invalid children to be garbage collected
-	if err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		children, err := clientSet.CoreV1().Secrets(namespaceA).List(context.TODO(), metav1.ListOptions{LabelSelector: "single-bad-reference=true"})
 		if err != nil {
 			return false, err
@@ -403,12 +403,12 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, nil
 		}
 		return true, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
 	// Wait for a little while to make sure they didn't trigger deletion of the valid children
-	if err := wait.Poll(time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 		children, err := clientSet.CoreV1().Secrets(namespaceB).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -417,7 +417,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, fmt.Errorf("expected %d valid children, got %d", validChildrenCount, len(children.Items))
 		}
 		return false, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
@@ -436,7 +436,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 		t.Fatal(err)
 	}
 	// Wait for the invalid child to be garbage collected
-	if err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := clientSet.CoreV1().Secrets(namespaceA).Get(context.TODO(), invalidChild.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -520,9 +520,7 @@ func TestCascadingDeletion(t *testing.T) {
 	// sometimes the deletion of the RC takes long time to be observed by
 	// the gc, so wait for the garbage collector to observe the deletion of
 	// the toBeDeletedRC
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		return !gc.GraphHasUID(toBeDeletedRC.ObjectMeta.UID), nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) { return !gc.GraphHasUID(toBeDeletedRC.ObjectMeta.UID), nil }); err != nil {
 		t.Fatal(err)
 	}
 	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 1*time.Second, 30*time.Second); err != nil {
@@ -615,7 +613,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	// creation of the pods, otherwise if the deletion of RC is observed before
 	// the creation of the pods, the pods will not be orphaned.
 	if orphan {
-		err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 			for _, u := range podUIDs {
 				if !gc.GraphHasUID(u) {
 					return false, nil
@@ -623,6 +621,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 			}
 			return true, nil
 		})
+
 		if err != nil {
 			errs <- fmt.Sprintf("failed to observe the expected pods in the GC graph for rc %s", rcName)
 			return
@@ -694,7 +693,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	}
 	t.Logf("all pods are created, all replications controllers are created then deleted")
 	// wait for the RCs and Pods to reach the expected numbers.
-	if err := wait.Poll(1*time.Second, 300*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 300*time.Second, false, func(ctx context.Context) (bool, error) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
 		remainingGroups := 4
@@ -759,7 +758,7 @@ func TestOrphaning(t *testing.T) {
 	// we need wait for the gc to observe the creation of the pods, otherwise if
 	// the deletion of RC is observed before the creation of the pods, the pods
 	// will not be orphaned.
-	err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, u := range podUIDs {
 			if !gc.GraphHasUID(u) {
 				return false, nil
@@ -767,6 +766,7 @@ func TestOrphaning(t *testing.T) {
 		}
 		return true, nil
 	})
+
 	if err != nil {
 		t.Fatalf("Failed to observe pods in GC graph for %s: %v", toBeDeletedRC.Name, err)
 	}
@@ -776,7 +776,7 @@ func TestOrphaning(t *testing.T) {
 		t.Fatalf("Failed to gracefully delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -840,7 +840,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := rcClient.Get(context.TODO(), toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -908,7 +908,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := rcClient.Get(context.TODO(), toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -949,7 +949,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	if err := podClient.Delete(context.TODO(), pod.Name, getForegroundOptions()); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		returnedPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -967,7 +967,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	if err := podClient.Delete(context.TODO(), pod.Name, getForegroundOptions()); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		returnedPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -986,7 +986,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	if _, err := podClient.Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{}); err != nil {
 		t.Fatalf("Failed to update pod: %v", err)
 	}
-	if err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
@@ -1088,7 +1088,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := resourceClient.Get(context.TODO(), owner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
@@ -1166,7 +1166,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := resourceClient.Get(context.TODO(), customOwner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
@@ -1190,7 +1190,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := configMapClient.Get(context.TODO(), coreOwner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
@@ -1261,7 +1261,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := resourceClient.Get(context.TODO(), owner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
@@ -1269,7 +1269,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	}
 
 	// Ensure the dependent is deleted.
-	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		_, err := configMapClient.Get(context.TODO(), dependent.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {

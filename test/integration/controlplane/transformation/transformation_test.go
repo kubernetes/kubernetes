@@ -519,7 +519,7 @@ func (e *transformTest) printMetrics() error {
 func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -532,7 +532,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 		return done, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
@@ -540,7 +540,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -553,7 +553,7 @@ func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains 
 		return done, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }

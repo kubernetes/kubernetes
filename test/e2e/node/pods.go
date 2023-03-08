@@ -114,7 +114,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			// for the kubelet to remove from api.  need to follow-up on if this
 			// latency between termination and reportal can be isolated further.
 			start := time.Now()
-			err = wait.Poll(time.Second*5, time.Second*30*3, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second*5, time.Second*30*3, false, func(ctx context.Context) (bool, error) {
 				podList, err := e2ekubelet.GetKubeletPods(ctx, f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
 					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
@@ -135,6 +135,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})
+
 			framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
@@ -275,7 +276,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			var eventList *v1.EventList
 			var err error
 			ginkgo.By("Getting events about the pod")
-			framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+			framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), time.Second*2, time.Second*60, false, func(ctx context.Context) (bool, error) {
 				selector := fields.Set{
 					"involvedObject.kind":      "Pod",
 					"involvedObject.uid":       string(createdPod.UID),

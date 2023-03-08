@@ -509,7 +509,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	// wait until the CRD is established
-	err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuBetaDefinition.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -523,6 +523,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}

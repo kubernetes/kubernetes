@@ -475,7 +475,7 @@ func newCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
 }
 
 func waitPDBStable(ctx context.Context, t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
-	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -490,7 +490,7 @@ func waitPDBStable(ctx context.Context, t *testing.T, clientSet clientset.Interf
 }
 
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int, phase v1.PodPhase) {
-	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != podNum {
 			return false, nil
@@ -745,7 +745,7 @@ func TestStalePodDisruption(t *testing.T) {
 			}
 			time.Sleep(stalePodDisruptionTimeout)
 			diff := ""
-			if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 				pod, err = clientSet.CoreV1().Pods(nsName).Get(ctx, name, metav1.GetOptions{})
 				if err != nil {
 					return false, err

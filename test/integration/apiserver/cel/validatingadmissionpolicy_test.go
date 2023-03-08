@@ -877,7 +877,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 	// and namespaces starting with "configmap-" are disallowed
 	// wait loop is required here since ConfigMaps were previousy allowed and we need to wait for the new policy
 	// to be enforced
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace = &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "configmap-",
@@ -972,7 +972,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-2-",
@@ -1025,7 +1025,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 
 	// validate that namespaces starting with "test-2" are allowed
 	// and namespaces starting with "test-1" are disallowed
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-1-",
@@ -1112,7 +1112,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-2-",
@@ -1159,7 +1159,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 
 	// validate that namespaces starting with "test-2" are allowed
 	// and namespaces starting with "test-1" are disallowed
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-1-",
@@ -1319,7 +1319,7 @@ func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		matchedConfigMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "denied-",
@@ -1338,7 +1338,6 @@ func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
 		}
 
 		return true, nil
-
 	}); waitErr != nil {
 		t.Errorf("timed out waiting: %v", waitErr)
 	}
@@ -1450,7 +1449,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-matched-by-exclude-resources",
@@ -1469,7 +1468,6 @@ func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
 		}
 
 		return true, nil
-
 	}); waitErr != nil {
 		t.Errorf("timed out waiting: %v", waitErr)
 	}
@@ -1710,7 +1708,7 @@ func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1740,7 +1738,7 @@ func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		allowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1765,7 +1763,7 @@ func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1828,7 +1826,7 @@ func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1858,7 +1856,7 @@ func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		allowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1884,7 +1882,7 @@ func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1957,7 +1955,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -1987,7 +1985,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		allowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -2014,7 +2012,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 		t.Fatal(err)
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		disallowedNamespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "not-test-",
@@ -2187,7 +2185,7 @@ func TestBindingRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	// check that the policy is active
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		namespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "check-namespace",
@@ -2211,7 +2209,7 @@ func TestBindingRemoval(t *testing.T) {
 	}
 
 	// wait for binding to be deleted
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 
 		_, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Get(context.TODO(), "test-binding", metav1.GetOptions{})
 		if err != nil {
@@ -2228,7 +2226,7 @@ func TestBindingRemoval(t *testing.T) {
 	}
 
 	// policy should be considered in an invalid state and namespace creation should be allowed
-	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		namespace := &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-namespace",
@@ -2471,7 +2469,7 @@ func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client *clientset
 		return err
 	}
 
-	if waitErr := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+	if waitErr := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		handler.reset()
 		_, err := client.CoreV1().Endpoints(ns).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if handler.hasObservedMarker() {

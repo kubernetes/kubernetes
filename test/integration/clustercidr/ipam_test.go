@@ -279,7 +279,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 		}
 
 		// Poll to make sure that the Node is deleted.
-		if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := clientSet.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return false, err
@@ -290,7 +290,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 		}
 
 		// Poll to make sure that the ClusterCIDR is now deleted, as there is no node associated with it.
-		if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := clientSet.NetworkingV1alpha1().ClusterCIDRs().Get(context.TODO(), clusterCIDR.Name, metav1.GetOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return false, err
@@ -502,7 +502,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 			}
 
 			// Wait till the Node is deleted.
-			if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				_, err := clientSet.CoreV1().Nodes().Get(context.TODO(), test.node.Name, metav1.GetOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					return false, err
@@ -520,7 +520,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 				}
 
 				// Wait till the ClusterCIDR is deleted.
-				if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+				if err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 					_, err := clientSet.NetworkingV1alpha1().ClusterCIDRs().Get(context.TODO(), clusterCIDR.Name, metav1.GetOptions{})
 					if err != nil && !apierrors.IsNotFound(err) {
 						return false, err
@@ -633,7 +633,7 @@ func nodeSelector(labels map[string][]string) *v1.NodeSelector {
 
 func nodePodCIDRs(c clientset.Interface, name string) ([]string, error) {
 	var node *v1.Node
-	nodePollErr := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	nodePollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		node, err = c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {

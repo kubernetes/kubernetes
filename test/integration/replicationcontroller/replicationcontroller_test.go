@@ -145,7 +145,7 @@ func runControllerAndInformers(t *testing.T, rm *replication.ReplicationManager,
 // running the RC controller to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		return len(objects) == podNum, nil
 	}); err != nil {
@@ -177,7 +177,7 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 // Verify .Status.Replicas is equal to .Spec.Replicas
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController) {
 	rcClient := clientSet.CoreV1().ReplicationControllers(rc.Namespace)
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -261,7 +261,7 @@ func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod,
 		pod.OwnerReferences = []metav1.OwnerReference{*ownerReference}
 	})
 
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -288,7 +288,7 @@ func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod,
 func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1.PodList, conditionStatus v1.ConditionStatus, lastTransitionTime time.Time) {
 	replicas := int32(len(pods.Items))
 	var readyPods int32
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		readyPods = 0
 		for i := range pods.Items {
 			pod := &pods.Items[i]
@@ -318,6 +318,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 		}
 		return readyPods >= replicas, nil
 	})
+
 	if err != nil {
 		t.Fatalf("failed to mark all ReplicationController pods to ready: %v", err)
 	}
@@ -433,7 +434,7 @@ func TestAdoption(t *testing.T) {
 
 			stopControllers := runControllerAndInformers(t, rm, informers, 1)
 			defer stopControllers()
-			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 				updatedPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -484,7 +485,7 @@ func TestSpecReplicasChange(t *testing.T) {
 		t.Fatalf("Failed to verify .Generation has incremented for rc %s", rc.Name)
 	}
 
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -570,7 +571,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	})
 
 	// Pool until 2 new pods have been created to replace deleting and failed pods
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		pods = getPods(t, podClient, labelMap())
 		return len(pods.Items) == 4, nil
 	}); err != nil {
@@ -662,7 +663,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
 		pod.Labels = newLabelMap
 	})
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -677,7 +678,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
 		pod.Labels = labelMap()
 	})
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			// If the pod is not found, it means the RC picks the pod for deletion (it is extra)
@@ -783,7 +784,7 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
 
 	rcClient := c.CoreV1().ReplicationControllers(ns.Name)
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -837,7 +838,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	// Verify the extra pod is deleted eventually by determining whether number of
 	// all pods within namespace matches .spec.replicas of the RC (2 in this case)
 	podClient := c.CoreV1().Pods(ns.Name)
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		// All pods have labelMap as their labels
 		pods := getPods(t, podClient, labelMap())
 		return int32(len(pods.Items)) == *rc.Spec.Replicas, nil
@@ -878,7 +879,7 @@ func TestFullyLabeledReplicas(t *testing.T) {
 	})
 
 	// Verify only one pod is fully labeled
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {
 		newRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

@@ -260,7 +260,7 @@ func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, na
 func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Duration, timeout time.Duration, cl clientset.Interface, name, namespace string, count int32) error {
 	var pod *v1.Pod
 	var err error
-	err = wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		pod, err = cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
@@ -270,19 +270,22 @@ func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Du
 		}
 		for i := range pod.Status.ContainerStatuses {
 			if pod.Status.ContainerStatuses[i].State.Waiting != nil {
-				// retry if pod is in waiting state
 				return false, nil
 			}
 			if pod.Status.ContainerStatuses[i].State.Running == nil {
 				return false, fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
 			}
 			if pod.Status.ContainerStatuses[i].RestartCount == count {
-				// found the restart count
 				return true, nil
 			}
 		}
 		return false, nil
 	})
+
+	// retry if pod is in waiting state
+
+	// found the restart count
+
 	if err != nil {
 		return err
 	}

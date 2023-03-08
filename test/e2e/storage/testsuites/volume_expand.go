@@ -299,7 +299,7 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 	// Retry the update on error, until we hit a timeout.
 	// TODO: Determine whether "retry with timeout" is appropriate here. Maybe we should only retry on version conflict.
 	var lastUpdateError error
-	waitErr := wait.PollImmediate(resizePollInterval, 30*time.Second, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(context.Background(), resizePollInterval, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if err != nil {
@@ -315,7 +315,8 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 		}
 		return true, nil
 	})
-	if waitErr == wait.ErrWaitTimeout {
+
+	if wait.Interrupted(waitErr) {
 		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %v", lastUpdateError)
 	}
 	if waitErr != nil {
@@ -326,14 +327,12 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 
 // WaitForResizingCondition waits for the pvc condition to be PersistentVolumeClaimResizing
 func WaitForResizingCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, duration time.Duration) error {
-	waitErr := wait.PollImmediateWithContext(ctx, resizePollInterval, duration, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, duration, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
 		}
-
 		pvcConditions := updatedPVC.Status.Conditions
 		if len(pvcConditions) > 0 {
 			if pvcConditions[0].Type == v1.PersistentVolumeClaimResizing {
@@ -342,6 +341,7 @@ func WaitForResizingCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim
 		}
 		return false, nil
 	})
+
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pvc %q to have resize status: %v", pvc.Name, waitErr)
 	}
@@ -351,22 +351,21 @@ func WaitForResizingCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim
 // WaitForControllerVolumeResize waits for the controller resize to be finished
 func WaitForControllerVolumeResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, timeout time.Duration) error {
 	pvName := pvc.Spec.VolumeName
-	waitErr := wait.PollImmediateWithContext(ctx, resizePollInterval, timeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
-
 		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching pv %q for resizing %v", pvName, err)
 		}
-
 		pvSize := pv.Spec.Capacity[v1.ResourceStorage]
-
-		// If pv size is greater or equal to requested size that means controller resize is finished.
 		if pvSize.Cmp(pvcSize) >= 0 {
 			return true, nil
 		}
 		return false, nil
 	})
+
+	// If pv size is greater or equal to requested size that means controller resize is finished.
+
 	if waitErr != nil {
 		return fmt.Errorf("error while waiting for controller resize to finish: %v", waitErr)
 	}
@@ -376,16 +375,13 @@ func WaitForControllerVolumeResize(ctx context.Context, pvc *v1.PersistentVolume
 // WaitForPendingFSResizeCondition waits for pvc to have resize condition
 func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	var updatedPVC *v1.PersistentVolumeClaim
-	waitErr := wait.PollImmediateWithContext(ctx, resizePollInterval, pvcConditionSyncPeriod, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, pvcConditionSyncPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %w", pvc.Name, err)
 		}
-
 		inProgressConditions := updatedPVC.Status.Conditions
-		// if there are no PVC conditions that means no node expansion is necessary
 		if len(inProgressConditions) == 0 {
 			return true, nil
 		}
@@ -395,6 +391,9 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 		}
 		return false, nil
 	})
+
+	// if there are no PVC conditions that means no node expansion is necessary
+
 	if waitErr != nil {
 		return nil, fmt.Errorf("error waiting for pvc %q to have filesystem resize status: %v", pvc.Name, waitErr)
 	}
@@ -404,23 +403,22 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 // WaitForFSResize waits for the filesystem in the pv to be resized
 func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	var updatedPVC *v1.PersistentVolumeClaim
-	waitErr := wait.PollImmediateWithContext(ctx, resizePollInterval, totalResizeWaitPeriod, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, totalResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %w", pvc.Name, err)
 		}
-
 		pvcSize := updatedPVC.Spec.Resources.Requests[v1.ResourceStorage]
 		pvcStatusSize := updatedPVC.Status.Capacity[v1.ResourceStorage]
-
-		//If pvc's status field size is greater than or equal to pvc's size then done
 		if pvcStatusSize.Cmp(pvcSize) >= 0 {
 			return true, nil
 		}
 		return false, nil
 	})
+
+	//If pvc's status field size is greater than or equal to pvc's size then done
+
 	if waitErr != nil {
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}

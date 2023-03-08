@@ -552,7 +552,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			}
 			return true, nil
 		}
-		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
+		err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 3*time.Minute, true, digFunc)
 		framework.ExpectNoError(err, "failed to verify customized name server and search path")
 
 		// TODO: Add more test cases for other DNSPolicies.

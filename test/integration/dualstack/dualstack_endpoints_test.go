@@ -53,7 +53,7 @@ func TestDualStackEndpoints(t *testing.T) {
 	defer tearDownFn()
 
 	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, time.Minute, false, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -213,7 +213,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			// wait until endpoints are created
 			// legacy endpoints are not dual stack
 			// and use the address of the first IP family
-			if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				e, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Logf("Error fetching endpoints: %v", err)
@@ -234,7 +234,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			}
 
 			// wait until the endpoint slices are created
-			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + svc.Name
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
@@ -267,6 +267,7 @@ func TestDualStackEndpoints(t *testing.T) {
 				}
 				return true, nil
 			})
+
 			if err != nil {
 				t.Fatalf("Error waiting for endpoint slices: %v", err)
 			}

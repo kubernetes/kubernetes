@@ -52,7 +52,7 @@ func TestConditionIsolation(t *testing.T) {
 	fsClient := loopbackClient.FlowcontrolV1beta3().FlowSchemas()
 	var dangleOrig *flowcontrol.FlowSchemaCondition
 
-	wait.PollUntil(time.Second, func() (bool, error) {
+	wait.PollUntilContextCancel(context.Background(), time.Second, false, func(ctx context.Context) (bool, error) {
 		fsGot, err := fsClient.Get(ctx, fsOrig.Name, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed to fetch FlowSchema %q: %v", fsOrig.Name, err)
@@ -60,7 +60,7 @@ func TestConditionIsolation(t *testing.T) {
 		}
 		dangleOrig = getCondition(fsGot.Status.Conditions, flowcontrol.FlowSchemaConditionDangling)
 		return dangleOrig != nil, nil
-	}, stopCh)
+	})
 
 	ssaType := flowcontrol.FlowSchemaConditionType("test-ssa")
 	patchSSA := flowcontrolapply.FlowSchema(fsOrig.Name).

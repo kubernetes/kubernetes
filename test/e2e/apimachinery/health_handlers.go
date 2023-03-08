@@ -95,12 +95,13 @@ var (
 
 func testPath(ctx context.Context, client clientset.Interface, path string, requiredChecks sets.String) error {
 	var result restclient.Result
-	err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		result = client.CoreV1().RESTClient().Get().RequestURI(path).Do(ctx)
 		status := 0
 		result.StatusCode(&status)
 		return status == 200, nil
 	})
+
 	if err != nil {
 		return err
 	}

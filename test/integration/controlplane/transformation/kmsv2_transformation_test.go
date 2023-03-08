@@ -270,18 +270,19 @@ resources:
 	// Wait 1 sec (poll interval to check resource version) until a resource version change is detected or timeout at 1 minute.
 
 	version3 := ""
-	err = wait.Poll(time.Second, time.Minute,
-		func() (bool, error) {
-			updatedPod, err = test.inplaceUpdatePod(testNamespace, updatedPod, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
-			if err != nil {
-				return false, err
-			}
-			version3 = updatedPod.GetResourceVersion()
-			if version1 != version3 {
-				return true, nil
-			}
-			return false, nil
-		})
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
+
+		updatedPod, err = test.inplaceUpdatePod(testNamespace, updatedPod, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+		if err != nil {
+			return false, err
+		}
+		version3 = updatedPod.GetResourceVersion()
+		if version1 != version3 {
+			return true, nil
+		}
+		return false, nil
+	})
+
 	if err != nil {
 		t.Fatalf("Failed to detect one resource version update within the allotted time after keyID is updated and pod has been inplace updated, err: %v, ns: %s", err, testNamespace)
 	}

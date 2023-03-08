@@ -153,7 +153,7 @@ func createTestStorageVersion(t *testing.T, client kubernetes.Interface, ids ...
 }
 
 func assertStorageVersionDeleted(t *testing.T, client kubernetes.Interface) {
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := client.InternalV1alpha1().StorageVersions().Get(
 			context.TODO(), svName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -201,7 +201,7 @@ func deleteTestAPIServerIdentityLease(t *testing.T, client kubernetes.Interface,
 func assertStorageVersionEntries(t *testing.T, client kubernetes.Interface,
 	numEntries int, firstID string) {
 	var lastErr error
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := client.InternalV1alpha1().StorageVersions().Get(
 			context.TODO(), svName, metav1.GetOptions{})
 		if err != nil {

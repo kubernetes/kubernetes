@@ -96,7 +96,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
-	pvcPollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pvcPollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
@@ -104,7 +104,6 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		}
 		for _, pvc := range pvcList.Items {
 			pvNames.Insert(pvc.Spec.VolumeName)
-			// TODO: Double check that there are no pods referencing the pvc
 			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
 			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
 				return false, nil
@@ -112,11 +111,14 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		}
 		return true, nil
 	})
+
+	// TODO: Double check that there are no pods referencing the pvc
+
 	if pvcPollErr != nil {
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
 	}
 
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
@@ -134,6 +136,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		framework.Logf("Still waiting for pvs of statefulset to disappear:\n%v", strings.Join(waitingFor, "\n"))
 		return false, nil
 	})
+
 	if pollErr != nil {
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
 	}
@@ -151,13 +154,14 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 	ss = update(ctx, c, ns, name, count)
 
 	var statefulPodList *v1.PodList
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		statefulPodList = GetPodList(ctx, c, ss)
 		if int32(len(statefulPodList.Items)) == count {
 			return true, nil
 		}
 		return false, nil
 	})
+
 	if pollErr != nil {
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {

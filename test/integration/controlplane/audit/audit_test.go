@@ -394,7 +394,7 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 	var lastMissingReport string
 	createNamespace(t, kubeclient, namespace)
 
-	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		// perform configmap operations
 		configMapOperations(t, kubeclient, namespace)
 
@@ -435,7 +435,7 @@ func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []ut
 		t.Fatalf("%v resource has no cross-group sub-resources", expEvents[0].Resource)
 	}
 
-	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		// perform cross-group subresources operations
 		if sa != nil {
 			tokenRequestOperations(t, kubeclient, sa.Namespace, sa.Name)

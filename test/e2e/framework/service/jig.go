@@ -328,7 +328,7 @@ func (j *TestJig) GetEndpointNodeNames(ctx context.Context) (sets.String, error)
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) error {
-	return wait.PollImmediateWithContext(ctx, framework.Poll, KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -338,7 +338,6 @@ func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) er
 			framework.Logf("Expect endpoints with subsets, got none.")
 			return false, nil
 		}
-		// TODO: Handle multiple endpoints
 		if len(endpoints.Subsets[0].Addresses) == 0 {
 			framework.Logf("Expected Ready endpoints - found none")
 			return false, nil
@@ -351,6 +350,9 @@ func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) er
 		}
 		return true, nil
 	})
+
+	// TODO: Handle multiple endpoints
+
 }
 
 // waitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
@@ -627,7 +629,7 @@ func (j *TestJig) waitForCondition(ctx context.Context, timeout time.Duration, m
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, pollFunc); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollFunc); err != nil {
 		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
@@ -910,7 +912,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
-	err := wait.PollImmediateWithContext(ctx, 1*time.Second, ServiceReachabilityShortPollTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (bool, error) {
 		stdout, err := e2epodoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
@@ -922,6 +924,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
 	}
@@ -1006,16 +1009,18 @@ func (j *TestJig) checkExternalServiceReachability(ctx context.Context, svc *v1.
 	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
-	return wait.PollImmediateWithContext(ctx, framework.Poll, ServiceReachabilityShortPollTimeout, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (done bool, err error) {
 		_, stderr, err := e2epodoutput.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
-		// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
-		// we can check stderr for the error.
 		if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
 			framework.Logf("ExternalName service %q failed to resolve to IP", pod.Namespace+"/"+pod.Name)
 			return false, nil
 		}
 		return true, nil
 	})
+
+	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
+	// we can check stderr for the error.
+
 }
 
 // CheckServiceReachability ensures that request are served by the services. Only supports Services with type ClusterIP, NodePort and ExternalName.

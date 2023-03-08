@@ -115,7 +115,7 @@ func TestMutatingWebhookDuplicateOwnerReferences(t *testing.T) {
 	// wait until new webhook is called
 	expectedWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat,
 		duplicateOwnerReferencesMarkerFixture.OwnerReferences[0].UID)
-	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pod, err = client.CoreV1().Pods("default").Patch(context.TODO(), duplicateOwnerReferencesMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil {
 			return false, err

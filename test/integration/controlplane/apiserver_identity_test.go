@@ -80,7 +80,7 @@ func TestCreateLeaseOnStart(t *testing.T) {
 	}
 
 	t.Logf(`Waiting the kube-apiserver Lease to be created`)
-	if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		leases, err := kubeclient.
 			CoordinationV1().
 			Leases(metav1.NamespaceSystem).
@@ -202,7 +202,7 @@ func testLeaseGarbageCollected(t *testing.T, client kubernetes.Interface, lease 
 		if _, err := client.CoordinationV1().Leases(ns).Create(context.TODO(), lease, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Unexpected error creating lease: %v", err)
 		}
-		if err := wait.PollImmediate(500*time.Millisecond, 5*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, err := client.CoordinationV1().Leases(ns).Get(context.TODO(), lease.Name, metav1.GetOptions{})
 			if err == nil {
 				return false, nil
@@ -224,7 +224,7 @@ func testLeaseNotGarbageCollected(t *testing.T, client kubernetes.Interface, lea
 		if _, err := client.CoordinationV1().Leases(ns).Create(context.TODO(), lease, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Unexpected error creating lease: %v", err)
 		}
-		if err := wait.PollImmediate(500*time.Millisecond, 5*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, err := client.CoordinationV1().Leases(ns).Get(context.TODO(), lease.Name, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
 				return true, nil

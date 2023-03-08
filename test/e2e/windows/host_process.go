@@ -662,7 +662,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		ginkgo.By("Getting container stats for pod")
 		statsChecked := false
 
-		wait.Poll(2*time.Second, timeout, func() (bool, error) {
+		wait.PollUntilContextTimeout(context.Background(), 2*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 			return ensurePodsStatsOnNode(ctx, f.ClientSet, f.Namespace.Name, targetNode.Name, &statsChecked)
 		})
 

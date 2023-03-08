@@ -30,7 +30,7 @@ import (
 // waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.
 func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, podScheduled(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, podScheduled(cs, pod.Namespace, pod.Name))
 }
 
 // waitForPodToSchedule waits for a pod to get scheduled and returns an error if
@@ -42,7 +42,7 @@ func waitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
 // waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
 func waitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, podUnschedulable(cs, pod.Namespace, pod.Name))
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, timeout, false, podUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
 // waitForPodUnschedule waits for a pod to fail scheduling and returns

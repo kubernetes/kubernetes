@@ -79,7 +79,7 @@ func TestTypeResolver(t *testing.T) {
 	discoveryResolver := &resolver.ClientDiscoveryResolver{Discovery: client.Discovery()}
 	definitionsResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions)
 	// wait until the CRD schema is published at the OpenAPI v3 endpoint
-	err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (done bool, err error) {
 		p, err := client.OpenAPIV3().Paths()
 		if err != nil {
 			return
@@ -89,6 +89,7 @@ func TestTypeResolver(t *testing.T) {
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		t.Fatalf("timeout wait for CRD schema publication: %v", err)
 	}

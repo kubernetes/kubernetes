@@ -357,15 +357,10 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicore
 	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
-		req := proxyRequest.Namespace(rc.nsName).
-			Name(rc.controllerName).
-			Suffix("ConsumeCPU").
-			Param("millicores", strconv.Itoa(millicores)).
-			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
+		req := proxyRequest.Namespace(rc.nsName).Name(rc.controllerName).Suffix("ConsumeCPU").Param("millicores", strconv.Itoa(millicores)).Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
 		framework.Logf("ConsumeCPU URL: %v", *req.URL())
 		_, err = req.DoRaw(ctx)
 		if err != nil {
@@ -383,15 +378,10 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes
 	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
-		req := proxyRequest.Namespace(rc.nsName).
-			Name(rc.controllerName).
-			Suffix("ConsumeMem").
-			Param("megabytes", strconv.Itoa(megabytes)).
-			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
+		req := proxyRequest.Namespace(rc.nsName).Name(rc.controllerName).Suffix("ConsumeMem").Param("megabytes", strconv.Itoa(megabytes)).Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
 		framework.Logf("ConsumeMem URL: %v", *req.URL())
 		_, err = req.DoRaw(ctx)
 		if err != nil {
@@ -409,16 +399,10 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
-		req := proxyRequest.Namespace(rc.nsName).
-			Name(rc.controllerName).
-			Suffix("BumpMetric").
-			Param("metric", customMetricName).
-			Param("delta", strconv.Itoa(delta)).
-			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
+		req := proxyRequest.Namespace(rc.nsName).Name(rc.controllerName).Suffix("BumpMetric").Param("metric", customMetricName).Param("delta", strconv.Itoa(delta)).Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
 		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
 		_, err = req.DoRaw(ctx)
 		if err != nil {
@@ -427,6 +411,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err)
 }
 
@@ -485,18 +470,21 @@ func (rc *ResourceConsumer) GetHpa(ctx context.Context, name string) (*autoscali
 // WaitForReplicas wait for the desired replicas
 func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		replicas := rc.GetReplicas(ctx)
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
-		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
+		return replicas == desiredReplicas, nil
 	})
+
+	// Expected number of replicas found. Exit.
+
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		replicas := rc.GetReplicas(ctx)
 		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
 		as, err := rc.GetHpa(ctx, hpaName)
@@ -510,11 +498,14 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, mi
 		} else if replicas > maxDesiredReplicas {
 			return false, fmt.Errorf("number of replicas above target")
 		} else {
-			return false, nil // Expected number of replicas found. Continue polling until timeout.
+			return false, nil
 		}
 	})
+
+	// Expected number of replicas found. Continue polling until timeout.
+
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		framework.Logf("Number of replicas was stable over %v", duration)
 		return
 	}
@@ -954,9 +945,8 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 		crd, err = c.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crdSchema, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		// Wait until just created CRD appears in discovery.
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
-			return ExistsInDiscovery(crd, c, "v1")
-		})
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) { return ExistsInDiscovery(crd, c, "v1") })
+
 		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Successfully created Custom Resource Definition: %v", crd))
 	}

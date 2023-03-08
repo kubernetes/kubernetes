@@ -265,7 +265,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			}()
 
 			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				received := recorder.MarkerReceived()
 				if len(tt.mutatingWebhooks) > 0 && !received.Has("mutating") {

@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -129,7 +130,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to delete node: %v, err: %v", pod.Spec.NodeName, err)
 			}
-			err = wait.PollImmediate(time.Second, time.Second*15, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
@@ -235,7 +236,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				t.Fatalf("Error: '%v' while deleting pod: '%v'", err, klog.KObj(pod))
 			}
 			// wait until the pod is terminating
-			err = wait.PollImmediate(time.Second, time.Second*15, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
@@ -246,7 +247,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 			if test.withFinalizer {
 				// wait until the pod phase is set as expected
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*15, true, func(ctx context.Context) (bool, error) {
 					var e error
 					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 					if e != nil {
@@ -254,6 +255,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 					}
 					return test.wantPhase == pod.Status.Phase, nil
 				})
+
 				if err != nil {
 					t.Errorf("Error %q while waiting for the pod %q to be in expected phase", err, klog.KObj(pod))
 				}
@@ -263,7 +265,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				}
 			} else {
 				// wait until the pod is deleted
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*15, true, func(ctx context.Context) (bool, error) {
 					var e error
 					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 					if e == nil {
@@ -275,6 +277,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 					}
 					return false, e
 				})
+
 				if err != nil {
 					t.Errorf("Error %q while waiting for the pod %q to be deleted", err, klog.KObj(pod))
 				}

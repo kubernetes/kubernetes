@@ -69,24 +69,24 @@ func extinguish(ctx context.Context, f *framework.Framework, totalNS int, maxAll
 
 	ginkgo.By("Waiting for namespaces to vanish")
 	//Now POLL until all namespaces have been eradicated.
-	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
-		func() (bool, error) {
-			var cnt = 0
-			nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-			if err != nil {
-				return false, err
+	framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 2*time.Second, time.Duration(maxSeconds)*time.Second, false, func(ctx context.Context) (bool, error) {
+
+		var cnt = 0
+		nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, item := range nsList.Items {
+			if strings.Contains(item.Name, "nslifetest") {
+				cnt++
 			}
-			for _, item := range nsList.Items {
-				if strings.Contains(item.Name, "nslifetest") {
-					cnt++
-				}
-			}
-			if cnt > maxAllowedAfterDel {
-				framework.Logf("Remaining namespaces : %v", cnt)
-				return false, nil
-			}
-			return true, nil
-		}))
+		}
+		if cnt > maxAllowedAfterDel {
+			framework.Logf("Remaining namespaces : %v", cnt)
+			return false, nil
+		}
+		return true, nil
+	}))
 }
 
 func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framework.Framework) {
@@ -126,14 +126,14 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framewor
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
-	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
-		func() (bool, error) {
-			_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}))
+	framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Duration(maxWaitSeconds)*time.Second, false, func(ctx context.Context) (bool, error) {
+
+		_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	}))
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(ctx, namespaceName, nil)
@@ -183,14 +183,14 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60)
-	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
-		func() (bool, error) {
-			_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
-		}))
+	framework.ExpectNoError(wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Duration(maxWaitSeconds)*time.Second, false, func(ctx context.Context) (bool, error) {
+
+		_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	}))
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(ctx, namespaceName, nil)

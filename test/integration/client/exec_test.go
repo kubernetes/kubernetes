@@ -598,17 +598,18 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 		waitTimeout = time.Second * 15
 	}
 
-	err := wait.PollImmediate(time.Second, waitTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, waitTimeout, true, func(ctx context.Context) (bool, error) {
 		is.mu.Lock()
 		defer is.mu.Unlock()
 		return len(is.adds) > 0 && len(is.updates) > 0 && len(is.deletes) > 0, nil
 	})
+
 	if wantEvents {
 		if err != nil {
 			t.Fatalf("wanted events, but got error: %v", err)
 		}
 	} else {
-		if !errors.Is(err, wait.ErrWaitTimeout) {
+		if !errors.Is(err, wait.ErrorInterrupted(errors.New("TODO"))) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
@@ -940,7 +941,7 @@ func waitForInformerSync(ctx context.Context, t *testing.T, informer cache.Share
 	}
 
 	if len(lastSyncResourceVersion) != 0 {
-		if err := wait.PollImmediate(time.Second, time.Second*60, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Second*60, true, func(ctx context.Context) (bool, error) {
 			return informer.LastSyncResourceVersion() != lastSyncResourceVersion, nil
 		}); err != nil {
 			t.Fatalf("informer never changed resource versions from %q: %v", lastSyncResourceVersion, err)

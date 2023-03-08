@@ -169,7 +169,7 @@ func AddPodLabels(ctx context.Context, k8s *kubeManager, namespace string, name 
 	_, err = k8s.clientSet.CoreV1().Pods(namespace).Update(ctx, kubePod, metav1.UpdateOptions{})
 	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", namespace, name)
 
-	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), waitInterval, waitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		waitForPod, err := k8s.getPod(ctx, namespace, name)
 		if err != nil {
 			return false, err
@@ -181,6 +181,7 @@ func AddPodLabels(ctx context.Context, k8s *kubeManager, namespace string, name 
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", namespace, name)
 }
 
@@ -195,7 +196,7 @@ func ResetPodLabels(ctx context.Context, k8s *kubeManager, namespace string, nam
 	_, err = k8s.clientSet.CoreV1().Pods(namespace).Update(ctx, kubePod, metav1.UpdateOptions{})
 	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", namespace, name)
 
-	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
+	err = wait.PollUntilContextTimeout(context.Background(), waitInterval, waitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		waitForPod, err := k8s.getPod(ctx, namespace, name)
 		if err != nil {
 			return false, nil
@@ -207,5 +208,6 @@ func ResetPodLabels(ctx context.Context, k8s *kubeManager, namespace string, nam
 		}
 		return true, nil
 	})
+
 	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", namespace, name)
 }
