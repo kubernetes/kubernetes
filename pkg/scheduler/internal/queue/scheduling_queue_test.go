@@ -76,6 +76,11 @@ var (
 	scheduledPodInfo = mustNewPodInfo(
 		st.MakePod().Name("sp").Namespace("ns1").UID("spns1").Node("foo").Obj(),
 	)
+
+	nominatorCmpOpts = []cmp.Option{
+		cmp.AllowUnexported(nominator{}),
+		cmpopts.IgnoreFields(nominator{}, "podLister", "lock"),
+	}
 )
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
@@ -109,7 +114,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 			"node1": {medPriorityPodInfo, unschedulablePodInfo},
 		},
 	}
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
 	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
@@ -121,8 +126,8 @@ func TestPriorityQueue_Add(t *testing.T) {
 	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods["node1"]) != 2 {
-		t.Errorf("Expected medPriorityPodInfo and unschedulablePodInfo to be still present in nomindatePods: %v", q.PodNominator.(*nominator).nominatedPods["node1"])
+	if len(q.nominator.nominatedPods["node1"]) != 2 {
+		t.Errorf("Expected medPriorityPodInfo and unschedulablePodInfo to be still present in nomindatePods: %v", q.nominator.nominatedPods["node1"])
 	}
 }
 
@@ -167,14 +172,14 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 			"node1": {highPriNominatedPodInfo, unschedulablePodInfo},
 		},
 	}
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
 	if p, err := q.Pop(); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriNominatedPodInfo.Pod.Name, p.Pod.Name)
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods) != 1 {
-		t.Errorf("Expected nomindatePods to have one element: %v", q.PodNominator)
+	if len(q.nominator.nominatedPods) != 1 {
+		t.Errorf("Expected nomindatePods to have one element: %v", q.nominator)
 	}
 	if getUnschedulablePod(q, unschedulablePodInfo.Pod) != unschedulablePodInfo.Pod {
 		t.Errorf("Pod %v was not found in the unschedulablePods.", unschedulablePodInfo.Pod.Name)
@@ -255,8 +260,8 @@ func TestPriorityQueue_Pop(t *testing.T) {
 		if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
 			t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 		}
-		if len(q.PodNominator.(*nominator).nominatedPods["node1"]) != 1 {
-			t.Errorf("Expected medPriorityPodInfo to be present in nomindatePods: %v", q.PodNominator.(*nominator).nominatedPods["node1"])
+		if len(q.nominator.nominatedPods["node1"]) != 1 {
+			t.Errorf("Expected medPriorityPodInfo to be present in nomindatePods: %v", q.nominator.nominatedPods["node1"])
 		}
 	}()
 	q.Add(medPriorityPodInfo.Pod)
@@ -273,16 +278,16 @@ func TestPriorityQueue_Update(t *testing.T) {
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(highPriorityPodInfo.Pod)); !exists {
 		t.Errorf("Expected %v to be added to activeQ.", highPriorityPodInfo.Pod.Name)
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods) != 0 {
-		t.Errorf("Expected nomindatePods to be empty: %v", q.PodNominator)
+	if len(q.nominator.nominatedPods) != 0 {
+		t.Errorf("Expected nomindatePods to be empty: %v", q.nominator)
 	}
 	// Update highPriorityPodInfo and add a nominatedNodeName to it.
 	q.Update(highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod)
 	if q.activeQ.Len() != 1 {
 		t.Error("Expected only one item in activeQ.")
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods) != 1 {
-		t.Errorf("Expected one item in nomindatePods map: %v", q.PodNominator)
+	if len(q.nominator.nominatedPods) != 1 {
+		t.Errorf("Expected one item in nomindatePods map: %v", q.nominator)
 	}
 	// Updating an unschedulable pod which is not in any of the two queues, should
 	// add the pod to activeQ.
@@ -363,14 +368,14 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(highPriNominatedPodInfo.Pod)); exists {
 		t.Errorf("Didn't expect %v to be in activeQ.", highPriorityPodInfo.Pod.Name)
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods) != 1 {
-		t.Errorf("Expected nomindatePods to have only 'unschedulablePodInfo': %v", q.PodNominator.(*nominator).nominatedPods)
+	if len(q.nominator.nominatedPods) != 1 {
+		t.Errorf("Expected nomindatePods to have only 'unschedulablePodInfo': %v", q.nominator.nominatedPods)
 	}
 	if err := q.Delete(unschedulablePodInfo.Pod); err != nil {
 		t.Errorf("delete failed: %v", err)
 	}
-	if len(q.PodNominator.(*nominator).nominatedPods) != 0 {
-		t.Errorf("Expected nomindatePods to be empty: %v", q.PodNominator)
+	if len(q.nominator.nominatedPods) != 0 {
+		t.Errorf("Expected nomindatePods to be empty: %v", q.nominator)
 	}
 }
 
@@ -842,7 +847,7 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 			podLister := informerFactory.Core().V1().Pods().Lister()
 
 			// Build a PriorityQueue.
-			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodNominator(NewPodNominator(podLister)))
+			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(podLister))
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory.Start(ctx.Done())
@@ -924,14 +929,14 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			"node5": {unschedulablePodInfo},
 		},
 	}
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
 	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	// List of nominated pods shouldn't change after popping them from the queue.
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after popping pods (-want, +got):\n%s", diff)
 	}
 	// Update one of the nominated pods that doesn't have nominatedNodeName in the
@@ -949,14 +954,14 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			"node5": {unschedulablePodInfo},
 		},
 	}
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after updating pods (-want, +got):\n%s", diff)
 	}
 
 	// Attempt to nominate a pod that was deleted from the informer cache.
 	// Nothing should change.
 	q.AddNominatedPod(nonExistentPodInfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after nominating a deleted pod (-want, +got):\n%s", diff)
 	}
 	// Attempt to nominate a pod that was already scheduled in the informer cache.
@@ -964,7 +969,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	scheduledPodCopy := scheduledPodInfo.Pod.DeepCopy()
 	scheduledPodInfo.Pod.Spec.NodeName = ""
 	q.AddNominatedPod(mustNewTestPodInfo(t, scheduledPodCopy), &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after nominating a scheduled pod (-want, +got):\n%s", diff)
 	}
 
@@ -981,7 +986,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			"node5": {unschedulablePodInfo},
 		},
 	}
-	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after deleting pods (-want, +got):\n%s", diff)
 	}
 }
@@ -1197,7 +1202,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	// Add an unschedulable pod to a priority queue.
 	// This makes a situation that the pod was tried to schedule
 	// and had been determined unschedulable so far
-	unschedulablePod := st.MakePod().Name(fmt.Sprintf("test-pod-unscheduled")).Namespace("ns1").UID("tp001").Priority(highPriority).NominatedNodeName("node1").Obj()
+	unschedulablePod := st.MakePod().Name("test-pod-unscheduled").Namespace("ns1").UID("tp001").Priority(highPriority).NominatedNodeName("node1").Obj()
 
 	// Update pod condition to unschedulable.
 	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
