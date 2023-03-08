@@ -1307,8 +1307,8 @@ func doPodResizeResourceQuotaTests() {
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
 		initDefaultResizePolicy(containers)
 		initDefaultResizePolicy(expected)
-		testPod1 := makeTestPod(f.Namespace.Name, "testpod1", tStamp, containers)
-		testPod2 := makeTestPod(f.Namespace.Name, "testpod2", tStamp, containers)
+		testPod1 := makeTestPod(f.Namespace.Name, "rqtestpod1", tStamp, containers)
+		testPod2 := makeTestPod(f.Namespace.Name, "rqtestpod2", tStamp, containers)
 
 		ginkgo.By("creating pods")
 		newPod1 := podClient.CreateSync(ctx, testPod1)
@@ -1421,7 +1421,7 @@ func doPodResizeErrorTests() {
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			initDefaultResizePolicy(tc.containers)
 			initDefaultResizePolicy(tc.expected)
-			testPod = makeTestPod(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod = makeTestPod(f.Namespace.Name, "errtestpod", tStamp, tc.containers)
 
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
@@ -1548,8 +1548,8 @@ func doPodResizeSchedulerTests() {
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
 		initDefaultResizePolicy(c1)
 		initDefaultResizePolicy(c2)
-		testPod1 := makeTestPod(f.Namespace.Name, "testpod1", tStamp, c1)
-		testPod2 := makeTestPod(f.Namespace.Name, "testpod2", tStamp, c2)
+		testPod1 := makeTestPod(f.Namespace.Name, "sctestpod1", tStamp, c1)
+		testPod2 := makeTestPod(f.Namespace.Name, "sctestpod2", tStamp, c2)
 		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
 		e2epod.SetNodeAffinity(&testPod2.Spec, node.Name)
 
@@ -1603,7 +1603,7 @@ func doPodResizeSchedulerTests() {
 
 		tStamp = strconv.Itoa(time.Now().Nanosecond())
 		initDefaultResizePolicy(c3)
-		testPod3 := makeTestPod(f.Namespace.Name, "testpod3", tStamp, c3)
+		testPod3 := makeTestPod(f.Namespace.Name, "sctestpod3", tStamp, c3)
 		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)
 
 		ginkgo.By(fmt.Sprintf("TEST2: Create testPod3 '%s' that cannot fit node '%s' due to insufficient CPU.", testPod3.Name, node.Name))
@@ -1637,7 +1637,7 @@ var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focused) [
 	doPodResizeSchedulerTests()
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling]", func() {
+var _ = SIGDescribe("[Serial] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling]", func() {
 	doPodResizeTests()
 	doPodResizeResourceQuotaTests()
 	doPodResizeErrorTests()
