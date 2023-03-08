@@ -751,10 +751,13 @@ func Test_PolicyExemption(t *testing.T) {
 	}
 
 	// validate that operations to ValidatingAdmissionPolicy are exempt from an existing policy that catches all resources
-	policyCopy := policy.DeepCopy()
+	policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Get(context.TODO(), policy.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ignoreFailurePolicy := admissionregistrationv1alpha1.Ignore
-	policyCopy.Spec.FailurePolicy = &ignoreFailurePolicy
-	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policyCopy, metav1.UpdateOptions{})
+	policy.Spec.FailurePolicy = &ignoreFailurePolicy
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policy, metav1.UpdateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -866,9 +869,12 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 		APIVersion: "v1",
 		Kind:       "Secret",
 	}
-	policyCopy := policy.DeepCopy()
-	policyCopy.Spec.ParamKind = paramKind
-	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policyCopy, metav1.UpdateOptions{})
+	policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Get(context.TODO(), policy.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+	policy.Spec.ParamKind = paramKind
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policy, metav1.UpdateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
