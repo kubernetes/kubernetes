@@ -1542,20 +1542,22 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		pod := testpod.DeepCopy()
-		pod.Spec.Containers[0].Resources.Requests = tt.requests
-		pod.Status.ContainerStatuses[0].ResourcesAllocated = tt.resourcesAllocated
-		pod.Status.Resize = tt.resizeStatus
+		t.Run(tt.name, func(t *testing.T) {
+			pod := testpod.DeepCopy()
+			pod.Spec.Containers[0].Resources.Requests = tt.requests
+			pod.Status.ContainerStatuses[0].ResourcesAllocated = tt.resourcesAllocated
+			pod.Status.Resize = tt.resizeStatus
 
-		res, non0CPU, non0Mem := calculateResource(pod)
-		if !reflect.DeepEqual(tt.expectedResource, res) {
-			t.Errorf("Test: %s expected resource: %+v, got: %+v", tt.name, tt.expectedResource, res)
-		}
-		if non0CPU != tt.expectedNon0CPU {
-			t.Errorf("Test: %s expected non0CPU: %d, got: %d", tt.name, tt.expectedNon0CPU, non0CPU)
-		}
-		if non0Mem != tt.expectedNon0Mem {
-			t.Errorf("Test: %s expected non0Mem: %d, got: %d", tt.name, tt.expectedNon0Mem, non0Mem)
-		}
+			res, non0CPU, non0Mem := calculateResource(pod)
+			if !reflect.DeepEqual(tt.expectedResource, res) {
+				t.Errorf("Test: %s expected resource: %+v, got: %+v", tt.name, tt.expectedResource, res)
+			}
+			if non0CPU != tt.expectedNon0CPU {
+				t.Errorf("Test: %s expected non0CPU: %d, got: %d", tt.name, tt.expectedNon0CPU, non0CPU)
+			}
+			if non0Mem != tt.expectedNon0Mem {
+				t.Errorf("Test: %s expected non0Mem: %d, got: %d", tt.name, tt.expectedNon0Mem, non0Mem)
+			}
+		})
 	}
 }
