@@ -48,3 +48,5 @@ linters-settings: # please keep this alphabetized
   stylecheck:
     checks:        # golangci-strict.yaml uses the default checks.
       - "ST1019"   # Importing the same package multiple times - enabled in golangci-strict.yaml.
+
+  foobar:
