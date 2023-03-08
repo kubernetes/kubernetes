@@ -790,30 +790,69 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 	}
 }
 
-func validateStatefulSetStatus(replicas int32, readyReplicas int32, currentReplicas int32, updatedReplicas int32, availableReplicas int32, observedGeneration *int64, collisionCount *int32) error {
+// StatefulSet represents a Kubernetes StatefulSet object and provides a method for validating its status.
+type StatefulSet struct {
+	Replicas           int32  // The desired number of replicas of the StatefulSet.
+	ReadyReplicas      int32  // The number of replicas that have reached the "Ready" state.
+	CurrentReplicas    int32  // The number of replicas that are currently running.
+	UpdatedReplicas    int32  // The number of replicas that have been updated to a new version.
+	AvailableReplicas  int32  // The number of replicas that are available for serving traffic.
+	ObservedGeneration *int64 // The generation observed by the StatefulSet controller.
+	CollisionCount     *int32 // The number of collisions between the StatefulSet controller and other controllers.
+}
+
+// Validate checks the status of the StatefulSet and returns an error if any of the values are invalid.
+func (s *StatefulSet) Validate() error {
 	// Check for invalid inputs and return an error if any are found
-	if replicas < 0 || readyReplicas < 0 || currentReplicas < 0 || updatedReplicas < 0 || availableReplicas < 0 {
-		return fmt.Errorf("invalid input: replicas=%d, readyReplicas=%d, currentReplicas=%d, updatedReplicas=%d, availableReplicas=%d", replicas, readyReplicas, currentReplicas, updatedReplicas, availableReplicas)
+	if s.Replicas < 0 || s.ReadyReplicas < 0 || s.CurrentReplicas < 0 || s.UpdatedReplicas < 0 || s.AvailableReplicas < 0 {
+		return fmt.Errorf("invalid input: replicas=%d, readyReplicas=%d, currentReplicas=%d, updatedReplicas=%d, availableReplicas=%d", s.Replicas, s.ReadyReplicas, s.CurrentReplicas, s.UpdatedReplicas, s.AvailableReplicas)
 	}
-	if readyReplicas > replicas {
-		return fmt.Errorf("invalid input: readyReplicas=%d greater than replicas=%d", readyReplicas, replicas)
+	if s.ReadyReplicas > s.Replicas {
+		return fmt.Errorf("invalid input: readyReplicas=%d greater than replicas=%d", s.ReadyReplicas, s.Replicas)
 	}
-	if currentReplicas > replicas {
-		return fmt.Errorf("invalid input: currentReplicas=%d greater than replicas=%d", currentReplicas, replicas)
+	if s.CurrentReplicas > s.Replicas {
+		return fmt.Errorf("invalid input: currentReplicas=%d greater than replicas=%d", s.CurrentReplicas, s.Replicas)
 	}
-	if updatedReplicas > replicas {
-		return fmt.Errorf("invalid input: updatedReplicas=%d greater than replicas=%d", updatedReplicas, replicas)
+	if s.UpdatedReplicas > s.Replicas {
+		return fmt.Errorf("invalid input: updatedReplicas=%d greater than replicas=%d", s.UpdatedReplicas, s.Replicas)
 	}
-	if observedGeneration != nil && *observedGeneration < 0 {
-		return fmt.Errorf("invalid input: observedGeneration=%d", *observedGeneration)
+	if s.ObservedGeneration != nil && *s.ObservedGeneration < 0 {
+		return fmt.Errorf("invalid input: observedGeneration=%d", *s.ObservedGeneration)
 	}
-	if collisionCount != nil && *collisionCount < 0 {
-		return fmt.Errorf("invalid input: collisionCount=%d", *collisionCount)
+	if s.CollisionCount != nil && *s.CollisionCount < 0 {
+		return fmt.Errorf("invalid input: collisionCount=%d", *s.CollisionCount)
 	}
 
 	// If no invalid inputs are found, return nil (no error)
 	return nil
 }
+
+/* NOTE:
+
+To use the StatefulSet struct, you would create an instance of the struct and call the Validate method:
+
+func main() {
+    // Create a sample StatefulSet instance
+    myStatefulSet := StatefulSet{
+        Replicas:          3,
+        ReadyReplicas:     3,
+        CurrentReplicas:   3,
+        UpdatedReplicas:   3,
+        AvailableReplicas: 3,
+        ObservedGeneration: nil,
+        CollisionCount:    nil,
+    }
+
+    // Validate the StatefulSet instance
+    err := myStatefulSet.Validate()
+    if err != nil {
+        fmt.Println("Validation failed:", err)
+    } else {
+        fmt.Println("Validation succeeded!")
+    }
+}
+
+*/
 
 // TestValidateStatefulSetStatus tests the validateStatefulSetStatus function with various test cases
 func TestValidateStatefulSetStatus(t *testing.T) {
@@ -834,8 +873,8 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		{"invalid readyReplicas", 3, -1, 2, 1, 0, nil, nil, true},
 		{"invalid currentReplicas", 3, 3, -1, 1, 0, nil, nil, true},
 		{"invalid updatedReplicas", 3, 3, 2, -1, 0, nil, nil, true},
-		{"invalid observedGeneration", 3, 3, 2, 1, 0, int64Ptr(-1), nil, true},
-		{"invalid collisionCount", 3, 3, 2, 1, 0, nil, int32Ptr(-1), true},
+		{"invalid observedGeneration", 3, 3, 2, 1, 0, Int64Ptr(-1), nil, true},
+		{"invalid collisionCount", 3, 3, 2, 1, 0, nil, Int32Ptr(-1), true},
 		{"readyReplicas greater than replicas", 3, 4, 2, 1, 0, nil, nil, true},
 		{"currentReplicas greater than replicas", 3, 3, 4, 1, 0, nil, nil, true},
 		{"updatedReplicas greater than replicas", 3, 3, 2, 4, 0, nil, nil, true},
@@ -862,16 +901,6 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-// int64Ptr is a helper function to create a pointer to an int64 value
-func int64Ptr(i int64) *int64 {
-	return &i
-}
-
-// int32Ptr is a helper function to create a pointer to an int32 value
-func int32Ptr(i int32) *int32 {
-	return &i
 }
 
 func TestValidateStatefulSetUpdate(t *testing.T) {
