@@ -201,6 +201,130 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			})
 		}
 	})
+	ginkgo.Context("CSI online volume expansion with secret[Feature:CSINodeExpandSecret]", func() {
+		var stringSecret = map[string]string{
+			"username": "admin",
+			"password": "t0p-Secret",
+		}
+		trackedCalls := []string{
+			"NodeExpandVolume",
+		}
+		tests := []struct {
+			name          string
+			disableAttach bool
+			expectedCalls []csiCall
+
+			// Called for each NodeExpandVolume calls, with counter incremented atomically before
+			// the invocation (i.e first value will be 1).
+			nodeExpandHook func(counter int64) error
+		}{
+			{
+				name: "should expand volume without restarting pod if attach=on, nodeExpansion=on, csiNodeExpandSecret=on",
+				expectedCalls: []csiCall{
+					{expectedMethod: "NodeExpandVolume", expectedError: codes.OK, expectedSecret: stringSecret},
+				},
+			},
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func(ctx context.Context) {
+				var (
+					err        error
+					hooks      *drivers.Hooks
+					secretName = "test-secret"
+					secret     = &v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: f.Namespace.Name,
+							Name:      secretName,
+						},
+						StringData: stringSecret,
+					}
+				)
+				if test.nodeExpandHook != nil {
+					hooks = createPreHook("NodeExpandVolume", test.nodeExpandHook)
+				}
+				params := testParameters{enableResizing: true, enableNodeExpansion: true, enableCSINodeExpandSecret: true, hooks: hooks}
+				if test.disableAttach {
+					params.disableAttach = true
+					params.registerDriver = true
+				}
+
+				m.init(ctx, params)
+				ginkgo.DeferCleanup(m.cleanup)
+
+				if secret, err := m.cs.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+					framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+				}
+
+				sc, pvc, pod := m.createPod(ctx, pvcReference)
+				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
+
+				if !*sc.AllowVolumeExpansion {
+					framework.Fail("failed creating sc with allowed expansion")
+				}
+				if sc.Parameters == nil {
+					framework.Fail("failed creating sc with secret")
+				}
+				if _, ok := sc.Parameters[csiNodeExpandSecretKey]; !ok {
+					framework.Failf("creating sc without %s", csiNodeExpandSecretKey)
+				}
+				if _, ok := sc.Parameters[csiNodeExpandSecretNamespaceKey]; !ok {
+					framework.Failf("creating sc without %s", csiNodeExpandSecretNamespaceKey)
+				}
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+
+				pv, err := m.cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+				if err != nil {
+					framework.Failf("failed to get pv %s, %v", pvc.Spec.VolumeName, err)
+				}
+				if pv.Spec.CSI == nil || pv.Spec.CSI.NodeExpandSecretRef == nil {
+					framework.Fail("creating pv without 'NodeExpandSecretRef'")
+				}
+
+				ginkgo.By("Expanding current pvc")
+				newSize := resource.MustParse("6Gi")
+				newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, m.cs)
+				framework.ExpectNoError(err, "While updating pvc for more size")
+				pvc = newPVC
+				gomega.Expect(pvc).NotTo(gomega.BeNil())
+
+				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+				if pvcSize.Cmp(newSize) != 0 {
+					framework.Failf("error updating pvc size %q", pvc.Name)
+				}
+
+				ginkgo.By("Waiting for persistent volume resize to finish")
+				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
+				framework.ExpectNoError(err, "While waiting for PV resize to finish")
+
+				ginkgo.By("Waiting for all remaining expected CSI calls")
+				err = wait.Poll(time.Second, csiResizeWaitPeriod, func() (done bool, err error) {
+					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					if err != nil {
+						return true, err
+					}
+					if index == 0 {
+						// No CSI call received yet
+						return false, nil
+					}
+					if len(test.expectedCalls) == index {
+						// all calls received
+						return true, nil
+					}
+					return false, nil
+				})
+				framework.ExpectNoError(err, "while waiting for all CSI calls")
+
+				ginkgo.By("Waiting for PVC resize to finish")
+				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
+				framework.ExpectNoError(err, "while waiting for PVC to finish")
+
+				pvcConditions := pvc.Status.Conditions
+				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			})
+		}
+	})
 	ginkgo.Context("CSI online volume expansion", func() {
 		tests := []struct {
 			name          string
