@@ -50,7 +50,9 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 }
 
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "statefulset"))
 	go statefulset.NewStatefulSetController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
