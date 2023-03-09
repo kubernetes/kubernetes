@@ -196,6 +196,7 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
-	reqs, limits = v1resource.PodRequestsAndLimitsReuse(pod, reuseReqs, reuseLimits)
+	reqs = v1resource.PodRequests(pod, v1resource.PodResourcesOptions{Reuse: reuseReqs})
+	limits = v1resource.PodLimits(pod, v1resource.PodResourcesOptions{Reuse: reuseLimits})
 	return
 }
