@@ -103,6 +103,8 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // preScoreState computed at PreScore and used at Score.
 type preScoreState struct {
+	// podRequests have the same order as the resources defined in NodeResourcesBalancedAllocationArgs.Resources,
+	// same for other place we store a list like that.
 	podRequests []int64
 }
 

@@ -50,6 +50,8 @@ const (
 
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
 type balancedAllocationPreScoreState struct {
+	// podRequests have the same order of the resources defined in NodeResourcesFitArgs.Resources,
+	// same for other place we store a list like that.
 	podRequests []int64
 }
 
