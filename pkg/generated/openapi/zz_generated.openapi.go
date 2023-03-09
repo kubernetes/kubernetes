@@ -58207,7 +58207,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"memoryThrottlingFactor": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.8",
+							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.9",
 							Type:        []string{"number"},
 							Format:      "double",
 						},

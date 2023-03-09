@@ -65,7 +65,7 @@ var (
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
-		MemoryThrottlingFactor:          utilpointer.Float64(0.8),
+		MemoryThrottlingFactor:          utilpointer.Float64(0.9),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,

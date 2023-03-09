@@ -20,6 +20,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"math"
+	"os"
 	"strconv"
 	"time"
 
@@ -36,6 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+var defaultPageSize = int64(os.Getpagesize())
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
@@ -112,22 +116,31 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 			unified[cm.MemoryMin] = strconv.FormatInt(memoryRequest, 10)
 		}
 
-		// If container sets limits.memory, we set memory.high=pod.spec.containers[i].resources.limits[memory] * memory_throttling_factor
-		// for container level cgroup if memory.high>memory.min.
-		// If container doesn't set limits.memory, we set memory.high=node_allocatable_memory * memory_throttling_factor
-		// for container level cgroup.
-		memoryHigh := int64(0)
-		if memoryLimit != 0 {
-			memoryHigh = int64(float64(memoryLimit) * m.memoryThrottlingFactor)
-		} else {
-			allocatable := m.getNodeAllocatable()
-			allocatableMemory, ok := allocatable[v1.ResourceMemory]
-			if ok && allocatableMemory.Value() > 0 {
-				memoryHigh = int64(float64(allocatableMemory.Value()) * m.memoryThrottlingFactor)
+		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
+		// Here, we only check from memory perspective. Hence MemoryQoS feature is disabled on those QoS pods by not setting memory.high.
+		if memoryRequest != memoryLimit {
+			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
+			// It will be set based on formula:
+			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
+			// where default value of memory throttling factor is set to 0.9
+			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
+			memoryHigh := int64(0)
+			if memoryLimit != 0 {
+				memoryHigh = int64(math.Floor(
+					float64(memoryRequest)+
+						(float64(memoryLimit)-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+			} else {
+				allocatable := m.getNodeAllocatable()
+				allocatableMemory, ok := allocatable[v1.ResourceMemory]
+				if ok && allocatableMemory.Value() > 0 {
+					memoryHigh = int64(math.Floor(
+						float64(memoryRequest)+
+							(float64(allocatableMemory.Value())-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+				}
 			}
-		}
-		if memoryHigh > memoryRequest {
-			unified[cm.MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+			if memoryHigh != 0 && memoryHigh > memoryRequest {
+				unified[cm.MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+			}
 		}
 		if len(unified) > 0 {
 			if lcr.Unified == nil {
