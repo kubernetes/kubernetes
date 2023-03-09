@@ -45,7 +45,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
-	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod]", func() {
+	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux]", func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
