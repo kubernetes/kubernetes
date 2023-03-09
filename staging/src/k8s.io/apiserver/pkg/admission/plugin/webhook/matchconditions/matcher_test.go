@@ -334,9 +334,9 @@ func TestMatch(t *testing.T) {
 			m := NewMatcher(&fakeCelFilter{
 				evaluations: tc.evaluations,
 				throwError:  tc.throwError,
-			}, nil, tc.failPolicy, "test", "testhook")
+			}, tc.failPolicy, "test", "testhook")
 			ctx := context.TODO()
-			matchResult := m.Match(ctx, fakeVersionedAttr, nil)
+			matchResult := m.Match(ctx, fakeVersionedAttr, nil, nil)
 
 			if matchResult.Error != nil {
 				if len(tc.expectError) == 0 {

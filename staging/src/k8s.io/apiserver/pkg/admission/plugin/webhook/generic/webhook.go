@@ -225,8 +225,8 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 			return nil, apierrors.NewInternalError(err)
 		}
 
-		matcher := h.GetCompiledMatcher(a.filterCompiler, a.authorizer)
-		matchResult := matcher.Match(ctx, versionedAttr, nil)
+		matcher := h.GetCompiledMatcher(a.filterCompiler)
+		matchResult := matcher.Match(ctx, versionedAttr, nil, a.authorizer)
 
 		if matchResult.Error != nil {
 			klog.Warningf("Failed evaluating match conditions, failing closed %v: %v", h.GetName(), matchResult.Error)
