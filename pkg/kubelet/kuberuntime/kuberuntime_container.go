@@ -52,6 +52,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/tail"
@@ -855,7 +856,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 // index of next init container to start, or done if there are no further init containers.
 // Status is only returned if an init container is failed, in which case next will
 // point to the current container.
-func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
+func (m *kubeGenericRuntimeManager) findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
 	}
@@ -863,17 +864,19 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 	// If any of the main containers have status and are Running, then all init containers must
 	// have been executed at some point in the past.  However, they could have been removed
 	// from the container runtime now, and if we proceed, it would appear as if they
-	// never ran and will re-execute improperly.
+	// never ran and will re-execute improperly except for the sidecar containers.
+	hasInitialized := false
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status != nil && status.State == kubecontainer.ContainerStateRunning {
-			return nil, nil, true
+			hasInitialized = true
+			break
 		}
 	}
 
-	// If there are failed containers, return the status of the last failed one.
-	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+	// If there are failed containers, return the status of the first failed one.
+	for i := range pod.Spec.InitContainers {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status != nil && isInitContainerFailed(status) {
@@ -882,30 +885,40 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 	}
 
 	// There are no failed containers now.
-	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
-		container := &pod.Spec.InitContainers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status == nil {
+	for _, container := range pod.Spec.InitContainers {
+		if hasInitialized && !types.IsSidecarContainer(&container) {
 			continue
 		}
 
-		// container is still running, return not done.
-		if status.State == kubecontainer.ContainerStateRunning {
-			return nil, nil, false
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			return nil, &container, false
 		}
 
-		if status.State == kubecontainer.ContainerStateExited {
-			// all init containers successful
-			if i == (len(pod.Spec.InitContainers) - 1) {
-				return nil, nil, true
+		switch status.State {
+		case kubecontainer.ContainerStateCreated:
+			return nil, nil, false
+
+		case kubecontainer.ContainerStateRunning:
+			if !types.IsSidecarContainer(&container) {
+				return nil, nil, false
 			}
 
-			// all containers up to i successful, go to i+1
-			return nil, &pod.Spec.InitContainers[i+1], false
+			if startup, found := m.startupManager.Get(status.ID); found && startup == proberesults.Failure {
+				return nil, nil, false
+			}
+			// sidecar container has started, continue
+
+		case kubecontainer.ContainerStateExited:
+			if types.IsSidecarContainer(&container) {
+				return nil, &container, false
+			}
+		default:
+			return nil, &container, false
 		}
 	}
 
-	return nil, &pod.Spec.InitContainers[0], false
+	return nil, nil, true
 }
 
 // GetContainerLogs returns logs of a specific container.
