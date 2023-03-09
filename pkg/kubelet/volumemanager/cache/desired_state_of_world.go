@@ -357,10 +357,6 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				if err := handleSELinuxMetricError(fullErr, supported, seLinuxVolumeContextMismatchWarnings, seLinuxVolumeContextMismatchErrors); err != nil {
 					return "", err
 				}
-			} else {
-				if seLinuxFileLabel != "" {
-					seLinuxVolumesAdmitted.Add(1.0)
-				}
 			}
 		}
 	}
