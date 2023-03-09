@@ -823,7 +823,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 		// We should not create a sandbox for a Pod if initialization is done and there is no container to start.
 		if len(containersToStart) == 0 {
-			_, _, done := findNextInitContainerToRun(pod, podStatus)
+			_, _, done := m.findNextInitContainerToRun(pod, podStatus)
 			if done {
 				changes.CreateSandbox = false
 				return changes
@@ -850,11 +850,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Check initialization progress.
-	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
+	initLastStatus, next, done := m.findNextInitContainerToRun(pod, podStatus)
 	if !done {
 		if next != nil {
 			initFailed := initLastStatus != nil && isInitContainerFailed(initLastStatus)
-			if initFailed && !shouldRestartOnFailure(pod) {
+			if initFailed && !shouldRestartOnFailure(pod) && !types.IsSidecarContainer(next) {
 				changes.KillPod = true
 			} else {
 				// Always try to stop containers in unknown state first.
