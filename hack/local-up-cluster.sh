@@ -1151,6 +1151,7 @@ echo "Using GO_OUT ${GO_OUT}"
 export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
+  trap cleanup INT
 fi
 
 echo "Starting services now!"
