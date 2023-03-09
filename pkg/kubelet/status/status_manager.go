@@ -97,11 +97,9 @@ type PodStatusProvider interface {
 
 // PodDeletionSafetyProvider provides guarantees that a pod can be safely deleted.
 type PodDeletionSafetyProvider interface {
-	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
-	PodCouldHaveRunningContainers(pod *v1.Pod) bool
-	// PodMightNeedToUnprepareResources returns true if the pod might need to
-	// unprepare resources
-	PodMightNeedToUnprepareResources(UID types.UID) bool
+	// ShouldDelayTransitioningPodToTerminal returns true if transitioning pod
+	// to terminal state should be delayed.
+	ShouldDelayTransitioningPodToTerminal(pod *v1.Pod) bool
 }
 
 type PodStartupLatencyStateHelper interface {
@@ -827,12 +825,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 
-	delayTransitioningToTerminal := m.podDeletionSafety.PodCouldHaveRunningContainers(pod)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		delayTransitioningToTerminal = delayTransitioningToTerminal || m.podDeletionSafety.PodMightNeedToUnprepareResources(pod.UID)
-	}
-
-	mergedStatus := mergePodStatus(pod.Status, status.status, delayTransitioningToTerminal)
+	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.ShouldDelayTransitioningPodToTerminal(pod))
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(context.TODO(), m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
 	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
@@ -1045,9 +1038,8 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, delayTransitioningT
 	newPodStatus.Conditions = podConditions
 
 	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
-	// The Kubelet should never transition a pod to terminal status that could have running
-	// containers or unprepared dynamic resources and thus actively be leveraging exclusive
-	// resources.
+	// The Kubelet should never transition a pod to terminal status that is actively
+	// leveraging exclusive resources.
 	// Note that resources
 	// like volumes are reconciled by a subsystem in the Kubelet and will converge if a new
 	// pod reuses an exclusive resource (unmount -> free -> mount), which means we do not

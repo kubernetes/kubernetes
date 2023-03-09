@@ -901,10 +901,13 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	return pullSecrets
 }
 
-// PodCouldHaveRunningContainers returns true if the pod with the given UID could still have running
-// containers. This returns false if the pod has not yet been started or the pod is unknown.
-func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
-	return kl.podWorkers.CouldHaveRunningContainers(pod.UID)
+// ShouldDelayTransitioningPodToTerminal returns true if transitioning pod to terminal state should be delayed.
+func (kl *Kubelet) ShouldDelayTransitioningPodToTerminal(pod *v1.Pod) bool {
+	delayTransition := kl.podWorkers.CouldHaveRunningContainers(pod.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		delayTransition = delayTransition || kl.containerManager.PodMightNeedToUnprepareResources(pod.UID)
+	}
+	return delayTransition
 }
 
 // PodIsFinished returns true if SyncTerminatedPod is finished, ie.
@@ -2166,11 +2169,6 @@ func (kl *Kubelet) enableHostUserNamespace(ctx context.Context, pod *v1.Pod) boo
 		return true
 	}
 	return false
-}
-
-// PodMightNeedToUnprepareResources wraps containerManager PodMightNeedToUnprepareResources call
-func (kl *Kubelet) PodMightNeedToUnprepareResources(UID types.UID) bool {
-	return kl.containerManager.PodMightNeedToUnprepareResources(UID)
 }
 
 // hasNonNamespacedCapability returns true if MKNOD, SYS_TIME, or SYS_MODULE is requested for any container.
