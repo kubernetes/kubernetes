@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	cidrset "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/multicidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -894,7 +894,7 @@ func (r *multiCIDRRangeAllocator) orderedMatchingClusterCIDRs(logger klog.Logger
 	}
 
 	// Append the catch all CIDR config.
-	defaultSelector, err := v1helper.NodeSelectorAsSelector(defaultNodeSelector())
+	defaultSelector, err := nodeSelectorAsSelector(defaultNodeSelector())
 	if err != nil {
 		return nil, err
 	}
@@ -1213,9 +1213,9 @@ func (r *multiCIDRRangeAllocator) nodeSelectorKey(clusterCIDR *networkingv1alpha
 	var err error
 
 	if clusterCIDR.Spec.NodeSelector != nil {
-		nodeSelector, err = v1helper.NodeSelectorAsSelector(clusterCIDR.Spec.NodeSelector)
+		nodeSelector, err = nodeSelectorAsSelector(clusterCIDR.Spec.NodeSelector)
 	} else {
-		nodeSelector, err = v1helper.NodeSelectorAsSelector(defaultNodeSelector())
+		nodeSelector, err = nodeSelectorAsSelector(defaultNodeSelector())
 	}
 
 	if err != nil {
@@ -1256,4 +1256,66 @@ func listClusterCIDRs(ctx context.Context, kubeClient clientset.Interface) (*net
 			apiserverStartupGracePeriod)
 	}
 	return clusterCIDRList, nil
+}
+
+// nodeSelectorRequirementsAsLabelRequirements converts the NodeSelectorRequirement
+// type to a labels.Requirement type.
+func nodeSelectorRequirementsAsLabelRequirements(nsr v1.NodeSelectorRequirement) (*labels.Requirement, error) {
+	var op selection.Operator
+	switch nsr.Operator {
+	case v1.NodeSelectorOpIn:
+		op = selection.In
+	case v1.NodeSelectorOpNotIn:
+		op = selection.NotIn
+	case v1.NodeSelectorOpExists:
+		op = selection.Exists
+	case v1.NodeSelectorOpDoesNotExist:
+		op = selection.DoesNotExist
+	case v1.NodeSelectorOpGt:
+		op = selection.GreaterThan
+	case v1.NodeSelectorOpLt:
+		op = selection.LessThan
+	default:
+		return nil, fmt.Errorf("%q is not a valid node selector operator", nsr.Operator)
+	}
+	return labels.NewRequirement(nsr.Key, op, nsr.Values)
+}
+
+// TODO: nodeSelect and labelSelector semantics are different and the function
+// doesn't translate them correctly, this has to be fixed before Beta
+// xref: https://issues.k8s.io/116419
+// nodeSelectorAsSelector converts the NodeSelector api type into a struct that
+// implements labels.Selector
+// Note: This function should be kept in sync with the selector methods in
+// pkg/labels/selector.go
+func nodeSelectorAsSelector(ns *v1.NodeSelector) (labels.Selector, error) {
+	if ns == nil {
+		return labels.Nothing(), nil
+	}
+	if len(ns.NodeSelectorTerms) == 0 {
+		return labels.Everything(), nil
+	}
+	var requirements []labels.Requirement
+
+	for _, nsTerm := range ns.NodeSelectorTerms {
+		for _, expr := range nsTerm.MatchExpressions {
+			req, err := nodeSelectorRequirementsAsLabelRequirements(expr)
+			if err != nil {
+				return nil, err
+			}
+			requirements = append(requirements, *req)
+		}
+
+		for _, field := range nsTerm.MatchFields {
+			req, err := nodeSelectorRequirementsAsLabelRequirements(field)
+			if err != nil {
+				return nil, err
+			}
+			requirements = append(requirements, *req)
+		}
+	}
+
+	selector := labels.NewSelector()
+	selector = selector.Add(requirements...)
+	return selector, nil
 }
