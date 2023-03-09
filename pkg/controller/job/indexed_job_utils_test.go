@@ -423,12 +423,12 @@ func TestPodGenerateNameWithIndex(t *testing.T) {
 		"job name exceeds MaxGeneneratedNameLength": {
 			jobname:             "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooo",
 			index:               1,
-			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhh-1-",
+			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooo-1-",
 		},
 		"job name with index suffix exceeds MaxGeneratedNameLength": {
 			jobname:             "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhoo",
 			index:               1,
-			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhh-1-",
+			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooo-1-",
 		},
 	}
 	for name, tc := range cases {
