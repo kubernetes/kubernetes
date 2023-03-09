@@ -18,6 +18,7 @@ package cpuset
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestCPUSetSize(t *testing.T) {
 	for _, c := range testCases {
 		actual := c.cpuset.Size()
 		if actual != c.expected {
-			t.Fatalf("expected: %d, actual: %d, cpuset: [%v]", c.expected, actual, c.cpuset)
+			t.Errorf("expected: %d, actual: %d, cpuset: [%v]", c.expected, actual, c.cpuset)
 		}
 	}
 }
@@ -52,7 +53,7 @@ func TestCPUSetIsEmpty(t *testing.T) {
 	for _, c := range testCases {
 		actual := c.cpuset.IsEmpty()
 		if actual != c.expected {
-			t.Fatalf("expected: %t, IsEmpty() returned: %t, cpuset: [%v]", c.expected, actual, c.cpuset)
+			t.Errorf("expected: %t, IsEmpty() returned: %t, cpuset: [%v]", c.expected, actual, c.cpuset)
 		}
 	}
 }
@@ -71,12 +72,12 @@ func TestCPUSetContains(t *testing.T) {
 	for _, c := range testCases {
 		for _, elem := range c.mustContain {
 			if !c.cpuset.Contains(elem) {
-				t.Fatalf("expected cpuset to contain element %d: [%v]", elem, c.cpuset)
+				t.Errorf("expected cpuset to contain element %d: [%v]", elem, c.cpuset)
 			}
 		}
 		for _, elem := range c.mustNotContain {
 			if c.cpuset.Contains(elem) {
-				t.Fatalf("expected cpuset not to contain element %d: [%v]", elem, c.cpuset)
+				t.Errorf("expected cpuset not to contain element %d: [%v]", elem, c.cpuset)
 			}
 		}
 	}
@@ -90,6 +91,7 @@ func TestCPUSetEqual(t *testing.T) {
 		{New(), New()},
 		{New(5), New(5)},
 		{New(1, 2, 3, 4, 5), New(1, 2, 3, 4, 5)},
+		{New(5, 4, 3, 2, 1), New(1, 2, 3, 4, 5)},
 	}
 
 	shouldNotEqual := []struct {
@@ -106,12 +108,12 @@ func TestCPUSetEqual(t *testing.T) {
 
 	for _, c := range shouldEqual {
 		if !c.s1.Equals(c.s2) {
-			t.Fatalf("expected cpusets to be equal: s1: [%v], s2: [%v]", c.s1, c.s2)
+			t.Errorf("expected cpusets to be equal: s1: [%v], s2: [%v]", c.s1, c.s2)
 		}
 	}
 	for _, c := range shouldNotEqual {
 		if c.s1.Equals(c.s2) {
-			t.Fatalf("expected cpusets to not be equal: s1: [%v], s2: [%v]", c.s1, c.s2)
+			t.Errorf("expected cpusets to not be equal: s1: [%v], s2: [%v]", c.s1, c.s2)
 		}
 	}
 }
@@ -139,16 +141,22 @@ func TestCPUSetIsSubsetOf(t *testing.T) {
 	shouldNotBeSubset := []struct {
 		s1 CPUSet
 		s2 CPUSet
-	}{}
+	}{
+		// A set with more elements is not a subset.
+		{New(5), New()},
+
+		// Disjoint set is not a subset.
+		{New(6), New(5)},
+	}
 
 	for _, c := range shouldBeSubset {
 		if !c.s1.IsSubsetOf(c.s2) {
-			t.Fatalf("expected s1 to be a subset of s2: s1: [%v], s2: [%v]", c.s1, c.s2)
+			t.Errorf("expected s1 to be a subset of s2: s1: [%v], s2: [%v]", c.s1, c.s2)
 		}
 	}
 	for _, c := range shouldNotBeSubset {
 		if c.s1.IsSubsetOf(c.s2) {
-			t.Fatalf("expected s1 to not be a subset of s2: s1: [%v], s2: [%v]", c.s1, c.s2)
+			t.Errorf("expected s1 to not be a subset of s2: s1: [%v], s2: [%v]", c.s1, c.s2)
 		}
 	}
 }
@@ -185,7 +193,7 @@ func TestCPUSetUnion(t *testing.T) {
 	for _, c := range testCases {
 		result := c.s1.Union(c.others...)
 		if !result.Equals(c.expected) {
-			t.Fatalf("expected the union of s1 and s2 to be [%v] (got [%v]), others: [%v]", c.expected, result, c.others)
+			t.Errorf("expected the union of s1 and s2 to be [%v] (got [%v]), others: [%v]", c.expected, result, c.others)
 		}
 	}
 }
@@ -216,7 +224,7 @@ func TestCPUSetIntersection(t *testing.T) {
 	for _, c := range testCases {
 		result := c.s1.Intersection(c.s2)
 		if !result.Equals(c.expected) {
-			t.Fatalf("expected the intersection of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
+			t.Errorf("expected the intersection of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
 		}
 	}
 }
@@ -247,7 +255,7 @@ func TestCPUSetDifference(t *testing.T) {
 	for _, c := range testCases {
 		result := c.s1.Difference(c.s2)
 		if !result.Equals(c.expected) {
-			t.Fatalf("expected the difference of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
+			t.Errorf("expected the difference of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
 		}
 	}
 }
@@ -255,17 +263,26 @@ func TestCPUSetDifference(t *testing.T) {
 func TestCPUSetList(t *testing.T) {
 	testCases := []struct {
 		set      CPUSet
-		expected []int
+		expected []int // must be sorted
 	}{
 		{New(), []int{}},
 		{New(5), []int{5}},
 		{New(1, 2, 3, 4, 5), []int{1, 2, 3, 4, 5}},
+		{New(5, 4, 3, 2, 1), []int{1, 2, 3, 4, 5}},
 	}
 
 	for _, c := range testCases {
 		result := c.set.List()
 		if !reflect.DeepEqual(result, c.expected) {
-			t.Fatalf("expected set as slice to be [%v] (got [%v]), s: [%v]", c.expected, result, c.set)
+			t.Errorf("unexpected List() contents. got [%v] want [%v] (set: [%v])", result, c.expected, c.set)
+		}
+
+		// We cannot rely on internal storage order details for a unit test.
+		// The best we can do is to sort the output of 'UnsortedList'.
+		result = c.set.UnsortedList()
+		sort.Ints(result)
+		if !reflect.DeepEqual(result, c.expected) {
+			t.Errorf("unexpected UnsortedList() contents. got [%v] want [%v] (set: [%v])", result, c.expected, c.set)
 		}
 	}
 }
@@ -284,7 +301,7 @@ func TestCPUSetString(t *testing.T) {
 	for _, c := range testCases {
 		result := c.set.String()
 		if result != c.expected {
-			t.Fatalf("expected set as string to be %s (got \"%s\"), s: [%v]", c.expected, result, c.set)
+			t.Errorf("expected set as string to be %s (got \"%s\"), s: [%v]", c.expected, result, c.set)
 		}
 	}
 }
@@ -307,10 +324,10 @@ func TestParse(t *testing.T) {
 	for _, c := range positiveTestCases {
 		result, err := Parse(c.cpusetString)
 		if err != nil {
-			t.Fatalf("expected error not to have occurred: %v", err)
+			t.Errorf("expected error not to have occurred: %v", err)
 		}
 		if !result.Equals(c.expected) {
-			t.Fatalf("expected string \"%s\" to parse as [%v] (got [%v])", c.cpusetString, c.expected, result)
+			t.Errorf("expected string \"%s\" to parse as [%v] (got [%v])", c.cpusetString, c.expected, result)
 		}
 	}
 
@@ -326,7 +343,16 @@ func TestParse(t *testing.T) {
 	for _, c := range negativeTestCases {
 		result, err := Parse(c)
 		if err == nil {
-			t.Fatalf("expected parse failure of \"%s\", but it succeeded as \"%s\"", c, result.String())
+			t.Errorf("expected parse failure of \"%s\", but it succeeded as \"%s\"", c, result.String())
 		}
+	}
+}
+
+func TestClone(t *testing.T) {
+	original := New(1, 2, 3, 4, 5)
+	clone := original.Clone()
+
+	if !original.Equals(clone) {
+		t.Errorf("expected clone [%v] to equal original [%v]", clone, original)
 	}
 }

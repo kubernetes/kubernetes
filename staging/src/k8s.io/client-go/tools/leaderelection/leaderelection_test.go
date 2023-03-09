@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -74,13 +74,15 @@ type Reactor struct {
 }
 
 func testTryAcquireOrRenew(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+	past := clock.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
+		retryAfter     time.Duration
 		reactors       []Reactor
 		expectedEvents []string
 
@@ -123,6 +125,33 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+		},
+		{
+			name: "acquire from led object with the lease duration seconds",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			retryAfter:       3 * time.Second,
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
@@ -283,10 +312,17 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
 				observedTime:      test.observedTime,
-				clock:             clock.RealClock{},
+				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
-				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				if test.retryAfter != 0 {
+					time.Sleep(test.retryAfter)
+					if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+						t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+					}
+				} else {
+					t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				}
 			}
 
 			le.observedRecord.AcquireTime = metav1.Time{}
@@ -326,8 +362,8 @@ func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
 	oldSpec := coordinationv1.LeaseSpec{
 		HolderIdentity:       &holderIdentity,
 		LeaseDurationSeconds: &leaseDurationSeconds,
-		AcquireTime:          &metav1.MicroTime{time.Now()},
-		RenewTime:            &metav1.MicroTime{time.Now()},
+		AcquireTime:          &metav1.MicroTime{Time: time.Now()},
+		RenewTime:            &metav1.MicroTime{Time: time.Now()},
 		LeaseTransitions:     &leaseTransitions,
 	}
 
@@ -378,8 +414,9 @@ func GetRawRecordOrDie(t *testing.T, objectType string, ler rl.LeaderElectionRec
 }
 
 func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
-	future := time.Now().Add(1000 * time.Hour)
-	past := time.Now().Add(-1000 * time.Hour)
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+	past := clock.Now().Add(-1000 * time.Hour)
 	primaryType, secondaryType := multiLockType(t, objectType)
 	tests := []struct {
 		name              string
@@ -838,7 +875,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				observedRecord:    test.observedRecord,
 				observedRawRecord: test.observedRawRecord,
 				observedTime:      test.observedTime,
-				clock:             clock.RealClock{},
+				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)

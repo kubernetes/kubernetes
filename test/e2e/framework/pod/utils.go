@@ -241,3 +241,23 @@ func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditi
 	}
 	return nil
 }
+
+// FindContainerStatusInPod finds a container status by its name in the provided pod
+func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
+	for _, containerStatus := range pod.Status.InitContainerStatuses {
+		if containerStatus.Name == containerName {
+			return &containerStatus
+		}
+	}
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			return &containerStatus
+		}
+	}
+	for _, containerStatus := range pod.Status.EphemeralContainerStatuses {
+		if containerStatus.Name == containerName {
+			return &containerStatus
+		}
+	}
+	return nil
+}

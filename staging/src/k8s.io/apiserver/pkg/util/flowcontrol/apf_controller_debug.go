@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -50,16 +51,30 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	defer cfgCtlr.lock.Unlock()
 	tabWriter := tabwriter.NewWriter(w, 8, 0, 1, ' ', 0)
 	columnHeaders := []string{
-		"PriorityLevelName", // 1
-		"ActiveQueues",      // 2
-		"IsIdle",            // 3
-		"IsQuiescing",       // 4
-		"WaitingRequests",   // 5
-		"ExecutingRequests", // 6
+		"PriorityLevelName",  // 1
+		"ActiveQueues",       // 2
+		"IsIdle",             // 3
+		"IsQuiescing",        // 4
+		"WaitingRequests",    // 5
+		"ExecutingRequests",  // 6
+		"DispatchedRequests", // 7
+		"RejectedRequests",   // 8
+		"TimedoutRequests",   // 9
+		"CancelledRequests",  // 10
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
-	for _, plState := range cfgCtlr.priorityLevelStates {
+	plNames := make([]string, 0, len(cfgCtlr.priorityLevelStates))
+	for plName := range cfgCtlr.priorityLevelStates {
+		plNames = append(plNames, plName)
+	}
+	sort.Strings(plNames)
+	for i := range plNames {
+		plState, ok := cfgCtlr.priorityLevelStates[plNames[i]]
+		if !ok {
+			continue
+		}
+
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
 				plState.pl.Name, // 1
@@ -68,6 +83,10 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 				"<none>",        // 4
 				"<none>",        // 5
 				"<none>",        // 6
+				"<none>",        // 7
+				"<none>",        // 8
+				"<none>",        // 9
+				"<none>",        // 10
 			))
 			endLine(tabWriter)
 			continue
@@ -81,12 +100,16 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 		}
 
 		tabPrint(tabWriter, rowForPriorityLevel(
-			plState.pl.Name,          // 1
-			activeQueueNum,           // 2
-			plState.queues.IsIdle(),  // 3
-			plState.quiescing,        // 4
-			queueSetDigest.Waiting,   // 5
-			queueSetDigest.Executing, // 6
+			plState.pl.Name,           // 1
+			activeQueueNum,            // 2
+			plState.queues.IsIdle(),   // 3
+			plState.quiescing,         // 4
+			queueSetDigest.Waiting,    // 5
+			queueSetDigest.Executing,  // 6
+			queueSetDigest.Dispatched, // 7
+			queueSetDigest.Rejected,   // 8
+			queueSetDigest.Timedout,   // 9
+			queueSetDigest.Cancelled,  // 10
 		))
 		endLine(tabWriter)
 	}
@@ -236,7 +259,8 @@ func rowForHeaders(headers []string) string {
 	return row(headers...)
 }
 
-func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bool, waitingRequests, executingRequests int) string {
+func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bool, waitingRequests, executingRequests int,
+	dispatchedReqeusts, rejectedRequests, timedoutRequests, cancelledRequests int) string {
 	return row(
 		plName,
 		strconv.Itoa(activeQueues),
@@ -244,6 +268,10 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 		strconv.FormatBool(isQuiescing),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
+		strconv.Itoa(dispatchedReqeusts),
+		strconv.Itoa(rejectedRequests),
+		strconv.Itoa(timedoutRequests),
+		strconv.Itoa(cancelledRequests),
 	)
 }
 

@@ -32,7 +32,7 @@ cd "${KUBE_ROOT}"
 
 errors=()
 # Check conformance tests follow the requirements as https://git.k8s.io/community/contributors/devel/sig-architecture/conformance-tests.md#conformance-test-requirements
-if ! failedLint=$(go run "${KUBE_ROOT}"/hack/conformance/check_conformance_test_requirements.go "${KUBE_ROOT}"/test/e2e/)
+if ! failedLint=$(GO111MODULE=on GOPROXY=off go run hack/conformance/check_conformance_test_requirements.go "${KUBE_ROOT}"/test/e2e/)
 then
   errors+=( "${failedLint}" )
 fi

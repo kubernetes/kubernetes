@@ -319,6 +319,55 @@
     return a valid PreferredVersion unless the group suffix is example.com.
   release: v1.19
   file: test/e2e/apimachinery/discovery.go
+- testname: Server side field validation, unknown fields CR no validation schema
+  codename: '[sig-api-machinery] FieldValidation should create/apply a CR with unknown
+    fields for CRD with no validation schema [Conformance]'
+  description: When a CRD does not have a validation schema, it should succeed when
+    a CR with unknown fields is applied.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, valid CR with validation schema
+  codename: '[sig-api-machinery] FieldValidation should create/apply a valid CR for
+    CRD with validation schema [Conformance]'
+  description: When a CRD has a validation schema, it should succeed when a valid
+    CR is applied.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, unknown fields CR fails validation
+  codename: '[sig-api-machinery] FieldValidation should create/apply an invalid CR
+    with extra properties for CRD with validation schema [Conformance]'
+  description: When a CRD does have a validation schema, it should reject CRs with
+    unknown fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, CR duplicates
+  codename: '[sig-api-machinery] FieldValidation should detect duplicates in a CR
+    when preserving unknown fields [Conformance]'
+  description: The server should reject CRs with duplicate fields even when preserving
+    unknown fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, typed object
+  codename: '[sig-api-machinery] FieldValidation should detect unknown and duplicate
+    fields of a typed object [Conformance]'
+  description: It should reject the request if a typed object has unknown or duplicate
+    fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, unknown metadata
+  codename: '[sig-api-machinery] FieldValidation should detect unknown metadata fields
+    in both the root and embedded object of a CR [Conformance]'
+  description: The server should reject CRs with unknown metadata fields in both the
+    root and embedded objects of a CR.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, typed unknown metadata
+  codename: '[sig-api-machinery] FieldValidation should detect unknown metadata fields
+    of a typed object [Conformance]'
+  description: It should reject the request if a typed object has unknown fields in
+    the metadata.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
     when not orphaning [Conformance]'

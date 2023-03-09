@@ -189,6 +189,13 @@ type TestContextType struct {
 	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
 	DockerConfigFile string
 
+	// E2EDockerConfigFile is a docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users.
+	// For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub
+	E2EDockerConfigFile string
+
+	// KubeTestRepoConfigFile is a yaml file used for overriding registries for test images.
+	KubeTestRepoList string
+
 	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
 	SnapshotControllerPodName string
 
@@ -359,7 +366,10 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
-	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
+	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A docker credential file which contains authorization token that is used to perform image pull tests from an authenticated registry. For more details regarding the content of the file refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+
+	flags.StringVar(&TestContext.E2EDockerConfigFile, "e2e-docker-config-file", "", "A docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users. For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+	flags.StringVar(&TestContext.KubeTestRepoList, "kube-test-repo-list", "", "A yaml file used for overriding registries for test images. Alternatively, the KUBE_TEST_REPO_LIST env variable can be set.")
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
@@ -463,6 +473,9 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// These flags are not exposed via the normal command line flag set,
 	// therefore we have to use our own private one here.
+	if t.KubeTestRepoList != "" {
+		image.Init(t.KubeTestRepoList)
+	}
 	var fs flag.FlagSet
 	klog.InitFlags(&fs)
 	fs.Set("logtostderr", "false")

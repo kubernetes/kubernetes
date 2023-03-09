@@ -31,11 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -200,8 +198,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
-
-	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
 	newCfg.TopologyManagerPolicy = policy
@@ -370,28 +366,6 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 
 	ginkgo.By("running multiple Gu pods")
 	runMultipleGuPods(ctx, f)
-}
-
-// waitForAllContainerRemoval waits until all the containers on a given pod are really gone.
-// This is needed by the e2e tests which involve exclusive resource allocation (cpu, topology manager; podresources; etc.)
-// In these cases, we need to make sure the tests clean up after themselves to make sure each test runs in
-// a pristine environment. The only way known so far to do that is to introduce this wait.
-// Worth noting, however, that this makes the test runtime much bigger.
-func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
-	rs, _, err := getCRIClient()
-	framework.ExpectNoError(err)
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
-		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
-			LabelSelector: map[string]string{
-				types.KubernetesPodNameLabel:      podName,
-				types.KubernetesPodNamespaceLabel: podNS,
-			},
-		})
-		if err != nil {
-			return false
-		}
-		return len(containers) == 0
-	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
 func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework, numPods int, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
@@ -970,7 +944,7 @@ func hostPrecheck() (int, int) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager [Serial] [NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

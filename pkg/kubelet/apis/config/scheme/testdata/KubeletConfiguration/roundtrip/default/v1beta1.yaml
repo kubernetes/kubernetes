@@ -46,8 +46,8 @@ imageMinimumGCAge: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration
-kubeAPIBurst: 10
-kubeAPIQPS: 5
+kubeAPIBurst: 100
+kubeAPIQPS: 50
 localStorageCapacityIsolation: true
 logging:
   flushFrequency: 5000000000

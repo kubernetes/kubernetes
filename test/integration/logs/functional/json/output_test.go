@@ -27,15 +27,19 @@ import (
 
 	logsapi "k8s.io/component-base/logs/api/v1"
 	logsjson "k8s.io/component-base/logs/json"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/test"
 )
 
 func init() {
-	test.InitKlog()
+	// hack/make-rules/test-integration.sh expects that all unit tests
+	// support -v and -vmodule.
+	klog.InitFlags(nil)
 }
 
 // TestJsonOutput tests the JSON logger, directly and as backend for klog.
 func TestJSONOutput(t *testing.T) {
+	test.InitKlog(t)
 	newLogger := func(out io.Writer, v int, vmodule string) logr.Logger {
 		logger, _ := logsjson.NewJSONLogger(logsapi.VerbosityLevel(v), logsjson.AddNopSync(out), nil,
 			&zapcore.EncoderConfig{

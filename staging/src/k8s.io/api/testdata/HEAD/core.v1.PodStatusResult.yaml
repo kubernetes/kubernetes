@@ -60,6 +60,15 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
+    resourcesAllocated:
+      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:
@@ -96,6 +105,15 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
+    resourcesAllocated:
+      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:
@@ -133,6 +151,15 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
+    resourcesAllocated:
+      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:
@@ -157,4 +184,5 @@ status:
   - ip: ipValue
   qosClass: qosClassValue
   reason: reasonValue
+  resize: resizeValue
   startTime: "2007-01-01T01:01:01Z"

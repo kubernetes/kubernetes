@@ -31,25 +31,25 @@ type Scale struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	// spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+	// status represents the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
 
 // ScaleSpec describes the attributes of a scale subresource.
 type ScaleSpec struct {
-	// desired number of instances for the scaled object.
+	// replicas is the desired number of instances for the scaled object.
 	// +optional
 	Replicas int32
 }
 
 // ScaleStatus represents the current status of a scale subresource.
 type ScaleStatus struct {
-	// actual number of observed instances of the scaled object.
+	// replicas is the actual number of observed instances of the scaled object.
 	Replicas int32
 
 	// label query over pods that should match the replicas count. This is same
@@ -62,20 +62,23 @@ type ScaleStatus struct {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string
-	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+
+	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string
-	// API version of the referent
+
+	// apiVersion is the API version of the referent
 	// +optional
 	APIVersion string
 }
 
 // HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerSpec struct {
-	// ScaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
+	// scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
 	// should be collected, as well as to actually change the replica count.
 	ScaleTargetRef CrossVersionObjectReference
+
 	// minReplicas is the lower limit for the number of replicas to which the autoscaler
 	// can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
 	// alpha feature gate HPAScaleToZero is enabled and at least one Object or External
@@ -83,10 +86,12 @@ type HorizontalPodAutoscalerSpec struct {
 	// available.
 	// +optional
 	MinReplicas *int32
-	// MaxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
+
+	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
 	// It cannot be less that minReplicas.
 	MaxReplicas int32
-	// Metrics contains the specifications for which to use to calculate the
+
+	// metrics contains the specifications for which to use to calculate the
 	// desired replica count (the maximum replica count across all metrics will
 	// be used).  The desired replica count is calculated multiplying the
 	// ratio between the target value and the current value by the current
@@ -487,7 +492,7 @@ type PodsMetricStatus struct {
 // Kubernetes, and have special scaling options on top of those available to
 // normal per-pod metrics using the "pods" source.
 type ResourceMetricStatus struct {
-	// Name is the name of the resource in question.
+	// name is the name of the resource in question.
 	Name    api.ResourceName
 	Current MetricValueStatus
 }
@@ -498,7 +503,7 @@ type ResourceMetricStatus struct {
 // Kubernetes, and have special scaling options on top of those available to
 // normal per-pod metrics using the "pods" source.
 type ContainerResourceMetricStatus struct {
-	// Name is the name of the resource in question.
+	// name is the name of the resource in question.
 	Name      api.ResourceName
 	Container string
 	Current   MetricValueStatus
@@ -530,12 +535,12 @@ type HorizontalPodAutoscaler struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Spec is the specification for the behaviour of the autoscaler.
+	// spec is the specification for the behaviour of the autoscaler.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 
-	// Status is the current information about the autoscaler.
+	// status is the current information about the autoscaler.
 	// +optional
 	Status HorizontalPodAutoscalerStatus
 }
@@ -549,6 +554,6 @@ type HorizontalPodAutoscalerList struct {
 	// +optional
 	metav1.ListMeta
 
-	// Items is the list of horizontal pod autoscaler objects.
+	// items is the list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler
 }

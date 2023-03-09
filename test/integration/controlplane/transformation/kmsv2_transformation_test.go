@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsv2api "k8s.io/kms/apis/v2alpha1"
-	kmsv2svc "k8s.io/kms/service"
+	kmsv2svc "k8s.io/kms/pkg/service"
 	"k8s.io/kubernetes/test/integration/etcd"
 )
 

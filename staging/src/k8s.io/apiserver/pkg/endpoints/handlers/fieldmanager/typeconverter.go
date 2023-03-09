@@ -34,9 +34,14 @@ func NewDeducedTypeConverter() TypeConverter {
 	return internal.NewDeducedTypeConverter()
 }
 
-// NewTypeConverter builds a TypeConverter from a proto.Models. This
-// will automatically find the proper version of the object, and the
+// NewTypeConverter builds a TypeConverter from a map of OpenAPIV3 schemas.
+// This will automatically find the proper version of the object, and the
 // corresponding schema information.
-func NewTypeConverter(openapiSpec *spec.Swagger, preserveUnknownFields bool) (TypeConverter, error) {
+// The keys to the map must be consistent with the names
+// used by Refs within the schemas.
+// The schemas should conform to the Kubernetes Structural Schema OpenAPI
+// restrictions found in docs:
+// https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema
+func NewTypeConverter(openapiSpec map[string]*spec.Schema, preserveUnknownFields bool) (TypeConverter, error) {
 	return internal.NewTypeConverter(openapiSpec, preserveUnknownFields)
 }

@@ -41,6 +41,12 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 		lg = zap.NewNop()
 	}
 	errC := make(chan error, 1)
+	lg.Info("started to purge file",
+		zap.String("dir", dirname),
+		zap.String("suffix", suffix),
+		zap.Uint("max", max),
+		zap.Duration("interval", interval))
+
 	go func() {
 		if donec != nil {
 			defer close(donec)
@@ -63,14 +69,16 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 				f := filepath.Join(dirname, newfnames[0])
 				l, err := TryLockFile(f, os.O_WRONLY, PrivateFileMode)
 				if err != nil {
+					lg.Warn("failed to lock file", zap.String("path", f), zap.Error(err))
 					break
 				}
 				if err = os.Remove(f); err != nil {
+					lg.Error("failed to remove file", zap.String("path", f), zap.Error(err))
 					errC <- err
 					return
 				}
 				if err = l.Close(); err != nil {
-					lg.Warn("failed to unlock/close", zap.String("path", l.Name()), zap.Error(err))
+					lg.Error("failed to unlock/close", zap.String("path", l.Name()), zap.Error(err))
 					errC <- err
 					return
 				}

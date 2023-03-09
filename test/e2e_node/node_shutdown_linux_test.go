@@ -45,6 +45,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -93,7 +94,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 			// Define test pods
 			pods := []*v1.Pod{
-				getGracePeriodOverrideTestPod("pod-to-evict", nodeName, 5, ""),
+				getGracePeriodOverrideTestPod("pod-to-evict-"+string(uuid.NewUUID()), nodeName, 5, ""),
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -118,13 +119,13 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 			for _, pod := range list.Items {
-				framework.Logf("Pod %q status conditions: %q", pod.Name, &pod.Status.Conditions)
+				framework.Logf("Pod (%v/%v) status conditions: %q", pod.Namespace, pod.Name, &pod.Status.Conditions)
 			}
 
 			ginkgo.By("Verifying batch pods are running")
 			for _, pod := range list.Items {
 				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
-					framework.Failf("Failed to start batch pod: %v", pod.Name)
+					framework.Failf("Failed to start batch pod: (%v/%v)", pod.Namespace, pod.Name)
 				}
 			}
 
@@ -145,12 +146,12 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 				for _, pod := range list.Items {
 					if !isPodShutdown(&pod) {
-						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
+						framework.Logf("Expecting pod to be shutdown, but it's not currently. Pod: (%v/%v), Pod Status Phase: %q, Pod Status Reason: %q", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 					}
 					podDisruptionCondition := e2epod.FindPodConditionByType(&pod.Status, v1.DisruptionTarget)
 					if podDisruptionCondition == nil {
-						framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, v1.DisruptionTarget, pod.Status)
+						framework.Failf("pod (%v/%v) should have the condition: %q, pod status: %v", pod.Namespace, pod.Name, v1.DisruptionTarget, pod.Status)
 					}
 				}
 				return nil
@@ -196,10 +197,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 			// Define test pods
 			pods := []*v1.Pod{
-				getGracePeriodOverrideTestPod("period-120", nodeName, 120, ""),
-				getGracePeriodOverrideTestPod("period-5", nodeName, 5, ""),
-				getGracePeriodOverrideTestPod("period-critical-120", nodeName, 120, scheduling.SystemNodeCritical),
-				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, scheduling.SystemNodeCritical),
+				getGracePeriodOverrideTestPod("period-120-"+string(uuid.NewUUID()), nodeName, 120, ""),
+				getGracePeriodOverrideTestPod("period-5-"+string(uuid.NewUUID()), nodeName, 5, ""),
+				getGracePeriodOverrideTestPod("period-critical-120-"+string(uuid.NewUUID()), nodeName, 120, scheduling.SystemNodeCritical),
+				getGracePeriodOverrideTestPod("period-critical-5-"+string(uuid.NewUUID()), nodeName, 5, scheduling.SystemNodeCritical),
 			}
 
 			ginkgo.By("Creating batch pods")
@@ -264,13 +265,13 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				for _, pod := range list.Items {
 					if kubelettypes.IsCriticalPod(&pod) {
 						if isPodShutdown(&pod) {
-							framework.Logf("Expecting critical pod to be running, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
-							return fmt.Errorf("critical pod should not be shutdown, phase: %s", pod.Status.Phase)
+							framework.Logf("Expecting critical pod (%v/%v) to be running, but it's not currently. Pod Status %+v", pod.Namespace, pod.Name, pod.Status)
+							return fmt.Errorf("critical pod (%v/%v) should not be shutdown, phase: %s", pod.Namespace, pod.Name, pod.Status.Phase)
 						}
 					} else {
 						if !isPodShutdown(&pod) {
-							framework.Logf("Expecting non-critical pod to be shutdown, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
-							return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
+							framework.Logf("Expecting non-critical pod (%v/%v) to be shutdown, but it's not currently. Pod Status %+v", pod.Name, pod.Status)
+							return fmt.Errorf("pod (%v/%v) should be shutdown, phase: %s", pod.Namespace, pod.Name, pod.Status.Phase)
 						}
 					}
 				}
@@ -290,8 +291,8 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 				for _, pod := range list.Items {
 					if !isPodShutdown(&pod) {
-						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
-						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
+						framework.Logf("Expecting pod (%v/%v) to be shutdown, but it's not currently: Pod Status %+v", pod.Namespace, pod.Name, pod.Status)
+						return fmt.Errorf("pod (%v/%v) should be shutdown, phase: %s", pod.Namespace, pod.Name, pod.Status.Phase)
 					}
 				}
 				return nil
@@ -360,7 +361,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 		const (
 			pollInterval                 = 1 * time.Second
-			podStatusUpdateTimeout       = 10 * time.Second
+			podStatusUpdateTimeout       = 30 * time.Second
 			priorityClassesCreateTimeout = 10 * time.Second
 		)
 
@@ -433,41 +434,50 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				"spec.nodeName": nodeName,
 			}.AsSelector().String()
 
+			var (
+				period5Name         = "period-5-" + string(uuid.NewUUID())
+				periodC5Name        = "period-c-5-" + string(uuid.NewUUID())
+				periodB5Name        = "period-b-5-" + string(uuid.NewUUID())
+				periodA5Name        = "period-a-5-" + string(uuid.NewUUID())
+				periodCritical5Name = "period-critical-5-" + string(uuid.NewUUID())
+			)
+
 			// Define test pods
 			pods := []*v1.Pod{
-				getGracePeriodOverrideTestPod("period-5", nodeName, 5, ""),
-				getGracePeriodOverrideTestPod("period-c-5", nodeName, 5, customClassC.Name),
-				getGracePeriodOverrideTestPod("period-b-5", nodeName, 5, customClassB.Name),
-				getGracePeriodOverrideTestPod("period-a-5", nodeName, 5, customClassA.Name),
-				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, scheduling.SystemNodeCritical),
+				getGracePeriodOverrideTestPod(period5Name, nodeName, 5, ""),
+				getGracePeriodOverrideTestPod(periodC5Name, nodeName, 5, customClassC.Name),
+				getGracePeriodOverrideTestPod(periodB5Name, nodeName, 5, customClassB.Name),
+				getGracePeriodOverrideTestPod(periodA5Name, nodeName, 5, customClassA.Name),
+				getGracePeriodOverrideTestPod(periodCritical5Name, nodeName, 5, scheduling.SystemNodeCritical),
 			}
 
 			// Expected down steps
 			downSteps := [][]string{
 				{
-					"period-5",
+					period5Name,
 				},
 				{
-					"period-5",
-					"period-c-5",
+					period5Name,
+					periodC5Name,
 				},
 				{
-					"period-5",
-					"period-c-5",
-					"period-b-5",
+
+					period5Name,
+					periodC5Name,
+					periodB5Name,
 				},
 				{
-					"period-5",
-					"period-c-5",
-					"period-b-5",
-					"period-a-5",
+					period5Name,
+					periodC5Name,
+					periodB5Name,
+					periodA5Name,
 				},
 				{
-					"period-5",
-					"period-c-5",
-					"period-b-5",
-					"period-a-5",
-					"period-critical-5",
+					period5Name,
+					periodC5Name,
+					periodB5Name,
+					periodA5Name,
+					periodCritical5Name,
 				},
 			}
 
@@ -483,7 +493,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			ginkgo.By("Verifying batch pods are running")
 			for _, pod := range list.Items {
 				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
-					framework.Failf("Failed to start batch pod: %v", pod.Name)
+					framework.Failf("Failed to start batch pod: (%v/%v)", pod.Namespace, pod.Name)
 				}
 			}
 
@@ -512,16 +522,16 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 						}
 						if !shouldShutdown {
 							if pod.Status.Phase != v1.PodRunning {
-								framework.Logf("Expecting pod to be running, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
-								return fmt.Errorf("pod should not be shutdown, phase: %s, reason: %s", pod.Status.Phase, pod.Status.Reason)
+								framework.Logf("Expecting pod to be running, but it's not currently. Pod: (%v/%v), Pod Status Phase: %q, Pod Status Reason: %q", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
+								return fmt.Errorf("pod (%v/%v) should not be shutdown, phase: %s, reason: %s", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
 							}
 						} else {
 							if pod.Status.Reason != podShutdownReason {
-								framework.Logf("Expecting pod to be shutdown, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+								framework.Logf("Expecting pod to be shutdown, but it's not currently. Pod: (%v/%v), Pod Status Phase: %q, Pod Status Reason: %q", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
 								for _, item := range list.Items {
 									framework.Logf("DEBUG %s, %s, %s", item.Name, item.Status.Phase, pod.Status.Reason)
 								}
-								return fmt.Errorf("pod should be shutdown, reason: %s", pod.Status.Reason)
+								return fmt.Errorf("pod (%v/%v) should be shutdown, reason: %s", pod.Namespace, pod.Name, pod.Status.Reason)
 							}
 						}
 					}

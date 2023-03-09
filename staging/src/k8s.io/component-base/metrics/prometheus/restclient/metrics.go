@@ -77,9 +77,9 @@ var (
 		&k8smetrics.CounterOpts{
 			Name:           "rest_client_requests_total",
 			StabilityLevel: k8smetrics.ALPHA,
-			Help:           "Number of HTTP requests, partitioned by status code, verb, and host.",
+			Help:           "Number of HTTP requests, partitioned by status code, method, and host.",
 		},
-		[]string{"code", "verb", "host"},
+		[]string{"code", "method", "host"},
 	)
 
 	requestRetry = k8smetrics.NewCounterVec(

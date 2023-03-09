@@ -48,7 +48,7 @@ var _ = Describe("Getting the Resources", func() {
 		instance = openapi.NewOpenAPIParser(openapi.NewOpenAPIGetter(&client))
 		var err error
 		expectedData, err = openapi.NewOpenAPIData(nil)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("when the server returns a successful result", func() {
@@ -56,12 +56,12 @@ var _ = Describe("Getting the Resources", func() {
 			Expect(client.Calls).To(Equal(0))
 
 			result, err := instance.Parse()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(expectedData))
 			Expect(client.Calls).To(Equal(1))
 
 			result, err = instance.Parse()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(expectedData))
 			// No additional client calls expected
 			Expect(client.Calls).To(Equal(1))

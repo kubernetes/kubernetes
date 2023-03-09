@@ -44,6 +44,7 @@ func TestDefaultFlags(t *testing.T) {
 				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  "",
 					ContentType: "application/vnd.kubernetes.protobuf",
 					QPS:         20.0,
 					Burst:       30,
@@ -125,7 +126,6 @@ func TestDefaultFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Kubeconfig:                "",
 		Master:                    "",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
@@ -188,6 +188,7 @@ func TestAddFlags(t *testing.T) {
 				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  "/kubeconfig",
 					ContentType: "application/vnd.kubernetes.protobuf",
 					QPS:         50.0,
 					Burst:       100,
@@ -269,7 +270,6 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{},
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Kubeconfig:                "/kubeconfig",
 		Master:                    "192.168.4.20",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}

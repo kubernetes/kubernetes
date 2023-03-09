@@ -35,6 +35,7 @@ func TestClientAuthenticationClusterTypesAreSynced(t *testing.T) {
 		clientauthenticationv1beta1.Cluster{},
 		clientauthenticationv1.Cluster{},
 	} {
+		cluster := cluster
 		t.Run(fmt.Sprintf("%T", cluster), func(t *testing.T) {
 			t.Parallel()
 			testClientAuthenticationClusterTypesAreSynced(t, cluster)

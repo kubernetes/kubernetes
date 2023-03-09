@@ -86,7 +86,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
-		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))
+		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty(), "Requires at least one ready node")
 
 		msg := fmt.Sprintf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), SCSIUnitsAvailablePerNode*len(nodes.Items))
 		gomega.Expect(volumeCount).To(gomega.BeNumerically("<=", SCSIUnitsAvailablePerNode*len(nodes.Items)), msg)

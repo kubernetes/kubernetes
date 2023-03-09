@@ -23,6 +23,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -33,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
@@ -85,6 +86,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager]"
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
+				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": timelessSample(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -108,6 +112,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager]"
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(1),
 				}),
+				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -122,7 +129,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager]"
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
-			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with pod should be admitted")
+			ginkgo.By("Checking the topologymanager metrics right after the kubelet restart, with pod should be admitted")
 
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_topology_manager_admission_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
@@ -130,6 +137,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][Feature:TopologyManager]"
 				}),
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
+				}),
+				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
 				}),
 			})
 
@@ -156,4 +166,13 @@ func hostCheck() (int, int) {
 	}
 
 	return numaNodes, coreCount
+}
+
+func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
+	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
+		// We already check Metric when matching the Id
+		"Metric":    gstruct.Ignore(),
+		"Value":     gomega.BeNumerically(">", value),
+		"Timestamp": gstruct.Ignore(),
+	}))
 }

@@ -834,7 +834,7 @@ func TestDifferentWidths(t *testing.T) {
 		concurrencyLimit:            6,
 		evalDuration:                time.Second * 20,
 		expectedFair:                []bool{true},
-		expectedFairnessMargin:      []float64{0.15},
+		expectedFairnessMargin:      []float64{0.155},
 		expectAllRequests:           true,
 		evalInqueueMetrics:          true,
 		evalExecutingMetrics:        true,

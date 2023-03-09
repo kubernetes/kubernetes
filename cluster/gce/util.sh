@@ -327,9 +327,6 @@ function upload-tars() {
 
   for region in "${PREFERRED_REGION[@]}"; do
     suffix="-${region}"
-    if [[ "${suffix}" == "-us-central1" ]]; then
-      suffix=""
-    fi
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
@@ -337,6 +334,8 @@ function upload-tars() {
       echo "Creating ${staging_bucket}"
       gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
     fi
+
+    gsutil retention clear "${staging_bucket}"
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
 

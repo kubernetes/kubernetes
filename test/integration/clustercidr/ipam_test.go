@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller/nodeipam"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
@@ -63,7 +64,7 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	tests := []struct {
@@ -149,7 +150,7 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("Pod CIDR release after node delete", func(t *testing.T) {
@@ -226,7 +227,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("delete cc with node associated", func(t *testing.T) {
@@ -322,7 +323,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("Pod CIDRS must not be allocated from a terminating CC", func(t *testing.T) {
@@ -407,7 +408,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	tests := []struct {
@@ -557,8 +558,9 @@ func booststrapMultiCIDRRangeAllocator(t *testing.T,
 	if _, err := clientSet.CoreV1().Nodes().Create(context.TODO(), initialNode, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-
+	_, ctx := ktesting.NewTestContext(t)
 	ipamController, err := nodeipam.NewNodeIpamController(
+		ctx,
 		sharedInformer.Core().V1().Nodes(),
 		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
 		nil,

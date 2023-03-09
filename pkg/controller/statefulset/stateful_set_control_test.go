@@ -174,6 +174,7 @@ func TestStatefulSetControl(t *testing.T) {
 		{UpdateSetStatusFailure, simpleSetFn},
 		{PodRecreateDeleteFailure, simpleSetFn},
 		{NewRevisionDeletePodFailure, simpleSetFn},
+		{RecreatesPVCForPendingPod, simpleSetFn},
 	}
 
 	for _, testCase := range testCases {
@@ -694,6 +695,45 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants
 		if actualPodOrdinal != expectedOrdinal {
 			t.Errorf("Expected pod ordinal %d. Got %d", expectedOrdinal, actualPodOrdinal)
 		}
+	}
+}
+
+func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset()
+	om, _, ssc := setupController(client)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, claim := range getPersistentVolumeClaims(set, pods[0]) {
+		om.claimsIndexer.Delete(&claim)
+	}
+	pods[0].Status.Phase = v1.PodPending
+	om.podsIndexer.Update(pods[0])
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	// invariants check if there any missing PVCs for the Pods
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	_, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
 	}
 }
 

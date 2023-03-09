@@ -68,7 +68,7 @@ const (
 	//           name: '*'
 	//           namespace: kube-system
 	EndpointsLeasesResourceLock = "endpointsleases"
-	// When using EndpointsLeasesResourceLock, you need to ensure that
+	// When using ConfigMapsLeasesResourceLock, you need to ensure that
 	// API Priority & Fairness is configured with non-default flow-schema
 	// that will catch the necessary operations on leader-election related
 	// configmap objects.

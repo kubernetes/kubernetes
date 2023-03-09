@@ -230,7 +230,7 @@ func Parse(s string) (CPUSet, error) {
 				return New(), err
 			}
 			if start > end {
-				return New(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
+				return New(), fmt.Errorf("invalid range %q (%d > %d)", r, start, end)
 			}
 			// start == end is acceptable (1-1 -> 1)
 

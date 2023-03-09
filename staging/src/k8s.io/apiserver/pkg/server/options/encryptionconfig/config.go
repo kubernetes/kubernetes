@@ -46,11 +46,12 @@ import (
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kmsservice "k8s.io/kms/service"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (
@@ -217,8 +218,22 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 		for _, resource := range resourceConfig.Resources {
 			resource := resource
 			gr := schema.ParseGroupResource(resource)
-			resourceToPrefixTransformer[gr] = append(
-				resourceToPrefixTransformer[gr], transformers...)
+
+			// check if resource is masked by *.group rule
+			anyResourceInGroup := schema.GroupResource{Group: gr.Group, Resource: "*"}
+			if _, masked := resourceToPrefixTransformer[anyResourceInGroup]; masked {
+				// an earlier rule already configured a transformer for *.group, masking this rule
+				// return error since this is not allowed
+				return nil, nil, nil, fmt.Errorf("resource %q is masked by earlier rule %q", grYAMLString(gr), grYAMLString(anyResourceInGroup))
+			}
+
+			if _, masked := resourceToPrefixTransformer[anyGroupAnyResource]; masked {
+				// an earlier rule already configured a transformer for *.*, masking this rule
+				// return error since this is not allowed
+				return nil, nil, nil, fmt.Errorf("resource %q is masked by earlier rule %q", grYAMLString(gr), grYAMLString(anyGroupAnyResource))
+			}
+
+			resourceToPrefixTransformer[gr] = append(resourceToPrefixTransformer[gr], transformers...)
 		}
 
 		probes = append(probes, p...)
@@ -277,8 +292,11 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 		return fmt.Errorf("failed to perform status section of the healthz check for KMS Provider %s, error: %w", h.name, err)
 	}
 	// we coast on the last valid key ID that we have observed
-	if err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
+	if errCode, err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
 		h.keyID.Store(&p.KeyID)
+		metrics.RecordKeyIDFromStatus(h.name, p.KeyID)
+	} else {
+		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
 	}
 
 	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
@@ -310,7 +328,7 @@ func isKMSv2ProviderHealthy(name string, response *kmsservice.StatusResponse) er
 	if response.Version != envelopekmsv2.KMSAPIVersion {
 		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
 	}
-	if err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
+	if _, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
 		errs = append(errs, fmt.Errorf("expected KMSv2 KeyID to be set, got %s", response.KeyID))
 	}
 
@@ -343,7 +361,7 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 
 	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
 	}
 	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
 	if !ok {
@@ -598,7 +616,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 
 		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := value.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, probe.getCurrentKeyID, aestransformer.NewGCMTransformer),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentKeyID, probe.check, aestransformer.NewGCMTransformer),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 
@@ -773,10 +791,34 @@ func (s StaticTransformers) TransformerForResource(resource schema.GroupResource
 	return transformerFromOverrides(s, resource)
 }
 
+var anyGroupAnyResource = schema.GroupResource{
+	Group:    "*",
+	Resource: "*",
+}
+
 func transformerFromOverrides(transformerOverrides map[schema.GroupResource]value.Transformer, resource schema.GroupResource) value.Transformer {
-	transformer := transformerOverrides[resource]
-	if transformer == nil {
-		return identity.NewEncryptCheckTransformer()
+	if transformer := transformerOverrides[resource]; transformer != nil {
+		return transformer
 	}
-	return transformer
+
+	if transformer := transformerOverrides[schema.GroupResource{
+		Group:    resource.Group,
+		Resource: "*",
+	}]; transformer != nil {
+		return transformer
+	}
+
+	if transformer := transformerOverrides[anyGroupAnyResource]; transformer != nil {
+		return transformer
+	}
+
+	return identity.NewEncryptCheckTransformer()
+}
+
+func grYAMLString(gr schema.GroupResource) string {
+	if gr.Group == "" && gr.Resource == "*" {
+		return "*."
+	}
+
+	return gr.String()
 }

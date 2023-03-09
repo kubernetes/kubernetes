@@ -682,12 +682,13 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		stopCh := make(chan struct{})
 		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
 
+		headerMatcher := headerMatcher{}
 		var executed bool
 		// we will raise a panic for the first request.
 		firstRequestPathPanic := "/request/panic-as-designed"
 		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			executed = true
-			expectMatchingAPFHeaders(t, w, fsName, plName)
+			headerMatcher.inspect(w, fsName, plName)
 
 			if r.URL.Path == firstRequestPathPanic {
 				panic(fmt.Errorf("request handler panic'd as designed - %#v", r.RequestURI))
@@ -724,6 +725,10 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusOK, secondRequestPathShouldWork, response)
 		}
 
+		for _, err := range headerMatcher.errors() {
+			t.Errorf("Expected APF headers to match, but got: %v", err)
+		}
+
 		close(stopCh)
 		t.Log("Waiting for the controller to shutdown")
 
@@ -747,12 +752,13 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		stopCh := make(chan struct{})
 		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
 
+		headerMatcher := headerMatcher{}
 		var executed bool
 		rquestTimesOutPath := "/request/time-out-as-designed"
 		reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			executed = true
-			expectMatchingAPFHeaders(t, w, fsName, plName)
+			headerMatcher.inspect(w, fsName, plName)
 
 			if r.URL.Path == rquestTimesOutPath {
 				defer close(reqHandlerCompletedCh)
@@ -795,6 +801,10 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
 
+		for _, err := range headerMatcher.errors() {
+			t.Errorf("Expected APF headers to match, but got: %v", err)
+		}
+
 		close(stopCh)
 		t.Log("Waiting for the controller to shutdown")
 
@@ -818,11 +828,12 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		stopCh := make(chan struct{})
 		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
 
+		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
 		reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 		rquestTimesOutPath := "/request/time-out-as-designed"
 		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			expectMatchingAPFHeaders(t, w, fsName, plName)
+			headerMatcher.inspect(w, fsName, plName)
 
 			if r.URL.Path == rquestTimesOutPath {
 				defer close(reqHandlerCompletedCh)
@@ -868,6 +879,10 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
 
+		for _, err := range headerMatcher.errors() {
+			t.Errorf("Expected APF headers to match, but got: %v", err)
+		}
+
 		close(stopCh)
 		t.Log("Waiting for the controller to shutdown")
 
@@ -891,11 +906,12 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		stopCh := make(chan struct{})
 		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
 
+		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
 		rquestTimesOutPath := "/request/time-out-as-designed"
 		reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			expectMatchingAPFHeaders(t, w, fsName, plName)
+			headerMatcher.inspect(w, fsName, plName)
 
 			if r.URL.Path == rquestTimesOutPath {
 				defer close(reqHandlerCompletedCh)
@@ -932,6 +948,10 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		}
 		expectResetStreamError(t, err)
 
+		for _, err := range headerMatcher.errors() {
+			t.Errorf("Expected APF headers to match, but got: %v", err)
+		}
+
 		close(stopCh)
 		t.Log("Waiting for the controller to shutdown")
 
@@ -961,6 +981,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		stopCh := make(chan struct{})
 		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
 
+		headerMatcher := headerMatcher{}
 		var firstRequestInnerHandlerWriteErr error
 		var secondRequestExecuted bool
 		firstRequestTimesOutPath := "/request/first/time-out-as-designed"
@@ -968,7 +989,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		firstReqHandlerCompletedCh, firstReqInProgressCh := make(chan struct{}), make(chan struct{})
 		firstReqRoundTripDoneCh, secondReqRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			expectMatchingAPFHeaders(t, w, fsName, plName)
+			headerMatcher.inspect(w, fsName, plName)
 
 			if r.URL.Path == firstRequestTimesOutPath {
 				defer close(firstReqHandlerCompletedCh)
@@ -1071,6 +1092,10 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d or %d for request: %q, but got: %#+v", http.StatusTooManyRequests, http.StatusGatewayTimeout, secondRequestEnqueuedPath, secondReqResult.response)
 		}
 
+		for _, err := range headerMatcher.errors() {
+			t.Errorf("Expected APF headers to match, but got: %v", err)
+		}
+
 		close(stopCh)
 		t.Log("Waiting for the controller to shutdown")
 
@@ -1137,21 +1162,42 @@ func newHTTP2ServerWithClient(handler http.Handler, clientTimeout time.Duration)
 	}
 }
 
+type headerMatcher struct {
+	lock    sync.Mutex
+	errsGot []error
+}
+
 // verifies that the expected flow schema and priority level UIDs are attached to the header.
-func expectMatchingAPFHeaders(t *testing.T, w http.ResponseWriter, expectedFS, expectedPL string) {
-	if w == nil {
-		t.Fatal("expected a non nil HTTP response")
+func (m *headerMatcher) inspect(w http.ResponseWriter, expectedFS, expectedPL string) {
+	err := func() error {
+		if w == nil {
+			return fmt.Errorf("expected a non nil HTTP response")
+		}
+
+		key := flowcontrol.ResponseHeaderMatchedFlowSchemaUID
+		if value := w.Header().Get(key); expectedFS != value {
+			return fmt.Errorf("expected HTTP header %s to have value %q, but got: %q", key, expectedFS, value)
+		}
+
+		key = flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID
+		if value := w.Header().Get(key); expectedPL != value {
+			return fmt.Errorf("expected HTTP header %s to have value %q, but got %q", key, expectedPL, value)
+		}
+		return nil
+	}()
+	if err == nil {
+		return
 	}
 
-	key := flowcontrol.ResponseHeaderMatchedFlowSchemaUID
-	if value := w.Header().Get(key); expectedFS != value {
-		t.Fatalf("expected HTTP header %s to have value %q, but got: %q", key, expectedFS, value)
-	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.errsGot = append(m.errsGot, err)
+}
 
-	key = flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID
-	if value := w.Header().Get(key); expectedPL != value {
-		t.Fatalf("expected HTTP header %s to have value %q, but got %q", key, expectedPL, value)
-	}
+func (m *headerMatcher) errors() []error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.errsGot[:]
 }
 
 // when a request panics, http2 resets the stream with an INTERNAL_ERROR message

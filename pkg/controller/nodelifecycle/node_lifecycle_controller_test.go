@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -87,12 +90,12 @@ type nodeLifecycleController struct {
 }
 
 // doEviction does the fake eviction and returns the status of eviction operation.
-func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) bool {
+func (nc *nodeLifecycleController) doEviction(logger klog.Logger, fakeNodeHandler *testutil.FakeNodeHandler) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	zones := testutil.GetZones(fakeNodeHandler)
 	for _, zone := range zones {
-		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+		nc.zonePodEvictor[zone].Try(logger, func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
 			pods, _ := nc.getPodsAssignedToNode(value.Value)
 			controllerutil.DeletePods(context.TODO(), fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
@@ -720,9 +723,10 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
+		logger, _ := ktesting.NewTestContext(t)
 		for _, zone := range zones {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
-				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+				nodeController.zonePodEvictor[zone].Try(logger, func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
 					pods, err := nodeController.getPodsAssignedToNode(value.Value)
 					if err != nil {
@@ -882,8 +886,9 @@ func TestPodStatusChange(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
+		logger, _ := ktesting.NewTestContext(t)
 		for _, zone := range zones {
-			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+			nodeController.zonePodEvictor[zone].Try(logger, func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUID, _ := value.UID.(string)
 				pods, err := nodeController.getPodsAssignedToNode(value.Value)
 				if err != nil {
@@ -1466,8 +1471,9 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 		// Infinite loop, used for retrying in case ratelimiter fails to reload for Try function.
 		// this breaks when we have the status that we need for test case or when we don't see the
 		// intended result after 1 minute.
+		logger, _ := ktesting.NewTestContext(t)
 		for {
-			podEvicted = nodeController.doEviction(fakeNodeHandler)
+			podEvicted = nodeController.doEviction(logger, fakeNodeHandler)
 			if podEvicted == item.expectedEvictPods || time.Since(start) > 1*time.Minute {
 				break
 			}
@@ -2759,6 +2765,10 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 // NodeController is just responsible for enqueuing the node to tainting queue from which taint manager picks up
 // and evicts the pods on the node.
 func TestApplyNoExecuteTaints(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 

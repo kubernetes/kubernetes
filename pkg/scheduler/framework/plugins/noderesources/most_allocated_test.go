@@ -154,7 +154,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			// Node1 Score: (100 + 90) / 2 = 95
 			// Node2 scores on 0-MaxNodeScore scale
 			// CPU Score: (5000 * MaxNodeScore) / 10000 = 50
-			// Memory Score: 8000 *MaxNodeScore / 8000 return 100
+			// Memory Score: 9000 * MaxNodeScore / 9000 return 100
 			// Node2 Score: (50 + 100) / 2 = 75
 			name: "resources requested equal node capacity",
 			requestedPod: st.MakePod().

@@ -903,20 +903,24 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 	cmd := ""
 	switch protocol {
 	case v1.ProtocolTCP:
-		cmd = fmt.Sprintf("nc -v -z -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", endpoint, port)
 	case v1.ProtocolUDP:
-		cmd = fmt.Sprintf("nc -v -z -u -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -u -w 2 %s %v", endpoint, port)
 	default:
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
 	err := wait.PollImmediateWithContext(ctx, 1*time.Second, ServiceReachabilityShortPollTimeout, func(ctx context.Context) (bool, error) {
-		_, err := e2epodoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		stdout, err := e2epodoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 			return false, nil
 		}
-		return true, nil
+		trimmed := strings.TrimSpace(stdout)
+		if trimmed != "" {
+			return true, nil
+		}
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)

@@ -117,6 +117,23 @@ func HashContainer(container *v1.Container) uint64 {
 	return uint64(hash.Sum32())
 }
 
+// HashContainerWithoutResources returns the hash of the container with Resources field zero'd out.
+func HashContainerWithoutResources(container *v1.Container) uint64 {
+	// InPlacePodVerticalScaling enables mutable Resources field.
+	// Changes to this field may not require container restart depending on policy.
+	// Compute hash over fields besides the Resources field
+	// NOTE: This is needed during alpha and beta so that containers using Resources but
+	//       not subject to In-place resize are not unexpectedly restarted when
+	//       InPlacePodVerticalScaling feature-gate is toggled.
+	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
+	hashWithoutResources := fnv.New32a()
+	containerCopy := container.DeepCopy()
+	containerCopy.Resources = v1.ResourceRequirements{}
+	containerJSON, _ := json.Marshal(containerCopy)
+	hashutil.DeepHashObject(hashWithoutResources, containerJSON)
+	return uint64(hashWithoutResources.Sum32())
+}
+
 // envVarsToMap constructs a map of environment name to value from a slice
 // of env vars.
 func envVarsToMap(envs []EnvVar) map[string]string {
@@ -252,12 +269,13 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			continue
 		}
 		container := &Container{
-			ID:      containerStatus.ID,
-			Name:    containerStatus.Name,
-			Image:   containerStatus.Image,
-			ImageID: containerStatus.ImageID,
-			Hash:    containerStatus.Hash,
-			State:   containerStatus.State,
+			ID:                   containerStatus.ID,
+			Name:                 containerStatus.Name,
+			Image:                containerStatus.Image,
+			ImageID:              containerStatus.ImageID,
+			Hash:                 containerStatus.Hash,
+			HashWithoutResources: containerStatus.HashWithoutResources,
+			State:                containerStatus.State,
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}

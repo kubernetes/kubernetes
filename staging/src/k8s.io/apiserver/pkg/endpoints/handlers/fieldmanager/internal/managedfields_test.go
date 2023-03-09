@@ -473,14 +473,14 @@ func TestSortEncodedManagedFields(t *testing.T) {
 		{
 			name: "sort drops nanoseconds",
 			managedFields: []metav1.ManagedFieldsEntry{
-				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 1, time.UTC)}},
-				{Manager: "a", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 2, time.UTC)}},
-				{Manager: "b", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 3, time.UTC)}},
+				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 1, time.UTC)}},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 2, time.UTC)}},
+				{Manager: "b", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 3, time.UTC)}},
 			},
 			expected: []metav1.ManagedFieldsEntry{
-				{Manager: "a", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 2, time.UTC)}},
-				{Manager: "b", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 3, time.UTC)}},
-				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 1, time.UTC)}},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 2, time.UTC)}},
+				{Manager: "b", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 3, time.UTC)}},
+				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{Time: time.Date(2000, time.January, 0, 0, 0, 0, 1, time.UTC)}},
 			},
 		},
 		{

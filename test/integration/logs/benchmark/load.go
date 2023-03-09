@@ -29,7 +29,8 @@ import (
 	"strings"
 	"text/template"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	runtimev1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -52,7 +53,7 @@ const (
 )
 
 type logStats struct {
-	TotalLines, JsonLines, ErrorMessages int
+	TotalLines, JsonLines, SplitLines, ErrorMessages int
 
 	ArgCounts     map[string]int
 	OtherLines    []string
@@ -73,10 +74,11 @@ var (
 			return x - y
 		},
 	}).Parse(`Total number of lines: {{.TotalLines}}
+JSON line continuation: {{.SplitLines}}
 Valid JSON messages: {{.JsonLines}} ({{percent .JsonLines .TotalLines}} of total lines)
 Error messages: {{.ErrorMessages}} ({{percent .ErrorMessages .JsonLines}} of valid JSON messages)
-Unrecognized lines: {{sub .TotalLines .JsonLines}}
-{{range .OtherLines}} {{.}}
+Unrecognized lines: {{sub (sub .TotalLines .JsonLines) .SplitLines}}
+{{range .OtherLines}} {{if gt (len .) 80}}{{slice . 0 80}}{{else}}{{.}}{{end}}
 {{end}}
 Args:
  total: {{if .ArgCounts.total}}{{.ArgCounts.total}}{{else}}0{{end}}{{if .ArgCounts.string}}
@@ -119,14 +121,28 @@ func loadLog(path string) (messages []logMessage, stats logStats, err error) {
 
 	stats.ArgCounts = map[string]int{}
 	scanner := bufio.NewScanner(file)
+	var buffer bytes.Buffer
 	for lineNo := 0; scanner.Scan(); lineNo++ {
+		stats.TotalLines++
 		line := scanner.Bytes()
-		msg, err := parseLine(line, &stats)
+		buffer.Write(line)
+		msg, err := parseLine(buffer.Bytes(), &stats)
 		if err != nil {
+			// JSON might have been split across multiple lines.
+			var jsonErr *json.SyntaxError
+			if errors.As(err, &jsonErr) && jsonErr.Offset > 1 {
+				// The start of the buffer was okay. Keep the
+				// data and add the next line to it.
+				stats.SplitLines++
+				continue
+			}
 			stats.OtherLines = append(stats.OtherLines, fmt.Sprintf("%d: %s", lineNo, string(line)))
+			buffer.Reset()
 			continue
 		}
+		stats.JsonLines++
 		messages = append(messages, msg)
+		buffer.Reset()
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -136,26 +152,16 @@ func loadLog(path string) (messages []logMessage, stats logStats, err error) {
 	return
 }
 
-// systemd prefix:
-// Nov 19 02:08:51 kind-worker2 kubelet[250]: {"ts":1637287731687.8315,...
-//
-// kubectl (?) prefix:
-// 2021-11-19T02:08:28.475825534Z stderr F {"ts": ...
-var prefixRE = regexp.MustCompile(`^\w+ \d+ \S+ \S+ \S+: |\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z stderr . `)
-
 // String format for API structs from generated.pb.go.
 // &Container{...}
 var objectRE = regexp.MustCompile(`^&([a-zA-Z]*)\{`)
 
 func parseLine(line []byte, stats *logStats) (item logMessage, err error) {
-	stats.TotalLines++
-	line = prefixRE.ReplaceAll(line, nil)
 
 	content := map[string]interface{}{}
 	if err := json.Unmarshal(line, &content); err != nil {
-		return logMessage{}, fmt.Errorf("JSON parsing failed: %v", err)
+		return logMessage{}, fmt.Errorf("JSON parsing failed: %w", err)
 	}
-	stats.JsonLines++
 
 	kvs := map[string]interface{}{}
 	item.isError = true
@@ -244,6 +250,7 @@ func parseLine(line []byte, stats *logStats) (item logMessage, err error) {
 // fields are an error).
 var objectTypes = []reflect.Type{
 	reflect.TypeOf(klog.ObjectRef{}),
+	reflect.TypeOf(&runtimev1.VersionResponse{}),
 	reflect.TypeOf(&v1.Pod{}),
 	reflect.TypeOf(&v1.Container{}),
 }

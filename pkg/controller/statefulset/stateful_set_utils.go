@@ -413,6 +413,11 @@ func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
 }
 
+// isPending returns true if pod has a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
+}
+
 // isFailed returns true if pod has a Phase of PodFailed
 func isFailed(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed

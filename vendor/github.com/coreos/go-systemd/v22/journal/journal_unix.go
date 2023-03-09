@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 // Package journal provides write bindings to the local systemd journal.
@@ -53,15 +54,9 @@ var (
 	onceConn sync.Once
 )
 
-func init() {
-	onceConn.Do(initConn)
-}
-
 // Enabled checks whether the local systemd journal is available for logging.
 func Enabled() bool {
-	onceConn.Do(initConn)
-
-	if (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr)) == nil {
+	if c := getOrInitConn(); c == nil {
 		return false
 	}
 
@@ -82,7 +77,7 @@ func Enabled() bool {
 // (http://www.freedesktop.org/software/systemd/man/systemd.journal-fields.html)
 // for more details.  vars may be nil.
 func Send(message string, priority Priority, vars map[string]string) error {
-	conn := (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
+	conn := getOrInitConn()
 	if conn == nil {
 		return errors.New("could not initialize socket to journald")
 	}
@@ -124,6 +119,16 @@ func Send(message string, priority Priority, vars map[string]string) error {
 	}
 
 	return nil
+}
+
+// getOrInitConn attempts to get the global `unixConnPtr` socket, initializing if necessary
+func getOrInitConn() *net.UnixConn {
+	conn := (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
+	if conn != nil {
+		return conn
+	}
+	onceConn.Do(initConn)
+	return (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
 }
 
 func appendVariable(w io.Writer, name, value string) {
@@ -194,7 +199,7 @@ func tempFd() (*os.File, error) {
 }
 
 // initConn initializes the global `unixConnPtr` socket.
-// It is meant to be called exactly once, at program startup.
+// It is automatically called when needed.
 func initConn() {
 	autobind, err := net.ResolveUnixAddr("unixgram", "")
 	if err != nil {

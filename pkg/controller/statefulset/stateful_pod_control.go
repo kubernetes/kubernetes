@@ -315,6 +315,22 @@ func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulS
 	}
 }
 
+// createMissingPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, and updates its retention policy
+func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
+	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
+		return err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		// Set PVC policy as much as is possible at this point.
+		if err := spc.UpdatePodClaimForRetentionPolicy(set, pod); err != nil {
+			spc.recordPodEvent("update", set, pod, err)
+			return err
+		}
+	}
+	return nil
+}
+
 // createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with

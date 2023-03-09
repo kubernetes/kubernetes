@@ -41,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,6 +53,11 @@ const (
 	dnsSubdomainLabelErrMsg = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
+
+type topologyPair struct {
+	key   string
+	value string
+}
 
 func line() string {
 	_, _, line, ok := runtime.Caller(1)
@@ -1088,6 +1094,29 @@ func simpleVolumeNodeAffinity(key, value string) *core.VolumeNodeAffinity {
 	}
 }
 
+func multipleVolumeNodeAffinity(terms [][]topologyPair) *core.VolumeNodeAffinity {
+	nodeSelectorTerms := []core.NodeSelectorTerm{}
+	for _, term := range terms {
+		matchExpressions := []core.NodeSelectorRequirement{}
+		for _, topology := range term {
+			matchExpressions = append(matchExpressions, core.NodeSelectorRequirement{
+				Key:      topology.key,
+				Operator: core.NodeSelectorOpIn,
+				Values:   []string{topology.value},
+			})
+		}
+		nodeSelectorTerms = append(nodeSelectorTerms, core.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		})
+	}
+
+	return &core.VolumeNodeAffinity{
+		Required: &core.NodeSelector{
+			NodeSelectorTerms: nodeSelectorTerms,
+		},
+	}
+}
+
 func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
@@ -1109,6 +1138,268 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar2")),
 		},
+		"affinity-non-beta-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo2", "bar")),
+		},
+		"affinity-zone-beta-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+		},
+		"affinity-zone-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyZone, "bar")),
+		},
+		"affinity-zone-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-zone-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+		},
+		"affinity-region-beta-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+		},
+		"affinity-region-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyRegion, "bar")),
+		},
+		"affinity-region-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-region-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+		},
+		"affinity-os-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+		},
+		"affinity-os-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
+		},
+		"affinity-os-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-os-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+		},
+		"affinity-arch-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+		},
+		"affinity-arch-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
+		},
+		"affinity-arch-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-arch-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+		},
+		"affinity-instanceType-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+		},
+		"affinity-instanceType-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "bar")),
+		},
+		"affinity-instanceType-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-instanceType-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+		},
+		"affinity-same-terms-expressions-length-beta-to-GA-partially-changed": {
+			isExpectedFailure: false,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{kubeletapis.LabelArch, "bar"},
+					topologyPair{v1.LabelInstanceType, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{v1.LabelArchStable, "bar"},
+					topologyPair{v1.LabelInstanceTypeStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-to-non-GA-partially-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{"foo", "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-GA-partially-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelOSStable, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelOSStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-fully-changed": {
+			isExpectedFailure: false,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{kubeletapis.LabelArch, "bar"},
+					topologyPair{v1.LabelInstanceType, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelTopologyRegion, "bar"},
+				},
+				{
+					topologyPair{v1.LabelOSStable, "bar"},
+					topologyPair{v1.LabelArchStable, "bar"},
+					topologyPair{v1.LabelInstanceTypeStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-GA-mixed-fully-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelTopologyZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar2"},
+				},
+			})),
+		},
+		"affinity-same-terms-length-different-expressions-length-beta-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+			})),
+		},
+		"affinity-different-terms-expressions-length-beta-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+				},
+				{
+					topologyPair{v1.LabelArchStable, "bar"},
+				},
+			})),
+		},
 		"nil-to-obj": {
 			isExpectedFailure: false,
 			oldPV:             testVolumeWithNodeAffinity(nil),
@@ -1122,6 +1413,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		originalNewPV := scenario.newPV.DeepCopy()
+		originalOldPV := scenario.oldPV.DeepCopy()
 		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
 		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
@@ -1129,6 +1422,12 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+		if diff := cmp.Diff(originalNewPV, scenario.newPV); len(diff) > 0 {
+			t.Errorf("newPV was modified: %s", diff)
+		}
+		if diff := cmp.Diff(originalOldPV, scenario.oldPV); len(diff) > 0 {
+			t.Errorf("oldPV was modified: %s", diff)
 		}
 	}
 }
@@ -4269,53 +4568,6 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowDownwardAPIHugePages: true},
-		},
-		{
-			name: "hugepages-downwardAPI-requests-disabled",
-			vol: core.Volume{
-				Name: "downwardapi",
-				VolumeSource: core.VolumeSource{
-					DownwardAPI: &core.DownwardAPIVolumeSource{
-						Items: []core.DownwardAPIVolumeFile{
-							{
-								Path: "hugepages_request",
-								ResourceFieldRef: &core.ResourceFieldSelector{
-									ContainerName: "test-container",
-									Resource:      "requests.hugepages-2Mi",
-								},
-							},
-						},
-					},
-				},
-			},
-			errs: []verr{{
-				etype: field.ErrorTypeNotSupported,
-				field: "downwardAPI.resourceFieldRef.resource",
-			}},
-		},
-		{
-			name: "hugepages-downwardAPI-limits-disabled",
-			vol: core.Volume{
-				Name: "downwardapi",
-				VolumeSource: core.VolumeSource{
-					DownwardAPI: &core.DownwardAPIVolumeSource{
-						Items: []core.DownwardAPIVolumeFile{
-							{
-								Path: "hugepages_limit",
-								ResourceFieldRef: &core.ResourceFieldSelector{
-									ContainerName: "test-container",
-									Resource:      "limits.hugepages-2Mi",
-								},
-							},
-						},
-					},
-				},
-			},
-			errs: []verr{{
-				etype: field.ErrorTypeNotSupported,
-				field: "downwardAPI.resourceFieldRef.resource",
-			}},
 		},
 		{
 			name: "downapi valid defaultMode",
@@ -5555,19 +5807,9 @@ func TestHugePagesEnv(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.Name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, true)()
-			opts := PodValidationOptions{AllowDownwardAPIHugePages: true}
+			opts := PodValidationOptions{}
 			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
-			}
-		})
-	}
-	// disable gate
-	for _, testCase := range testCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, false)()
-			opts := PodValidationOptions{AllowDownwardAPIHugePages: false}
-			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) == 0 {
-				t.Errorf("expected failure")
 			}
 		})
 	}
@@ -6764,10 +7006,118 @@ func TestValidatePullPolicy(t *testing.T) {
 	}
 }
 
+func TestValidateResizePolicy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+	tSupportedResizePolicies := sets.NewString(string(core.RestartNotRequired), string(core.RestartRequired))
+	type T struct {
+		PolicyList  []core.ContainerResizePolicy
+		ExpectError bool
+		Errors      field.ErrorList
+	}
+	testCases := map[string]T{
+		"ValidCPUandMemoryPolicies": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartNotRequired"},
+				{ResourceName: "memory", Policy: "RestartRequired"},
+			},
+			false,
+			nil,
+		},
+		"ValidCPUPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartRequired"},
+			},
+			false,
+			nil,
+		},
+		"ValidMemoryPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "memory", Policy: "RestartNotRequired"},
+			},
+			false,
+			nil,
+		},
+		"NoPolicy": {
+			[]core.ContainerResizePolicy{},
+			false,
+			nil,
+		},
+		"ValidCPUandInvalidMemoryPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartNotRequired"},
+				{ResourceName: "memory", Policy: "Restarrrt"},
+			},
+			true,
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizePolicy("Restarrrt"), tSupportedResizePolicies.List())},
+		},
+		"ValidMemoryandInvalidCPUPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartNotRequirrred"},
+				{ResourceName: "memory", Policy: "RestartRequired"},
+			},
+			true,
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizePolicy("RestartNotRequirrred"), tSupportedResizePolicies.List())},
+		},
+		"InvalidResourceNameValidPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpuuu", Policy: "RestartNotRequired"},
+			},
+			true,
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
+		},
+		"ValidResourceNameMissingPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "memory", Policy: ""},
+			},
+			true,
+			field.ErrorList{field.Required(field.NewPath("field"), "")},
+		},
+		"RepeatedPolicies": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartNotRequired"},
+				{ResourceName: "memory", Policy: "RestartRequired"},
+				{ResourceName: "cpu", Policy: "RestartRequired"},
+			},
+			true,
+			field.ErrorList{field.Duplicate(field.NewPath("field").Index(2), core.ResourceCPU)},
+		},
+	}
+	for k, v := range testCases {
+		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"))
+		if !v.ExpectError && len(errs) > 0 {
+			t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
+		}
+		if v.ExpectError {
+			if len(errs) == 0 {
+				t.Errorf("Testcase %s - expected error, got success", k)
+			}
+			delta := cmp.Diff(errs, v.Errors)
+			if delta != "" {
+				t.Errorf("Testcase %s - expected errors '%v', got '%v', diff: '%v'", k, v.Errors, errs, delta)
+			}
+		}
+	}
+}
+
 func getResourceLimits(cpu, memory string) core.ResourceList {
 	res := core.ResourceList{}
 	res[core.ResourceCPU] = resource.MustParse(cpu)
 	res[core.ResourceMemory] = resource.MustParse(memory)
+	return res
+}
+
+func getResources(cpu, memory, storage string) core.ResourceList {
+	res := core.ResourceList{}
+	if cpu != "" {
+		res[core.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[core.ResourceMemory] = resource.MustParse(memory)
+	}
+	if storage != "" {
+		res[core.ResourceEphemeralStorage] = resource.MustParse(storage)
+	}
 	return res
 }
 
@@ -7114,6 +7464,24 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"}},
 		},
+		{
+			"Container uses disallowed field: ResizePolicy",
+			line(),
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "resources-resize-policy",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						ResizePolicy: []core.ContainerResizePolicy{
+							{ResourceName: "cpu", Policy: "RestartNotRequired"},
+						},
+					},
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resizePolicy"}},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -7326,6 +7694,16 @@ func TestValidateContainers(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("9.5"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "resources-resize-policy",
+			Image: "image",
+			ResizePolicy: []core.ContainerResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartNotRequired"},
+				{ResourceName: "memory", Policy: "RestartRequired"},
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9089,6 +9467,32 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"disallowed resources resize policy for init containers": {
+			InitContainers: []core.Container{
+				{
+					Name:  "initctr",
+					Image: "initimage",
+					ResizePolicy: []core.ContainerResizePolicy{
+						{ResourceName: "cpu", Policy: "RestartNotRequired"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			Containers: []core.Container{
+				{
+					Name:  "ctr",
+					Image: "image",
+					ResizePolicy: []core.ContainerResizePolicy{
+						{ResourceName: "cpu", Policy: "RestartNotRequired"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -10875,6 +11279,7 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -11329,33 +11734,586 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Image: "foo:V1",
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
 							Resources: core.ResourceRequirements{
-								Limits: getResourceLimits("100m", "0"),
+								Limits: getResources("200m", "0", "1Gi"),
 							},
 						},
 					},
 				},
 			},
 			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Image: "foo:V2",
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
 							Resources: core.ResourceRequirements{
-								Limits: getResourceLimits("1000m", "0"),
+								Limits: getResources("100m", "0", "1Gi"),
 							},
 						},
 					},
 				},
 			},
-			err:  "spec: Forbidden: pod updates may not change fields",
-			test: "cpu change",
+			err:  "",
+			test: "cpu limit change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "memory limit change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits: getResources("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResources("100m", "100Mi", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "Forbidden: pod updates may not change fields other than",
+			test: "storage limit change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "0"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("200m", "0"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "cpu request change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("0", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("0", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "memory request change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResources("100m", "0", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResources("100m", "0", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "Forbidden: pod updates may not change fields other than",
+			test: "storage request change",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("200m", "400Mi", "1Gi"),
+								Requests: getResources("200m", "400Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("100m", "100Mi", "1Gi"),
+								Requests: getResources("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, guaranteed -> guaranteed",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("200m", "200Mi", "2Gi"),
+								Requests: getResources("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("400m", "400Mi", "2Gi"),
+								Requests: getResources("200m", "200Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, add limits",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("400m", "", "1Gi"),
+								Requests: getResources("300m", "", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResources("200m", "500Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, add requests",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResources("400m", "500Mi", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResources("200m", "300Mi", "2Gi"),
+								Requests: getResourceLimits("100m", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("100m", "100Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, guaranteed -> burstable",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("100m", "100Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, burstable -> guaranteed",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+						},
+					},
+				},
+			},
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, besteffort -> burstable",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+						},
+					},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, burstable -> besteffort",
 		},
 		{
 			new: core.Pod{
@@ -18568,6 +19526,8 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].Ports",
 		"Containers[*].ReadinessProbe",
 		"Containers[*].Resources",
+		"Containers[*].ResizePolicy[*].Policy",
+		"Containers[*].ResizePolicy[*].ResourceName",
 		"Containers[*].SecurityContext.RunAsNonRoot",
 		"Containers[*].Stdin",
 		"Containers[*].StdinOnce",
@@ -18592,6 +19552,8 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.Ports",
 		"EphemeralContainers[*].EphemeralContainerCommon.ReadinessProbe",
 		"EphemeralContainers[*].EphemeralContainerCommon.Resources",
+		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].Policy",
+		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].ResourceName",
 		"EphemeralContainers[*].EphemeralContainerCommon.Stdin",
 		"EphemeralContainers[*].EphemeralContainerCommon.StdinOnce",
 		"EphemeralContainers[*].EphemeralContainerCommon.TTY",
@@ -18618,6 +19580,8 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].Ports",
 		"InitContainers[*].ReadinessProbe",
 		"InitContainers[*].Resources",
+		"InitContainers[*].ResizePolicy[*].Policy",
+		"InitContainers[*].ResizePolicy[*].ResourceName",
 		"InitContainers[*].Stdin",
 		"InitContainers[*].StdinOnce",
 		"InitContainers[*].TTY",
@@ -18696,7 +19660,10 @@ func TestValidateSchedulingGates(t *testing.T) {
 				{Name: "foo"},
 				{Name: ""},
 			},
-			wantFieldErrors: []*field.Error{field.Required(fieldPath.Index(1), "must not be empty")},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fieldPath.Index(1), "", "name part must be non-empty"),
+				field.Invalid(fieldPath.Index(1), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+			},
 		},
 		{
 			name: "legal gates",
@@ -18705,6 +19672,14 @@ func TestValidateSchedulingGates(t *testing.T) {
 				{Name: "bar"},
 			},
 			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "illegal gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "\nbar"},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPath.Index(1), "\nbar", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
 		},
 		{
 			name: "duplicated gates (single duplication)",

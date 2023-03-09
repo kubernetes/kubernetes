@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -27,6 +29,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 )
 
 // FakeFischers implements FischerInterface
@@ -114,6 +117,27 @@ func (c *FakeFischers) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeFischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, name, pt, data, subresources...), &v1alpha1.Fischer{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Fischer), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied fischer.
+func (c *FakeFischers) Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error) {
+	if fischer == nil {
+		return nil, fmt.Errorf("fischer provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(fischer)
+	if err != nil {
+		return nil, err
+	}
+	name := fischer.Name
+	if name == nil {
+		return nil, fmt.Errorf("fischer.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, *name, types.ApplyPatchType, data), &v1alpha1.Fischer{})
 	if obj == nil {
 		return nil, err
 	}

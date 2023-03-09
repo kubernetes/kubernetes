@@ -19,12 +19,13 @@ require (
 	github.com/onsi/ginkgo/v2 v2.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.1
-	golang.org/x/net v0.5.0
+	golang.org/x/net v0.7.0
+	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	gopkg.in/inf.v0 v0.9.1
-	k8s.io/klog/v2 v2.80.1
-	k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a
+	k8s.io/klog/v2 v2.90.1
+	k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
-	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -43,8 +44,8 @@ require (
 	github.com/onsi/gomega v1.26.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

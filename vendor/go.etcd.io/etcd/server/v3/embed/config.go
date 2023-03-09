@@ -619,13 +619,9 @@ func updateCipherSuites(tls *transport.TLSInfo, ss []string) error {
 		return fmt.Errorf("TLSInfo.CipherSuites is already specified (given %v)", ss)
 	}
 	if len(ss) > 0 {
-		cs := make([]uint16, len(ss))
-		for i, s := range ss {
-			var ok bool
-			cs[i], ok = tlsutil.GetCipherSuite(s)
-			if !ok {
-				return fmt.Errorf("unexpected TLS cipher suite %q", s)
-			}
+		cs, err := tlsutil.GetCipherSuites(ss)
+		if err != nil {
+			return err
 		}
 		tls.CipherSuites = cs
 	}

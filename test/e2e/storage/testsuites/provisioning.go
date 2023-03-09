@@ -747,8 +747,7 @@ func PVWriteReadSingleNodeCheck(ctx context.Context, client clientset.Interface,
 		// agnhost doesn't support mount
 		command = "grep 'hello world' /mnt/test/data"
 	}
-	RunInPodWithVolume(ctx, client, timeouts, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName})
-
+	RunInPodWithVolume(ctx, client, timeouts, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName, Selector: node.Selector})
 	return e2evolume
 }
 
@@ -1184,7 +1183,7 @@ func MultiplePVMountSingleNodeCheck(ctx context.Context, client clientset.Interf
 
 	pod2Config := e2epod.Config{
 		NS:            pvc2.Namespace,
-		NodeSelection: e2epod.NodeSelection{Name: pod1.Spec.NodeName},
+		NodeSelection: e2epod.NodeSelection{Name: pod1.Spec.NodeName, Selector: node.Selector},
 		PVCs:          []*v1.PersistentVolumeClaim{pvc2},
 	}
 	pod2, err := e2epod.CreateSecPodWithNodeSelection(ctx, client, &pod2Config, timeouts.PodStart)

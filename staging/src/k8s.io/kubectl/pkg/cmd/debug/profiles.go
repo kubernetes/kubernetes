@@ -52,6 +52,8 @@ const (
 	// ProfileRestricted is identical to "baseline" but adds configuration that's required
 	// under the restricted security profile, such as requiring a non-root user and dropping all capabilities.
 	ProfileRestricted = "restricted"
+	// ProfileNetadmin offers elevated privileges for network debugging.
+	ProfileNetadmin = "netadmin"
 )
 
 type ProfileApplier interface {
@@ -70,6 +72,8 @@ func NewProfileApplier(profile string) (ProfileApplier, error) {
 		return &baselineProfile{}, nil
 	case ProfileRestricted:
 		return &restrictedProfile{}, nil
+	case ProfileNetadmin:
+		return &netadminProfile{}, nil
 	}
 
 	return nil, fmt.Errorf("unknown profile: %s", profile)
@@ -85,6 +89,9 @@ type baselineProfile struct {
 }
 
 type restrictedProfile struct {
+}
+
+type netadminProfile struct {
 }
 
 func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
@@ -166,17 +173,35 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		return fmt.Errorf("restricted profile: %s", err)
 	}
 
+	clearSecurityContext(pod, containerName)
 	disallowRoot(pod, containerName)
 	dropCapabilities(pod, containerName)
 
 	switch style {
-	case node:
-		clearSecurityContext(pod, containerName)
-
 	case podCopy:
 		shareProcessNamespace(pod)
 
-	case ephemeral:
+	case ephemeral, node:
+		// no additional modifications needed
+	}
+
+	return nil
+}
+
+func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("netadmin profile: %s", err)
+	}
+
+	allowNetadminCapability(pod, containerName)
+
+	switch style {
+	case node:
+		useHostNamespaces(pod)
+		setPrivileged(pod, containerName)
+
+	case podCopy, ephemeral:
 		// no additional modifications needed
 	}
 
@@ -225,7 +250,7 @@ func useHostNamespaces(p *corev1.Pod) {
 // shareProcessNamespace configures all containers in the pod to share the
 // process namespace.
 func shareProcessNamespace(p *corev1.Pod) {
-	p.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+	p.Spec.ShareProcessNamespace = pointer.Bool(true)
 }
 
 // clearSecurityContext clears the security context for the container.
@@ -239,15 +264,30 @@ func clearSecurityContext(p *corev1.Pod, containerName string) {
 	})
 }
 
+// setPrivileged configures the containers as privileged.
+func setPrivileged(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.Privileged = pointer.Bool(true)
+		return false
+	})
+}
+
 // disallowRoot configures the container to run as a non-root user.
 func disallowRoot(p *corev1.Pod, containerName string) {
 	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
 		}
-		c.SecurityContext = &corev1.SecurityContext{
-			RunAsNonRoot: pointer.BoolPtr(true),
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
 		}
+		c.SecurityContext.RunAsNonRoot = pointer.Bool(true)
 		return false
 	})
 }
@@ -261,9 +301,11 @@ func dropCapabilities(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.Capabilities = &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
+		if c.SecurityContext.Capabilities == nil {
+			c.SecurityContext.Capabilities = &corev1.Capabilities{}
 		}
+		c.SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
+		c.SecurityContext.Capabilities.Add = nil
 		return false
 	})
 }
@@ -274,13 +316,28 @@ func allowProcessTracing(p *corev1.Pod, containerName string) {
 		if c.Name != containerName {
 			return true
 		}
-		if c.SecurityContext == nil {
-			c.SecurityContext = &corev1.SecurityContext{}
-		}
-		if c.SecurityContext.Capabilities == nil {
-			c.SecurityContext.Capabilities = &corev1.Capabilities{}
-		}
-		c.SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
+		addCapability(c, "SYS_PTRACE")
 		return false
 	})
+}
+
+// allowNetadminCapability grants NET_ADMIN capability to the container.
+func allowNetadminCapability(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		addCapability(c, "NET_ADMIN")
+		return false
+	})
+}
+
+func addCapability(c *corev1.Container, capability corev1.Capability) {
+	if c.SecurityContext == nil {
+		c.SecurityContext = &corev1.SecurityContext{}
+	}
+	if c.SecurityContext.Capabilities == nil {
+		c.SecurityContext.Capabilities = &corev1.Capabilities{}
+	}
+	c.SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, capability)
 }

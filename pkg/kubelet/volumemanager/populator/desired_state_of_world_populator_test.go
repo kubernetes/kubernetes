@@ -89,8 +89,7 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 
 func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 	// Outer volume spec replacement is needed only when the old volume reconstruction is used
-	// (i.e. with SELinuxMountReadWriteOncePod disabled)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, false)()
 	// create dswp
 	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
 
@@ -1613,13 +1612,12 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 
 	csiTranslator := csitrans.New()
 	dswp := &desiredStateOfWorldPopulator{
-		kubeClient:                fakeClient,
-		loopSleepDuration:         100 * time.Millisecond,
-		getPodStatusRetryDuration: 2 * time.Second,
-		podManager:                fakePodManager,
-		podStateProvider:          fakeStateProvider,
-		desiredStateOfWorld:       fakesDSW,
-		actualStateOfWorld:        fakeASW,
+		kubeClient:          fakeClient,
+		loopSleepDuration:   100 * time.Millisecond,
+		podManager:          fakePodManager,
+		podStateProvider:    fakeStateProvider,
+		desiredStateOfWorld: fakesDSW,
+		actualStateOfWorld:  fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,

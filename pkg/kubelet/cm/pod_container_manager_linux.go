@@ -120,6 +120,25 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	return cgroupName, cgroupfsName
 }
 
+func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	memUsage, err := m.cgroupManager.MemoryUsage(podCgroupName)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(memUsage), nil
+}
+
+func (m *podContainerManagerImpl) GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.GetCgroupConfig(podCgroupName, resource)
+}
+
+func (m *podContainerManagerImpl) SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.SetCgroupConfig(podCgroupName, resource, resourceConfig)
+}
+
 // Kill one process ID
 func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	// os.FindProcess never returns an error on POSIX
@@ -321,4 +340,16 @@ func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 
 func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+
+func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+	return nil
 }

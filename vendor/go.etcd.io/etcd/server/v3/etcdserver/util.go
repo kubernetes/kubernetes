@@ -140,7 +140,11 @@ func warnOfExpensiveReadOnlyTxnRequest(lg *zap.Logger, warningApplyDuration time
 		for _, r := range txnResponse.Responses {
 			switch op := r.Response.(type) {
 			case *pb.ResponseOp_ResponseRange:
-				resps = append(resps, fmt.Sprintf("range_response_count:%d", len(op.ResponseRange.Kvs)))
+				if op.ResponseRange != nil {
+					resps = append(resps, fmt.Sprintf("range_response_count:%d", len(op.ResponseRange.Kvs)))
+				} else {
+					resps = append(resps, "range_response:nil")
+				}
 			default:
 				// only range responses should be in a read only txn request
 			}

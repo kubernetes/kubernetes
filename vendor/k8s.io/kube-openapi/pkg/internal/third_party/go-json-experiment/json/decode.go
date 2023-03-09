@@ -347,9 +347,9 @@ func (d *Decoder) PeekKind() Kind {
 	return next
 }
 
-// skipValue is semantically equivalent to calling ReadValue and discarding
+// SkipValue is semantically equivalent to calling ReadValue and discarding
 // the result except that memory is not wasted trying to hold the entire result.
-func (d *Decoder) skipValue() error {
+func (d *Decoder) SkipValue() error {
 	switch d.PeekKind() {
 	case '{', '[':
 		// For JSON objects and arrays, keep skipping all tokens
@@ -374,7 +374,7 @@ func (d *Decoder) skipValue() error {
 }
 
 // ReadToken reads the next Token, advancing the read offset.
-// The returned token is only valid until the next Peek or Read call.
+// The returned token is only valid until the next Peek, Read, or Skip call.
 // It returns io.EOF if there are no more tokens.
 func (d *Decoder) ReadToken() (Token, error) {
 	// Determine the next kind.
@@ -585,7 +585,7 @@ func (f valueFlags) isCanonical() bool  { return f&stringNonCanonical == 0 }
 
 // ReadValue returns the next raw JSON value, advancing the read offset.
 // The value is stripped of any leading or trailing whitespace.
-// The returned value is only valid until the next Peek or Read call and
+// The returned value is only valid until the next Peek, Read, or Skip call and
 // may not be mutated while the Decoder remains in use.
 // If the decoder is currently at the end token for an object or array,
 // then it reports a SyntacticError and the internal state remains unchanged.
@@ -1013,7 +1013,7 @@ func (d *Decoder) InputOffset() int64 {
 // UnreadBuffer returns the data remaining in the unread buffer,
 // which may contain zero or more bytes.
 // The returned buffer must not be mutated while Decoder continues to be used.
-// The buffer contents are valid until the next Peek or Read call.
+// The buffer contents are valid until the next Peek, Read, or Skip call.
 func (d *Decoder) UnreadBuffer() []byte {
 	return d.unreadBuffer()
 }
@@ -1213,7 +1213,7 @@ func consumeStringResumable(flags *valueFlags, b []byte, resumeOffset int, valid
 					return n, &SyntacticError{str: "invalid escape sequence " + strconv.Quote(string(b[n:n+6])) + " within string"}
 				}
 				// Only certain control characters can use the \uFFFF notation
-				// for canonical formating (per RFC 8785, section 3.2.2.2.).
+				// for canonical formatting (per RFC 8785, section 3.2.2.2.).
 				switch v1 {
 				// \uFFFF notation not permitted for these characters.
 				case '\b', '\f', '\n', '\r', '\t':

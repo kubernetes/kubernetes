@@ -148,11 +148,12 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		_, err := client.Create(ctx, pod, metav1.CreateOptions{})
 
-		gomega.Expect(err).NotTo(gomega.BeNil())
-		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "foo-"`))
-		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "bar.."`))
-		gomega.Expect(err.Error()).NotTo(gomega.ContainSubstring(`safe-and-unsafe`))
-		gomega.Expect(err.Error()).NotTo(gomega.ContainSubstring("kernel.shmmax"))
+		gomega.Expect(err).To(gomega.MatchError(gomega.SatisfyAll(
+			gomega.ContainSubstring(`Invalid value: "foo-"`),
+			gomega.ContainSubstring(`Invalid value: "bar.."`),
+			gomega.Not(gomega.ContainSubstring(`safe-and-unsafe`)),
+			gomega.Not(gomega.ContainSubstring("kernel.shmmax")),
+		)))
 	})
 
 	// Pod is created with kernel.msgmax, an unsafe sysctl.

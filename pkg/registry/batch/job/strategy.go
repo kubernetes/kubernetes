@@ -169,6 +169,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 	opts := batchvalidation.JobValidationOptions{
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
 		AllowTrackingAnnotation: true,
+		AllowElasticIndexedJobs: utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob),
 	}
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
@@ -182,11 +183,8 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		// only for suspended jobs that never started before.
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
-		opts.AllowMutableSchedulingDirectives = utilfeature.DefaultFeatureGate.Enabled(features.JobMutableNodeSchedulingDirectives) &&
-			suspended && notStarted
-
+		opts.AllowMutableSchedulingDirectives = suspended && notStarted
 	}
-
 	return opts
 }
 
@@ -213,9 +211,8 @@ func generateSelector(obj *batch.Job) {
 	// a label.
 	_, found := obj.Spec.Template.Labels["job-name"]
 	if found {
-		// User asked us to not automatically generate a selector and labels,
-		// but set a possibly conflicting value.  If there is a conflict,
-		// we will reject in validation.
+		// User asked us to automatically generate a selector, but set manual labels.
+		// If there is a conflict, we will reject in validation.
 	} else {
 		obj.Spec.Template.Labels["job-name"] = string(obj.ObjectMeta.Name)
 	}
@@ -223,9 +220,8 @@ func generateSelector(obj *batch.Job) {
 	// only match this job.
 	_, found = obj.Spec.Template.Labels["controller-uid"]
 	if found {
-		// User asked us to automatically generate a selector and labels,
-		// but set a possibly conflicting value.  If there is a conflict,
-		// we will reject in validation.
+		// User asked us to automatically generate a selector, but set manual labels.
+		// If there is a conflict, we will reject in validation.
 	} else {
 		obj.Spec.Template.Labels["controller-uid"] = string(obj.ObjectMeta.UID)
 	}

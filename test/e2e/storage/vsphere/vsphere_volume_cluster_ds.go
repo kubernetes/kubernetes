@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, client)
 		scParameters = make(map[string]string)
 		clusterDatastore = GetAndExpectStringEnvVar(VCPClusterDatastore)
 	})

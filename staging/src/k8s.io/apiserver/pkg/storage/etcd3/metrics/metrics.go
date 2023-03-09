@@ -64,6 +64,15 @@ var (
 		},
 		[]string{"endpoint"},
 	)
+	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      "apiserver",
+			Name:           "storage_events_received_total",
+			Help:           "Number of etcd events received split by kind.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "etcd_bookmark_counts",
@@ -151,6 +160,11 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordEtcdEvent updated the etcd_events_received_total metric.
+func RecordEtcdEvent(resource string) {
+	etcdEventsReceivedCounts.WithLabelValues(resource).Inc()
 }
 
 // RecordEtcdBookmark updates the etcd_bookmark_counts metric.

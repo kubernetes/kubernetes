@@ -161,6 +161,56 @@ func TestListKubeContainers(t *testing.T) {
 	}
 }
 
+func TestSandboxImage(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9\n"), nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+		},
+	}
+
+	execer := &fakeexec.FakeExec{
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
+		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
+	}
+
+	cases := []struct {
+		name     string
+		expected string
+		isError  bool
+	}{
+		{"valid: read sandbox image normally", "registry.k8s.io/pause:3.9", false},
+		{"valid: read sandbox image with leading/trailing white spaces", "registry.k8s.io/pause:3.9", false},
+		{"invalid: read empty sandbox image", "", true},
+		{"invalid: failed to read sandbox image", "", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(execer, "unix:///some/socket.sock")
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
+			}
+
+			sandboxImage, err := runtime.SandboxImage()
+			if tc.isError {
+				if err == nil {
+					t.Errorf("unexpected SandboxImage success")
+				}
+				return
+			} else if err != nil {
+				t.Errorf("unexpected SandboxImage error: %v", err)
+			}
+
+			if sandboxImage != tc.expected {
+				t.Errorf("expected sandbox image %v, but got %v", tc.expected, sandboxImage)
+			}
+		})
+	}
+}
+
 func TestRemoveContainers(t *testing.T) {
 	fakeOK := func() ([]byte, []byte, error) { return nil, nil, nil }
 	fakeErr := func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} }

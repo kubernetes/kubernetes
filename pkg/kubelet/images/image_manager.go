@@ -52,14 +52,14 @@ type imageManager struct {
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
+func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
 	if serialized {
 		puller = newSerialImagePuller(imageService)
 	} else {
-		puller = newParallelImagePuller(imageService)
+		puller = newParallelImagePuller(imageService, maxParallelImagePulls)
 	}
 	return &imageManager{
 		recorder:               recorder,

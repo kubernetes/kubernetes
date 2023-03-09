@@ -64,7 +64,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
+			framework.ExpectNoError(expectLease(lease, nodeName))
 
 			ginkgo.By("check that node lease is updated at least once within the lease duration")
 			gomega.Eventually(ctx, func() error {
@@ -126,7 +126,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
+			framework.ExpectNoError(expectLease(lease, nodeName))
 			leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
 
 			ginkgo.By("verify NodeStatus report period is longer than lease duration")

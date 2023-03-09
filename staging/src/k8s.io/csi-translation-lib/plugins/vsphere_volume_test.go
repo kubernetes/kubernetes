@@ -28,19 +28,19 @@ import (
 
 func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
-	topologySelectorTerm := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
+	topologySelectorTerm := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
 			Key:    v1.LabelTopologyZone,
 			Values: []string{"zone-a"},
 		},
 	}}
-	topologySelectorTermWithBetaLabels := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
+	topologySelectorTermWithBetaLabels := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
 			Key:    v1.LabelFailureDomainBetaZone,
 			Values: []string{"zone-a"},
 		},
 	}}
-	expectedTopologySelectorTerm := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
+	expectedTopologySelectorTerm := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
 			Key:    vSphereCSITopologyZoneKey,
 			Values: []string{"zone-a"},

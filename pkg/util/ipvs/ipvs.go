@@ -67,6 +67,8 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
+	// FlagSourceHash enables IPVS service hashing on source port and source IP
+	FlagSourceHash = 0x10
 )
 
 // Equal check the equality of virtual server.

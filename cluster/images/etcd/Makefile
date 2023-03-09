@@ -179,10 +179,10 @@ else
 	done
 
 	# Add this ENV variable in order to workaround an unsupported arch blocker
-	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
-	# On arm (which is 32-bit), it can't handle >1GB data in-memory, but it is very unlikely someone tinkering with their limited arm devices would reach such a high usage
-	# ppc64le is still quite untested, but compiles and is probably in the process of being validated by IBM.
-	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
+	# On arm (which is 32-bit), it can't handle >1GB data in-memory
+	ifeq ($(ARCH),arm)
+		cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
+	endif
 endif
 
 	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes

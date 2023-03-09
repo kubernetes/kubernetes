@@ -20,8 +20,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -121,6 +124,28 @@ func (c *FakeExamples) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 func (c *FakeExamples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), &v1.Example{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Example), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied example.
+func (c *FakeExamples) Apply(ctx context.Context, example *crv1.ExampleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Example, err error) {
+	if example == nil {
+		return nil, fmt.Errorf("example provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(example)
+	if err != nil {
+		return nil, err
+	}
+	name := example.Name
+	if name == nil {
+		return nil, fmt.Errorf("example.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, *name, types.ApplyPatchType, data), &v1.Example{})
 
 	if obj == nil {
 		return nil, err

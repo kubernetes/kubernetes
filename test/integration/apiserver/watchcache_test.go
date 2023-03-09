@@ -37,12 +37,12 @@ import (
 // with one of them containing events and the other all other objects.
 func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
-	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs)
+	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs, nil)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
 
-	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs)
+	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs, nil)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}

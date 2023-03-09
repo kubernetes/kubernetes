@@ -17,6 +17,7 @@ limitations under the License.
 package ipamperf
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/client-go/informers"
@@ -37,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/integration/util"
 )
 
-func setupAllocator(kubeConfig *restclient.Config, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*clientset.Clientset, util.ShutdownFunc, error) {
+func setupAllocator(ctx context.Context, kubeConfig *restclient.Config, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*clientset.Clientset, util.ShutdownFunc, error) {
 	controllerStopChan := make(chan struct{})
 	shutdownFunc := func() {
 		close(controllerStopChan)
@@ -50,6 +52,7 @@ func setupAllocator(kubeConfig *restclient.Config, config *Config, clusterCIDR, 
 
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ipamController, err := nodeipam.NewNodeIpamController(
+		ctx,
 		sharedInformer.Core().V1().Nodes(),
 		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
 		config.Cloud, clientSet, []*net.IPNet{clusterCIDR}, serviceCIDR, nil,
@@ -58,7 +61,7 @@ func setupAllocator(kubeConfig *restclient.Config, config *Config, clusterCIDR, 
 	if err != nil {
 		return nil, shutdownFunc, err
 	}
-	go ipamController.Run(controllerStopChan)
+	go ipamController.Run(ctx)
 	sharedInformer.Start(controllerStopChan)
 
 	return clientSet, shutdownFunc, nil
@@ -74,8 +77,8 @@ func runTest(t *testing.T, kubeConfig *restclient.Config, config *Config, cluste
 	nodeClient := clientset.NewForConfigOrDie(nodeClientConfig)
 
 	defer deleteNodes(nodeClient) // cleanup nodes on after controller shutdown
-
-	clientSet, shutdownFunc, err := setupAllocator(kubeConfig, config, clusterCIDR, serviceCIDR, subnetMaskSize)
+	_, ctx := ktesting.NewTestContext(t)
+	clientSet, shutdownFunc, err := setupAllocator(ctx, kubeConfig, config, clusterCIDR, serviceCIDR, subnetMaskSize)
 	if err != nil {
 		t.Fatalf("Error starting IPAM allocator: %v", err)
 	}

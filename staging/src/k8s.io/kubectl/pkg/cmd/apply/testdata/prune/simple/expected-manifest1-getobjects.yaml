@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    applyset.k8s.io/part-of: placeholder-todo
+  name: foo
+
+---
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    applyset.k8s.io/part-of: placeholder-todo
+  name: bar

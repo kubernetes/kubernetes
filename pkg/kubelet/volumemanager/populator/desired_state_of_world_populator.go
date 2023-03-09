@@ -90,7 +90,6 @@ type podStateProvider interface {
 func NewDesiredStateOfWorldPopulator(
 	kubeClient clientset.Interface,
 	loopSleepDuration time.Duration,
-	getPodStatusRetryDuration time.Duration,
 	podManager pod.Manager,
 	podStateProvider podStateProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
@@ -101,13 +100,12 @@ func NewDesiredStateOfWorldPopulator(
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		kubeClient:                kubeClient,
-		loopSleepDuration:         loopSleepDuration,
-		getPodStatusRetryDuration: getPodStatusRetryDuration,
-		podManager:                podManager,
-		podStateProvider:          podStateProvider,
-		desiredStateOfWorld:       desiredStateOfWorld,
-		actualStateOfWorld:        actualStateOfWorld,
+		kubeClient:          kubeClient,
+		loopSleepDuration:   loopSleepDuration,
+		podManager:          podManager,
+		podStateProvider:    podStateProvider,
+		desiredStateOfWorld: desiredStateOfWorld,
+		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
 		kubeContainerRuntime:     kubeContainerRuntime,
@@ -121,22 +119,20 @@ func NewDesiredStateOfWorldPopulator(
 }
 
 type desiredStateOfWorldPopulator struct {
-	kubeClient                clientset.Interface
-	loopSleepDuration         time.Duration
-	getPodStatusRetryDuration time.Duration
-	podManager                pod.Manager
-	podStateProvider          podStateProvider
-	desiredStateOfWorld       cache.DesiredStateOfWorld
-	actualStateOfWorld        cache.ActualStateOfWorld
-	pods                      processedPods
-	kubeContainerRuntime      kubecontainer.Runtime
-	timeOfLastGetPodStatus    time.Time
-	keepTerminatedPodVolumes  bool
-	hasAddedPods              bool
-	hasAddedPodsLock          sync.RWMutex
-	csiMigratedPluginManager  csimigration.PluginManager
-	intreeToCSITranslator     csimigration.InTreeToCSITranslator
-	volumePluginMgr           *volume.VolumePluginMgr
+	kubeClient               clientset.Interface
+	loopSleepDuration        time.Duration
+	podManager               pod.Manager
+	podStateProvider         podStateProvider
+	desiredStateOfWorld      cache.DesiredStateOfWorld
+	actualStateOfWorld       cache.ActualStateOfWorld
+	pods                     processedPods
+	kubeContainerRuntime     kubecontainer.Runtime
+	keepTerminatedPodVolumes bool
+	hasAddedPods             bool
+	hasAddedPodsLock         sync.RWMutex
+	csiMigratedPluginManager csimigration.PluginManager
+	intreeToCSITranslator    csimigration.InTreeToCSITranslator
+	volumePluginMgr          *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -174,17 +170,6 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 
 func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
 	dswp.findAndAddNewPods()
-
-	// findAndRemoveDeletedPods() calls out to the container runtime to
-	// determine if the containers for a given pod are terminated. This is
-	// an expensive operation, therefore we limit the rate that
-	// findAndRemoveDeletedPods() is called independently of the main
-	// populator loop.
-	if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
-		klog.V(5).InfoS("Skipping findAndRemoveDeletedPods(). ", "nextRetryTime", dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration), "retryDuration", dswp.getPodStatusRetryDuration)
-		return
-	}
-
 	dswp.findAndRemoveDeletedPods()
 }
 
@@ -323,7 +308,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		} else {
 			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
 			// sync reconstructed volume. This is necessary only when the old-style reconstruction is still used.
 			// With reconstruct_new.go, AWS.MarkVolumeAsMounted will update the outer spec name of previously
 			// uncertain volumes.

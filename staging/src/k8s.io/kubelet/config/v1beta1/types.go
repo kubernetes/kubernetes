@@ -205,14 +205,14 @@ type KubeletConfiguration struct {
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced. The value cannot be a negative number.
-	// Default: 5
+	// Default: 50
 	// +optional
 	EventRecordQPS *int32 `json:"eventRecordQPS,omitempty"`
 	// eventBurst is the maximum size of a burst of event creations, temporarily
 	// allows event creations to burst to this number, while still not exceeding
 	// eventRecordQPS. This field canot be a negative number and it is only used
 	// when eventRecordQPS > 0.
-	// Default: 10
+	// Default: 100
 	// +optional
 	EventBurst int32 `json:"eventBurst,omitempty"`
 	// enableDebuggingHandlers enables server endpoints for log access
@@ -368,7 +368,6 @@ type KubeletConfiguration struct {
 	// - `single-numa-node`: kubelet only allows pods with a single NUMA alignment
 	//   of CPU and device resources.
 	//
-	// Policies other than "none" require the TopologyManager feature gate to be enabled.
 	// Default: "none"
 	// +optional
 	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
@@ -378,7 +377,6 @@ type KubeletConfiguration struct {
 	// - `container`: topology policy is applied on a per-container basis.
 	// - `pod`: topology policy is applied on a per-pod basis.
 	//
-	// "pod" scope requires the TopologyManager feature gate to be enabled.
 	// Default: "container"
 	// +optional
 	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
@@ -467,12 +465,12 @@ type KubeletConfiguration struct {
 	// +optional
 	ContentType string `json:"contentType,omitempty"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	// Default: 5
+	// Default: 50
 	// +optional
 	KubeAPIQPS *int32 `json:"kubeAPIQPS,omitempty"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes API server.
 	// This field cannot be a negative number.
-	// Default: 10
+	// Default: 100
 	// +optional
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one
@@ -482,6 +480,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	SerializeImagePulls *bool `json:"serializeImagePulls,omitempty"`
+	// MaxParallelImagePulls sets the maximum number of image pulls in parallel.
+	// This field cannot be set if SerializeImagePulls is true.
+	// Setting it to nil means no limit.
+	// Default: nil
+	// +optional
+	MaxParallelImagePulls *int32 `json:"maxParallelImagePulls,omitempty"`
 	// evictionHard is a map of signal names to quantities that defines hard eviction
 	// thresholds. For example: `{"memory.available": "300Mi"}`.
 	// To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource.
@@ -631,14 +635,14 @@ type KubeletConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// systemReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `systemReserved` compute resource reservation for OS system daemons.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// doc for more information.
 	// Default: ""
 	// +optional
 	SystemReservedCgroup string `json:"systemReservedCgroup,omitempty"`
 	// kubeReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// doc for more information.
 	// Default: ""
 	// +optional
@@ -650,7 +654,7 @@ type KubeletConfiguration struct {
 	// When `system-reserved` is in the list, systemReservedCgroup must be specified.
 	// When `kube-reserved` is in the list, kubeReservedCgroup must be specified.
 	// This field is supported only when `cgroupsPerQOS` is set to true.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// for more information.
 	// Default: ["pods"]
 	// +optional
@@ -764,7 +768,6 @@ type KubeletConfiguration struct {
 	// +optional
 	EnableDebugFlagsHandler *bool `json:"enableDebugFlagsHandler,omitempty"`
 	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
-	// This requires the corresponding SeccompDefault feature gate to be enabled as well.
 	// Default: false
 	// +optional
 	SeccompDefault *bool `json:"seccompDefault,omitempty"`

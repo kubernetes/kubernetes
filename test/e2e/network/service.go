@@ -1015,16 +1015,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
 		serviceName := "sourceip-test"
 		ns := f.Namespace.Name
 
@@ -2480,16 +2470,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -2557,16 +2537,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2637,16 +2607,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2749,16 +2709,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -2848,16 +2798,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -2930,16 +2870,6 @@ var _ = common.SIGDescribe("Services", func() {
 	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -3019,16 +2949,6 @@ var _ = common.SIGDescribe("Services", func() {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -3103,16 +3023,6 @@ var _ = common.SIGDescribe("Services", func() {
 	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(ctx, f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -3708,6 +3618,114 @@ var _ = common.SIGDescribe("Services", func() {
 
 		framework.Logf("Collection of services has been deleted")
 	})
+
+	ginkgo.It("should serve endpoints on same port and different protocols", func(ctx context.Context) {
+		serviceName := "multiprotocol-test"
+		testLabels := map[string]string{"app": "multiport"}
+		ns := f.Namespace.Name
+		containerPort := 80
+
+		svcTCPport := v1.ServicePort{
+			Name:       "tcp-port",
+			Port:       80,
+			TargetPort: intstr.FromInt(containerPort),
+			Protocol:   v1.ProtocolTCP,
+		}
+		svcUDPport := v1.ServicePort{
+			Name:       "udp-port",
+			Port:       80,
+			TargetPort: intstr.FromInt(containerPort),
+			Protocol:   v1.ProtocolUDP,
+		}
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+
+		testService := v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   serviceName,
+				Labels: testLabels,
+			},
+			Spec: v1.ServiceSpec{
+				Type:     v1.ServiceTypeClusterIP,
+				Selector: testLabels,
+				Ports:    []v1.ServicePort{svcTCPport, svcUDPport},
+			},
+		}
+		service, err := cs.CoreV1().Services(ns).Create(ctx, &testService, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Service")
+
+		containerPorts := []v1.ContainerPort{{
+			Name:          svcTCPport.Name,
+			ContainerPort: int32(containerPort),
+			Protocol:      v1.ProtocolTCP,
+		}, {
+			Name:          svcUDPport.Name,
+			ContainerPort: int32(containerPort),
+			Protocol:      v1.ProtocolUDP,
+		}}
+		podname1 := "pod1"
+		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
+		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+
+		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
+		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)
+		if err != nil {
+			framework.Failf("Failed to connect to Service TCP port: %v", err)
+		}
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 30*time.Second)
+		if err != nil {
+			framework.Failf("Failed to connect to Service UDP port: %v", err)
+		}
+
+		ginkgo.By("Checking if the Service forwards traffic to TCP only")
+		service, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("failed to get Service %q: %v", serviceName, err)
+		}
+		service.Spec.Ports = []v1.ServicePort{svcTCPport}
+		_, err = cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
+		if err != nil {
+			framework.Failf("failed to get Service %q: %v", serviceName, err)
+		}
+
+		// test reachability
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)
+		if err != nil {
+			framework.Failf("Failed to connect to Service TCP port: %v", err)
+		}
+		// take into account the NetworkProgrammingLatency
+		// testEndpointReachability tries 3 times every 3 second
+		// we retry again during 30 seconds to check if the port stops forwarding
+		gomega.Eventually(ctx, func() error {
+			return testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 6*time.Second)
+		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
+
+		ginkgo.By("Checking if the Service forwards traffic to UDP only")
+		service, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("failed to get Service %q: %v", serviceName, err)
+		}
+		service.Spec.Ports = []v1.ServicePort{svcUDPport}
+		_, err = cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
+		if err != nil {
+			framework.Failf("failed to update Service %q: %v", serviceName, err)
+		}
+
+		// test reachability
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 30*time.Second)
+		if err != nil {
+			framework.Failf("Failed to connect to Service UDP port: %v", err)
+		}
+		// take into account the NetworkProgrammingLatency
+		// testEndpointReachability tries 3 times every 3 second
+		// we retry again during 30 seconds to check if the port stops forwarding
+		gomega.Eventually(ctx, func() error {
+			return testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 6*time.Second)
+		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
+	})
+
 	/*
 		Release: v1.26
 		Testname: Service, same ports with different protocols on a Load Balancer Service

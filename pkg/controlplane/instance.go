@@ -17,7 +17,6 @@ limitations under the License.
 package controlplane
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
@@ -64,6 +64,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -453,14 +454,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			select {
-			case <-hookContext.StopCh:
-				cancel() // stopCh closed, so cancel our context
-			case <-ctx.Done():
-			}
-		}()
+		ctx := wait.ContextForChannel(hookContext.StopCh)
 
 		// prime values and start listeners
 		if m.ClusterAuthenticationInfo.ClientCA != nil {
@@ -495,6 +489,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				return err
 			}
 
+			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
+			// TODO: See if we can pass ctx to the current method
+			ctx := wait.ContextForChannel(hookContext.StopCh)
+
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
@@ -509,7 +507,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
 				labelAPIServerHeartbeatFunc(KubeAPIServer))
-			go controller.Run(hookContext.StopCh)
+			go controller.Run(ctx)
 			return nil
 		})
 		// Labels for apiserver idenitiy leases switched from k8s.io/component=kube-apiserver to apiserver.kubernetes.io/identity=kube-apiserver.
@@ -708,6 +706,7 @@ var (
 	}
 	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
 	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv2beta1.SchemeGroupVersion,
 		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,

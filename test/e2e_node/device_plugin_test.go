@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,17 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-)
-
-const (
-	// sampleResourceName is the name of the example resource which is used in the e2e test
-	sampleResourceName = "example.com/resource"
-	// sampleDevicePluginName is the name of the device plugin pod
-	sampleDevicePluginName = "sample-device-plugin"
-
-	// fake resource name
-	resourceName            = "example.com/resource"
-	envVarNamePluginSockDir = "PLUGIN_SOCK_DIR"
 )
 
 var (
@@ -66,17 +54,6 @@ var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:Devic
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 })
-
-// numberOfSampleResources returns the number of resources advertised by a node.
-func numberOfSampleResources(node *v1.Node) int64 {
-	val, ok := node.Status.Capacity[sampleResourceName]
-
-	if !ok {
-		return 0
-	}
-
-	return val.Value()
-}
 
 // readDaemonSetV1OrDie reads daemonset object from bytes. Panics on error.
 func readDaemonSetV1OrDie(objBytes []byte) *appsv1.DaemonSet {
@@ -133,31 +110,14 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.Succeed())
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
-			if err != nil {
-				framework.Fail(err.Error())
-			}
-			ds := readDaemonSetV1OrDie(data)
-
-			dp := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: sampleDevicePluginName,
-				},
-				Spec: ds.Spec.Template.Spec,
-			}
-
-			for i := range dp.Spec.Containers[0].Env {
-				if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
-					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
-				}
-			}
+			dp := getSampleDevicePluginPod(pluginSockDir)
 			dptemplate = dp.DeepCopy()
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
-				return ready && numberOfSampleResources(node) > 0
+				return ready && CountSampleDeviceCapacity(node) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 
@@ -165,8 +125,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready &&
-					numberOfDevicesCapacity(node, resourceName) == devsLen &&
-					numberOfDevicesAllocatable(node, resourceName) == devsLen
+					CountSampleDeviceCapacity(node) == devsLen &&
+					CountSampleDeviceAllocatable(node) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 		})
 
@@ -191,7 +151,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
-				return ready && numberOfSampleResources(node) <= 0
+				return ready && CountSampleDeviceCapacity(node) <= 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("devices now unavailable on the local node")
@@ -199,7 +159,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Can schedule a pod that requires a device", func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
@@ -250,8 +210,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectEqual(len(v1alphaResourcesForOurPod.Containers[0].Devices), 1)
 			framework.ExpectEqual(len(v1ResourcesForOurPod.Containers[0].Devices), 1)
 
-			framework.ExpectEqual(v1alphaResourcesForOurPod.Containers[0].Devices[0].ResourceName, resourceName)
-			framework.ExpectEqual(v1ResourcesForOurPod.Containers[0].Devices[0].ResourceName, resourceName)
+			framework.ExpectEqual(v1alphaResourcesForOurPod.Containers[0].Devices[0].ResourceName, SampleDeviceResourceName)
+			framework.ExpectEqual(v1ResourcesForOurPod.Containers[0].Devices[0].ResourceName, SampleDeviceResourceName)
 
 			framework.ExpectEqual(len(v1alphaResourcesForOurPod.Containers[0].Devices[0].DeviceIds), 1)
 			framework.ExpectEqual(len(v1ResourcesForOurPod.Containers[0].Devices[0].DeviceIds), 1)
@@ -259,7 +219,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Keeps device plugin assignments across pod and kubelet restarts", func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
@@ -288,7 +248,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Keeps device plugin assignments after the device plugin has been re-registered", func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
@@ -322,12 +282,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func() bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready &&
-					numberOfDevicesCapacity(node, resourceName) == devsLen &&
-					numberOfDevicesAllocatable(node, resourceName) == devsLen
+					CountSampleDeviceCapacity(node) == devsLen &&
+					CountSampleDeviceAllocatable(node) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Creating another pod")
-			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(resourceName, podRECMD))
+			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 
 			ginkgo.By("Checking that pod got a different fake device")
 			devID2 := parseLog(ctx, f, pod2.Name, pod2.Name, deviceIDRE)
@@ -338,10 +298,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 }
 
 // makeBusyboxPod returns a simple Pod spec with a busybox container
-// that requests resourceName and runs the specified command.
-func makeBusyboxPod(resourceName, cmd string) *v1.Pod {
+// that requests SampleDeviceResourceName and runs the specified command.
+func makeBusyboxPod(SampleDeviceResourceName, cmd string) *v1.Pod {
 	podName := "device-plugin-test-" + string(uuid.NewUUID())
-	rl := v1.ResourceList{v1.ResourceName(resourceName): *resource.NewQuantity(1, resource.DecimalSI)}
+	rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}
 
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName},
@@ -396,24 +356,4 @@ func parseLog(ctx context.Context, f *framework.Framework, podName string, contN
 	}
 
 	return matches[1]
-}
-
-// numberOfDevicesCapacity returns the number of devices of resourceName advertised by a node capacity
-func numberOfDevicesCapacity(node *v1.Node, resourceName string) int64 {
-	val, ok := node.Status.Capacity[v1.ResourceName(resourceName)]
-	if !ok {
-		return 0
-	}
-
-	return val.Value()
-}
-
-// numberOfDevicesAllocatable returns the number of devices of resourceName advertised by a node allocatable
-func numberOfDevicesAllocatable(node *v1.Node, resourceName string) int64 {
-	val, ok := node.Status.Allocatable[v1.ResourceName(resourceName)]
-	if !ok {
-		return 0
-	}
-
-	return val.Value()
 }

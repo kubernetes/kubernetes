@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -525,7 +524,7 @@ var _ = SIGDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port:    2379,
+					Port:    5000,
 					Service: nil,
 				},
 			},
@@ -534,7 +533,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 
-		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
@@ -555,7 +554,7 @@ var _ = SIGDescribe("Probing container", func() {
 			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
-		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
@@ -630,7 +629,7 @@ done
 		podClient := e2epod.NewPodClient(f)
 		terminationGracePeriod := int64(30)
 		script := `
-_term() { 
+_term() {
 	rm -f /tmp/ready
 	rm -f /tmp/liveness
 	sleep 20
@@ -641,7 +640,7 @@ trap _term SIGTERM
 touch /tmp/ready
 touch /tmp/liveness
 
-while true; do 
+while true; do
   echo \"hello\"
   sleep 10
 done
@@ -1036,27 +1035,18 @@ func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.P
 }
 
 func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
-	etcdLocalhostAddress := "127.0.0.1"
-	if framework.TestContext.ClusterIsIPv6() {
-		etcdLocalhostAddress = "::1"
-	}
-	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Etcd),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
-						"/usr/local/bin/etcd",
-						"--listen-client-urls",
-						"http://0.0.0.0:2379", //should listen on all addresses
-						"--advertise-client-urls",
-						etcdURL,
+						"/agnhost",
+						"grpc-health-checking",
 					},
-					// 2380 is an automatic peer URL
-					Ports:          []v1.ContainerPort{{ContainerPort: int32(2379)}, {ContainerPort: int32(2380)}},
+					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},
