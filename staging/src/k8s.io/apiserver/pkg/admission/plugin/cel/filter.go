@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
@@ -78,6 +78,9 @@ func (a *evaluationActivation) Parent() interpreter.Activation {
 func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, perCallLimit uint64) Filter {
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
+		if expressionAccessor == nil {
+			continue
+		}
 		compilationResults[i] = CompileCELExpression(expressionAccessor, options, perCallLimit)
 	}
 	return NewFilter(compilationResults)
@@ -119,24 +122,24 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error) {
+func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
 
 	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
 		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
 		if err != nil {
-			return nil, err
+			return nil, -1, err
 		}
 	}
 
@@ -147,7 +150,7 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 
 	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	va := &evaluationActivation{
 		object:                    objectVal,
@@ -161,13 +164,22 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 	remainingBudget := runtimeCELCostBudget
 	for i, compilationResult := range f.compilationResults {
 		var evaluation = &evaluations[i]
+		if compilationResult.ExpressionAccessor == nil { // in case of placeholder
+			continue
+		}
 		evaluation.ExpressionAccessor = compilationResult.ExpressionAccessor
 		if compilationResult.Error != nil {
-			evaluation.Error = errors.New(fmt.Sprintf("compilation error: %v", compilationResult.Error))
+			evaluation.Error = &cel.Error{
+				Type:   cel.ErrorTypeInvalid,
+				Detail: fmt.Sprintf("compilation error: %v", compilationResult.Error),
+			}
 			continue
 		}
 		if compilationResult.Program == nil {
-			evaluation.Error = errors.New("unexpected internal error compiling expression")
+			evaluation.Error = &cel.Error{
+				Type:   cel.ErrorTypeInternal,
+				Detail: fmt.Sprintf("unexpected internal error compiling expression"),
+			}
 			continue
 		}
 		t1 := time.Now()
@@ -175,26 +187,38 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		elapsed := time.Since(t1)
 		evaluation.Elapsed = elapsed
 		if evalDetails == nil {
-			return nil, errors.New(fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()))
+			return nil, -1, &cel.Error{
+				Type:   cel.ErrorTypeInternal,
+				Detail: fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()),
+			}
 		} else {
 			rtCost := evalDetails.ActualCost()
 			if rtCost == nil {
-				return nil, errors.New(fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()))
+				return nil, -1, &cel.Error{
+					Type:   cel.ErrorTypeInvalid,
+					Detail: fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()),
+				}
 			} else {
 				if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
-					return nil, errors.New(fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"))
+					return nil, -1, &cel.Error{
+						Type:   cel.ErrorTypeInvalid,
+						Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+					}
 				}
 				remainingBudget -= int64(*rtCost)
 			}
 		}
 		if err != nil {
-			evaluation.Error = errors.New(fmt.Sprintf("expression '%v' resulted in error: %v", compilationResult.ExpressionAccessor.GetExpression(), err))
+			evaluation.Error = &cel.Error{
+				Type:   cel.ErrorTypeInvalid,
+				Detail: fmt.Sprintf("expression '%v' resulted in error: %v", compilationResult.ExpressionAccessor.GetExpression(), err),
+			}
 		} else {
 			evaluation.EvalResult = evalResult
 		}
 	}
 
-	return evaluations, nil
+	return evaluations, remainingBudget, nil
 }
 
 // TODO: to reuse https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go#L154

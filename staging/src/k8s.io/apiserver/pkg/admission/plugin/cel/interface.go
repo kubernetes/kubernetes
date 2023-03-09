@@ -92,9 +92,10 @@ type OptionalVariableBindings struct {
 // by the underlying CEL code (which is indicated by the match criteria of a policy definition).
 // versionedParams may be nil.
 type Filter interface {
-	// ForInput converts compiled CEL-typed values into evaluated CEL-typed values
+	// ForInput converts compiled CEL-typed values into evaluated CEL-typed value.
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, error)
+	// If cost budget is calculated, the filter should return the remaining budget.
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error

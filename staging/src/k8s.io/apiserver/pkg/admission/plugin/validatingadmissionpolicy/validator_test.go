@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 var _ cel.Filter = &fakeCelFilter{}
@@ -43,11 +44,17 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
-	if f.throwError {
-		return nil, errors.New("test error")
+func (f *fakeCelFilter) ForInput(_ context.Context, _ *admission.VersionedAttributes, _ *admissionv1.AdmissionRequest, _ cel.OptionalVariableBindings, costBudget int64) ([]cel.EvaluationResult, int64, error) {
+	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
+		return nil, -1, &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInvalid,
+			Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+		}
 	}
-	return f.evaluations, nil
+	if f.throwError {
+		return nil, -1, errors.New("test error")
+	}
+	return f.evaluations, costBudget - 1, nil
 }
 
 func (f *fakeCelFilter) CompilationErrors() []error {
@@ -65,13 +72,15 @@ func TestValidate(t *testing.T) {
 	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
 
 	cases := []struct {
-		name             string
-		failPolicy       *v1.FailurePolicyType
-		evaluations      []cel.EvaluationResult
-		auditEvaluations []cel.EvaluationResult
-		policyDecision   []PolicyDecision
-		auditAnnotations []PolicyAuditAnnotation
-		throwError       bool
+		name               string
+		failPolicy         *v1.FailurePolicyType
+		evaluations        []cel.EvaluationResult
+		messageEvaluations []cel.EvaluationResult
+		auditEvaluations   []cel.EvaluationResult
+		policyDecision     []PolicyDecision
+		auditAnnotations   []PolicyAuditAnnotation
+		throwError         bool
+		costBudget         int64 // leave zero to use default
 	}{
 		{
 			name: "test pass",
@@ -572,6 +581,244 @@ func TestValidate(t *testing.T) {
 			},
 			failPolicy: &ignore,
 		},
+		{
+			name: "messageExpression successful, empty message",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("evaluated message"),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "evaluated message",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression for multiple validations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "I am not overwritten",
+					},
+				},
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "I am overwritten",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{},
+				{
+					EvalResult: celtypes.String("evaluated message"),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "I am not overwritten",
+					Reason:  forbiddenReason,
+				},
+				{
+					Action:  ActionDeny,
+					Message: "evaluated message",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression successful, overwritten message",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "I am overwritten",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("evaluated message"),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "evaluated message",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression user failure",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					Error: &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test1", // original message used
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression eval to empty",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String(" "),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test1",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression eval to multi-line",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("hello\nthere"),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test1",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression eval result too long",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String(strings.Repeat("x", 5*1024+1)),
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test1",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression eval to null",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.NullValue,
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "test1",
+					Reason:  forbiddenReason,
+				},
+			},
+		},
+		{
+			name: "messageExpression out of budget after successful eval of expression",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.False,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			messageEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.StringType, // does not matter
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "running out of cost budget",
+				},
+			},
+			costBudget: 1, // shared between expression and messageExpression, needs 1 + 1 = 2 in total
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -581,13 +828,21 @@ func TestValidate(t *testing.T) {
 					evaluations: tc.evaluations,
 					throwError:  tc.throwError,
 				},
+				messageFilter: &fakeCelFilter{
+					evaluations: tc.messageEvaluations,
+					throwError:  tc.throwError,
+				},
 				auditAnnotationFilter: &fakeCelFilter{
 					evaluations: tc.auditEvaluations,
 					throwError:  tc.throwError,
 				},
 			}
 			ctx := context.TODO()
-			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+			var budget int64 = celconfig.RuntimeCELCostBudget
+			if tc.costBudget != 0 {
+				budget = tc.costBudget
+			}
+			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, budget)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -630,6 +885,7 @@ func TestContextCanceled(t *testing.T) {
 	v := validator{
 		failPolicy:       &fail,
 		validationFilter: f,
+		messageFilter:    f,
 		auditAnnotationFilter: &fakeCelFilter{
 			evaluations: nil,
 			throwError:  false,

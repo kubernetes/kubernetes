@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/utils/pointer"
 )
 
 type condition struct {
@@ -661,7 +662,7 @@ func TestFilter(t *testing.T) {
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
+			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -697,6 +698,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		authorizer               authorizer.Authorizer
 		testRuntimeCELCostBudget int64
 		exceedBudget             bool
+		expectRemainingBudget    *int64
 	}{
 		{
 			name: "expression exceed RuntimeCELCostBudget at fist expression",
@@ -739,10 +741,49 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "object.subsets.size() > 2",
 				},
 			},
-			attributes:   newValidAttribute(nil, false),
-			hasParamKind: true,
-			params:       configMapParams,
-			exceedBudget: false,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 10,
+			expectRemainingBudget:    pointer.Int64(4), // 10 - 6
+		},
+		{
+			name: "test RuntimeCELCostBudge exactly covers",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "oldObject != null",
+				},
+				&condition{
+					Expression: "object.subsets.size() > 2",
+				},
+			},
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 6,
+			expectRemainingBudget:    pointer.Int64(0),
+		},
+		{
+			name: "test RuntimeCELCostBudge exactly covers then constant",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "oldObject != null",
+				},
+				&condition{
+					Expression: "object.subsets.size() > 2",
+				},
+				&condition{
+					Expression: "true", // zero cost
+				},
+			},
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 6,
+			expectRemainingBudget:    pointer.Int64(0),
 		},
 	}
 
@@ -767,18 +808,24 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			}
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
+			evalResults, remaining, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
 			if tc.exceedBudget && err == nil {
 				t.Errorf("Expected RuntimeCELCostBudge to be exceeded but got nil")
 			}
 			if tc.exceedBudget && !strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
 				t.Errorf("Expected RuntimeCELCostBudge exceeded error but got: %v", err)
 			}
+			if err != nil && remaining != -1 {
+				t.Errorf("expected -1 remaining when error, but got %d", remaining)
+			}
 			if err != nil && !tc.exceedBudget {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if tc.exceedBudget && len(evalResults) != 0 {
 				t.Fatalf("unexpected result returned: %v", evalResults)
+			}
+			if tc.expectRemainingBudget != nil && *tc.expectRemainingBudget != remaining {
+				t.Errorf("wrong remaining budget, expect %d, but got %d", *tc.expectRemainingBudget, remaining)
 			}
 		})
 	}

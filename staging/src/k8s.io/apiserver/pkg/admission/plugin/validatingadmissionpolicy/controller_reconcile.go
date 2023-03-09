@@ -92,7 +92,7 @@ type policyController struct {
 	authz authorizer.Authorizer
 }
 
-type newValidator func(validationFilter cel.Filter, auditAnnotationFilter cel.Filter, failurePolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator
+type newValidator func(validationFilter cel.Filter, auditAnnotationFilter cel.Filter, messageFilter cel.Filter, failurePolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
@@ -459,9 +459,11 @@ func (c *policyController) latestPolicyData() []policyData {
 					hasParam = true
 				}
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
+				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 				bindingInfo.validator = c.newValidator(
 					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
 					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, celconfig.PerCallLimit),
 					convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy),
 					c.authz,
 				)
@@ -510,6 +512,19 @@ func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.Ex
 			Reason:     validation.Reason,
 		}
 		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
+}
+
+func convertV1Alpha1MessageExpressions(inputValidations []v1alpha1.Validation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		if validation.MessageExpression != "" {
+			condition := MessageExpressionCondition{
+				MessageExpression: validation.MessageExpression,
+			}
+			celExpressionAccessor[i] = &condition
+		}
 	}
 	return celExpressionAccessor
 }

@@ -212,7 +212,7 @@ func (f *fakeCompiler) Compile(
 	options cel.OptionalVariableDeclarations,
 	perCallLimit uint64,
 ) cel.Filter {
-	if len(expressions) > 0 {
+	if len(expressions) > 0 && expressions[0] != nil {
 		key := expressions[0].GetExpression()
 		if fun, ok := f.CompileFuncs[key]; ok {
 			return fun(expressions, options)
@@ -252,8 +252,8 @@ type fakeFilter struct {
 	keyId string
 }
 
-func (f *fakeFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, error) {
-	return []cel.EvaluationResult{}, nil
+func (f *fakeFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, int64, error) {
+	return []cel.EvaluationResult{}, 0, nil
 }
 
 func (f *fakeFilter) CompilationErrors() []error {
@@ -263,8 +263,8 @@ func (f *fakeFilter) CompilationErrors() []error {
 var _ Validator = &fakeValidator{}
 
 type fakeValidator struct {
-	validationFilter, auditAnnotationFilter *fakeFilter
-	ValidateFunc                            func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
+	validationFilter, auditAnnotationFilter, messageFilter *fakeFilter
+	ValidateFunc                                           func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
 }
 
 func (f *fakeValidator) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult) {
@@ -418,10 +418,11 @@ func setupTestCommon(t *testing.T, compiler cel.FilterCompiler, matcher Matcher,
 	// Override compiler used by controller for tests
 	controller = handler.evaluator.(*celAdmissionController)
 	controller.policyController.filterCompiler = compiler
-	controller.policyController.newValidator = func(validationFilter, auditAnnotationFilter cel.Filter, fail *admissionRegistrationv1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+	controller.policyController.newValidator = func(validationFilter, auditAnnotationFilter, messageFilter cel.Filter, fail *admissionRegistrationv1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
 		f := validationFilter.(*fakeFilter)
 		v := validatorMap[f.keyId]
 		v.validationFilter = f
+		v.messageFilter = f
 		v.auditAnnotationFilter = auditAnnotationFilter.(*fakeFilter)
 		return v
 	}

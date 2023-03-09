@@ -782,26 +782,24 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	var allErrors field.ErrorList
 	trimmedExpression := strings.TrimSpace(v.Expression)
 	trimmedMsg := strings.TrimSpace(v.Message)
+	trimmedMessageExpression := strings.TrimSpace(v.MessageExpression)
 	if len(trimmedExpression) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), "expression is not specified"))
 	} else {
-		result := plugincel.CompileCELExpression(&validatingadmissionpolicy.ValidationCondition{
-			Expression: trimmedExpression,
-			Message:    v.Message,
-			Reason:     v.Reason,
-		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true}, celconfig.PerCallLimit)
-		if result.Error != nil {
-			switch result.Error.Type {
-			case cel.ErrorTypeRequired:
-				allErrors = append(allErrors, field.Required(fldPath.Child("expression"), result.Error.Detail))
-			case cel.ErrorTypeInvalid:
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("expression"), v.Expression, result.Error.Detail))
-			case cel.ErrorTypeInternal:
-				allErrors = append(allErrors, field.InternalError(fldPath.Child("expression"), result.Error))
-			default:
-				allErrors = append(allErrors, field.InternalError(fldPath.Child("expression"), fmt.Errorf("unsupported error type: %w", result.Error)))
-			}
-		}
+		allErrors = append(allErrors, validateCELExpression(v.Expression, plugincel.OptionalVariableDeclarations{
+			HasParams:     paramKind != nil,
+			HasAuthorizer: true,
+		}, fldPath.Child("expression"))...)
+	}
+	if len(v.MessageExpression) > 0 && len(trimmedMessageExpression) == 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("messageExpression"), v.MessageExpression, "must be non-empty if specified"))
+	} else if len(trimmedMessageExpression) != 0 {
+		// use v.MessageExpression instead of trimmedMessageExpression so that
+		// the compiler output shows the correct column.
+		allErrors = append(allErrors, validateCELExpression(v.MessageExpression, plugincel.OptionalVariableDeclarations{
+			HasParams:     paramKind != nil,
+			HasAuthorizer: false,
+		}, fldPath.Child("messageExpression"))...)
 	}
 	if len(v.Message) > 0 && len(trimmedMsg) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must be non-empty if specified"))
@@ -812,6 +810,26 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	}
 	if v.Reason != nil && !supportedValidationPolicyReason.Has(string(*v.Reason)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reason"), *v.Reason, supportedValidationPolicyReason.List()))
+	}
+	return allErrors
+}
+
+func validateCELExpression(expression string, variables plugincel.OptionalVariableDeclarations, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	result := plugincel.CompileCELExpression(&validatingadmissionpolicy.ValidationCondition{
+		Expression: expression,
+	}, variables, celconfig.PerCallLimit)
+	if result.Error != nil {
+		switch result.Error.Type {
+		case cel.ErrorTypeRequired:
+			allErrors = append(allErrors, field.Required(fldPath, result.Error.Detail))
+		case cel.ErrorTypeInvalid:
+			allErrors = append(allErrors, field.Invalid(fldPath, expression, result.Error.Detail))
+		case cel.ErrorTypeInternal:
+			allErrors = append(allErrors, field.InternalError(fldPath, result.Error))
+		default:
+			allErrors = append(allErrors, field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", result.Error)))
+		}
 	}
 	return allErrors
 }
