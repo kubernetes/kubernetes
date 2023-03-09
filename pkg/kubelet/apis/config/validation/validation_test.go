@@ -334,30 +334,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			errMsg: "invalid configuration: serverTLSBootstrap true requires feature gate RotateKubeletServerCertificate",
 		},
 		{
-			name: "use SingleNumaNodeTopologyManagerPolicy without enabling TopologyManager",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"TopologyManager": false}
-				conf.TopologyManagerPolicy = kubeletconfig.SingleNumaNodeTopologyManagerPolicy
-				return conf
-			},
-			errMsg: "invalid configuration: topologyManagerPolicy single-numa-node requires feature gate TopologyManager",
-		},
-		{
 			name: "invalid TopologyManagerPolicy",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.TopologyManagerPolicy = "invalid-policy"
 				return conf
 			},
 			errMsg: "invalid configuration: topologyManagerPolicy (--topology-manager-policy) \"invalid-policy\" must be one of: [\"none\" \"best-effort\" \"restricted\" \"single-numa-node\"]",
-		},
-		{
-			name: "use PodTopologyManagerScope without enabling TopologyManager",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"TopologyManager": false}
-				conf.TopologyManagerScope = kubeletconfig.PodTopologyManagerScope
-				return conf
-			},
-			errMsg: "invalid configuration: topologyManagerScope pod requires feature gate TopologyManager",
 		},
 		{
 			name: "invalid TopologyManagerScope",
