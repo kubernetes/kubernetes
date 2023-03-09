@@ -428,7 +428,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].CreatedAt > result[j].CreatedAt
 	})
-
+	klog.V(4).InfoS("Retrieved pods from runtime", "all", all)
 	return result, nil
 }
 
