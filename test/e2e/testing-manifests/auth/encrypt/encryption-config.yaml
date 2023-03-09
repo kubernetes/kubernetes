@@ -1,64 +1,8 @@
 apiVersion: apiserver.config.k8s.io/v1
 kind: EncryptionConfiguration
 resources:
-  # The set of resources here are configured using output from "kubectl api-resources -o name" in a
-  # kind cluster running the latest built release.
   - resources:
-    - bindings
-    - componentstatuses
-    - configmaps
-    - endpoints
-    - events
-    - limitranges
-    - namespaces
-    - nodes
-    - persistentvolumeclaims
-    - persistentvolumes
-    - pods
-    - podtemplates
-    - replicationcontrollers
-    - resourcequotas
-    - secrets
-    - serviceaccounts
-    - services
-    - mutatingwebhookconfigurations.admissionregistration.k8s.io
-    - validatingwebhookconfigurations.admissionregistration.k8s.io
-    - customresourcedefinitions.apiextensions.k8s.io
-    - apiservices.apiregistration.k8s.io
-    - controllerrevisions.apps
-    - daemonsets.apps
-    - deployments.apps
-    - replicasets.apps
-    - statefulsets.apps
-    - tokenreviews.authentication.k8s.io
-    - localsubjectaccessreviews.authorization.k8s.io
-    - selfsubjectaccessreviews.authorization.k8s.io
-    - selfsubjectrulesreviews.authorization.k8s.io
-    - subjectaccessreviews.authorization.k8s.io
-    - horizontalpodautoscalers.autoscaling
-    - cronjobs.batch
-    - jobs.batch
-    - certificatesigningrequests.certificates.k8s.io
-    - leases.coordination.k8s.io
-    - endpointslices.discovery.k8s.io
-    - events.events.k8s.io
-    - flowschemas.flowcontrol.apiserver.k8s.io
-    - prioritylevelconfigurations.flowcontrol.apiserver.k8s.io
-    - ingressclasses.networking.k8s.io
-    - ingresses.networking.k8s.io
-    - networkpolicies.networking.k8s.io
-    - runtimeclasses.node.k8s.io
-    - poddisruptionbudgets.policy
-    - clusterrolebindings.rbac.authorization.k8s.io
-    - clusterroles.rbac.authorization.k8s.io
-    - rolebindings.rbac.authorization.k8s.io
-    - roles.rbac.authorization.k8s.io
-    - priorityclasses.scheduling.k8s.io
-    - csidrivers.storage.k8s.io
-    - csinodes.storage.k8s.io
-    - csistoragecapacities.storage.k8s.io
-    - storageclasses.storage.k8s.io
-    - volumeattachments.storage.k8s.io
+    - '*.*'
     providers:
     - kms:
         apiVersion: v2
