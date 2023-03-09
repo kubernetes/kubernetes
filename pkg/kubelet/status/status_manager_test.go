@@ -1284,18 +1284,18 @@ func TestDeletePods(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction(), patchAction(), deleteAction()})
 }
 
-func TestDeletePodsWithFinalizer(t *testing.T) {
+func TestDeleteRunningPods(t *testing.T) {
 	testCases := map[string]struct {
 		podPhase                      v1.PodPhase
 		wantActions                   []core.Action
 		enablePodDisruptionConditions bool
 	}{
-		"Running pod with finalizer; PodDisruptionConditions enabled": {
+		"Running pod; PodDisruptionConditions enabled": {
 			podPhase:                      v1.PodRunning,
 			wantActions:                   []core.Action{getAction(), patchAction()},
 			enablePodDisruptionConditions: true,
 		},
-		"Running pod with finalizer; PodDisruptionConditions disabled": {
+		"Running pod; PodDisruptionConditions disabled": {
 			podPhase:                      v1.PodRunning,
 			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
 			enablePodDisruptionConditions: false,
@@ -1305,7 +1305,6 @@ func TestDeletePodsWithFinalizer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
 			pod := getTestPod()
-			pod.Finalizers = append(pod.Finalizers, "example.com/test-finalizer")
 			t.Logf("Set the deletion timestamp.")
 			pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 			client := fake.NewSimpleClientset(pod)

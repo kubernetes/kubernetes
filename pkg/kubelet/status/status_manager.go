@@ -856,10 +856,8 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 		// Delay deletion of Running pods until the phase is terminal, which
-		// is expected to be set in the generateAPIPodStatus. The check for
-		// presence of a finalizer is optimization to avoid additional pod
-		// status update, to set the phase, as the pod is deleted anyway.
-		if len(pod.Finalizers) > 0 && pod.Status.Phase == v1.PodRunning {
+		// is expected to be set in the generateAPIPodStatus.
+		if pod.Status.Phase == v1.PodRunning {
 			return false
 		}
 	}
