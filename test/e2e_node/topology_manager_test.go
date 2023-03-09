@@ -199,8 +199,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["TopologyManager"] = true
-
 	// Set the Topology Manager policy
 	newCfg.TopologyManagerPolicy = policy
 
@@ -946,7 +944,7 @@ func hostPrecheck() (int, int) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager [Serial] [NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

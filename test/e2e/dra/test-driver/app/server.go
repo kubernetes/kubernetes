@@ -70,8 +70,8 @@ func NewCommand() *cobra.Command {
 
 	fs = sharedFlagSets.FlagSet("Kubernetes client")
 	kubeconfig := fs.String("kubeconfig", "", "Absolute path to the kube.config file. Either this or KUBECONFIG need to be set if the driver is being run out of cluster.")
-	kubeAPIQPS := fs.Float32("kube-api-qps", 5, "QPS to use while communicating with the kubernetes apiserver.")
-	kubeAPIBurst := fs.Int("kube-api-burst", 10, "Burst to use while communicating with the kubernetes apiserver.")
+	kubeAPIQPS := fs.Float32("kube-api-qps", 50, "QPS to use while communicating with the kubernetes apiserver.")
+	kubeAPIBurst := fs.Int("kube-api-burst", 100, "Burst to use while communicating with the kubernetes apiserver.")
 	workers := fs.Int("workers", 10, "Concurrency to process multiple claims")
 
 	fs = sharedFlagSets.FlagSet("http server")

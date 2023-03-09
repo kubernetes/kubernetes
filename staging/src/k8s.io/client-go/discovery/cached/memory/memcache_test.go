@@ -32,6 +32,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/fake"
@@ -599,10 +600,11 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 			groupToServerResources: map[string]*cacheEntry{},
 		}
 		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, err := memClient.GroupsAndMaybeResources()
+		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
 		require.NoError(t, err)
 		// "Unaggregated" discovery always returns nil for resources.
 		assert.Nil(t, resourcesMap)
+		assert.True(t, len(failedGVs) == 0, "expected empty failed GroupVersions, got (%d)", len(failedGVs))
 		assert.False(t, memClient.receivedAggregatedDiscovery)
 		assert.True(t, memClient.Fresh())
 		// Test the expected groups are returned for the aggregated format.
@@ -618,7 +620,7 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		// Invalidate the cache and retrieve the server groups and resources again.
 		memClient.Invalidate()
 		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, err = memClient.GroupsAndMaybeResources()
+		apiGroupList, resourcesMap, _, err = memClient.GroupsAndMaybeResources()
 		require.NoError(t, err)
 		assert.Nil(t, resourcesMap)
 		assert.False(t, memClient.receivedAggregatedDiscovery)
@@ -638,6 +640,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		expectedGroupNames    []string
 		expectedGroupVersions []string
 		expectedGVKs          []string
+		expectedFailedGVs     []string
 	}{
 		{
 			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/1 resources at /apis",
@@ -694,9 +697,10 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 				"/v1/Pod",
 				"apps/v1/Deployment",
 			},
+			expectedFailedGVs: []string{},
 		},
 		{
-			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/2 versions/1 resources at /apis",
+			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/2 versions/1 resources/1 stale GV at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
 					{
@@ -741,6 +745,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 								},
 							},
 							{
+								// Stale Version is not included in discovery.
 								Version: "v2",
 								Resources: []apidiscovery.APIResourceDiscovery{
 									{
@@ -753,18 +758,19 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 										Scope: apidiscovery.ScopeNamespace,
 									},
 								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
 							},
 						},
 					},
 				},
 			},
 			expectedGroupNames:    []string{"", "apps"},
-			expectedGroupVersions: []string{"v1", "apps/v1", "apps/v2"},
+			expectedGroupVersions: []string{"v1", "apps/v1"},
 			expectedGVKs: []string{
 				"/v1/Pod",
 				"apps/v1/Deployment",
-				"apps/v2/Deployment",
 			},
+			expectedFailedGVs: []string{"apps/v2"},
 		},
 		{
 			name: "Aggregated discovery: 1 group/2 resources at /api, 1 group/2 resources at /apis",
@@ -841,9 +847,10 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
 			},
+			expectedFailedGVs: []string{},
 		},
 		{
-			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources at /apis",
+			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources/1 stale GV at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
 					{
@@ -905,6 +912,31 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								// Stale version is not included in discovery.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 					{
@@ -949,9 +981,10 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 				"batch/v1/Job",
 				"batch/v1/CronJob",
 			},
+			expectedFailedGVs: []string{"apps/v1beta1"},
 		},
 		{
-			name:   "Aggregated discovery: /api returns nothing, 2 groups/2 resources at /apis",
+			name:   "Aggregated discovery: /api returns nothing, 2 groups/2 resources/2 stale GV at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{},
 			apis: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
@@ -960,6 +993,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 							Name: "apps",
 						},
 						Versions: []apidiscovery.APIVersionDiscovery{
+							// Statel "v1" Version is not included in discovery.
 							{
 								Version: "v1",
 								Resources: []apidiscovery.APIResourceDiscovery{
@@ -977,6 +1011,30 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 										ResponseKind: &metav1.GroupVersionKind{
 											Group:   "apps",
 											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
 											Kind:    "StatefulSet",
 										},
 										Scope: apidiscovery.ScopeNamespace,
@@ -1013,18 +1071,35 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								// Stale Version is not included in discovery.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 				},
 			},
 			expectedGroupNames:    []string{"apps", "batch"},
-			expectedGroupVersions: []string{"apps/v1", "batch/v1"},
+			expectedGroupVersions: []string{"apps/v1beta1", "batch/v1"},
 			expectedGVKs: []string{
-				"apps/v1/Deployment",
-				"apps/v1/StatefulSet",
+				"apps/v1beta1/Deployment",
+				"apps/v1beta1/StatefulSet",
 				"batch/v1/Job",
 				"batch/v1/CronJob",
 			},
+			expectedFailedGVs: []string{"apps/v1", "batch/v1beta1"},
 		},
 	}
 
@@ -1054,7 +1129,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 			groupToServerResources: map[string]*cacheEntry{},
 		}
 		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, err := memClient.GroupsAndMaybeResources()
+		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
 		require.NoError(t, err)
 		assert.True(t, memClient.receivedAggregatedDiscovery)
 		assert.True(t, memClient.Fresh())
@@ -1077,10 +1152,15 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+		// Test the returned failed GroupVersions are correct.
+		expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+		actualFailedGVs := sets.NewString(failedGroupVersions(failedGVs)...)
+		assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+			"%s: Expected Failed GroupVersions (%s), got (%s)", test.name, expectedFailedGVs.List(), actualFailedGVs.List())
 		// Invalidate the cache and retrieve the server groups again.
 		memClient.Invalidate()
 		assert.False(t, memClient.Fresh())
-		apiGroupList, _, err = memClient.GroupsAndMaybeResources()
+		apiGroupList, _, _, err = memClient.GroupsAndMaybeResources()
 		require.NoError(t, err)
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)
@@ -1407,6 +1487,14 @@ func groupVersionKinds(resources []*metav1.APIResourceList) []string {
 			gvk := fmt.Sprintf("%s/%s/%s", resource.Group, resource.Version, resource.Kind)
 			result = append(result, gvk)
 		}
+	}
+	return result
+}
+
+func failedGroupVersions(gvs map[schema.GroupVersion]error) []string {
+	result := []string{}
+	for gv := range gvs {
+		result = append(result, gv.String())
 	}
 	return result
 }
