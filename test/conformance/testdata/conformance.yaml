@@ -2185,6 +2185,14 @@
     restart count MUST remain zero.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
+- testname: Pod liveness probe, using grpc call, success
+  codename: '[sig-node] Probing container should *not* be restarted with a GRPC liveness
+    probe [NodeConformance] [Conformance]'
+  description: A Pod is created with liveness probe on grpc service. Liveness probe
+    on this endpoint will not fail. When liveness probe does not fail then the restart
+    count MUST remain zero.
+  release: v1.23
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a exec "cat
     /tmp/health" liveness probe [NodeConformance] [Conformance]'
@@ -2210,6 +2218,14 @@
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
     killed and restarted incrementing restart count to 1.
   release: v1.9
+  file: test/e2e/common/node/container_probe.go
+- testname: Pod liveness probe, using grpc call, failure
+  codename: '[sig-node] Probing container should be restarted with a GRPC liveness
+    probe [NodeConformance] [Conformance]'
+  description: A Pod is created with liveness probe on grpc service. Liveness probe
+    on this endpoint should fail because of wrong probe port. When liveness probe
+    does  fail then the restart count should +1.
+  release: v1.23
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, restart
   codename: '[sig-node] Probing container should be restarted with a exec "cat /tmp/health"
