@@ -60,6 +60,8 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+var alwaysRestartPolicy = v1.RestartPolicyAlways
+
 func TestNodeHostsFileContent(t *testing.T) {
 	testCases := []struct {
 		hostsFileName            string
@@ -2384,6 +2386,142 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	}
 }
 
+func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "containerX", RestartPolicy: &alwaysRestartPolicy},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						stoppedState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container stopped",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, terminated zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithNonZeroTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, not terminated",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"all containers running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						stoppedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"sidecar stopped, main containers running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"backoff crashloop sidecar container, main containers running",
+		},
+	}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	for _, test := range tests {
+		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		status := getPhase(&test.pod.Spec, statusInfo)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
 func TestPodPhaseWithRestartNever(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
@@ -2583,6 +2721,158 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
 		status := getPhase(test.pod, statusInfo, false)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func TestPodPhaseWithRestartNeverSidecarContainers(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "containerX", RestartPolicy: &alwaysRestartPolicy},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyNever,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						stoppedState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container stopped",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, terminated zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithNonZeroTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container waiting, not terminated",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"sidecar container running, main containers succeeded",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			"all containers succeeded",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						failedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			"sidecar container terminated non-zero, main containers succeeded",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"backoff crashloop sidecar container, main containers succeeded",
+		},
+	}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	for _, test := range tests {
+		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		status := getPhase(&test.pod.Spec, statusInfo)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
