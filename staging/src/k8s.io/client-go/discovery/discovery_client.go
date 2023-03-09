@@ -475,6 +475,9 @@ func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, 
 	if err != nil {
 		return nil, err
 	}
+	if serverGroupList == nil {
+		serverGroupList = &metav1.APIGroupList{}
+	}
 	// Non-aggregated discovery must fetch resources from Groups.
 	if groupVersionResources == nil {
 		groupVersionResources, failedGroups = fetchGroupVersionResources(d, serverGroupList)
