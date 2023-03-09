@@ -362,9 +362,9 @@ func hashString(s string) uint32 {
 //go:linkname goStringHash runtime.stringHash
 func goStringHash(s string, seed uintptr) uintptr
 
-// softHashString computes the FNV hash of s in software.
+// softHashString computes the 32-bit FNV-1a hash of s in software.
 func softHashString(s string) uint32 {
-	var h uint32
+	var h uint32 = 2166136261
 	for i := 0; i < len(s); i++ {
 		h ^= uint32(s[i])
 		h *= 16777619

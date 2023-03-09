@@ -33,6 +33,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"go.starlark.net/resolve"
@@ -46,7 +47,7 @@ var Disassemble = false
 const debug = false // make code generation verbose, for debugging the compiler
 
 // Increment this to force recompilation of saved bytecode files.
-const Version = 10
+const Version = 12
 
 type Opcode uint8
 
@@ -111,8 +112,6 @@ const (
 	SLICE       //   x lo hi step SLICE       slice
 	INPLACE_ADD //            x y INPLACE_ADD z      where z is x+y or x.extend(y)
 	MAKEDICT    //              - MAKEDICT    dict
-	SETCELL     //     value cell SETCELL     -
-	CELL        //           cell CELL        value
 
 	// --- opcodes with an argument must go below this line ---
 
@@ -122,21 +121,24 @@ const (
 	ITERJMP //            - ITERJMP<addr> elem   (and fall through) [acts on topmost iterator]
 	//       or:          - ITERJMP<addr> -      (and jump)
 
-	CONSTANT    //                 - CONSTANT<constant>  value
-	MAKETUPLE   //         x1 ... xn MAKETUPLE<n>        tuple
-	MAKELIST    //         x1 ... xn MAKELIST<n>         list
-	MAKEFUNC    // defaults+freevars MAKEFUNC<func>      fn
-	LOAD        //   from1 ... fromN module LOAD<n>      v1 ... vN
-	SETLOCAL    //             value SETLOCAL<local>     -
-	SETGLOBAL   //             value SETGLOBAL<global>   -
-	LOCAL       //                 - LOCAL<local>        value
-	FREE        //                 - FREE<freevar>       cell
-	GLOBAL      //                 - GLOBAL<global>      value
-	PREDECLARED //                 - PREDECLARED<name>   value
-	UNIVERSAL   //                 - UNIVERSAL<name>     value
-	ATTR        //                 x ATTR<name>          y           y = x.name
-	SETFIELD    //               x y SETFIELD<name>      -           x.name = y
-	UNPACK      //          iterable UNPACK<n>           vn ... v1
+	CONSTANT     //                 - CONSTANT<constant>  value
+	MAKETUPLE    //         x1 ... xn MAKETUPLE<n>        tuple
+	MAKELIST     //         x1 ... xn MAKELIST<n>         list
+	MAKEFUNC     // defaults+freevars MAKEFUNC<func>      fn
+	LOAD         //   from1 ... fromN module LOAD<n>      v1 ... vN
+	SETLOCAL     //             value SETLOCAL<local>     -
+	SETGLOBAL    //             value SETGLOBAL<global>   -
+	LOCAL        //                 - LOCAL<local>        value
+	FREE         //                 - FREE<freevar>       cell
+	FREECELL     //                 - FREECELL<freevar>   value       (content of FREE cell)
+	LOCALCELL    //                 - LOCALCELL<local>    value       (content of LOCAL cell)
+	SETLOCALCELL //             value SETLOCALCELL<local> -           (set content of LOCAL cell)
+	GLOBAL       //                 - GLOBAL<global>      value
+	PREDECLARED  //                 - PREDECLARED<name>   value
+	UNIVERSAL    //                 - UNIVERSAL<name>     value
+	ATTR         //                 x ATTR<name>          y           y = x.name
+	SETFIELD     //               x y SETFIELD<name>      -           x.name = y
+	UNPACK       //          iterable UNPACK<n>           vn ... v1
 
 	// n>>8 is #positional args and n&0xff is #named args (pairs).
 	CALL        // fn positional named                CALL<n>        result
@@ -151,72 +153,73 @@ const (
 // TODO(adonovan): add dynamic checks for missing opcodes in the tables below.
 
 var opcodeNames = [...]string{
-	AMP:         "amp",
-	APPEND:      "append",
-	ATTR:        "attr",
-	CALL:        "call",
-	CALL_KW:     "call_kw ",
-	CALL_VAR:    "call_var",
-	CALL_VAR_KW: "call_var_kw",
-	CELL:        "cell",
-	CIRCUMFLEX:  "circumflex",
-	CJMP:        "cjmp",
-	CONSTANT:    "constant",
-	DUP2:        "dup2",
-	DUP:         "dup",
-	EQL:         "eql",
-	EXCH:        "exch",
-	FALSE:       "false",
-	FREE:        "free",
-	GE:          "ge",
-	GLOBAL:      "global",
-	GT:          "gt",
-	GTGT:        "gtgt",
-	IN:          "in",
-	INDEX:       "index",
-	INPLACE_ADD: "inplace_add",
-	ITERJMP:     "iterjmp",
-	ITERPOP:     "iterpop",
-	ITERPUSH:    "iterpush",
-	JMP:         "jmp",
-	LE:          "le",
-	LOAD:        "load",
-	LOCAL:       "local",
-	LT:          "lt",
-	LTLT:        "ltlt",
-	MAKEDICT:    "makedict",
-	MAKEFUNC:    "makefunc",
-	MAKELIST:    "makelist",
-	MAKETUPLE:   "maketuple",
-	MANDATORY:   "mandatory",
-	MINUS:       "minus",
-	NEQ:         "neq",
-	NONE:        "none",
-	NOP:         "nop",
-	NOT:         "not",
-	PERCENT:     "percent",
-	PIPE:        "pipe",
-	PLUS:        "plus",
-	POP:         "pop",
-	PREDECLARED: "predeclared",
-	RETURN:      "return",
-	SETCELL:     "setcell",
-	SETDICT:     "setdict",
-	SETDICTUNIQ: "setdictuniq",
-	SETFIELD:    "setfield",
-	SETGLOBAL:   "setglobal",
-	SETINDEX:    "setindex",
-	SETLOCAL:    "setlocal",
-	SLASH:       "slash",
-	SLASHSLASH:  "slashslash",
-	SLICE:       "slice",
-	STAR:        "star",
-	TILDE:       "tilde",
-	TRUE:        "true",
-	UMINUS:      "uminus",
-	UNIVERSAL:   "universal",
-	UNPACK:      "unpack",
-	UPLUS:       "uplus",
+	AMP:          "amp",
+	APPEND:       "append",
+	ATTR:         "attr",
+	CALL:         "call",
+	CALL_KW:      "call_kw ",
+	CALL_VAR:     "call_var",
+	CALL_VAR_KW:  "call_var_kw",
+	CIRCUMFLEX:   "circumflex",
+	CJMP:         "cjmp",
+	CONSTANT:     "constant",
+	DUP2:         "dup2",
+	DUP:          "dup",
+	EQL:          "eql",
+	EXCH:         "exch",
+	FALSE:        "false",
+	FREE:         "free",
+	FREECELL:     "freecell",
+	GE:           "ge",
+	GLOBAL:       "global",
+	GT:           "gt",
+	GTGT:         "gtgt",
+	IN:           "in",
+	INDEX:        "index",
+	INPLACE_ADD:  "inplace_add",
+	ITERJMP:      "iterjmp",
+	ITERPOP:      "iterpop",
+	ITERPUSH:     "iterpush",
+	JMP:          "jmp",
+	LE:           "le",
+	LOAD:         "load",
+	LOCAL:        "local",
+	LOCALCELL:    "localcell",
+	LT:           "lt",
+	LTLT:         "ltlt",
+	MAKEDICT:     "makedict",
+	MAKEFUNC:     "makefunc",
+	MAKELIST:     "makelist",
+	MAKETUPLE:    "maketuple",
+	MANDATORY:    "mandatory",
+	MINUS:        "minus",
+	NEQ:          "neq",
+	NONE:         "none",
+	NOP:          "nop",
+	NOT:          "not",
+	PERCENT:      "percent",
+	PIPE:         "pipe",
+	PLUS:         "plus",
+	POP:          "pop",
+	PREDECLARED:  "predeclared",
+	RETURN:       "return",
+	SETDICT:      "setdict",
+	SETDICTUNIQ:  "setdictuniq",
+	SETFIELD:     "setfield",
+	SETGLOBAL:    "setglobal",
+	SETINDEX:     "setindex",
+	SETLOCAL:     "setlocal",
+	SETLOCALCELL: "setlocalcell",
+	SLASH:        "slash",
+	SLASHSLASH:   "slashslash",
+	SLICE:        "slice",
+	STAR:         "star",
+	TILDE:        "tilde",
+	TRUE:         "true",
+	UMINUS:       "uminus",
+	UNIVERSAL:    "universal",
+	UNPACK:       "unpack",
+	UPLUS:        "uplus",
 }
 
 const variableStackEffect = 0x7f
@@ -224,70 +227,71 @@ const variableStackEffect = 0x7f
 // stackEffect records the effect on the size of the operand stack of
 // each kind of instruction. For some instructions this requires computation.
 var stackEffect = [...]int8{
-	AMP:         -1,
-	APPEND:      -2,
-	ATTR:        0,
-	CALL:        variableStackEffect,
-	CALL_KW:     variableStackEffect,
-	CALL_VAR:    variableStackEffect,
-	CALL_VAR_KW: variableStackEffect,
-	CELL:        0,
-	CIRCUMFLEX:  -1,
-	CJMP:        -1,
-	CONSTANT:    +1,
-	DUP2:        +2,
-	DUP:         +1,
-	EQL:         -1,
-	FALSE:       +1,
-	FREE:        +1,
-	GE:          -1,
-	GLOBAL:      +1,
-	GT:          -1,
-	GTGT:        -1,
-	IN:          -1,
-	INDEX:       -1,
-	INPLACE_ADD: -1,
-	ITERJMP:     variableStackEffect,
-	ITERPOP:     0,
-	ITERPUSH:    -1,
-	JMP:         0,
-	LE:          -1,
-	LOAD:        -1,
-	LOCAL:       +1,
-	LT:          -1,
-	LTLT:        -1,
-	MAKEDICT:    +1,
-	MAKEFUNC:    0,
-	MAKELIST:    variableStackEffect,
-	MAKETUPLE:   variableStackEffect,
-	MANDATORY:   +1,
-	MINUS:       -1,
-	NEQ:         -1,
-	NONE:        +1,
-	NOP:         0,
-	NOT:         0,
-	PERCENT:     -1,
-	PIPE:        -1,
-	PLUS:        -1,
-	POP:         -1,
-	PREDECLARED: +1,
-	RETURN:      -1,
-	SETCELL:     -2,
-	SETDICT:     -3,
-	SETDICTUNIQ: -3,
-	SETFIELD:    -2,
-	SETGLOBAL:   -1,
-	SETINDEX:    -3,
-	SETLOCAL:    -1,
-	SLASH:       -1,
-	SLASHSLASH:  -1,
-	SLICE:       -3,
-	STAR:        -1,
-	TRUE:        +1,
-	UMINUS:      0,
-	UNIVERSAL:   +1,
-	UNPACK:      variableStackEffect,
-	UPLUS:       0,
+	AMP:          -1,
+	APPEND:       -2,
+	ATTR:         0,
+	CALL:         variableStackEffect,
+	CALL_KW:      variableStackEffect,
+	CALL_VAR:     variableStackEffect,
+	CALL_VAR_KW:  variableStackEffect,
+	CIRCUMFLEX:   -1,
+	CJMP:         -1,
+	CONSTANT:     +1,
+	DUP2:         +2,
+	DUP:          +1,
+	EQL:          -1,
+	FALSE:        +1,
+	FREE:         +1,
+	FREECELL:     +1,
+	GE:           -1,
+	GLOBAL:       +1,
+	GT:           -1,
+	GTGT:         -1,
+	IN:           -1,
+	INDEX:        -1,
+	INPLACE_ADD:  -1,
+	ITERJMP:      variableStackEffect,
+	ITERPOP:      0,
+	ITERPUSH:     -1,
+	JMP:          0,
+	LE:           -1,
+	LOAD:         -1,
+	LOCAL:        +1,
+	LOCALCELL:    +1,
+	LT:           -1,
+	LTLT:         -1,
+	MAKEDICT:     +1,
+	MAKEFUNC:     0,
+	MAKELIST:     variableStackEffect,
+	MAKETUPLE:    variableStackEffect,
+	MANDATORY:    +1,
+	MINUS:        -1,
+	NEQ:          -1,
+	NONE:         +1,
+	NOP:          0,
+	NOT:          0,
+	PERCENT:      -1,
+	PIPE:         -1,
+	PLUS:         -1,
+	POP:          -1,
+	PREDECLARED:  +1,
+	RETURN:       -1,
+	SETLOCALCELL: -1,
+	SETDICT:      -3,
+	SETDICTUNIQ:  -3,
+	SETFIELD:     -2,
+	SETGLOBAL:    -1,
+	SETINDEX:     -3,
+	SETLOCAL:     -1,
+	SLASH:        -1,
+	SLASHSLASH:   -1,
+	SLICE:        -3,
+	STAR:         -1,
+	TRUE:         +1,
+	UMINUS:       0,
+	UNIVERSAL:    +1,
+	UNPACK:       variableStackEffect,
+	UPLUS:        0,
 }
 
 func (op Opcode) String() string {
@@ -306,11 +310,14 @@ func (op Opcode) String() string {
 type Program struct {
 	Loads     []Binding     // name (really, string) and position of each load stmt
 	Names     []string      // names of attributes and predeclared variables
-	Constants []interface{} // = string | int64 | float64 | *big.Int
+	Constants []interface{} // = string | int64 | float64 | *big.Int | Bytes
 	Functions []*Funcode
 	Globals   []Binding // for error messages and tracing
 	Toplevel  *Funcode  // module initialization function
 }
+
+// The type of a bytes literal value, to distinguish from text string.
+type Bytes string
 
 // A Funcode is the code of a compiled Starlark function.
 //
@@ -860,6 +867,8 @@ func PrintOp(fn *Funcode, pc uint32, op Opcode, arg uint32) {
 		switch x := fn.Prog.Constants[arg].(type) {
 		case string:
 			comment = strconv.Quote(x)
+		case Bytes:
+			comment = "b" + strconv.Quote(string(x))
 		default:
 			comment = fmt.Sprint(x)
 		}
@@ -994,9 +1003,7 @@ func (fcomp *fcomp) set(id *syntax.Ident) {
 	case resolve.Local:
 		fcomp.emit1(SETLOCAL, uint32(bind.Index))
 	case resolve.Cell:
-		// TODO(adonovan): opt: make a single op for LOCAL<n>, SETCELL.
-		fcomp.emit1(LOCAL, uint32(bind.Index))
-		fcomp.emit(SETCELL)
+		fcomp.emit1(SETLOCALCELL, uint32(bind.Index))
 	case resolve.Global:
 		fcomp.emit1(SETGLOBAL, uint32(bind.Index))
 	default:
@@ -1014,13 +1021,9 @@ func (fcomp *fcomp) lookup(id *syntax.Ident) {
 	case resolve.Local:
 		fcomp.emit1(LOCAL, uint32(bind.Index))
 	case resolve.Free:
-		// TODO(adonovan): opt: make a single op for FREE<n>, CELL.
-		fcomp.emit1(FREE, uint32(bind.Index))
-		fcomp.emit(CELL)
+		fcomp.emit1(FREECELL, uint32(bind.Index))
 	case resolve.Cell:
-		// TODO(adonovan): opt: make a single op for LOCAL<n>, CELL.
-		fcomp.emit1(LOCAL, uint32(bind.Index))
-		fcomp.emit(CELL)
+		fcomp.emit1(LOCALCELL, uint32(bind.Index))
 	case resolve.Global:
 		fcomp.emit1(GLOBAL, uint32(bind.Index))
 	case resolve.Predeclared:
@@ -1286,8 +1289,12 @@ func (fcomp *fcomp) expr(e syntax.Expr) {
 		fcomp.lookup(e)
 
 	case *syntax.Literal:
-		// e.Value is int64, float64, *bigInt, or string.
-		fcomp.emit1(CONSTANT, fcomp.pcomp.constantIndex(e.Value))
+		// e.Value is int64, float64, *bigInt, string
+		v := e.Value
+		if e.Token == syntax.BYTES {
+			v = Bytes(v.(string))
+		}
+		fcomp.emit1(CONSTANT, fcomp.pcomp.constantIndex(v))
 
 	case *syntax.ListExpr:
 		for _, x := range e.List {
@@ -1525,7 +1532,7 @@ func (fcomp *fcomp) plus(e *syntax.BinaryExpr) {
 }
 
 // addable reports whether e is a statically addable
-// expression: a [s]tring, [l]ist, or [t]uple.
+// expression: a [s]tring, [b]ytes, [l]ist, or [t]uple.
 func addable(e syntax.Expr) rune {
 	switch e := e.(type) {
 	case *syntax.Literal:
@@ -1533,6 +1540,8 @@ func addable(e syntax.Expr) rune {
 		switch e.Token {
 		case syntax.STRING:
 			return 's'
+		case syntax.BYTES:
+			return 'b'
 		}
 	case *syntax.ListExpr:
 		return 'l'
@@ -1547,12 +1556,16 @@ func addable(e syntax.Expr) rune {
 // The resulting syntax is degenerate, lacking position, etc.
 func add(code rune, args []summand) syntax.Expr {
 	switch code {
-	case 's':
-		var buf bytes.Buffer
+	case 's', 'b':
+		var buf strings.Builder
 		for _, arg := range args {
 			buf.WriteString(arg.x.(*syntax.Literal).Value.(string))
 		}
-		return &syntax.Literal{Token: syntax.STRING, Value: buf.String()}
+		tok := syntax.STRING
+		if code == 'b' {
+			tok = syntax.BYTES
+		}
+		return &syntax.Literal{Token: tok, Value: buf.String()}
 	case 'l':
 		var elems []syntax.Expr
 		for _, arg := range args {

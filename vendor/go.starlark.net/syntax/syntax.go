@@ -251,10 +251,10 @@ func (x *Ident) Span() (start, end Position) {
 // A Literal represents a literal string or number.
 type Literal struct {
 	commentsRef
-	Token    Token // = STRING | INT
+	Token    Token // = STRING | BYTES | INT | FLOAT
 	TokenPos Position
 	Raw      string      // uninterpreted text
-	Value    interface{} // = string | int64 | *big.Int
+	Value    interface{} // = string | int64 | *big.Int | float64
 }
 
 func (x *Literal) Span() (start, end Position) {
@@ -398,10 +398,6 @@ func (x *DictEntry) Span() (start, end Position) {
 }
 
 // A LambdaExpr represents an inline function abstraction.
-//
-// Although they may be added in future, lambda expressions are not
-// currently part of the Starlark spec, so their use is controlled by the
-// resolver.AllowLambda flag.
 type LambdaExpr struct {
 	commentsRef
 	Lambda Position

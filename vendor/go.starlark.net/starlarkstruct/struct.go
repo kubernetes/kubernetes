@@ -66,7 +66,7 @@ func FromKeywords(constructor starlark.Value, kwargs []starlark.Tuple) *Struct {
 	return s
 }
 
-// FromStringDict returns a whose elements are those of d.
+// FromStringDict returns a new struct instance whose elements are those of d.
 // The constructor parameter specifies the constructor; use Default for an ordinary struct.
 func FromStringDict(constructor starlark.Value, d starlark.StringDict) *Struct {
 	if constructor == nil {
