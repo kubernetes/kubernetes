@@ -417,8 +417,12 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
 					klog.V(4).Infof("%s: watch of %v returned %v - backing off", r.name, r.typeDescription, err)
-					<-r.initConnBackoffManager.Backoff().C()
-					continue
+					select {
+					case <-stopCh:
+						return nil
+					case <-r.initConnBackoffManager.Backoff().C():
+						continue
+					}
 				}
 				return err
 			}
@@ -439,8 +443,12 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
 					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
-					<-r.initConnBackoffManager.Backoff().C()
-					continue
+					select {
+					case <-stopCh:
+						return nil
+					case <-r.initConnBackoffManager.Backoff().C():
+						continue
+					}
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
 					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)
 					continue
