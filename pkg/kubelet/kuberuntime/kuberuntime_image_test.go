@@ -52,8 +52,13 @@ func TestPullImageWithError(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
+	// trying to pull an image with an invalid name should return an error
+	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: ":invalid"}, nil, nil)
+	assert.Error(t, err)
+	assert.Equal(t, "", imageRef)
+
 	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
-	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
 
@@ -269,6 +274,62 @@ func TestPullWithSecrets(t *testing.T) {
 		_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
+	}
+}
+
+func TestPullWithSecretsWithError(t *testing.T) {
+	ctx := context.Background()
+
+	dockerCfg := map[string]map[string]map[string]string{
+		"auths": {
+			"index.docker.io/v1/": {
+				"email": "passed-email",
+				"auth":  "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk",
+			},
+		},
+	}
+
+	dockerConfigJSON, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name              string
+		imageName         string
+		passedSecrets     []v1.Secret
+		shouldInjectError bool
+	}{
+		{
+			name:          "invalid docker secret",
+			imageName:     "ubuntu",
+			passedSecrets: []v1.Secret{{Type: v1.SecretTypeDockercfg, Data: map[string][]byte{v1.DockerConfigKey: []byte("invalid")}}},
+		},
+		{
+			name:      "secret provided, pull failed",
+			imageName: "ubuntu",
+			passedSecrets: []v1.Secret{
+				{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigKey: dockerConfigJSON}},
+			},
+			shouldInjectError: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+			assert.NoError(t, err)
+
+			if test.shouldInjectError {
+				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
+			}
+
+			imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
+			assert.Error(t, err)
+			assert.Equal(t, "", imageRef)
+
+			images, err := fakeManager.ListImages(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, len(images))
+		})
 	}
 }
 
