@@ -2278,7 +2278,15 @@ type Container struct {
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// Restart policy for the container.
-	// This MUST be set only for init containers.
+	// This may only be set for init containers.
+	// The only supported value is "Always".
+	// Setting ContainerRestartPolicyAlways on an init container changes how its
+	// lifecycle is managed. Kubernetes will still start this container in order
+	// with the other init containers, but instead of waiting for the container's
+	// completion, it will wait for the container's startup completion. If this
+	// container exits for any reason, it will be restarted, until all of the
+	// regular containers terminate, at which point this container will be
+	// terminated. This is often referred to as a "sidecar" container.
 	// +featureGate=SidecarContainers
 	// +optional
 	RestartPolicy *ContainerRestartPolicy
@@ -2601,16 +2609,10 @@ const (
 )
 
 // ContainerRestartPolicy is the restart policy for a single container.
-// Always is the only supported policy for now.
+// The only supported value is "Always".
 type ContainerRestartPolicy string
 
 const (
-	// The container with ContainerRestartPolicyAlways will be restarted
-	// regardless of pod's RestartPolicy. And Kubernetes will start the container
-	// in order with the other init containers, but instead of waiting for its
-	// completion, it will wait for the container startup completion. And the
-	// container will not block the pod from completing.
-	// This MUST be set only for init containers.
 	ContainerRestartPolicyAlways ContainerRestartPolicy = "Always"
 )
 
@@ -3523,7 +3525,8 @@ type EphemeralContainerCommon struct {
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// Restart policy for the container.
-	// This MUST be set only for init containers.
+	// This may only be set for init containers. You cannot set this field on
+	// ephemeral containers.
 	// +featureGate=SidecarContainers
 	// +optional
 	RestartPolicy *ContainerRestartPolicy
