@@ -17188,7 +17188,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. This MUST be set only for init containers.",
+							Description: "Restart policy for the container. This may only be set for init containers. The only supported value is \"Always\". Setting ContainerRestartPolicyAlways on an init container changes how its lifecycle is managed. Kubernetes will still start this container in order with the other init containers, but instead of waiting for the container's completion, it will wait for the container's startup completion. If this container exits for any reason, it will be restarted, until all of the regular containers terminate, at which point this container will be terminated. This is often referred to as a \"sidecar\" container.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18356,7 +18356,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. This MUST be set only for init containers.",
+							Description: "Restart policy for the container. This may only be set for init containers. You cannot set this field on ephemeral containers.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18637,7 +18637,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. This MUST be set only for init containers.",
+							Description: "Restart policy for the container. This may only be set for init containers. You cannot set this field on ephemeral containers.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
