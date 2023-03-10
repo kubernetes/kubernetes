@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/resource/v1alpha2"
 )
 
 func init() {
@@ -34,5 +35,6 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(resource.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(v1alpha2.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1alpha2.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }

@@ -18,6 +18,7 @@ package rest
 
 import (
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -41,6 +42,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.v1alpha2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha2.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
@@ -75,6 +82,46 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	}
 
 	if resource := "podschedulings"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = podSchedulingStorage
+		storage[resource+"/status"] = podSchedulingStatusStorage
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	if resource := "resourceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClassStorage, err := resourceclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClassStorage
+	}
+
+	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClaimStorage
+		storage[resource+"/status"] = resourceClaimStatusStorage
+	}
+
+	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClaimTemplateStorage
+	}
+
+	if resource := "podschedulings"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
 		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err

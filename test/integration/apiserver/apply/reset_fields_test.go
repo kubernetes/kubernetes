@@ -65,7 +65,9 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 25}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 25}}`,
 	gvr("resource.k8s.io", "v1alpha1", "podschedulings"):            `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulings.
+	gvr("resource.k8s.io", "v1alpha2", "podschedulings"):            `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulings.
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 }
 
@@ -147,9 +149,13 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"):                        `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):                             `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("resource.k8s.io", "v1alpha1", "podschedulings"):                           `{"spec": {"selectedNode": "node2name"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "podschedulings"):                           `{"spec": {"selectedNode": "node2name"}}`,
 	gvr("resource.k8s.io", "v1alpha1", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 }
 

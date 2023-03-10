@@ -460,18 +460,41 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("resource.k8s.io", "v1alpha1", "resourceclasses"): {
 			Stub:             `{"metadata": {"name": "class1name"}, "driverName": "example.com"}`,
 			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1alpha2", "ResourceClass"),
 		},
 		gvr("resource.k8s.io", "v1alpha1", "resourceclaims"): {
 			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
 			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1alpha2", "ResourceClaim"),
 		},
 		gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"): {
 			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1alpha2", "ResourceClaimTemplate"),
 		},
 		gvr("resource.k8s.io", "v1alpha1", "podschedulings"): {
 			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
 			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1alpha2", "PodScheduling"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/resource/v1alpha2
+		gvr("resource.k8s.io", "v1alpha2", "resourceclasses"): {
+			Stub:             `{"metadata": {"name": "class2name"}, "driverName": "example.com"}`,
+			ExpectedEtcdPath: "/registry/resourceclasses/class2name",
+		},
+		gvr("resource.k8s.io", "v1alpha2", "resourceclaims"): {
+			Stub:             `{"metadata": {"name": "claim2name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
+			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim2name",
+		},
+		gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"): {
+			Stub:             `{"metadata": {"name": "claimtemplate2name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
+			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate2name",
+		},
+		gvr("resource.k8s.io", "v1alpha2", "podschedulings"): {
+			Stub:             `{"metadata": {"name": "pod2name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
+			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod2name",
 		},
 		// --
 

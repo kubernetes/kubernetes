@@ -55,6 +55,9 @@ func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -114,6 +117,9 @@ var StatusStrategy = resourceclaimStatusStrategy{Strategy}
 func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
