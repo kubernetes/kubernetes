@@ -210,7 +210,6 @@ func newTestKubeletWithImageList(
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
-	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeHasSynced = func() bool { return true }
@@ -2984,7 +2983,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		metav1.Duration{Duration: time.Minute},
 		1024,
 		110,
-		"default",
 		true,
 		true,
 		map[string]string{},

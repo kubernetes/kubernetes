@@ -396,10 +396,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		buildService("test", "test2", "1.2.3.5", "TCP", 8085),
 		buildService("test", "test2", "None", "TCP", 8085),
 		buildService("test", "test2", "", "TCP", 8085),
-		buildService("kubernetes", "kubernetes", "1.2.3.6", "TCP", 8086),
-		buildService("not-special", "kubernetes", "1.2.3.8", "TCP", 8088),
-		buildService("not-special", "kubernetes", "None", "TCP", 8088),
-		buildService("not-special", "kubernetes", "", "TCP", 8088),
+		buildService("not-special", metav1.NamespaceDefault, "1.2.3.8", "TCP", 8088),
+		buildService("not-special", metav1.NamespaceDefault, "None", "TCP", 8088),
+		buildService("not-special", metav1.NamespaceDefault, "", "TCP", 8088),
 	}
 
 	trueValue := true
@@ -409,7 +408,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		ns                 string                 // the namespace to generate environment for
 		enableServiceLinks *bool                  // enabling service links
 		container          *v1.Container          // the container to use
-		masterServiceNs    string                 // the namespace to read master service info from
 		nilLister          bool                   // whether the lister should be nil
 		staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
 		unsyncedServices   bool                   // whether the services should NOT be synced
@@ -425,7 +423,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ns:                 "test1",
 			enableServiceLinks: &falseValue,
 			container:          &v1.Container{Env: []v1.EnvVar{}},
-			masterServiceNs:    metav1.NamespaceDefault,
 			nilLister:          false,
 			staticPod:          false,
 			unsyncedServices:   true,
@@ -437,7 +434,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ns:                 "test1",
 			enableServiceLinks: &falseValue,
 			container:          &v1.Container{Env: []v1.EnvVar{}},
-			masterServiceNs:    metav1.NamespaceDefault,
 			nilLister:          false,
 			staticPod:          true,
 			unsyncedServices:   true,
@@ -458,8 +454,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			masterServiceNs: metav1.NamespaceDefault,
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAR"},
 				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
@@ -494,8 +489,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			masterServiceNs: metav1.NamespaceDefault,
-			nilLister:       true,
+			nilLister: true,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAR"},
 				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
@@ -516,8 +510,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "FOO", Value: "BAZ"},
 				},
 			},
-			masterServiceNs: metav1.NamespaceDefault,
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAZ"},
 				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
@@ -538,8 +531,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "FOO", Value: "BAZ"},
 				},
 			},
-			masterServiceNs: metav1.NamespaceDefault,
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAZ"},
 				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
@@ -567,17 +559,16 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "FOO", Value: "ZAP"},
 				},
 			},
-			masterServiceNs: "kubernetes",
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "ZAP"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
 			},
 		},
 		{
@@ -589,8 +580,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "FOO", Value: "ZAP"},
 				},
 			},
-			masterServiceNs: "kubernetes",
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "ZAP"},
 				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.5"},
@@ -611,27 +601,25 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name:               "pod in master service ns",
-			ns:                 "kubernetes",
+			ns:                 metav1.NamespaceDefault,
 			enableServiceLinks: &falseValue,
 			container:          &v1.Container{},
-			masterServiceNs:    "kubernetes",
 			nilLister:          false,
 			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
 			},
 		},
 		{
 			name:               "pod in master service ns, service env vars",
-			ns:                 "kubernetes",
+			ns:                 metav1.NamespaceDefault,
 			enableServiceLinks: &trueValue,
 			container:          &v1.Container{},
-			masterServiceNs:    "kubernetes",
 			nilLister:          false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "NOT_SPECIAL_SERVICE_HOST", Value: "1.2.3.8"},
@@ -641,13 +629,13 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "NOT_SPECIAL_PORT_8088_TCP_PROTO", Value: "tcp"},
 				{Name: "NOT_SPECIAL_PORT_8088_TCP_PORT", Value: "8088"},
 				{Name: "NOT_SPECIAL_PORT_8088_TCP_ADDR", Value: "1.2.3.8"},
-				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
-				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
-				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
 			},
 		},
 		{
@@ -721,9 +709,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			podIPs:          []string{"1.2.3.4", "fd00::6"},
-			masterServiceNs: "nothing",
-			nilLister:       true,
+			podIPs:    []string{"1.2.3.4", "fd00::6"},
+			nilLister: true,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
@@ -769,9 +756,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			podIPs:          []string{"fd00::6", "1.2.3.4"},
-			masterServiceNs: "nothing",
-			nilLister:       true,
+			podIPs:    []string{"fd00::6", "1.2.3.4"},
+			nilLister: true,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
@@ -813,9 +799,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			podIPs:          []string{"1.2.3.4", "192.168.1.1.", "fd00::6"},
-			masterServiceNs: "nothing",
-			nilLister:       true,
+			podIPs:    []string{"1.2.3.4", "192.168.1.1.", "fd00::6"},
+			nilLister: true,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
@@ -874,8 +859,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
 					Name:  "TEST_LITERAL",
@@ -915,6 +899,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{
 					Name:  "EMPTY_TEST",
 					Value: "foo-",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
 				},
 			},
 		},
@@ -974,8 +986,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
 					Name:  "TEST_LITERAL",
@@ -1048,6 +1059,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "EMPTY_TEST",
 					Value: "foo-",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 		},
 		{
@@ -1068,8 +1107,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedEnvs:    nil,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
 		},
 		{
 			name:               "configmapkeyref_missing_key_optional",
@@ -1089,8 +1135,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       true,
+			nilLister: true,
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1120,8 +1165,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedEnvs:    nil,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
 		},
 		{
 			name:               "secretkeyref_missing_key_optional",
@@ -1141,8 +1193,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       true,
+			nilLister: true,
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1183,8 +1234,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1219,6 +1269,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{
 					Name:  "p_DUPE_TEST",
 					Value: "CONFIG_MAP",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
 				},
 			},
 		},
@@ -1251,8 +1329,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1316,6 +1393,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "p_DUPE_TEST",
 					Value: "CONFIG_MAP",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 		},
 		{
@@ -1327,8 +1432,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedError:   true,
+			expectedError: true,
 		},
 		{
 			name:               "configmap_missing_optional",
@@ -1341,8 +1445,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						LocalObjectReference: v1.LocalObjectReference{Name: "missing-config-map"}}},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedEnvs:    nil,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
 		},
 		{
 			name:               "configmap_invalid_keys",
@@ -1353,7 +1464,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
 				},
 			},
-			masterServiceNs: "nothing",
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1370,6 +1480,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "key",
 					Value: "value",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
 		},
@@ -1385,7 +1523,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "",
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1399,6 +1536,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{
 					Name:  "p_1234",
 					Value: "abc",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
 				},
 			},
 		},
@@ -1431,8 +1596,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1468,6 +1632,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "p_DUPE_TEST",
 					Value: "SECRET",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 		},
 		{
@@ -1499,8 +1691,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "nothing",
-			nilLister:       false,
+			nilLister: false,
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1564,6 +1755,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "p_DUPE_TEST",
 					Value: "SECRET",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 		},
 		{
@@ -1575,8 +1794,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedError:   true,
+			expectedError: true,
 		},
 		{
 			name:               "secret_missing_optional",
@@ -1589,8 +1807,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Optional:             &trueVal}},
 				},
 			},
-			masterServiceNs: "nothing",
-			expectedEnvs:    nil,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
 		},
 		{
 			name:               "secret_invalid_keys",
@@ -1601,7 +1826,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
 				},
 			},
-			masterServiceNs: "nothing",
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1618,6 +1842,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:  "key.1",
 					Value: "value",
 				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
+				},
 			},
 			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
@@ -1633,7 +1885,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "",
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1647,6 +1898,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{
 					Name:  "p_1234.name",
 					Value: "abc",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_HOST",
+					Value: "1.2.3.1",
+				},
+				{
+					Name:  "KUBERNETES_SERVICE_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP",
+					Value: "tcp://1.2.3.1:8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_PORT",
+					Value: "8081",
+				},
+				{
+					Name:  "KUBERNETES_PORT_8081_TCP_ADDR",
+					Value: "1.2.3.1",
 				},
 			},
 		},
@@ -1662,7 +1941,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			masterServiceNs: "",
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
@@ -1683,7 +1961,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			testKubelet.kubelet.recorder = fakeRecorder
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
-			kl.masterServiceNamespace = tc.masterServiceNs
 			if tc.nilLister {
 				kl.serviceLister = nil
 			} else if tc.unsyncedServices {

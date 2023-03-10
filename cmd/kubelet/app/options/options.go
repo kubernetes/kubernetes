@@ -122,9 +122,6 @@ type KubeletFlags struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
-	// masterServiceNamespace is The namespace from which the kubernetes
-	// master services should be injected into pods.
-	MasterServiceNamespace string
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -142,7 +139,6 @@ func NewKubeletFlags() *KubeletFlags {
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
 		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           defaultRootDir,
-		MasterServiceNamespace:  metav1.NamespaceDefault,
 		MaxContainerCount:       -1,
 		MaxPerPodContainerCount: 1,
 		MinimumGCAge:            metav1.Duration{Duration: 0},
@@ -314,8 +310,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.StringVar(&f.MasterServiceNamespace, "master-service-namespace", f.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")
 	fs.BoolVar(&f.RegisterSchedulable, "register-schedulable", f.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
 	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
