@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -71,6 +72,12 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		networking.Resource("clustercidrs").WithVersion("v1alpha1"),
 		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1alpha1"),
 		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1alpha1"),
+
+		// Current version is v1alpha2, Kubernetes 1.26 uses v1alpha1.
+		resource.Resource("resourceclaims").WithVersion("v1alpha1"),
+		resource.Resource("resourceclaimtemplates").WithVersion("v1alpha1"),
+		resource.Resource("resourceclasses").WithVersion("v1alpha1"),
+		resource.Resource("podschedulings").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
