@@ -34,12 +34,17 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getComputeResourceList(cpu, memory string) api.ResourceList {
@@ -269,8 +274,9 @@ func TestMergePodResourceRequirements(t *testing.T) {
 
 func TestPodLimitFunc(t *testing.T) {
 	type testCase struct {
-		pod        api.Pod
-		limitRange corev1.LimitRange
+		pod          api.Pod
+		limitRange   corev1.LimitRange
+		featureGates []featuregate.Feature
 	}
 
 	successCases := []testCase{
@@ -445,14 +451,19 @@ func TestPodLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
-		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
+		t.Run(test.pod.Name, func(t *testing.T) {
+			for _, fg := range test.featureGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)()
+			}
+			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+		})
 	}
 
 	errorCases := []testCase{
@@ -626,18 +637,41 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
 		},
+		{
+			pod: withSidecar(getComputeResourceList("1500m", ""), api.ResourceList{},
+				validPod("ctr-max-cpu-limit-sidecar", 1, getResourceRequirements(getComputeResourceList("1000m", ""), getComputeResourceList("1500m", "")))),
+			limitRange:   createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			featureGates: []featuregate.Feature{features.SidecarContainers},
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
-		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
-		if err == nil {
-			t.Errorf("Expected error for pod: %s", test.pod.Name)
-		}
+		t.Run(test.pod.Name, func(t *testing.T) {
+			for _, fg := range test.featureGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)()
+			}
+			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			if err == nil {
+				t.Errorf("Expected error for pod: %s", test.pod.Name)
+			}
+		})
 	}
+}
+
+func withSidecar(requests, limits api.ResourceList, pod api.Pod) api.Pod {
+	policyAlways := api.ContainerRestartPolicyAlways
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+		api.Container{
+			RestartPolicy: &policyAlways,
+			Image:         "foo:V" + strconv.Itoa(len(pod.Spec.InitContainers)),
+			Resources:     getResourceRequirements(requests, limits),
+			Name:          "foo-" + strconv.Itoa(len(pod.Spec.InitContainers)),
+		})
+	return pod
 }
 
 func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
