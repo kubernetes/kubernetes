@@ -795,7 +795,7 @@ func (in *Container) DeepCopyInto(out *Container) {
 	}
 	if in.RestartPolicy != nil {
 		in, out := &in.RestartPolicy, &out.RestartPolicy
-		*out = new(RestartPolicy)
+		*out = new(ContainerRestartPolicy)
 		**out = **in
 	}
 	if in.VolumeMounts != nil {
@@ -1427,7 +1427,7 @@ func (in *EphemeralContainerCommon) DeepCopyInto(out *EphemeralContainerCommon) 
 	}
 	if in.RestartPolicy != nil {
 		in, out := &in.RestartPolicy, &out.RestartPolicy
-		*out = new(RestartPolicy)
+		*out = new(ContainerRestartPolicy)
 		**out = **in
 	}
 	if in.VolumeMounts != nil {
