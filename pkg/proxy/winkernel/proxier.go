@@ -1467,14 +1467,14 @@ func (proxier *Proxier) syncProxyRules() {
 		endpointsAvailableForLB := !allEndpointsTerminating && !allEndpointsNonServing
 		proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
-		if endpointsAvailableForLB {
+		// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
+		clusterIPEndpoints := hnsEndpoints
+		if svcInfo.internalTrafficLocal {
+			// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
+			clusterIPEndpoints = hnsLocalEndpoints
+		}
 
-			// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
-			clusterIPEndpoints := hnsEndpoints
-			if svcInfo.internalTrafficLocal {
-				// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
-				clusterIPEndpoints = hnsLocalEndpoints
-			}
+		if len(clusterIPEndpoints) > 0 {
 
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation
