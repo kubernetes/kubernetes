@@ -11295,6 +11295,7 @@ func TestValidatePodUpdate(t *testing.T) {
 	tests := []struct {
 		new  core.Pod
 		old  core.Pod
+		opts PodValidationOptions
 		err  string
 		test string
 	}{
@@ -12784,6 +12785,952 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "",
 			test: "update pod spec schedulingGates: legal deletion",
 		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "node selector is immutable when AllowMutableNodeSelector is false",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "adding node selector is allowed for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo":  "bar",
+						"foo2": "bar2",
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "adding node selector is not allowed for non-gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.nodeSelector: Invalid value:",
+			test: "removing node selector is not allowed for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			new: core.Pod{},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "removing node selector is not allowed for non-gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo":  "bar",
+						"foo2": "bar2",
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "old pod spec has scheduling gate, new pod spec does not, and node selector is added",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "new value",
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.nodeSelector: Invalid value:",
+			test: "modifying value of existing node selector is not allowed",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "addition to nodeAffinity is allowed for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
+			test: "old RequiredDuringSchedulingIgnoredDuringExecution is non-nil, new RequiredDuringSchedulingIgnoredDuringExecution is nil, pod is gated",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "addition to nodeAffinity is not allowed for non-gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "old pod spec has scheduling gate, new pod spec does not, and node affinity addition occurs",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
+			test: "nodeAffinity deletion from MatchExpressions not allowed",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
+			test: "nodeAffinity deletion from MatchFields not allowed",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
+			test: "nodeAffinity modification of item in MatchExpressions not allowed",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
+			test: "nodeAffinity modification of item in MatchFields not allowed",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"bar2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
+			test: "nodeSelectorTerms addition on gated pod should fail",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "preferredDuringSchedulingIgnoredDuringExecution can modified for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []core.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have additions for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity:        &core.Affinity{},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms: Invalid value:",
+			test: "new node affinity is nil",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+								{
+									Weight: 1.0,
+									Preference: core.NodeSelectorTerm{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "preferredDuringSchedulingIgnoredDuringExecution can have removals for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{
+									{
+										MatchExpressions: []core.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: core.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
+			test: "empty NodeSelectorTerm (selects nothing) cannot become populated (selects something)",
+		},
 	}
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
@@ -12811,7 +13758,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			test.old.Spec.RestartPolicy = "Always"
 		}
 
-		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodUpdate(&test.new, &test.old, test.opts)
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)

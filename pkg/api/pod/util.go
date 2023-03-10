@@ -395,6 +395,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
+		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 	}
 
 	if oldPodSpec != nil {
