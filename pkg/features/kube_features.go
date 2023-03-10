@@ -739,6 +739,14 @@ const (
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
+	// owner: @alexanderConstantinescu
+	// kep: http://kep.k8s.io/3458
+	// beta: v1.27
+	//
+	// Enables less load balancer re-configurations by the service controller
+	// (KCCM) as an effect of changing node state.
+	StableLoadBalancerNodeSet featuregate.Feature = "StableLoadBalancerNodeSet"
+
 	// owner: @mattcary
 	// alpha: v1.22
 	//
@@ -1056,6 +1064,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceNodePortStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
+
+	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
 
 	StatefulSetAutoDeletePVC: {Default: false, PreRelease: featuregate.Alpha},
 

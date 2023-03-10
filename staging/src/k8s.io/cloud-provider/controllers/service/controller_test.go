@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,6 +46,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
+	_ "k8s.io/controller-manager/pkg/features/register"
 
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -573,6 +577,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 }
 
 func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, false)()
 	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
 	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
 	node2NotReady := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
@@ -677,6 +682,174 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
 			},
+		},
+		{
+			desc:         "1 node get excluded",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2Exclude, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 old node gets deleted",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2}},
+			},
+		},
+		{
+			desc:         "1 spurious node update",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2SpuriousChange, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			controller, cloud, _ := newController()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			controller.lastSyncedNodes = tc.initialState
+
+			for _, state := range tc.stateChanges {
+				setupState := func() {
+					controller.nodeLister = newFakeNodeLister(nil, state.nodes...)
+					if state.syncCallErr {
+						cloud.Err = fmt.Errorf("error please")
+					}
+				}
+				cleanupState := func() {
+					cloud.Err = nil
+				}
+				setupState()
+				controller.updateLoadBalancerHosts(ctx, services, 3)
+				cleanupState()
+			}
+
+			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
+		})
+	}
+}
+
+func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
+	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2NotReady := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2Tainted := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint}}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2SpuriousChange := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Phase: v1.NodeTerminated, Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2Exclude := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+
+	type stateChanges struct {
+		nodes       []*v1.Node
+		syncCallErr bool
+	}
+
+	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
+	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	service3 := defaultExternalService()
+
+	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
+
+	for _, tc := range []struct {
+		desc                string
+		expectedUpdateCalls []fakecloud.UpdateBalancerCall
+		stateChanges        []stateChanges
+		initialState        []*v1.Node
+	}{
+		{
+			desc:         "No node changes",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+		{
+			desc:         "1 new node gets added",
+			initialState: []*v1.Node{node1, node2},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
+			desc:         "1 new node gets added - with retries",
+			initialState: []*v1.Node{node1, node2},
+			stateChanges: []stateChanges{
+				{
+					nodes:       []*v1.Node{node1, node2, node3},
+					syncCallErr: true,
+				},
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
+			desc:         "1 node goes NotReady",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2NotReady, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+		{
+			desc:         "1 node gets Tainted",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2Tainted, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 node goes Ready",
+			initialState: []*v1.Node{node1, node2NotReady, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
 		},
 		{
 			desc:         "1 node get excluded",
@@ -1887,10 +2060,11 @@ func TestListWithPredicate(t *testing.T) {
 
 func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 	testcases := []struct {
-		name       string
-		oldNode    *v1.Node
-		newNode    *v1.Node
-		shouldSync bool
+		name                 string
+		oldNode              *v1.Node
+		newNode              *v1.Node
+		shouldSync           bool
+		stableNodeSetEnabled bool
 	}{
 		{
 			name: "taint F->T",
@@ -2267,6 +2441,146 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				},
 			},
 			shouldSync: false,
+		},
+		{
+			name: "excluded F->T",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node",
+					Labels: map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+					Labels: map[string]string{
+						v1.LabelNodeExcludeBalancers: "",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync:           true,
+			stableNodeSetEnabled: true,
+		},
+		{
+			name: "excluded changed T->F",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+					Labels: map[string]string{
+						v1.LabelNodeExcludeBalancers: "",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node",
+					Labels: map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync:           true,
+			stableNodeSetEnabled: true,
+		},
+		{
+			name: "excluded changed T->T",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+					Labels: map[string]string{
+						v1.LabelNodeExcludeBalancers: "",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+					Labels: map[string]string{
+						v1.LabelNodeExcludeBalancers: "",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync:           false,
+			stableNodeSetEnabled: true,
+		},
+		{
+			name: "excluded changed F->F",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node",
+					Labels: map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node",
+					Labels: map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync:           false,
+			stableNodeSetEnabled: true,
 		},
 		{
 			name: "other label changed F->T",
@@ -2730,7 +3044,8 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		},
 	}
 	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.stableNodeSetEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, testcase.stableNodeSetEnabled)()
 			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
 			if shouldSync != testcase.shouldSync {
 				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
@@ -2740,516 +3055,519 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 }
 
 func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
-	testcases := []struct {
-		name       string
-		oldNode    *v1.Node
-		newNode    *v1.Node
-		shouldSync bool
-	}{
-		{
-			name: "tainted T, excluded F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+	for _, fgEnabled := range []bool{true, false} {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, fgEnabled)()
+		testcases := []struct {
+			name       string
+			oldNode    *v1.Node
+			newNode    *v1.Node
+			shouldSync bool
+		}{
+			{
+				name: "tainted T, excluded F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node",
+						Labels: map[string]string{},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: true,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "tainted T, excluded T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node",
+						Labels: map[string]string{},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: true,
 			},
-			shouldSync: true,
-		},
-		{
-			name: "tainted T, excluded T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "tainted T, ready F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+			{
+				name: "tainted T, ready T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			shouldSync: true,
-		},
-		{
-			name: "tainted T, ready F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+			{
+				name: "excluded T, tainted F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+			{
+				name: "excluded T, tainted T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			shouldSync: false,
-		},
-		{
-			name: "tainted T, ready T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+			{
+				name: "excluded T, ready F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+			{
+				name: "excluded T, ready T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			shouldSync: false,
-		},
-		{
-			name: "excluded T, tainted F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "ready F, tainted F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+				shouldSync: false,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "ready F, tainted T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key: ToBeDeletedTaint,
+							},
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				shouldSync: false,
 			},
-			shouldSync: false,
-		},
-		{
-			name: "excluded T, tainted T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "ready F, excluded F->T",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node",
+						Labels: map[string]string{},
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				shouldSync: true,
 			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
+			{
+				name: "ready F, excluded T->F",
+				oldNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node",
+						Labels: map[string]string{
+							v1.LabelNodeExcludeBalancers: "",
+						},
 					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
 						},
 					},
 				},
+				newNode: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node",
+						Labels: map[string]string{},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+				shouldSync: true,
 			},
-			shouldSync: false,
-		},
-		{
-			name: "excluded T, ready F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
-						},
-					},
-				},
-			},
-			shouldSync: false,
-		},
-		{
-			name: "excluded T, ready T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionTrue,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			shouldSync: false,
-		},
-		{
-			name: "ready F, tainted F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
-						},
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			shouldSync: false,
-		},
-		{
-			name: "ready F, tainted T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key: ToBeDeletedTaint,
-						},
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			shouldSync: false,
-		},
-		{
-			name: "ready F, excluded F->T",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			shouldSync: true,
-		},
-		{
-			name: "ready F, excluded T->F",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node",
-					Labels: map[string]string{
-						v1.LabelNodeExcludeBalancers: "",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:   v1.NodeReady,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			shouldSync: true,
-		},
-	}
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
-			if shouldSync != testcase.shouldSync {
-				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
-			}
-		})
+		}
+		for _, testcase := range testcases {
+			t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, fgEnabled), func(t *testing.T) {
+				shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
+				if shouldSync != testcase.shouldSync {
+					t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
+				}
+			})
+		}
 	}
 }
 
