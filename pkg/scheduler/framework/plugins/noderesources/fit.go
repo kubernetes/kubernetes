@@ -24,9 +24,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -202,7 +204,9 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 // Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
-	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
+		SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)
 	return result

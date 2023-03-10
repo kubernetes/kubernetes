@@ -26,11 +26,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type resourceLifecycleDescriptors struct {
@@ -196,7 +198,13 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
-	reqs = v1resource.PodRequests(pod, v1resource.PodResourcesOptions{Reuse: reuseReqs})
-	limits = v1resource.PodLimits(pod, v1resource.PodResourcesOptions{Reuse: reuseLimits})
+	reqs = v1resource.PodRequests(pod, v1resource.PodResourcesOptions{
+		Reuse:                    reuseReqs,
+		SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+	})
+	limits = v1resource.PodLimits(pod, v1resource.PodResourcesOptions{
+		Reuse:                    reuseLimits,
+		SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+	})
 	return
 }
