@@ -20456,6 +20456,8 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SupplementalGroups",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
+		"DisruptionPolicy.Policy",
+		"DisruptionPolicy.PriorityGreaterThanOrEqual",
 	)
 	osNeutralFields := sets.NewString(
 		"ActiveDeadlineSeconds",

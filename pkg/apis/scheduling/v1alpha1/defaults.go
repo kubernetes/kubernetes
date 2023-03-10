@@ -20,6 +20,8 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -34,7 +36,7 @@ func SetDefaults_PriorityClass(obj *v1alpha1.PriorityClass) {
 		obj.PreemptionPolicy = &preemptLowerPriority
 	}
 
-	if obj.DisruptionPolicy == nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisruptionPolicyInPriorityClass) && obj.DisruptionPolicy == nil {
 		pdbBestEffort := apiv1.DisruptionPolicy{
 			Policy: apiv1.PDBBestEffort,
 		}
