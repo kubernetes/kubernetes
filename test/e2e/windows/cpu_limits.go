@@ -52,7 +52,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 			ginkgo.By("Waiting 2 minutes")
 			time.Sleep(2 * time.Minute)
 			ginkgo.By("Ensuring pods are still running")
-			var allPods [](*v1.Pod)
+			var allPods []*v1.Pod
 			for _, p := range podsDecimal {
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
 					ctx,
