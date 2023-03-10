@@ -561,6 +561,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
+			// TODO: look into re-using resourcehelper.PodRequests/resourcehelper.PodLimits instead of duplicating
+			// that calculation
 			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]

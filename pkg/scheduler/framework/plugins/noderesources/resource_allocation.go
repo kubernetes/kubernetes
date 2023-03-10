@@ -18,7 +18,12 @@ package noderesources
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -108,29 +113,23 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
 // the Overhead is added to the result.
-// podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
-func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
-	var podRequest int64
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		value := schedutil.GetRequestForResource(resource, &container.Resources.Requests, !r.useRequested)
-		podRequest += value
-	}
+func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
-	for i := range pod.Spec.InitContainers {
-		initContainer := &pod.Spec.InitContainers[i]
-		value := schedutil.GetRequestForResource(resource, &initContainer.Resources.Requests, !r.useRequested)
-		if podRequest < value {
-			podRequest = value
+	opts := resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+	}
+	if !r.useRequested {
+		opts.NonMissingContainerRequests = v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
 		}
 	}
 
-	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil {
-		if quantity, found := pod.Spec.Overhead[resource]; found {
-			podRequest += quantity.Value()
-		}
-	}
+	requests := resourcehelper.PodRequests(pod, opts)
 
-	return podRequest
+	quantity := requests[resourceName]
+	if resourceName == v1.ResourceCPU {
+		return quantity.MilliValue()
+	}
+	return quantity.Value()
 }
