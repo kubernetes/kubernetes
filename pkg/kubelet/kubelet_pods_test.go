@@ -2082,6 +2082,16 @@ func runningState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+func startedState(cName string) v1.ContainerStatus {
+	started := true
+	return v1.ContainerStatus{
+		Name: cName,
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+		Started: &started,
+	}
+}
 func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -2430,6 +2440,37 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 				Spec: desiredState,
 				Status: v1.PodStatus{
 					InitContainerStatuses: []v1.ContainerStatus{
+						startedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container started, one main container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						startedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"sidecar container started, main containers running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
 						runningState("containerX"),
 					},
 					ContainerStatuses: []v1.ContainerStatus{
@@ -2439,7 +2480,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 				},
 			},
 			v1.PodRunning,
-			"all containers running",
+			"sidecar container running, main containers running",
 		},
 		{
 			&v1.Pod{
@@ -2763,6 +2804,37 @@ func TestPodPhaseWithRestartNeverSidecarContainers(t *testing.T) {
 			},
 			v1.PodPending,
 			"sidecar container waiting, not terminated",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						startedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			v1.PodPending,
+			"sidecar container started, one main container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						startedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"sidecar container started, main containers succeeded",
 		},
 		{
 			&v1.Pod{

@@ -1457,7 +1457,8 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 
 		switch {
 		case containerStatus.State.Running != nil:
-			if kubetypes.IsSidecarContainer(&container) {
+			if kubetypes.IsSidecarContainer(&container) &&
+				containerStatus.Started != nil && *containerStatus.Started {
 				continue
 			}
 			pendingInitialization++
@@ -1492,6 +1493,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	succeeded := 0
 	terminatedSidecar := 0
 	crashedSidecar := 0
+	hasInitialized := false
 
 	checkContainers := func(containers []v1.Container, isInitContainers bool) {
 		for _, container := range containers {
@@ -1503,6 +1505,12 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 			if !ok {
 				unknown++
 				continue
+			}
+
+			if !isInitContainers {
+				if containerStatus.State.Running != nil || containerStatus.State.Terminated != nil {
+					hasInitialized = true
+				}
 			}
 
 			switch {
@@ -1538,7 +1546,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	}
 
 	switch {
-	case pendingInitialization > 0:
+	case pendingInitialization > 0 && !hasInitialized:
 		fallthrough
 	case waiting > 0:
 		klog.V(5).InfoS("Pod waiting > 0, pending")
