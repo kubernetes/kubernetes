@@ -157,7 +157,7 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 }
 
 func initDefaultResizePolicy(containers []TestContainerInfo) {
-	noRestart := v1.RestartNotRequired
+	noRestart := v1.NotRequired
 	setDefaultPolicy := func(ci *TestContainerInfo) {
 		if ci.CPUPolicy == nil {
 			ci.CPUPolicy = &noRestart
@@ -500,7 +500,7 @@ func doPodResizeTests() {
 		expected    []TestContainerInfo
 	}
 
-	noRestart := v1.RestartNotRequired
+	noRestart := v1.NotRequired
 	doRestart := v1.RestartContainer
 	tests := []testCase{
 		{
@@ -1010,7 +1010,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, one container - increase CPU (RestartNotRequired) & memory (RestartContainer)",
+			name: "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
 			containers: []TestContainerInfo{
 				{
 					Name:      "c1",
@@ -1033,7 +1033,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (RestartNotRequired)",
+			name: "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)",
 			containers: []TestContainerInfo{
 				{
 					Name:      "c1",

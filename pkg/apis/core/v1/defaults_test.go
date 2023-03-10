@@ -322,9 +322,6 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
 	}
-	if featuresEnabled {
-		expectedDefaults[".Spec.Containers[0].ResizePolicy"] = `[{"resourceName":"cpu","restartPolicy":"RestartNotRequired"},{"resourceName":"memory","restartPolicy":"RestartNotRequired"}]`
-	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")

@@ -3016,7 +3016,7 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 }
 
 var supportedResizeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-var supportedResizePolicies = sets.NewString(string(core.RestartNotRequired), string(core.RestartContainer))
+var supportedResizePolicies = sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 
 func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -3036,7 +3036,7 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 			allErrors = append(allErrors, field.NotSupported(fldPath, p.ResourceName, supportedResizeResources.List()))
 		}
 		switch p.RestartPolicy {
-		case core.RestartNotRequired, core.RestartContainer:
+		case core.NotRequired, core.RestartContainer:
 		case "":
 			allErrors = append(allErrors, field.Required(fldPath, ""))
 		default:

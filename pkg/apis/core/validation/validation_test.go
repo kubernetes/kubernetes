@@ -7009,7 +7009,7 @@ func TestValidatePullPolicy(t *testing.T) {
 func TestValidateResizePolicy(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-	tSupportedResizePolicies := sets.NewString(string(core.RestartNotRequired), string(core.RestartContainer))
+	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
 		PolicyList  []core.ContainerResizePolicy
 		ExpectError bool
@@ -7018,7 +7018,7 @@ func TestValidateResizePolicy(t *testing.T) {
 	testCases := map[string]T{
 		"ValidCPUandMemoryPolicies": {
 			[]core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
 			false,
@@ -7033,7 +7033,7 @@ func TestValidateResizePolicy(t *testing.T) {
 		},
 		"ValidMemoryPolicy": {
 			[]core.ContainerResizePolicy{
-				{ResourceName: "memory", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 			},
 			false,
 			nil,
@@ -7045,7 +7045,7 @@ func TestValidateResizePolicy(t *testing.T) {
 		},
 		"ValidCPUandInvalidMemoryPolicy": {
 			[]core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "Restarrrt"},
 			},
 			true,
@@ -7061,7 +7061,7 @@ func TestValidateResizePolicy(t *testing.T) {
 		},
 		"InvalidResourceNameValidPolicy": {
 			[]core.ContainerResizePolicy{
-				{ResourceName: "cpuuu", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "cpuuu", RestartPolicy: "NotRequired"},
 			},
 			true,
 			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
@@ -7075,7 +7075,7 @@ func TestValidateResizePolicy(t *testing.T) {
 		},
 		"RepeatedPolicies": {
 			[]core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 			},
@@ -7475,7 +7475,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						ResizePolicy: []core.ContainerResizePolicy{
-							{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+							{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 						},
 					},
 				},
@@ -7702,7 +7702,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-resize-policy",
 			Image: "image",
 			ResizePolicy: []core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -9477,7 +9477,7 @@ func TestValidatePodSpec(t *testing.T) {
 					Name:  "initctr",
 					Image: "initimage",
 					ResizePolicy: []core.ContainerResizePolicy{
-						{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+						{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 					},
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
@@ -9488,7 +9488,7 @@ func TestValidatePodSpec(t *testing.T) {
 					Name:  "ctr",
 					Image: "image",
 					ResizePolicy: []core.ContainerResizePolicy{
-						{ResourceName: "cpu", RestartPolicy: "RestartNotRequired"},
+						{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 					},
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",

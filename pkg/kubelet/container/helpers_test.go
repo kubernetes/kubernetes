@@ -915,8 +915,8 @@ func TestHashContainerWithoutResources(t *testing.T) {
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
 	mem200M := resource.MustParse("200Mi")
-	cpuPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartNotRequired}
-	memPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartNotRequired}
+	cpuPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired}
+	memPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired}
 	cpuPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer}
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer}
 
@@ -938,7 +938,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0xbf0fc03d,
+			0x5f62cb4c,
 		},
 		{
 			"Burstable pod with memory policy restart required",
@@ -951,7 +951,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0x97dd7301,
+			0xcdab9e00,
 		},
 		{
 			"Guaranteed pod with CPU policy restart required",
@@ -964,7 +964,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0xbf0fc03d,
+			0x5f62cb4c,
 		},
 		{
 			"Guaranteed pod with memory policy restart required",
@@ -977,7 +977,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0x97dd7301,
+			0xcdab9e00,
 		},
 	}
 	for _, tc := range tests {
