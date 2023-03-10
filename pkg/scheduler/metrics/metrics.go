@@ -46,15 +46,6 @@ var (
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 
-	e2eSchedulingLatency = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "e2e_scheduling_duration_seconds",
-			DeprecatedVersion: "1.23.0",
-			Help:              "E2e scheduling latency in seconds (scheduling algorithm + binding). This metric is replaced by scheduling_attempt_duration_seconds.",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-		}, []string{"result", "profile"})
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
