@@ -190,13 +190,13 @@ func addDirToProject(path string, id common.QuotaID, list *projectsList) (common
 	idMap := make(map[common.QuotaID]bool)
 	for _, project := range list.projects {
 		if project.data == path {
-			if id != project.id {
+			if id != common.BadQuotaID && id != project.id {
 				return common.BadQuotaID, false, fmt.Errorf("attempt to reassign project ID for %s", path)
 			}
 			// Trying to reassign a directory to the project it's
 			// already in.  Maybe this should be an error, but for
 			// now treat it as an idempotent operation
-			return id, false, nil
+			return project.id, false, nil
 		}
 		idMap[project.id] = true
 	}
