@@ -653,7 +653,7 @@ func TestFitScore(t *testing.T) {
 		existingPods         []*v1.Pod
 		expectedPriorities   framework.NodeScoreList
 		nodeResourcesFitArgs config.NodeResourcesFitArgs
-		disablePreScore      bool
+		runPreScore          bool
 	}{
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
@@ -681,6 +681,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case2",
@@ -708,6 +709,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy MostAllocated",
@@ -729,6 +731,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy LeastAllocated",
@@ -750,6 +753,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1 if PreScore is not called",
@@ -777,7 +781,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
-			disablePreScore: true,
+			runPreScore: false,
 		},
 		{
 			name: "test case for ScoringStrategy MostAllocated if PreScore is not called",
@@ -799,7 +803,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
-			disablePreScore: true,
+			runPreScore: false,
 		},
 		{
 			name: "test case for ScoringStrategy LeastAllocated if PreScore is not called",
@@ -821,7 +825,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
-			disablePreScore: true,
+			runPreScore: false,
 		},
 	}
 
@@ -841,7 +845,7 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
-				if !test.disablePreScore {
+				if !test.runPreScore {
 					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
