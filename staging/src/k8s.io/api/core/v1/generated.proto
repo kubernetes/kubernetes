@@ -875,7 +875,7 @@ message ContainerResizePolicy {
   optional string resourceName = 1;
 
   // Restart policy to apply when specified resource is resized.
-  // If not specified, it defaults to RestartNotRequired.
+  // If not specified, it defaults to NotRequired.
   optional string restartPolicy = 2;
 }
 
