@@ -20,5 +20,5 @@ limitations under the License.
 
 // +groupName=resource.k8s.io
 
-// Package v1alpha1 is the v1alpha1 version of the resource API.
-package v1alpha1 // import "k8s.io/api/resource/v1alpha1"
+// Package v1alpha2 is the v1alpha2 version of the resource API.
+package v1alpha2 // import "k8s.io/api/resource/v1alpha2"

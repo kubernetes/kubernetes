@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
-	"k8s.io/api/resource/v1alpha1"
+	"k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
-	localSchemeBuilder = &v1alpha1.SchemeBuilder
+	localSchemeBuilder = &v1alpha2.SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
@@ -38,7 +38,7 @@ func init() {
 const GroupName = "resource.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha2"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {

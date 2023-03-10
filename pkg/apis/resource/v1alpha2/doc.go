@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/resource
-// +k8s:conversion-gen-external-types=k8s.io/api/resource/v1alpha1
+// +k8s:conversion-gen-external-types=k8s.io/api/resource/v1alpha2
 // +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/resource/v1alpha1
+// +k8s:defaulter-gen-input=k8s.io/api/resource/v1alpha2
 
-// Package v1alpha1 is the v1alpha1 version of the resource API.
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/resource/v1alpha1"
+// Package v1alpha2 is the v1alpha2 version of the resource API.
+package v1alpha2 // import "k8s.io/kubernetes/pkg/apis/resource/v1alpha2"

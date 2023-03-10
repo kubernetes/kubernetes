@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
-	"k8s.io/api/resource/v1alpha1"
+	"k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -25,8 +25,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ResourceClaimSpec(obj *v1alpha1.ResourceClaimSpec) {
+func SetDefaults_ResourceClaimSpec(obj *v1alpha2.ResourceClaimSpec) {
 	if obj.AllocationMode == "" {
-		obj.AllocationMode = v1alpha1.AllocationModeWaitForFirstConsumer
+		obj.AllocationMode = v1alpha2.AllocationModeWaitForFirstConsumer
 	}
 }

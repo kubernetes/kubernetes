@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1_test
+package v1alpha2_test
 
 import (
 	"reflect"
 	"testing"
 
-	v1alpha1 "k8s.io/api/resource/v1alpha1"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	// ensure types are installed
@@ -29,32 +29,32 @@ import (
 )
 
 func TestSetDefaultAllocationMode(t *testing.T) {
-	claim := &v1alpha1.ResourceClaim{}
+	claim := &v1alpha2.ResourceClaim{}
 
 	// field should be defaulted
-	defaultMode := v1alpha1.AllocationModeWaitForFirstConsumer
-	output := roundTrip(t, runtime.Object(claim)).(*v1alpha1.ResourceClaim)
+	defaultMode := v1alpha2.AllocationModeWaitForFirstConsumer
+	output := roundTrip(t, runtime.Object(claim)).(*v1alpha2.ResourceClaim)
 	outMode := output.Spec.AllocationMode
 	if outMode != defaultMode {
 		t.Errorf("Expected AllocationMode to be defaulted to: %+v, got: %+v", defaultMode, outMode)
 	}
 
 	// field should not change
-	nonDefaultMode := v1alpha1.AllocationModeImmediate
-	claim = &v1alpha1.ResourceClaim{
-		Spec: v1alpha1.ResourceClaimSpec{
+	nonDefaultMode := v1alpha2.AllocationModeImmediate
+	claim = &v1alpha2.ResourceClaim{
+		Spec: v1alpha2.ResourceClaimSpec{
 			AllocationMode: nonDefaultMode,
 		},
 	}
-	output = roundTrip(t, runtime.Object(claim)).(*v1alpha1.ResourceClaim)
+	output = roundTrip(t, runtime.Object(claim)).(*v1alpha2.ResourceClaim)
 	outMode = output.Spec.AllocationMode
-	if outMode != v1alpha1.AllocationModeImmediate {
+	if outMode != v1alpha2.AllocationModeImmediate {
 		t.Errorf("Expected AllocationMode to remain %+v, got: %+v", nonDefaultMode, outMode)
 	}
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	codec := legacyscheme.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.LegacyCodec(v1alpha2.SchemeGroupVersion)
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
