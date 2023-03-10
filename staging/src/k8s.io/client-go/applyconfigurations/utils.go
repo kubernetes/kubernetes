@@ -1477,12 +1477,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=resource.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
-	case v1alpha2.SchemeGroupVersion.WithKind("PodScheduling"):
-		return &resourcev1alpha2.PodSchedulingApplyConfiguration{}
-	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingSpec"):
-		return &resourcev1alpha2.PodSchedulingSpecApplyConfiguration{}
-	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingStatus"):
-		return &resourcev1alpha2.PodSchedulingStatusApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingHints"):
+		return &resourcev1alpha2.PodSchedulingHintsApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingHintsSpec"):
+		return &resourcev1alpha2.PodSchedulingHintsSpecApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingHintsStatus"):
+		return &resourcev1alpha2.PodSchedulingHintsStatusApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaim"):
 		return &resourcev1alpha2.ResourceClaimApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):

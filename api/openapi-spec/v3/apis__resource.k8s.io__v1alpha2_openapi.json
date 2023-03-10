@@ -104,8 +104,8 @@
         },
         "type": "object"
       },
-      "io.k8s.api.resource.v1alpha2.PodScheduling": {
-        "description": "PodScheduling objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+      "io.k8s.api.resource.v1alpha2.PodSchedulingHints": {
+        "description": "PodSchedulingHints objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -127,7 +127,7 @@
           "spec": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingSpec"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsSpec"
               }
             ],
             "default": {},
@@ -136,7 +136,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingStatus"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsStatus"
               }
             ],
             "default": {},
@@ -150,24 +150,24 @@
         "x-kubernetes-group-version-kind": [
           {
             "group": "resource.k8s.io",
-            "kind": "PodScheduling",
+            "kind": "PodSchedulingHints",
             "version": "v1alpha2"
           }
         ]
       },
-      "io.k8s.api.resource.v1alpha2.PodSchedulingList": {
-        "description": "PodSchedulingList is a collection of Pod scheduling objects.",
+      "io.k8s.api.resource.v1alpha2.PodSchedulingHintsList": {
+        "description": "PodSchedulingHintsList is a collection of Pod scheduling objects.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
             "type": "string"
           },
           "items": {
-            "description": "Items is the list of PodScheduling objects.",
+            "description": "Items is the list of PodSchedulingHints objects.",
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               ],
               "default": {}
@@ -195,13 +195,13 @@
         "x-kubernetes-group-version-kind": [
           {
             "group": "resource.k8s.io",
-            "kind": "PodSchedulingList",
+            "kind": "PodSchedulingHintsList",
             "version": "v1alpha2"
           }
         ]
       },
-      "io.k8s.api.resource.v1alpha2.PodSchedulingSpec": {
-        "description": "PodSchedulingSpec describes where resources for the Pod are needed.",
+      "io.k8s.api.resource.v1alpha2.PodSchedulingHintsSpec": {
+        "description": "PodSchedulingHintsSpec describes where resources for the Pod are needed.",
         "properties": {
           "potentialNodes": {
             "description": "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
@@ -219,8 +219,8 @@
         },
         "type": "object"
       },
-      "io.k8s.api.resource.v1alpha2.PodSchedulingStatus": {
-        "description": "PodSchedulingStatus describes where resources for the Pod can be allocated.",
+      "io.k8s.api.resource.v1alpha2.PodSchedulingHintsStatus": {
+        "description": "PodSchedulingHintsStatus describes where resources for the Pod can be allocated.",
         "properties": {
           "resourceClaims": {
             "description": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
@@ -1893,10 +1893,10 @@
         ]
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulings": {
+    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulinghints": {
       "delete": {
-        "description": "delete collection of PodScheduling",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedPodScheduling",
+        "description": "delete collection of PodSchedulingHints",
+        "operationId": "deleteResourceV1alpha2CollectionNamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -2047,13 +2047,13 @@
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "get": {
-        "description": "list or watch objects of kind PodScheduling",
-        "operationId": "listResourceV1alpha2NamespacedPodScheduling",
+        "description": "list or watch objects of kind PodSchedulingHints",
+        "operationId": "listResourceV1alpha2NamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -2151,27 +2151,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               }
             },
@@ -2187,7 +2187,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
@@ -2213,8 +2213,8 @@
         }
       ],
       "post": {
-        "description": "create a PodScheduling",
-        "operationId": "createResourceV1alpha2NamespacedPodScheduling",
+        "description": "create PodSchedulingHints",
+        "operationId": "createResourceV1alpha2NamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2248,7 +2248,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
               }
             }
           }
@@ -2258,17 +2258,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2278,17 +2278,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2298,17 +2298,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2324,15 +2324,15 @@
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulings/{name}": {
+    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulinghints/{name}": {
       "delete": {
-        "description": "delete a PodScheduling",
-        "operationId": "deleteResourceV1alpha2NamespacedPodScheduling",
+        "description": "delete PodSchedulingHints",
+        "operationId": "deleteResourceV1alpha2NamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2385,17 +2385,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2405,17 +2405,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2431,29 +2431,29 @@
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "get": {
-        "description": "read the specified PodScheduling",
-        "operationId": "readResourceV1alpha2NamespacedPodScheduling",
+        "description": "read the specified PodSchedulingHints",
+        "operationId": "readResourceV1alpha2NamespacedPodSchedulingHints",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2469,13 +2469,13 @@
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "parameters": [
         {
-          "description": "name of the PodScheduling",
+          "description": "name of the PodSchedulingHints",
           "in": "path",
           "name": "name",
           "required": true,
@@ -2505,8 +2505,8 @@
         }
       ],
       "patch": {
-        "description": "partially update the specified PodScheduling",
-        "operationId": "patchResourceV1alpha2NamespacedPodScheduling",
+        "description": "partially update the specified PodSchedulingHints",
+        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2574,17 +2574,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2594,17 +2594,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2620,13 +2620,13 @@
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "put": {
-        "description": "replace the specified PodScheduling",
-        "operationId": "replaceResourceV1alpha2NamespacedPodScheduling",
+        "description": "replace the specified PodSchedulingHints",
+        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingHints",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2660,7 +2660,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
               }
             }
           }
@@ -2670,17 +2670,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2690,17 +2690,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2716,31 +2716,31 @@
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulings/{name}/status": {
+    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulinghints/{name}/status": {
       "get": {
-        "description": "read status of the specified PodScheduling",
-        "operationId": "readResourceV1alpha2NamespacedPodSchedulingStatus",
+        "description": "read status of the specified PodSchedulingHints",
+        "operationId": "readResourceV1alpha2NamespacedPodSchedulingHintsStatus",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2756,13 +2756,13 @@
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "parameters": [
         {
-          "description": "name of the PodScheduling",
+          "description": "name of the PodSchedulingHints",
           "in": "path",
           "name": "name",
           "required": true,
@@ -2792,8 +2792,8 @@
         }
       ],
       "patch": {
-        "description": "partially update status of the specified PodScheduling",
-        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingStatus",
+        "description": "partially update status of the specified PodSchedulingHints",
+        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingHintsStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2861,17 +2861,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2881,17 +2881,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2907,13 +2907,13 @@
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
       "put": {
-        "description": "replace status of the specified PodScheduling",
-        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingStatus",
+        "description": "replace status of the specified PodSchedulingHints",
+        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingHintsStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2947,7 +2947,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
               }
             }
           }
@@ -2957,17 +2957,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -2977,17 +2977,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodScheduling"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHints"
                 }
               }
             },
@@ -3003,7 +3003,7 @@
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       }
@@ -4951,36 +4951,36 @@
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/podschedulings": {
+    "/apis/resource.k8s.io/v1alpha2/podschedulinghints": {
       "get": {
-        "description": "list or watch objects of kind PodScheduling",
-        "operationId": "listResourceV1alpha2PodSchedulingForAllNamespaces",
+        "description": "list or watch objects of kind PodSchedulingHints",
+        "operationId": "listResourceV1alpha2PodSchedulingHintsForAllNamespaces",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingList"
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingHintsList"
                 }
               }
             },
@@ -4996,7 +4996,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
@@ -6212,10 +6212,10 @@
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulings": {
+    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulinghints": {
       "get": {
-        "description": "watch individual changes to a list of PodScheduling. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingList",
+        "description": "watch individual changes to a list of PodSchedulingHints. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingHintsList",
         "responses": {
           "200": {
             "content": {
@@ -6257,7 +6257,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
@@ -6373,10 +6373,10 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulings/{name}": {
+    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulinghints/{name}": {
       "get": {
-        "description": "watch changes to an object of kind PodScheduling. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedPodScheduling",
+        "description": "watch changes to an object of kind PodSchedulingHints. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingHints",
         "responses": {
           "200": {
             "content": {
@@ -6418,7 +6418,7 @@
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },
@@ -6469,7 +6469,7 @@
           }
         },
         {
-          "description": "name of the PodScheduling",
+          "description": "name of the PodSchedulingHints",
           "in": "path",
           "name": "name",
           "required": true,
@@ -7208,10 +7208,10 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/podschedulings": {
+    "/apis/resource.k8s.io/v1alpha2/watch/podschedulinghints": {
       "get": {
-        "description": "watch individual changes to a list of PodScheduling. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2PodSchedulingListForAllNamespaces",
+        "description": "watch individual changes to a list of PodSchedulingHints. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchResourceV1alpha2PodSchedulingHintsListForAllNamespaces",
         "responses": {
           "200": {
             "content": {
@@ -7253,7 +7253,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
-          "kind": "PodScheduling",
+          "kind": "PodSchedulingHints",
           "version": "v1alpha2"
         }
       },

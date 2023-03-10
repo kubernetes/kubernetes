@@ -50,43 +50,43 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodScheduling)(nil), (*resource.PodScheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_PodScheduling_To_resource_PodScheduling(a.(*v1alpha2.PodScheduling), b.(*resource.PodScheduling), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingHints)(nil), (*resource.PodSchedulingHints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_PodSchedulingHints_To_resource_PodSchedulingHints(a.(*v1alpha2.PodSchedulingHints), b.(*resource.PodSchedulingHints), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resource.PodScheduling)(nil), (*v1alpha2.PodScheduling)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_PodScheduling_To_v1alpha2_PodScheduling(a.(*resource.PodScheduling), b.(*v1alpha2.PodScheduling), scope)
+	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingHints)(nil), (*v1alpha2.PodSchedulingHints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_PodSchedulingHints_To_v1alpha2_PodSchedulingHints(a.(*resource.PodSchedulingHints), b.(*v1alpha2.PodSchedulingHints), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingList)(nil), (*resource.PodSchedulingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_PodSchedulingList_To_resource_PodSchedulingList(a.(*v1alpha2.PodSchedulingList), b.(*resource.PodSchedulingList), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingHintsList)(nil), (*resource.PodSchedulingHintsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_PodSchedulingHintsList_To_resource_PodSchedulingHintsList(a.(*v1alpha2.PodSchedulingHintsList), b.(*resource.PodSchedulingHintsList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingList)(nil), (*v1alpha2.PodSchedulingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_PodSchedulingList_To_v1alpha2_PodSchedulingList(a.(*resource.PodSchedulingList), b.(*v1alpha2.PodSchedulingList), scope)
+	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingHintsList)(nil), (*v1alpha2.PodSchedulingHintsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_PodSchedulingHintsList_To_v1alpha2_PodSchedulingHintsList(a.(*resource.PodSchedulingHintsList), b.(*v1alpha2.PodSchedulingHintsList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingSpec)(nil), (*resource.PodSchedulingSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec(a.(*v1alpha2.PodSchedulingSpec), b.(*resource.PodSchedulingSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingHintsSpec)(nil), (*resource.PodSchedulingHintsSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec(a.(*v1alpha2.PodSchedulingHintsSpec), b.(*resource.PodSchedulingHintsSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingSpec)(nil), (*v1alpha2.PodSchedulingSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec(a.(*resource.PodSchedulingSpec), b.(*v1alpha2.PodSchedulingSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingHintsSpec)(nil), (*v1alpha2.PodSchedulingHintsSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec(a.(*resource.PodSchedulingHintsSpec), b.(*v1alpha2.PodSchedulingHintsSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingStatus)(nil), (*resource.PodSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus(a.(*v1alpha2.PodSchedulingStatus), b.(*resource.PodSchedulingStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingHintsStatus)(nil), (*resource.PodSchedulingHintsStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus(a.(*v1alpha2.PodSchedulingHintsStatus), b.(*resource.PodSchedulingHintsStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingStatus)(nil), (*v1alpha2.PodSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus(a.(*resource.PodSchedulingStatus), b.(*v1alpha2.PodSchedulingStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingHintsStatus)(nil), (*v1alpha2.PodSchedulingHintsStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus(a.(*resource.PodSchedulingHintsStatus), b.(*v1alpha2.PodSchedulingHintsStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -247,100 +247,100 @@ func Convert_resource_AllocationResult_To_v1alpha2_AllocationResult(in *resource
 	return autoConvert_resource_AllocationResult_To_v1alpha2_AllocationResult(in, out, s)
 }
 
-func autoConvert_v1alpha2_PodScheduling_To_resource_PodScheduling(in *v1alpha2.PodScheduling, out *resource.PodScheduling, s conversion.Scope) error {
+func autoConvert_v1alpha2_PodSchedulingHints_To_resource_PodSchedulingHints(in *v1alpha2.PodSchedulingHints, out *resource.PodSchedulingHints, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1alpha2_PodScheduling_To_resource_PodScheduling is an autogenerated conversion function.
-func Convert_v1alpha2_PodScheduling_To_resource_PodScheduling(in *v1alpha2.PodScheduling, out *resource.PodScheduling, s conversion.Scope) error {
-	return autoConvert_v1alpha2_PodScheduling_To_resource_PodScheduling(in, out, s)
+// Convert_v1alpha2_PodSchedulingHints_To_resource_PodSchedulingHints is an autogenerated conversion function.
+func Convert_v1alpha2_PodSchedulingHints_To_resource_PodSchedulingHints(in *v1alpha2.PodSchedulingHints, out *resource.PodSchedulingHints, s conversion.Scope) error {
+	return autoConvert_v1alpha2_PodSchedulingHints_To_resource_PodSchedulingHints(in, out, s)
 }
 
-func autoConvert_resource_PodScheduling_To_v1alpha2_PodScheduling(in *resource.PodScheduling, out *v1alpha2.PodScheduling, s conversion.Scope) error {
+func autoConvert_resource_PodSchedulingHints_To_v1alpha2_PodSchedulingHints(in *resource.PodSchedulingHints, out *v1alpha2.PodSchedulingHints, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_resource_PodScheduling_To_v1alpha2_PodScheduling is an autogenerated conversion function.
-func Convert_resource_PodScheduling_To_v1alpha2_PodScheduling(in *resource.PodScheduling, out *v1alpha2.PodScheduling, s conversion.Scope) error {
-	return autoConvert_resource_PodScheduling_To_v1alpha2_PodScheduling(in, out, s)
+// Convert_resource_PodSchedulingHints_To_v1alpha2_PodSchedulingHints is an autogenerated conversion function.
+func Convert_resource_PodSchedulingHints_To_v1alpha2_PodSchedulingHints(in *resource.PodSchedulingHints, out *v1alpha2.PodSchedulingHints, s conversion.Scope) error {
+	return autoConvert_resource_PodSchedulingHints_To_v1alpha2_PodSchedulingHints(in, out, s)
 }
 
-func autoConvert_v1alpha2_PodSchedulingList_To_resource_PodSchedulingList(in *v1alpha2.PodSchedulingList, out *resource.PodSchedulingList, s conversion.Scope) error {
+func autoConvert_v1alpha2_PodSchedulingHintsList_To_resource_PodSchedulingHintsList(in *v1alpha2.PodSchedulingHintsList, out *resource.PodSchedulingHintsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resource.PodScheduling)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]resource.PodSchedulingHints)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
-// Convert_v1alpha2_PodSchedulingList_To_resource_PodSchedulingList is an autogenerated conversion function.
-func Convert_v1alpha2_PodSchedulingList_To_resource_PodSchedulingList(in *v1alpha2.PodSchedulingList, out *resource.PodSchedulingList, s conversion.Scope) error {
-	return autoConvert_v1alpha2_PodSchedulingList_To_resource_PodSchedulingList(in, out, s)
+// Convert_v1alpha2_PodSchedulingHintsList_To_resource_PodSchedulingHintsList is an autogenerated conversion function.
+func Convert_v1alpha2_PodSchedulingHintsList_To_resource_PodSchedulingHintsList(in *v1alpha2.PodSchedulingHintsList, out *resource.PodSchedulingHintsList, s conversion.Scope) error {
+	return autoConvert_v1alpha2_PodSchedulingHintsList_To_resource_PodSchedulingHintsList(in, out, s)
 }
 
-func autoConvert_resource_PodSchedulingList_To_v1alpha2_PodSchedulingList(in *resource.PodSchedulingList, out *v1alpha2.PodSchedulingList, s conversion.Scope) error {
+func autoConvert_resource_PodSchedulingHintsList_To_v1alpha2_PodSchedulingHintsList(in *resource.PodSchedulingHintsList, out *v1alpha2.PodSchedulingHintsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha2.PodScheduling)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]v1alpha2.PodSchedulingHints)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
-// Convert_resource_PodSchedulingList_To_v1alpha2_PodSchedulingList is an autogenerated conversion function.
-func Convert_resource_PodSchedulingList_To_v1alpha2_PodSchedulingList(in *resource.PodSchedulingList, out *v1alpha2.PodSchedulingList, s conversion.Scope) error {
-	return autoConvert_resource_PodSchedulingList_To_v1alpha2_PodSchedulingList(in, out, s)
+// Convert_resource_PodSchedulingHintsList_To_v1alpha2_PodSchedulingHintsList is an autogenerated conversion function.
+func Convert_resource_PodSchedulingHintsList_To_v1alpha2_PodSchedulingHintsList(in *resource.PodSchedulingHintsList, out *v1alpha2.PodSchedulingHintsList, s conversion.Scope) error {
+	return autoConvert_resource_PodSchedulingHintsList_To_v1alpha2_PodSchedulingHintsList(in, out, s)
 }
 
-func autoConvert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec(in *v1alpha2.PodSchedulingSpec, out *resource.PodSchedulingSpec, s conversion.Scope) error {
+func autoConvert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec(in *v1alpha2.PodSchedulingHintsSpec, out *resource.PodSchedulingHintsSpec, s conversion.Scope) error {
 	out.SelectedNode = in.SelectedNode
 	out.PotentialNodes = *(*[]string)(unsafe.Pointer(&in.PotentialNodes))
 	return nil
 }
 
-// Convert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec is an autogenerated conversion function.
-func Convert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec(in *v1alpha2.PodSchedulingSpec, out *resource.PodSchedulingSpec, s conversion.Scope) error {
-	return autoConvert_v1alpha2_PodSchedulingSpec_To_resource_PodSchedulingSpec(in, out, s)
+// Convert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec is an autogenerated conversion function.
+func Convert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec(in *v1alpha2.PodSchedulingHintsSpec, out *resource.PodSchedulingHintsSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha2_PodSchedulingHintsSpec_To_resource_PodSchedulingHintsSpec(in, out, s)
 }
 
-func autoConvert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec(in *resource.PodSchedulingSpec, out *v1alpha2.PodSchedulingSpec, s conversion.Scope) error {
+func autoConvert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec(in *resource.PodSchedulingHintsSpec, out *v1alpha2.PodSchedulingHintsSpec, s conversion.Scope) error {
 	out.SelectedNode = in.SelectedNode
 	out.PotentialNodes = *(*[]string)(unsafe.Pointer(&in.PotentialNodes))
 	return nil
 }
 
-// Convert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec is an autogenerated conversion function.
-func Convert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec(in *resource.PodSchedulingSpec, out *v1alpha2.PodSchedulingSpec, s conversion.Scope) error {
-	return autoConvert_resource_PodSchedulingSpec_To_v1alpha2_PodSchedulingSpec(in, out, s)
+// Convert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec is an autogenerated conversion function.
+func Convert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec(in *resource.PodSchedulingHintsSpec, out *v1alpha2.PodSchedulingHintsSpec, s conversion.Scope) error {
+	return autoConvert_resource_PodSchedulingHintsSpec_To_v1alpha2_PodSchedulingHintsSpec(in, out, s)
 }
 
-func autoConvert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus(in *v1alpha2.PodSchedulingStatus, out *resource.PodSchedulingStatus, s conversion.Scope) error {
+func autoConvert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus(in *v1alpha2.PodSchedulingHintsStatus, out *resource.PodSchedulingHintsStatus, s conversion.Scope) error {
 	out.ResourceClaims = *(*[]resource.ResourceClaimSchedulingStatus)(unsafe.Pointer(&in.ResourceClaims))
 	return nil
 }
 
-// Convert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus is an autogenerated conversion function.
-func Convert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus(in *v1alpha2.PodSchedulingStatus, out *resource.PodSchedulingStatus, s conversion.Scope) error {
-	return autoConvert_v1alpha2_PodSchedulingStatus_To_resource_PodSchedulingStatus(in, out, s)
+// Convert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus is an autogenerated conversion function.
+func Convert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus(in *v1alpha2.PodSchedulingHintsStatus, out *resource.PodSchedulingHintsStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha2_PodSchedulingHintsStatus_To_resource_PodSchedulingHintsStatus(in, out, s)
 }
 
-func autoConvert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus(in *resource.PodSchedulingStatus, out *v1alpha2.PodSchedulingStatus, s conversion.Scope) error {
+func autoConvert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus(in *resource.PodSchedulingHintsStatus, out *v1alpha2.PodSchedulingHintsStatus, s conversion.Scope) error {
 	out.ResourceClaims = *(*[]v1alpha2.ResourceClaimSchedulingStatus)(unsafe.Pointer(&in.ResourceClaims))
 	return nil
 }
 
-// Convert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus is an autogenerated conversion function.
-func Convert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus(in *resource.PodSchedulingStatus, out *v1alpha2.PodSchedulingStatus, s conversion.Scope) error {
-	return autoConvert_resource_PodSchedulingStatus_To_v1alpha2_PodSchedulingStatus(in, out, s)
+// Convert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus is an autogenerated conversion function.
+func Convert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus(in *resource.PodSchedulingHintsStatus, out *v1alpha2.PodSchedulingHintsStatus, s conversion.Scope) error {
+	return autoConvert_resource_PodSchedulingHintsStatus_To_v1alpha2_PodSchedulingHintsStatus(in, out, s)
 }
 
 func autoConvert_v1alpha2_ResourceClaim_To_resource_ResourceClaim(in *v1alpha2.ResourceClaim, out *resource.ResourceClaim, s conversion.Scope) error {

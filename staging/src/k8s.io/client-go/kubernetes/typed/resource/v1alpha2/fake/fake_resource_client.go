@@ -28,8 +28,8 @@ type FakeResourceV1alpha2 struct {
 	*testing.Fake
 }
 
-func (c *FakeResourceV1alpha2) PodSchedulings(namespace string) v1alpha2.PodSchedulingInterface {
-	return &FakePodSchedulings{c, namespace}
+func (c *FakeResourceV1alpha2) PodSchedulingHints(namespace string) v1alpha2.PodSchedulingHintsInterface {
+	return &FakePodSchedulingHints{c, namespace}
 }
 
 func (c *FakeResourceV1alpha2) ResourceClaims(namespace string) v1alpha2.ResourceClaimInterface {

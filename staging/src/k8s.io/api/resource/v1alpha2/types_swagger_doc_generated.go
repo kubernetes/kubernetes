@@ -38,44 +38,44 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
-var map_PodScheduling = map[string]string{
-	"":         "PodScheduling objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+var map_PodSchedulingHints = map[string]string{
+	"":         "PodSchedulingHints objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec describes where resources for the Pod are needed.",
 	"status":   "Status describes where resources for the Pod can be allocated.",
 }
 
-func (PodScheduling) SwaggerDoc() map[string]string {
-	return map_PodScheduling
+func (PodSchedulingHints) SwaggerDoc() map[string]string {
+	return map_PodSchedulingHints
 }
 
-var map_PodSchedulingList = map[string]string{
-	"":         "PodSchedulingList is a collection of Pod scheduling objects.",
+var map_PodSchedulingHintsList = map[string]string{
+	"":         "PodSchedulingHintsList is a collection of Pod scheduling objects.",
 	"metadata": "Standard list metadata",
-	"items":    "Items is the list of PodScheduling objects.",
+	"items":    "Items is the list of PodSchedulingHints objects.",
 }
 
-func (PodSchedulingList) SwaggerDoc() map[string]string {
-	return map_PodSchedulingList
+func (PodSchedulingHintsList) SwaggerDoc() map[string]string {
+	return map_PodSchedulingHintsList
 }
 
-var map_PodSchedulingSpec = map[string]string{
-	"":               "PodSchedulingSpec describes where resources for the Pod are needed.",
+var map_PodSchedulingHintsSpec = map[string]string{
+	"":               "PodSchedulingHintsSpec describes where resources for the Pod are needed.",
 	"selectedNode":   "SelectedNode is the node for which allocation of ResourceClaims that are referenced by the Pod and that use \"WaitForFirstConsumer\" allocation is to be attempted.",
 	"potentialNodes": "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
 }
 
-func (PodSchedulingSpec) SwaggerDoc() map[string]string {
-	return map_PodSchedulingSpec
+func (PodSchedulingHintsSpec) SwaggerDoc() map[string]string {
+	return map_PodSchedulingHintsSpec
 }
 
-var map_PodSchedulingStatus = map[string]string{
-	"":               "PodSchedulingStatus describes where resources for the Pod can be allocated.",
+var map_PodSchedulingHintsStatus = map[string]string{
+	"":               "PodSchedulingHintsStatus describes where resources for the Pod can be allocated.",
 	"resourceClaims": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
 }
 
-func (PodSchedulingStatus) SwaggerDoc() map[string]string {
-	return map_PodSchedulingStatus
+func (PodSchedulingHintsStatus) SwaggerDoc() map[string]string {
+	return map_PodSchedulingHintsStatus
 }
 
 var map_ResourceClaim = map[string]string{

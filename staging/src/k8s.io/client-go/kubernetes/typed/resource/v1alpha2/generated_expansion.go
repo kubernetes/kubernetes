@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha2
 
-type PodSchedulingExpansion interface{}
+type PodSchedulingHintsExpansion interface{}
 
 type ResourceClaimExpansion interface{}
 

@@ -840,10 +840,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha1.ResourceClassList":                                                  schema_k8sio_api_resource_v1alpha1_ResourceClassList(ref),
 		"k8s.io/api/resource/v1alpha1.ResourceClassParametersReference":                                   schema_k8sio_api_resource_v1alpha1_ResourceClassParametersReference(ref),
 		"k8s.io/api/resource/v1alpha2.AllocationResult":                                                   schema_k8sio_api_resource_v1alpha2_AllocationResult(ref),
-		"k8s.io/api/resource/v1alpha2.PodScheduling":                                                      schema_k8sio_api_resource_v1alpha2_PodScheduling(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingList":                                                  schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingSpec":                                                  schema_k8sio_api_resource_v1alpha2_PodSchedulingSpec(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingStatus":                                                schema_k8sio_api_resource_v1alpha2_PodSchedulingStatus(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingHints":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingHints(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingHintsList":                                             schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsList(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingHintsSpec":                                             schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsSpec(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingHintsStatus":                                           schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsStatus(ref),
 		"k8s.io/api/resource/v1alpha2.ResourceClaim":                                                      schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref),
 		"k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference":                                     schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref),
 		"k8s.io/api/resource/v1alpha2.ResourceClaimList":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref),
@@ -41852,11 +41852,11 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodScheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingHints(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodScheduling objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Description: "PodSchedulingHints objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -41884,14 +41884,14 @@ func schema_k8sio_api_resource_v1alpha2_PodScheduling(ref common.ReferenceCallba
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec describes where resources for the Pod are needed.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingSpec"),
+							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingHintsSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status describes where resources for the Pod can be allocated.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingStatus"),
+							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingHintsStatus"),
 						},
 					},
 				},
@@ -41899,15 +41899,15 @@ func schema_k8sio_api_resource_v1alpha2_PodScheduling(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.PodSchedulingSpec", "k8s.io/api/resource/v1alpha2.PodSchedulingStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha2.PodSchedulingHintsSpec", "k8s.io/api/resource/v1alpha2.PodSchedulingHintsStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodSchedulingList is a collection of Pod scheduling objects.",
+				Description: "PodSchedulingHintsList is a collection of Pod scheduling objects.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -41933,13 +41933,13 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref common.ReferenceCa
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of PodScheduling objects.",
+							Description: "Items is the list of PodSchedulingHints objects.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.PodScheduling"),
+										Ref:     ref("k8s.io/api/resource/v1alpha2.PodSchedulingHints"),
 									},
 								},
 							},
@@ -41950,15 +41950,15 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.PodScheduling", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha2.PodSchedulingHints", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodSchedulingSpec describes where resources for the Pod are needed.",
+				Description: "PodSchedulingHintsSpec describes where resources for the Pod are needed.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"selectedNode": {
@@ -41994,11 +41994,11 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingSpec(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingHintsStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodSchedulingStatus describes where resources for the Pod can be allocated.",
+				Description: "PodSchedulingHintsStatus describes where resources for the Pod can be allocated.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"resourceClaims": {
