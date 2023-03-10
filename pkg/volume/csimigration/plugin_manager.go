@@ -67,7 +67,7 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 	case csilibplugins.AzureFileInTreePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginAzureFileUnregister)
 	case csilibplugins.AzureDiskInTreePluginName:
-		return true
+		return pm.featureGate.Enabled(features.InTreePluginAzureDiskUnregister)
 	case csilibplugins.CinderInTreePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginOpenStackUnregister)
 	case csilibplugins.VSphereInTreePluginName:

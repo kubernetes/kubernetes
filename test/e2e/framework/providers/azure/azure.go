@@ -63,6 +63,28 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 	return errors.New("not implemented yet")
 }
 
+// CreatePD creates a persistent volume
+func (p *Provider) CreatePD(zone string) (string, error) {
+	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+
+	volumeOptions := &azure.ManagedDiskOptions{
+		DiskName:           pdName,
+		StorageAccountType: compute.StandardLRS,
+		ResourceGroup:      "",
+		PVCName:            pdName,
+		SizeGB:             1,
+		Tags:               nil,
+		DiskIOPSReadWrite:  "",
+		DiskMBpsReadWrite:  "",
+	}
+
+	// do not use blank zone definition
+	if len(zone) > 0 {
+		volumeOptions.AvailabilityZone = zone
+	}
+	return p.azureCloud.CreateManagedDisk(volumeOptions)
+}
+
 // CreateShare creates a share and return its account name and key.
 func (p *Provider) CreateShare() (string, string, string, error) {
 	accountOptions := &azure.AccountOptions{
@@ -94,6 +116,15 @@ func (p *Provider) DeleteShare(accountName, shareName string) error {
 		framework.Logf("failed to delete Azure File share %q: %v", shareName, err)
 	}
 	return err
+}
+
+// DeletePD deletes a persistent volume
+func (p *Provider) DeletePD(pdName string) error {
+	if err := p.azureCloud.DeleteManagedDisk(pdName); err != nil {
+		framework.Logf("failed to delete Azure volume %q: %v", pdName, err)
+		return err
+	}
+	return nil
 }
 
 // EnableAndDisableInternalLB returns functions for both enabling and disabling internal Load Balancer
