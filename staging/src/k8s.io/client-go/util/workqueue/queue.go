@@ -33,32 +33,59 @@ type Interface interface {
 	ShuttingDown() bool
 }
 
+// QueueConfig specifies optional configurations to customize an Interface.
+type QueueConfig struct {
+	// Name for the queue. If unnamed, the metrics will not be registered.
+	Name string
+
+	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
+	// instead of the global provider.
+	MetricsProvider MetricsProvider
+
+	// Clock ability to inject real or fake clock for testing purposes.
+	Clock clock.WithTicker
+}
+
 // New constructs a new work queue (see the package comment).
-func New(opts ...QueueOption) *Type {
-	return NewNamed("", opts...)
+func New() *Type {
+	return NewWithConfig(QueueConfig{
+		Name: "",
+	})
 }
 
-func NewNamed(name string, opts ...QueueOption) *Type {
-	return newNamedQueueWithCustomClock(clock.RealClock{}, name, defaultUnfinishedWorkUpdatePeriod, opts...)
+// NewWithConfig constructs a new workqueue with ability to
+// customize different properties.
+func NewWithConfig(config QueueConfig) *Type {
+	return newQueueWithConfig(config, defaultUnfinishedWorkUpdatePeriod)
 }
 
-// newNamedQueueWithCustomClock constructs a new named workqueue
-// with ability to inject real or fake clock for testing purposes
-func newNamedQueueWithCustomClock(clock clock.WithTicker, name string, updatePeriod time.Duration, opts ...QueueOption) *Type {
-	config := NewConfig(opts...)
+// NewNamed creates a new named queue.
+// Deprecated: Use NewWithConfig instead.
+func NewNamed(name string) *Type {
+	return NewWithConfig(QueueConfig{
+		Name: name,
+	})
+}
 
+// newQueueWithConfig constructs a new named workqueue
+// with the ability to customize different properties for testing purposes
+func newQueueWithConfig(config QueueConfig, updatePeriod time.Duration) *Type {
 	var metricsFactory *queueMetricsFactory
-	if config.metricsProvider != nil {
+	if config.MetricsProvider != nil {
 		metricsFactory = &queueMetricsFactory{
-			metricsProvider: config.metricsProvider,
+			metricsProvider: config.MetricsProvider,
 		}
 	} else {
 		metricsFactory = &globalMetricsFactory
 	}
 
+	if config.Clock == nil {
+		config.Clock = clock.RealClock{}
+	}
+
 	return newQueue(
-		clock,
-		metricsFactory.newQueueMetrics(name, clock),
+		config.Clock,
+		metricsFactory.newQueueMetrics(config.Name, config.Clock),
 		updatePeriod,
 	)
 }

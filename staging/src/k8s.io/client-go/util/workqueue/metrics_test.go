@@ -171,7 +171,12 @@ func TestMetrics(t *testing.T) {
 	mp := testMetricsProvider{}
 	t0 := time.Unix(0, 0)
 	c := testingclock.NewFakeClock(t0)
-	q := newNamedQueueWithCustomClock(c, "test", time.Millisecond, WithMetricsProvider(&mp))
+	config := QueueConfig{
+		Name:            "test",
+		Clock:           c,
+		MetricsProvider: &mp,
+	}
+	q := newQueueWithConfig(config, time.Millisecond)
 	defer q.ShutDown()
 	for !c.HasWaiters() {
 		// Wait for the go routine to call NewTicker()
