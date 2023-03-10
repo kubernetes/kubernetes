@@ -284,8 +284,6 @@ func New(client clientset.Interface,
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 
-	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewPodNominator(podLister)
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
@@ -295,7 +293,6 @@ func New(client clientset.Interface,
 		frameworkruntime.WithKubeConfig(options.kubeConfig),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
@@ -318,11 +315,15 @@ func New(client clientset.Interface,
 		informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
-		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithPodLister(podLister),
 		internalqueue.WithClusterEventMap(clusterEventMap),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 	)
+
+	for _, fwk := range profiles {
+		fwk.SetPodNominator(podQueue)
+	}
 
 	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
 

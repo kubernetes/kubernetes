@@ -608,6 +608,9 @@ type Framework interface {
 
 	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
 	PercentageOfNodesToScore() *int32
+
+	// SetPodNominator sets the PodNominator
+	SetPodNominator(nominator PodNominator)
 }
 
 // Handle provides data and some tools that plugins can use. It is
