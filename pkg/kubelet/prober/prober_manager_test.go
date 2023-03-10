@@ -403,11 +403,11 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 		},
 	}
 
-	restartPolicy := func(isSidecar bool) *v1.RestartPolicy {
+	containerRestartPolicy := func(isSidecar bool) *v1.ContainerRestartPolicy {
 		if !isSidecar {
 			return nil
 		}
-		restartPolicy := v1.RestartPolicyAlways
+		restartPolicy := v1.ContainerRestartPolicyAlways
 		return &restartPolicy
 	}
 
@@ -429,15 +429,15 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							Name:          notStarted.Name,
-							RestartPolicy: restartPolicy(tc.sidecarContainers),
+							RestartPolicy: containerRestartPolicy(tc.sidecarContainers),
 						},
 						{
 							Name:          started.Name,
-							RestartPolicy: restartPolicy(tc.sidecarContainers),
+							RestartPolicy: containerRestartPolicy(tc.sidecarContainers),
 						},
 						{
 							Name:          terminated.Name,
-							RestartPolicy: restartPolicy(tc.sidecarContainers),
+							RestartPolicy: containerRestartPolicy(tc.sidecarContainers),
 						},
 					},
 				},

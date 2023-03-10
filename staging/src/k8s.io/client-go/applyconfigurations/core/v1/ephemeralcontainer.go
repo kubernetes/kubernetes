@@ -142,7 +142,7 @@ func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*Conta
 // WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.RestartPolicy) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerApplyConfiguration {
 	b.RestartPolicy = &value
 	return b
 }
