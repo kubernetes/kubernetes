@@ -27,10 +27,8 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/armon/go-socks5"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -42,13 +40,10 @@ type serverHandlerConfig struct {
 	statusCode       int
 	connectionHeader string
 	upgradeHeader    string
-	delay            time.Duration
 }
 
 func serverHandler(t *testing.T, config serverHandlerConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		time.Sleep(config.delay)
-
 		if config.shouldError {
 			if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
 				t.Fatalf("expected connection=upgrade header, got '%s", a)
@@ -122,7 +117,6 @@ func localhostCertPool(t *testing.T) *x509.CertPool {
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripAndNewConnection(t *testing.T) {
 	localhostPool := localhostCertPool(t)
-	timeout := 10 * time.Millisecond
 
 	testCases := map[string]struct {
 		serverFunc             func(http.Handler) *httptest.Server
@@ -132,7 +126,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		serverConnectionHeader string
 		serverUpgradeHeader    string
 		serverStatusCode       int
-		delay                  time.Duration
 		shouldError            bool
 	}{
 		"no headers": {
@@ -161,14 +154,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			serverConnectionHeader: "Upgrade",
 			serverUpgradeHeader:    "SPDY/3.1",
 			serverStatusCode:       http.StatusForbidden,
-			shouldError:            true,
-		},
-		"timeout": {
-			serverFunc:             httptest.NewServer,
-			serverConnectionHeader: "Upgrade",
-			serverUpgradeHeader:    "SPDY/3.1",
-			serverStatusCode:       http.StatusSwitchingProtocols,
-			delay:                  2 * timeout,
 			shouldError:            true,
 		},
 		"http": {
@@ -324,7 +309,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					statusCode:       testCase.serverStatusCode,
 					connectionHeader: testCase.serverConnectionHeader,
 					upgradeHeader:    testCase.serverUpgradeHeader,
-					delay:            testCase.delay,
 				},
 			))
 			defer server.Close()
@@ -334,11 +318,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating request: %s", err)
 			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			req, err := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
+			req, err := http.NewRequest("GET", server.URL, nil)
 			if err != nil {
 				t.Fatalf("error creating request: %s", err)
 			}
@@ -725,9 +705,30 @@ func TestRoundTripPassesContextToDialer(t *testing.T) {
 			require.NoError(t, err)
 			spdyTransport := NewRoundTripper(&tls.Config{})
 			_, err = spdyTransport.Dial(req)
-			assert.EqualError(t, err, "dial tcp 127.0.0.1:1233: operation was canceled")
+			require.ErrorIs(t, err, context.Canceled)
 		})
 	}
+}
+
+func TestRoundTripReadResponseIsCancelable(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server := httptest.NewServer(func() http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			cancel()
+		}
+	}())
+	defer server.Close()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
+	require.NoError(t, err)
+
+	spdyTransport := NewRoundTripper(nil)
+	client := &http.Client{Transport: spdyTransport}
+
+	_, err = client.Do(req)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
