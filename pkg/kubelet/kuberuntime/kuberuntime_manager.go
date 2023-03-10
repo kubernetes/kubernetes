@@ -849,7 +849,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	// Check initialization progress.
+	// Check initialization progress or find any sidecar container that needs to
+	// run after initialization is done.
 	initLastStatus, next, done := m.findNextInitContainerToRun(pod, podStatus)
 	if !done {
 		if next != nil {
