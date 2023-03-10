@@ -2,7 +2,7 @@
 # When using it instead of a functional one, scheduling a pod leads to:
 #   Warning  FailedScheduling  16s   default-scheduler  0/1 nodes are available: 1 excluded via potential node filter in resource class.
 
-apiVersion: resource.k8s.io/v1alpha1
+apiVersion: resource.k8s.io/v1alpha2
 kind: ResourceClass
 metadata:
   name: example

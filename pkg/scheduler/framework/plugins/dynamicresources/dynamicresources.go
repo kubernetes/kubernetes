@@ -24,13 +24,13 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
-	resourcev1alpha1listers "k8s.io/client-go/listers/resource/v1alpha1"
+	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -58,7 +58,7 @@ type stateData struct {
 	// the plugin itself successfully does an Update.
 	//
 	// Empty if the Pod has no claims.
-	claims []*resourcev1alpha1.ResourceClaim
+	claims []*resourcev1alpha2.ResourceClaim
 
 	// The AvailableOnNodes node filters of the claims converted from the
 	// v1 API to nodeaffinity.NodeSelector by PreFilter for repeated
@@ -81,7 +81,7 @@ type stateData struct {
 	// where it might get shared by different plugins. But in practice,
 	// it is currently only used by dynamic provisioning and thus
 	// managed entirely here.
-	podScheduling *resourcev1alpha1.PodScheduling
+	podScheduling *resourcev1alpha2.PodScheduling
 
 	// podSchedulingDirty is true if the current copy was locally modified.
 	podSchedulingDirty bool
@@ -93,10 +93,10 @@ func (d *stateData) Clone() framework.StateData {
 	return d
 }
 
-func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.Interface, index int, claim *resourcev1alpha1.ResourceClaim) error {
+func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.Interface, index int, claim *resourcev1alpha2.ResourceClaim) error {
 	// TODO (#113700): replace with patch operation. Beware that patching must only succeed if the
 	// object has not been modified in parallel by someone else.
-	claim, err := clientset.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+	claim, err := clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 	// TODO: metric for update results, with the operation ("set selected
 	// node", "set PotentialNodes", etc.) as one dimension.
 	if err != nil {
@@ -115,7 +115,7 @@ func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.
 // initializePodScheduling can be called concurrently. It returns an existing PodScheduling
 // object if there is one already, retrieves one if not, or as a last resort creates
 // one from scratch.
-func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, podSchedulingLister resourcev1alpha1listers.PodSchedulingLister) (*resourcev1alpha1.PodScheduling, error) {
+func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, podSchedulingLister resourcev1alpha2listers.PodSchedulingLister) (*resourcev1alpha2.PodScheduling, error) {
 	// TODO (#113701): check if this mutex locking can be avoided by calling initializePodScheduling during PreFilter.
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -128,7 +128,7 @@ func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, po
 	switch {
 	case apierrors.IsNotFound(err):
 		controller := true
-		podScheduling = &resourcev1alpha1.PodScheduling{
+		podScheduling = &resourcev1alpha2.PodScheduling{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
@@ -157,7 +157,7 @@ func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, po
 }
 
 // publishPodScheduling creates or updates the PodScheduling object.
-func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernetes.Interface, podScheduling *resourcev1alpha1.PodScheduling) error {
+func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernetes.Interface, podScheduling *resourcev1alpha2.PodScheduling) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -174,10 +174,10 @@ func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernet
 		logger.V(5).Info(msg, "podscheduling", klog.KObj(podScheduling))
 	}
 	if podScheduling.UID == "" {
-		podScheduling, err = clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Create(ctx, podScheduling, metav1.CreateOptions{})
+		podScheduling, err = clientset.ResourceV1alpha2().PodSchedulings(podScheduling.Namespace).Create(ctx, podScheduling, metav1.CreateOptions{})
 	} else {
 		// TODO (#113700): patch here to avoid racing with drivers which update the status.
-		podScheduling, err = clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Update(ctx, podScheduling, metav1.UpdateOptions{})
+		podScheduling, err = clientset.ResourceV1alpha2().PodSchedulings(podScheduling.Namespace).Update(ctx, podScheduling, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernet
 }
 
 // storePodScheduling replaces the pod scheduling object in the state.
-func (d *stateData) storePodScheduling(podScheduling *resourcev1alpha1.PodScheduling) {
+func (d *stateData) storePodScheduling(podScheduling *resourcev1alpha2.PodScheduling) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -196,7 +196,7 @@ func (d *stateData) storePodScheduling(podScheduling *resourcev1alpha1.PodSchedu
 	d.podSchedulingDirty = true
 }
 
-func statusForClaim(podScheduling *resourcev1alpha1.PodScheduling, podClaimName string) *resourcev1alpha1.ResourceClaimSchedulingStatus {
+func statusForClaim(podScheduling *resourcev1alpha2.PodScheduling, podClaimName string) *resourcev1alpha2.ResourceClaimSchedulingStatus {
 	for _, status := range podScheduling.Status.ResourceClaims {
 		if status.Name == podClaimName {
 			return &status
@@ -209,9 +209,9 @@ func statusForClaim(podScheduling *resourcev1alpha1.PodScheduling, podClaimName 
 type dynamicResources struct {
 	enabled             bool
 	clientset           kubernetes.Interface
-	claimLister         resourcev1alpha1listers.ResourceClaimLister
-	classLister         resourcev1alpha1listers.ResourceClassLister
-	podSchedulingLister resourcev1alpha1listers.PodSchedulingLister
+	claimLister         resourcev1alpha2listers.ResourceClaimLister
+	classLister         resourcev1alpha2listers.ResourceClassLister
+	podSchedulingLister resourcev1alpha2listers.PodSchedulingLister
 }
 
 // New initializes a new plugin and returns it.
@@ -224,9 +224,9 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 	return &dynamicResources{
 		enabled:             true,
 		clientset:           fh.ClientSet(),
-		claimLister:         fh.SharedInformerFactory().Resource().V1alpha1().ResourceClaims().Lister(),
-		classLister:         fh.SharedInformerFactory().Resource().V1alpha1().ResourceClasses().Lister(),
-		podSchedulingLister: fh.SharedInformerFactory().Resource().V1alpha1().PodSchedulings().Lister(),
+		claimLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
+		classLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
+		podSchedulingLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulings().Lister(),
 	}, nil
 }
 
@@ -266,8 +266,8 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 }
 
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
-func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha1.ResourceClaim, error) {
-	claims := make([]*resourcev1alpha1.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
+func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
+	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &resource)
 		isEphemeral := resource.Source.ResourceClaimTemplateName != nil
@@ -329,7 +329,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 
 	s.availableOnNodes = make([]*nodeaffinity.NodeSelector, len(claims))
 	for index, claim := range claims {
-		if claim.Spec.AllocationMode == resourcev1alpha1.AllocationModeImmediate &&
+		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeImmediate &&
 			claim.Status.Allocation == nil {
 			// This will get resolved by the resource driver.
 			return nil, statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
@@ -414,7 +414,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		case claim.Status.DeallocationRequested:
 			// We shouldn't get here. PreFilter already checked this.
 			return statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-		case claim.Spec.AllocationMode == resourcev1alpha1.AllocationModeWaitForFirstConsumer:
+		case claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer:
 			// The ResourceClass might have a node filter. This is
 			// useful for trimming the initial set of potential
 			// nodes before we ask the driver(s) for information
@@ -468,7 +468,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			// delayed allocation. Claims with immediate allocation
 			// would just get allocated again for a random node,
 			// which is unlikely to help the pod.
-			if claim.Spec.AllocationMode == resourcev1alpha1.AllocationModeWaitForFirstConsumer {
+			if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
 				state.unavailableClaims.Insert(unavailableClaims...)
 			}
 		}
@@ -548,8 +548,8 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		logger.V(5).Info("remembering potential nodes", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
 		podScheduling = podScheduling.DeepCopy()
 		numNodes := len(nodes)
-		if numNodes > resourcev1alpha1.PodSchedulingNodeListMaxSize {
-			numNodes = resourcev1alpha1.PodSchedulingNodeListMaxSize
+		if numNodes > resourcev1alpha2.PodSchedulingNodeListMaxSize {
+			numNodes = resourcev1alpha2.PodSchedulingNodeListMaxSize
 		}
 		podScheduling.Spec.PotentialNodes = make([]string, 0, numNodes)
 		if numNodes == len(nodes) {
@@ -567,7 +567,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 				nodeNames[node.Name] = struct{}{}
 			}
 			for nodeName := range nodeNames {
-				if len(podScheduling.Spec.PotentialNodes) >= resourcev1alpha1.PodSchedulingNodeListMaxSize {
+				if len(podScheduling.Spec.PotentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
 					break
 				}
 				podScheduling.Spec.PotentialNodes = append(podScheduling.Spec.PotentialNodes, nodeName)
@@ -627,13 +627,13 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			}
 			claim := claim.DeepCopy()
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-				resourcev1alpha1.ResourceClaimConsumerReference{
+				resourcev1alpha2.ResourceClaimConsumerReference{
 					Resource: "pods",
 					Name:     pod.Name,
 					UID:      pod.UID,
 				})
 			logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
-			_, err := pl.clientset.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			_, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 			// TODO: metric for update errors.
 			if err != nil {
 				return statusError(logger, err)
@@ -727,7 +727,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 			resourceclaim.IsReservedForPod(pod, claim) {
 			// Remove pod from ReservedFor.
 			claim := claim.DeepCopy()
-			reservedFor := make([]resourcev1alpha1.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor)-1)
+			reservedFor := make([]resourcev1alpha2.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor)-1)
 			for _, reserved := range claim.Status.ReservedFor {
 				// TODO: can UID be assumed to be unique all resources or do we also need to compare Group/Version/Resource?
 				if reserved.UID != pod.UID {
@@ -767,7 +767,7 @@ func (pl *dynamicResources) PostBind(ctx context.Context, cs *framework.CycleSta
 	// have it in our informer cache yet. Let's try to delete, just to be
 	// on the safe side.
 	logger := klog.FromContext(ctx)
-	err = pl.clientset.ResourceV1alpha1().PodSchedulings(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	err = pl.clientset.ResourceV1alpha2().PodSchedulings(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		logger.V(5).Info("no PodScheduling object to delete")

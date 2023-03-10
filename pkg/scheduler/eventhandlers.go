@@ -380,13 +380,13 @@ func addAllEventHandlers(
 			)
 		case framework.PodScheduling:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				_, _ = informerFactory.Resource().V1alpha1().PodSchedulings().Informer().AddEventHandler(
+				_, _ = informerFactory.Resource().V1alpha2().PodSchedulings().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.PodScheduling, "PodScheduling"),
 				)
 			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				_, _ = informerFactory.Resource().V1alpha1().ResourceClaims().Informer().AddEventHandler(
+				_, _ = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
 				)
 			}

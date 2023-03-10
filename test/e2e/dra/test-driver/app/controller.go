@@ -28,7 +28,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -47,11 +47,11 @@ type Resources struct {
 	AllocateWrapper AllocateWrapperType
 }
 
-type AllocateWrapperType func(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, claimParameters interface{},
-	class *resourcev1alpha1.ResourceClass, classParameters interface{}, selectedNode string,
-	handler func(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, claimParameters interface{},
-		class *resourcev1alpha1.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha1.AllocationResult, err error),
-) (result *resourcev1alpha1.AllocationResult, err error)
+type AllocateWrapperType func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
+	class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string,
+	handler func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
+		class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error),
+) (result *resourcev1alpha2.AllocationResult, err error)
 
 type ExampleController struct {
 	clientset  kubernetes.Interface
@@ -122,7 +122,7 @@ func (c *ExampleController) GetNumDeallocations() int64 {
 	return c.numDeallocations
 }
 
-func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourcev1alpha1.ResourceClass) (interface{}, error) {
+func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error) {
 	if class.ParametersRef != nil {
 		if class.ParametersRef.APIGroup != "" ||
 			class.ParametersRef.Kind != "ConfigMap" {
@@ -133,7 +133,7 @@ func (c *ExampleController) GetClassParameters(ctx context.Context, class *resou
 	return nil, nil
 }
 
-func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, class *resourcev1alpha1.ResourceClass, classParameters interface{}) (interface{}, error) {
+func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error) {
 	if claim.Spec.ParametersRef != nil {
 		if claim.Spec.ParametersRef.APIGroup != "" ||
 			claim.Spec.ParametersRef.Kind != "ConfigMap" {
@@ -152,7 +152,7 @@ func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, nam
 	return configMap.Data, nil
 }
 
-func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, claimParameters interface{}, class *resourcev1alpha1.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha1.AllocationResult, err error) {
+func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
 	if c.resources.AllocateWrapper != nil {
 		return c.resources.AllocateWrapper(ctx, claim, claimParameters, class, classParameters, selectedNode, c.allocate)
 	}
@@ -160,7 +160,7 @@ func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha
 }
 
 // allocate simply copies parameters as JSON map into ResourceHandle.
-func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha1.ResourceClaim, claimParameters interface{}, class *resourcev1alpha1.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha1.AllocationResult, err error) {
+func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
 		logger.V(3).Info("done", "result", result, "err", err)
@@ -210,7 +210,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 		}
 	}
 
-	allocation := &resourcev1alpha1.AllocationResult{
+	allocation := &resourcev1alpha2.AllocationResult{
 		Shareable: c.resources.Shareable,
 	}
 	p := parameters{
@@ -252,7 +252,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 	return allocation, nil
 }
 
-func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alpha1.ResourceClaim) error {
+func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Deallocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

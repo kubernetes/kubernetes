@@ -91,7 +91,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				}
 
 				// Query claim object from the API server
-				resourceClaim, err := m.kubeClient.ResourceV1alpha1().ResourceClaims(pod.Namespace).Get(
+				resourceClaim, err := m.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Get(
 					context.TODO(),
 					claimName,
 					metav1.GetOptions{})

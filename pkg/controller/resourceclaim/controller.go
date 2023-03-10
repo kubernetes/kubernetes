@@ -23,18 +23,18 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1informers "k8s.io/client-go/informers/core/v1"
-	resourcev1alpha1informers "k8s.io/client-go/informers/resource/v1alpha1"
+	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	resourcev1alpha1listers "k8s.io/client-go/listers/resource/v1alpha1"
+	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -60,7 +60,7 @@ type Controller struct {
 	// claimLister is the shared ResourceClaim lister used to fetch and store ResourceClaim
 	// objects from the API server. It is shared with other controllers and
 	// therefore the ResourceClaim objects in its store should be treated as immutable.
-	claimLister  resourcev1alpha1listers.ResourceClaimLister
+	claimLister  resourcev1alpha2listers.ResourceClaimLister
 	claimsSynced cache.InformerSynced
 
 	// podLister is the shared Pod lister used to fetch Pod
@@ -73,7 +73,7 @@ type Controller struct {
 	// fetch template objects from the API server. It is shared with other
 	// controllers and therefore the objects in its store should be treated
 	// as immutable.
-	templateLister  resourcev1alpha1listers.ResourceClaimTemplateLister
+	templateLister  resourcev1alpha2listers.ResourceClaimTemplateLister
 	templatesSynced cache.InformerSynced
 
 	// podIndexer has the common PodResourceClaim indexer indexer installed To
@@ -100,8 +100,8 @@ const (
 func NewController(
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
-	claimInformer resourcev1alpha1informers.ResourceClaimInformer,
-	templateInformer resourcev1alpha1informers.ResourceClaimTemplateInformer) (*Controller, error) {
+	claimInformer resourcev1alpha2informers.ResourceClaimInformer,
+	templateInformer resourcev1alpha2informers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
 		kubeClient:      kubeClient,
@@ -190,7 +190,7 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 }
 
 func (ec *Controller) onResourceClaimAddOrUpdate(obj interface{}) {
-	claim, ok := obj.(*resourcev1alpha1.ResourceClaim)
+	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 	if !ok {
 		return
 	}
@@ -202,7 +202,7 @@ func (ec *Controller) onResourceClaimAddOrUpdate(obj interface{}) {
 }
 
 func (ec *Controller) onResourceClaimDelete(obj interface{}) {
-	claim, ok := obj.(*resourcev1alpha1.ResourceClaim)
+	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 	if !ok {
 		return
 	}
@@ -356,7 +356,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 
 	// Create the ResourceClaim with pod as owner.
 	isTrue := true
-	claim = &resourcev1alpha1.ResourceClaim{
+	claim = &resourcev1alpha2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: claimName,
 			OwnerReferences: []metav1.OwnerReference{
@@ -375,7 +375,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 		Spec: template.Spec.Spec,
 	}
 	metrics.ResourceClaimCreateAttempts.Inc()
-	_, err = ec.kubeClient.ResourceV1alpha1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+	_, err = ec.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {
 		metrics.ResourceClaimCreateFailures.Inc()
 		return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
@@ -396,7 +396,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 	}
 
 	// Check if the ReservedFor entries are all still valid.
-	valid := make([]resourcev1alpha1.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor))
+	valid := make([]resourcev1alpha2.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor))
 	for _, reservedFor := range claim.Status.ReservedFor {
 		if reservedFor.APIGroup == "" &&
 			reservedFor.Resource == "pods" {
@@ -455,7 +455,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// TODO (#113700): patch
 		claim := claim.DeepCopy()
 		claim.Status.ReservedFor = valid
-		_, err := ec.kubeClient.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
