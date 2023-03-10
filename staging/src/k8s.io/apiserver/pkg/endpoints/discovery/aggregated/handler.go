@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 
 	"sync/atomic"
 
@@ -72,6 +73,8 @@ type resourceDiscoveryManager struct {
 	// cache is an atomic pointer to avoid the use of locks
 	cache atomic.Pointer[cachedGroupList]
 
+	serveHTTPFunc http.HandlerFunc
+
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
 	lock              sync.RWMutex
@@ -84,13 +87,26 @@ type priorityInfo struct {
 	VersionPriority      int
 }
 
-func NewResourceManager() ResourceManager {
+func NewResourceManager(path string) ResourceManager {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	return &resourceDiscoveryManager{serializer: codecs, versionPriorities: make(map[metav1.GroupVersion]priorityInfo)}
+	rdm := &resourceDiscoveryManager{
+		serializer:        codecs,
+		versionPriorities: make(map[metav1.GroupVersion]priorityInfo),
+	}
+	rdm.serveHTTPFunc = metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ path,
+		/* scope = */ "",
+		/* component = */ metrics.APIServerComponent,
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		rdm.serveHTTP)
+	return rdm
 }
-
 func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVersion, groupPriorityMinimum, versionPriority int) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
@@ -246,6 +262,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 // Prepares the api group list for serving by converting them from map into
 // list and sorting them according to insertion order
 func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2beta1.APIGroupDiscovery {
+	regenerationCounter.Inc()
 	// Re-order the apiGroups by their priority.
 	groups := []apidiscoveryv2beta1.APIGroupDiscovery{}
 	for _, group := range rdm.apiGroups {
@@ -338,6 +355,10 @@ type cachedGroupList struct {
 }
 
 func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	rdm.serveHTTPFunc(resp, req)
+}
+
+func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *http.Request) {
 	cache := rdm.fetchFromCache()
 	response := cache.cachedResponse
 	etag := cache.cachedResponseETag

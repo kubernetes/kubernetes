@@ -199,7 +199,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	// Create a resource manager whichs serves our GroupVersion
-	resourceManager := discoveryendpoint.NewResourceManager()
+	resourceManager := discoveryendpoint.NewResourceManager("apis")
 	resourceManager.SetGroups([]apidiscoveryv2beta1.APIGroupDiscovery{basicTestGroup})
 
 	// Install our ResourceManager as an Aggregated APIService to the

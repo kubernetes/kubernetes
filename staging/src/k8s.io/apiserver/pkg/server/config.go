@@ -738,10 +738,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
-			manager = discoveryendpoint.NewResourceManager()
+			manager = discoveryendpoint.NewResourceManager("apis")
 		}
 		s.AggregatedDiscoveryGroupManager = manager
-		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager()
+		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
 	}
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
