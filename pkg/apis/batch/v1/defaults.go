@@ -31,14 +31,14 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	// For a non-parallel job, you can leave both `.spec.completions` and
 	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
 	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-		obj.Spec.Completions = utilpointer.Int32Ptr(1)
-		obj.Spec.Parallelism = utilpointer.Int32Ptr(1)
+		obj.Spec.Completions = utilpointer.Int32(1)
+		obj.Spec.Parallelism = utilpointer.Int32(1)
 	}
 	if obj.Spec.Parallelism == nil {
-		obj.Spec.Parallelism = utilpointer.Int32Ptr(1)
+		obj.Spec.Parallelism = utilpointer.Int32(1)
 	}
 	if obj.Spec.BackoffLimit == nil {
-		obj.Spec.BackoffLimit = utilpointer.Int32Ptr(6)
+		obj.Spec.BackoffLimit = utilpointer.Int32(6)
 	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil && len(obj.Labels) == 0 {
@@ -49,7 +49,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 		obj.Spec.CompletionMode = &mode
 	}
 	if obj.Spec.Suspend == nil {
-		obj.Spec.Suspend = utilpointer.BoolPtr(false)
+		obj.Spec.Suspend = utilpointer.Bool(false)
 	}
 	if obj.Spec.PodFailurePolicy != nil {
 		for _, rule := range obj.Spec.PodFailurePolicy.Rules {
@@ -69,12 +69,12 @@ func SetDefaults_CronJob(obj *batchv1.CronJob) {
 		obj.Spec.ConcurrencyPolicy = batchv1.AllowConcurrent
 	}
 	if obj.Spec.Suspend == nil {
-		obj.Spec.Suspend = utilpointer.BoolPtr(false)
+		obj.Spec.Suspend = utilpointer.Bool(false)
 	}
 	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
-		obj.Spec.SuccessfulJobsHistoryLimit = utilpointer.Int32Ptr(3)
+		obj.Spec.SuccessfulJobsHistoryLimit = utilpointer.Int32(3)
 	}
 	if obj.Spec.FailedJobsHistoryLimit == nil {
-		obj.Spec.FailedJobsHistoryLimit = utilpointer.Int32Ptr(1)
+		obj.Spec.FailedJobsHistoryLimit = utilpointer.Int32(1)
 	}
 }

@@ -118,19 +118,19 @@ func TestValidateBehavior(t *testing.T) {
 		},
 		{
 			ScaleUp: &autoscaling.HPAScalingRules{
-				StabilizationWindowSeconds: utilpointer.Int32Ptr(3600),
+				StabilizationWindowSeconds: utilpointer.Int32(3600),
 				SelectPolicy:               &minPolicy,
 				Policies:                   simplePoliciesList,
 			},
 			ScaleDown: &autoscaling.HPAScalingRules{
-				StabilizationWindowSeconds: utilpointer.Int32Ptr(0),
+				StabilizationWindowSeconds: utilpointer.Int32(0),
 				SelectPolicy:               &disabledPolicy,
 				Policies:                   simplePoliciesList,
 			},
 		},
 		{
 			ScaleUp: &autoscaling.HPAScalingRules{
-				StabilizationWindowSeconds: utilpointer.Int32Ptr(120),
+				StabilizationWindowSeconds: utilpointer.Int32(120),
 				SelectPolicy:               &maxPolicy,
 				Policies: []autoscaling.HPAScalingPolicy{
 					{
@@ -156,7 +156,7 @@ func TestValidateBehavior(t *testing.T) {
 				},
 			},
 			ScaleDown: &autoscaling.HPAScalingRules{
-				StabilizationWindowSeconds: utilpointer.Int32Ptr(120),
+				StabilizationWindowSeconds: utilpointer.Int32(120),
 				SelectPolicy:               &maxPolicy,
 				Policies: []autoscaling.HPAScalingPolicy{
 					{
@@ -204,7 +204,7 @@ func TestValidateBehavior(t *testing.T) {
 		{
 			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
 				ScaleUp: &autoscaling.HPAScalingRules{
-					StabilizationWindowSeconds: utilpointer.Int32Ptr(3601),
+					StabilizationWindowSeconds: utilpointer.Int32(3601),
 					SelectPolicy:               &minPolicy,
 					Policies:                   simplePoliciesList,
 				},
@@ -319,7 +319,7 @@ func TestValidateBehavior(t *testing.T) {
 		{
 			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
 				ScaleDown: &autoscaling.HPAScalingRules{
-					StabilizationWindowSeconds: utilpointer.Int32Ptr(3601),
+					StabilizationWindowSeconds: utilpointer.Int32(3601),
 					SelectPolicy:               &minPolicy,
 					Policies:                   simplePoliciesList,
 				},
@@ -445,7 +445,7 @@ func prepareHPAWithBehavior(b autoscaling.HorizontalPodAutoscalerBehavior) autos
 				Kind: "ReplicationController",
 				Name: "myrc",
 			},
-			MinReplicas: utilpointer.Int32Ptr(1),
+			MinReplicas: utilpointer.Int32(1),
 			MaxReplicas: 5,
 			Metrics: []autoscaling.MetricSpec{
 				{
@@ -454,7 +454,7 @@ func prepareHPAWithBehavior(b autoscaling.HorizontalPodAutoscalerBehavior) autos
 						Name: api.ResourceCPU,
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: utilpointer.Int32Ptr(70),
+							AverageUtilization: utilpointer.Int32(70),
 						},
 					},
 				},
@@ -481,7 +481,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -490,7 +490,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 							Name: api.ResourceCPU,
 							Target: autoscaling.MetricTarget{
 								Type:               autoscaling.UtilizationMetricType,
-								AverageUtilization: utilpointer.Int32Ptr(70),
+								AverageUtilization: utilpointer.Int32(70),
 							},
 						},
 					},
@@ -507,7 +507,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 			},
 		},
@@ -521,7 +521,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -547,7 +547,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -575,7 +575,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -585,7 +585,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 							Container: "test-container",
 							Target: autoscaling.MetricTarget{
 								Type:               autoscaling.UtilizationMetricType,
-								AverageUtilization: utilpointer.Int32Ptr(70),
+								AverageUtilization: utilpointer.Int32(70),
 							},
 						},
 					},
@@ -602,7 +602,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -629,7 +629,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -661,7 +661,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -690,7 +690,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(1),
+				MinReplicas: utilpointer.Int32(1),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -725,7 +725,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -734,7 +734,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -748,7 +748,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -758,7 +758,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -772,7 +772,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -781,7 +781,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -795,7 +795,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -805,7 +805,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -819,7 +819,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -828,7 +828,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -842,7 +842,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -852,7 +852,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -866,7 +866,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -875,7 +875,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -889,7 +889,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -899,7 +899,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -916,7 +916,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
-					MinReplicas:    utilpointer.Int32Ptr(-1),
+					MinReplicas:    utilpointer.Int32(-1),
 					MaxReplicas:    5,
 				},
 			},
@@ -930,7 +930,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
-					MinReplicas:    utilpointer.Int32Ptr(7),
+					MinReplicas:    utilpointer.Int32(7),
 					MaxReplicas:    5,
 				},
 			},
@@ -944,7 +944,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -953,7 +953,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 									AverageValue:       resource.NewMilliQuantity(300, resource.DecimalSI),
 								},
 							},
@@ -971,7 +971,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -981,7 +981,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 									AverageValue:       resource.NewMilliQuantity(300, resource.DecimalSI),
 								},
 							},
@@ -996,7 +996,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1004,7 +1004,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 							Resource: &autoscaling.ResourceMetricSource{
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -1018,7 +1018,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1027,7 +1027,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -1041,7 +1041,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1051,7 +1051,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(70),
+									AverageUtilization: utilpointer.Int32(70),
 								},
 							},
 						},
@@ -1065,7 +1065,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1074,7 +1074,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(-10),
+									AverageUtilization: utilpointer.Int32(-10),
 								},
 							},
 						},
@@ -1088,7 +1088,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1098,7 +1098,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "test-application",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(-10),
+									AverageUtilization: utilpointer.Int32(-10),
 								},
 							},
 						},
@@ -1112,7 +1112,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1121,7 +1121,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Name: api.ResourceCPU,
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(-10),
+									AverageUtilization: utilpointer.Int32(-10),
 								},
 							},
 						},
@@ -1135,7 +1135,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1145,7 +1145,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Container: "---***",
 								Target: autoscaling.MetricTarget{
 									Type:               autoscaling.UtilizationMetricType,
-									AverageUtilization: utilpointer.Int32Ptr(-10),
+									AverageUtilization: utilpointer.Int32(-10),
 								},
 							},
 						},
@@ -1159,7 +1159,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1181,7 +1181,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1204,7 +1204,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1227,7 +1227,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1251,7 +1251,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1279,7 +1279,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1307,7 +1307,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1333,7 +1333,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1358,7 +1358,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1385,7 +1385,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1410,7 +1410,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1436,7 +1436,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1462,7 +1462,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1489,7 +1489,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1515,7 +1515,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1540,7 +1540,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1562,7 +1562,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{},
@@ -1576,7 +1576,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1592,7 +1592,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -1690,7 +1690,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    utilpointer.Int32Ptr(1),
+					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5, Metrics: []autoscaling.MetricSpec{spec},
 				},
 			})
@@ -1723,7 +1723,7 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MinReplicas: utilpointer.Int32(minReplicas),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -1756,7 +1756,7 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MinReplicas: utilpointer.Int32(minReplicas),
 				MaxReplicas: 5,
 				Metrics: []autoscaling.MetricSpec{
 					{
@@ -1810,7 +1810,7 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
 	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
 
 	for _, successCase := range nonZeroMinReplicasCases {
-		successCase.Spec.MinReplicas = utilpointer.Int32Ptr(1)
+		successCase.Spec.MinReplicas = utilpointer.Int32(1)
 		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
