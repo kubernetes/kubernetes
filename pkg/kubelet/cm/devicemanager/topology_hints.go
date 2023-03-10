@@ -19,10 +19,12 @@ package devicemanager
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
@@ -234,7 +236,8 @@ func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
 func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {
 	// for these device plugin resources, requests == limits
 	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
-		ExcludeOverhead: true,
+		ExcludeOverhead:          true,
+		SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers),
 	})
 	podRequests := make(map[string]int)
 	for resourceName, quantity := range limits {

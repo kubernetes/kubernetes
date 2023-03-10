@@ -518,7 +518,9 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStats, pod *v1.Pod) bool {
-	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+	})
 	_, found := podLimits[v1.ResourceEphemeralStorage]
 	if !found {
 		return false

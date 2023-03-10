@@ -34,11 +34,14 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/lru"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -561,38 +564,12 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
-			// TODO: look into re-using resourcehelper.PodRequests/resourcehelper.PodLimits instead of duplicating
-			// that calculation
-			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
-			for j := range pod.Spec.Containers {
-				container := &pod.Spec.Containers[j]
-				containerRequests = append(containerRequests, container.Resources.Requests)
-				containerLimits = append(containerLimits, container.Resources.Limits)
+			opts := podResourcesOptions{
+				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				SidecarContainersEnabled:         feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 			}
-			podRequests := sum(containerRequests)
-			podLimits := sum(containerLimits)
-			for j := range pod.Spec.InitContainers {
-				container := &pod.Spec.InitContainers[j]
-				// take max(sum_containers, any_init_container)
-				for k, v := range container.Resources.Requests {
-					if v2, ok := podRequests[k]; ok {
-						if v.Cmp(v2) > 0 {
-							podRequests[k] = v
-						}
-					} else {
-						podRequests[k] = v
-					}
-				}
-				for k, v := range container.Resources.Limits {
-					if v2, ok := podLimits[k]; ok {
-						if v.Cmp(v2) > 0 {
-							podLimits[k] = v
-						}
-					} else {
-						podLimits[k] = v
-					}
-				}
-			}
+			podRequests := podRequests(pod, opts)
+			podLimits := podLimits(pod, opts)
 			for k, v := range limit.Min {
 				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
@@ -611,4 +588,155 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+type podResourcesOptions struct {
+	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
+	InPlacePodVerticalScalingEnabled bool
+	// SidecarContainersEnabled indicates that the sidecar containers feature gate is enabled
+	SidecarContainersEnabled bool
+}
+
+// podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
+// pod. Any changes to that calculation should be reflected here.
+func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
+	reqs := api.ResourceList{}
+
+	var containerStatuses map[string]*api.ContainerStatus
+	if opts.InPlacePodVerticalScalingEnabled {
+		containerStatuses = map[string]*api.ContainerStatus{}
+		for i := range pod.Status.ContainerStatuses {
+			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		containerReqs := container.Resources.Requests
+		if opts.InPlacePodVerticalScalingEnabled {
+			cs, found := containerStatuses[container.Name]
+			if found {
+				if pod.Status.Resize == api.PodResizeStatusInfeasible {
+					containerReqs = cs.AllocatedResources
+				} else {
+					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
+				}
+			}
+		}
+
+		addResourceList(reqs, containerReqs)
+	}
+
+	var sidecarResources api.ResourceList
+	if opts.SidecarContainersEnabled {
+		sidecarResources = api.ResourceList{}
+	}
+	initContainerReqs := api.ResourceList{}
+	// init containers define the minimum of any resource
+	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
+	for _, container := range pod.Spec.InitContainers {
+		containerReqs := container.Resources.Requests
+
+		if opts.SidecarContainersEnabled {
+			if container.RestartPolicy != nil && *container.RestartPolicy == api.ContainerRestartPolicyAlways {
+				// and add them to the resulting cumulative container requests
+				addResourceList(reqs, containerReqs)
+
+				// track our cumulative sidecar resources
+				addResourceList(sidecarResources, containerReqs)
+				containerReqs = sidecarResources
+			} else {
+				tmp := api.ResourceList{}
+				addResourceList(tmp, containerReqs)
+				addResourceList(tmp, sidecarResources)
+				containerReqs = tmp
+			}
+		}
+
+		maxResourceList(initContainerReqs, containerReqs)
+	}
+
+	maxResourceList(reqs, initContainerReqs)
+	return reqs
+}
+
+// podLimits is a simplified version of pkg/api/v1/resource/PodLimits that operates against the core version of
+// pod. Any changes to that calculation should be reflected here.
+func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
+	limits := api.ResourceList{}
+
+	for _, container := range pod.Spec.Containers {
+		addResourceList(limits, container.Resources.Limits)
+	}
+
+	var sidecarResources api.ResourceList
+	if opts.SidecarContainersEnabled {
+		sidecarResources = api.ResourceList{}
+	}
+	initContainerLimits := api.ResourceList{}
+	// init containers define the minimum of any resource
+	for _, container := range pod.Spec.InitContainers {
+		containerLimits := container.Resources.Limits
+		// Is the sidecar feature gate enabled and the init container marked as a sidecar?
+		if opts.SidecarContainersEnabled {
+			if container.RestartPolicy != nil && *container.RestartPolicy == api.ContainerRestartPolicyAlways {
+				addResourceList(limits, containerLimits)
+
+				// track our cumulative sidecar resources
+				addResourceList(sidecarResources, containerLimits)
+				containerLimits = sidecarResources
+			} else {
+				tmp := api.ResourceList{}
+				addResourceList(tmp, containerLimits)
+				addResourceList(tmp, sidecarResources)
+				containerLimits = tmp
+			}
+		}
+		maxResourceList(initContainerLimits, containerLimits)
+	}
+
+	maxResourceList(limits, initContainerLimits)
+
+	return limits
+}
+
+// addResourceList adds the resources in newList to list.
+func addResourceList(list, newList api.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; !ok {
+			list[name] = quantity.DeepCopy()
+		} else {
+			value.Add(quantity)
+			list[name] = value
+		}
+	}
+}
+
+// maxResourceList sets list to the greater of list/newList for every resource in newList
+func maxResourceList(list, newList api.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; !ok || quantity.Cmp(value) > 0 {
+			list[name] = quantity.DeepCopy()
+		}
+	}
+}
+
+// max returns the result of max(a, b) for each named resource and is only used if we can't
+// accumulate into an existing resource list
+func max(a api.ResourceList, b api.ResourceList) api.ResourceList {
+	result := api.ResourceList{}
+	for key, value := range a {
+		if other, found := b[key]; found {
+			if value.Cmp(other) <= 0 {
+				result[key] = other.DeepCopy()
+				continue
+			}
+		}
+		result[key] = value.DeepCopy()
+	}
+	for key, value := range b {
+		if _, found := result[key]; !found {
+			result[key] = value.DeepCopy()
+		}
+	}
+	return result
 }

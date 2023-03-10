@@ -304,11 +304,14 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	}
 	klog.V(4).InfoS("expected volume SELinux label context", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
 
+	opts := resourcehelper.PodResourcesOptions{
+		SidecarContainersEnabled: feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+	}
 	if vol, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+				podLimits := resourcehelper.PodLimits(pod, opts)
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&
