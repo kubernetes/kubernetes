@@ -371,22 +371,5 @@ func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, v
 
 	isMigratedOnNode := mpaSet.Has(pluginName)
 
-	if isMigratedOnNode {
-		installed := false
-		driverName, err := csiMigratedPluginManager.GetCSINameFromInTreeName(pluginName)
-		if err != nil {
-			return isMigratedOnNode, err
-		}
-		for _, driver := range csiNode.Spec.Drivers {
-			if driver.Name == driverName {
-				installed = true
-				break
-			}
-		}
-		if !installed {
-			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
-		}
-	}
-
 	return isMigratedOnNode, nil
 }
