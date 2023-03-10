@@ -839,6 +839,24 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha1.ResourceClass":                                                      schema_k8sio_api_resource_v1alpha1_ResourceClass(ref),
 		"k8s.io/api/resource/v1alpha1.ResourceClassList":                                                  schema_k8sio_api_resource_v1alpha1_ResourceClassList(ref),
 		"k8s.io/api/resource/v1alpha1.ResourceClassParametersReference":                                   schema_k8sio_api_resource_v1alpha1_ResourceClassParametersReference(ref),
+		"k8s.io/api/resource/v1alpha2.AllocationResult":                                                   schema_k8sio_api_resource_v1alpha2_AllocationResult(ref),
+		"k8s.io/api/resource/v1alpha2.PodScheduling":                                                      schema_k8sio_api_resource_v1alpha2_PodScheduling(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingList":                                                  schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingSpec":                                                  schema_k8sio_api_resource_v1alpha2_PodSchedulingSpec(ref),
+		"k8s.io/api/resource/v1alpha2.PodSchedulingStatus":                                                schema_k8sio_api_resource_v1alpha2_PodSchedulingStatus(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaim":                                                      schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference":                                     schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimList":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference":                                   schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersReference(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus":                                      schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimSpec":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimStatus":                                                schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplate":                                              schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateList":                                          schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec":                                          schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClass":                                                      schema_k8sio_api_resource_v1alpha2_ResourceClass(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClassList":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceClassParametersReference":                                   schema_k8sio_api_resource_v1alpha2_ResourceClassParametersReference(ref),
 		"k8s.io/api/scheduling/v1.PriorityClass":                                                          schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		"k8s.io/api/scheduling/v1.PriorityClassList":                                                      schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
 		"k8s.io/api/scheduling/v1alpha1.PriorityClass":                                                    schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref),
@@ -41756,6 +41774,815 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClassList(ref common.ReferenceCa
 }
 
 func schema_k8sio_api_resource_v1alpha1_ResourceClassParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of resource being referenced.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace that contains the referenced resource. Must be empty for cluster-scoped resources and non-empty for namespaced resources.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllocationResult contains attributed of an allocated resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resourceHandle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceHandle contains arbitrary data returned by the driver after a successful allocation. This is opaque for Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"availableOnNodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "This field will get set by the resource driver after it has allocated the resource driver to inform the scheduler where it can schedule Pods using the ResourceClaim.\n\nSetting this field is optional. If null, the resource is available everywhere.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+						},
+					},
+					"shareable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Shareable determines whether the resource supports more than one consumer at a time.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.NodeSelector"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_PodScheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodScheduling objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec describes where resources for the Pod are needed.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status describes where resources for the Pod can be allocated.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingStatus"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.PodSchedulingSpec", "k8s.io/api/resource/v1alpha2.PodSchedulingStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodSchedulingList is a collection of Pod scheduling objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of PodScheduling objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.PodScheduling"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.PodScheduling", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodSchedulingSpec describes where resources for the Pod are needed.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selectedNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SelectedNode is the node for which allocation of ResourceClaims that are referenced by the Pod and that use \"WaitForFirstConsumer\" allocation is to be attempted.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"potentialNodes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_PodSchedulingStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodSchedulingStatus describes where resources for the Pod can be allocated.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaim describes which resources are needed by a resource consumer. Its status tracks whether the resource has been allocated and what the resulting attributes are.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec describes the desired attributes of a resource that then needs to be allocated. It can only be set once when creating the ResourceClaim.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status describes whether the resource is available and with which attributes.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimStatus"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimSpec", "k8s.io/api/resource/v1alpha2.ResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimConsumerReference contains enough information to let you locate the consumer of a ResourceClaim. The user must be a resource in the same namespace as the ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is the type of resource being referenced, for example \"pods\".",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of resource being referenced.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UID identifies exactly one incarnation of the resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"resource", "name", "uid"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimList is a collection of claims.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of resource claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaim"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaim", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimParametersReference contains enough information to let you locate the parameters for a ResourceClaim. The object must be in the same namespace as the ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata, for example \"ConfigMap\".",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of resource being referenced.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimSchedulingStatus contains information about one particular ResourceClaim with \"WaitForFirstConsumer\" allocation mode.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name matches the pod.spec.resourceClaims[*].Name field.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"unsuitableNodes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "UnsuitableNodes lists nodes that the ResourceClaim cannot be allocated for.\n\nThe size of this field is limited to 128, the same as for PodSchedulingSpec.PotentialNodes. This may get increased in the future, but not reduced.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimSpec defines how a resource is to be allocated.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resourceClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClassName references the driver and additional parameters via the name of a ResourceClass that was created as part of the driver deployment.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parametersRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParametersRef references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim.",
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"),
+						},
+					},
+					"allocationMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Allocation can start immediately or when a Pod wants to use the resource. \"WaitForFirstConsumer\" is the default.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"resourceClassName"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimStatus tracks whether the resource has been allocated and what the resulting attributes are.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DriverName is a copy of the driver name from the ResourceClass at the time when allocation started.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"allocation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Allocation is set by the resource driver once a resource has been allocated successfully. If this is not specified, the resource is not yet allocated.",
+							Ref:         ref("k8s.io/api/resource/v1alpha2.AllocationResult"),
+						},
+					},
+					"reservedFor": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"uid",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference"),
+									},
+								},
+							},
+						},
+					},
+					"deallocationRequested": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeallocationRequested indicates that a ResourceClaim is to be deallocated.\n\nThe driver then must deallocate this claim and reset the field together with clearing the Allocation field.\n\nWhile DeallocationRequested is set, no new consumers may be added to ReservedFor.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.AllocationResult", "k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimTemplate is used to produce ResourceClaim objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimTemplateList is a collection of claim templates.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of resource claim templates.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimTemplate"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimTemplate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ObjectMeta may contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec for the ResourceClaim. The entire content is copied unchanged into the ResourceClaim that gets created from this template. The same fields as in a ResourceClaim are also valid here.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClaimSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parametersRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
+							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClassParametersReference"),
+						},
+					},
+					"suitableNodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+						},
+					},
+				},
+				Required: []string{"driverName"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha2.ResourceClassParametersReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClassList is a collection of classes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of resource classes.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClass"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

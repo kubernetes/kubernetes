@@ -11542,6 +11542,228 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+- name: io.k8s.api.resource.v1alpha2.AllocationResult
+  map:
+    fields:
+    - name: availableOnNodes
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: resourceHandle
+      type:
+        scalar: string
+    - name: shareable
+      type:
+        scalar: boolean
+- name: io.k8s.api.resource.v1alpha2.PodScheduling
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
+      default: {}
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
+  map:
+    fields:
+    - name: potentialNodes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: selectedNode
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
+  map:
+    fields:
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus
+          elementRelationship: associative
+          keys:
+          - name
+- name: io.k8s.api.resource.v1alpha2.ResourceClaim
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimStatus
+      default: {}
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: unsuitableNodes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: parametersRef
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
+    - name: resourceClassName
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimStatus
+  map:
+    fields:
+    - name: allocation
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.AllocationResult
+    - name: deallocationRequested
+      type:
+        scalar: boolean
+    - name: driverName
+      type:
+        scalar: string
+    - name: reservedFor
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference
+          elementRelationship: associative
+          keys:
+          - uid
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimTemplate
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec
+      default: {}
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec
+  map:
+    fields:
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
+      default: {}
+- name: io.k8s.api.resource.v1alpha2.ResourceClass
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverName
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: parametersRef
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
+    - name: suitableNodes
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: namespace
+      type:
+        scalar: string
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

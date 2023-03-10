@@ -59,6 +59,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -108,6 +109,7 @@ import (
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	applyconfigurationsrbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
 	applyconfigurationsresourcev1alpha1 "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	applyconfigurationsschedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
 	applyconfigurationsschedulingv1alpha1 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha1"
 	applyconfigurationsschedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
@@ -1471,6 +1473,36 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1alpha1.ResourceClassApplyConfiguration{}
 	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
 		return &applyconfigurationsresourcev1alpha1.ResourceClassParametersReferenceApplyConfiguration{}
+
+		// Group=resource.k8s.io, Version=v1alpha2
+	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResult"):
+		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodScheduling"):
+		return &resourcev1alpha2.PodSchedulingApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingSpec"):
+		return &resourcev1alpha2.PodSchedulingSpecApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingStatus"):
+		return &resourcev1alpha2.PodSchedulingStatusApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaim"):
+		return &resourcev1alpha2.ResourceClaimApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
+		return &resourcev1alpha2.ResourceClaimConsumerReferenceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimParametersReference"):
+		return &resourcev1alpha2.ResourceClaimParametersReferenceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
+		return &resourcev1alpha2.ResourceClaimSchedulingStatusApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
+		return &resourcev1alpha2.ResourceClaimSpecApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimStatus"):
+		return &resourcev1alpha2.ResourceClaimStatusApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimTemplate"):
+		return &resourcev1alpha2.ResourceClaimTemplateApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimTemplateSpec"):
+		return &resourcev1alpha2.ResourceClaimTemplateSpecApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClass"):
+		return &resourcev1alpha2.ResourceClassApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
+		return &resourcev1alpha2.ResourceClassParametersReferenceApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):
