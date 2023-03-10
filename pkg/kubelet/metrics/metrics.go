@@ -102,6 +102,10 @@ const (
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
 	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_ms"
 
+	// Metrics to track orphan pod cleanup
+	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
+	orphanPodCleanedVolumesErrorsKey = "orphan_pod_cleaned_volumes_errors"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -649,6 +653,25 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// OrphanPodCleanedVolumes is number of orphaned Pods that times that removeOrphanedPodVolumeDirs was called during the last sweep.
+	OrphanPodCleanedVolumes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           orphanPodCleanedVolumesKey,
+			Help:           "The total number of orphaned Pods whose volumes were cleaned in the last periodic sweep.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// OrphanPodCleanedVolumes is number of times that removeOrphanedPodVolumeDirs failed.
+	OrphanPodCleanedVolumesErrors = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           orphanPodCleanedVolumesErrorsKey,
+			Help:           "The number of orphaned Pods whose volumes failed to be cleaned in the last periodic sweep.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -709,6 +732,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
+		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
+		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
