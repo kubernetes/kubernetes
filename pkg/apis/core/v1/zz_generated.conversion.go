@@ -3225,7 +3225,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *v1.ContainerStat
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
-	out.ResourcesAllocated = *(*core.ResourceList)(unsafe.Pointer(&in.ResourcesAllocated))
+	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }
@@ -3249,7 +3249,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
-	out.ResourcesAllocated = *(*v1.ResourceList)(unsafe.Pointer(&in.ResourcesAllocated))
+	out.AllocatedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*v1.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }

@@ -1115,7 +1115,9 @@ status:
     status: statusValue
     type: typeValue
   containerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1141,8 +1143,6 @@ status:
         limitsKey: "0"
       requests:
         requestsKey: "0"
-    resourcesAllocated:
-      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:
@@ -1160,7 +1160,9 @@ status:
         message: messageValue
         reason: reasonValue
   ephemeralContainerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1186,8 +1188,6 @@ status:
         limitsKey: "0"
       requests:
         requestsKey: "0"
-    resourcesAllocated:
-      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:
@@ -1206,7 +1206,9 @@ status:
         reason: reasonValue
   hostIP: hostIPValue
   initContainerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1232,8 +1234,6 @@ status:
         limitsKey: "0"
       requests:
         requestsKey: "0"
-    resourcesAllocated:
-      resourcesAllocatedKey: "0"
     restartCount: 5
     started: true
     state:

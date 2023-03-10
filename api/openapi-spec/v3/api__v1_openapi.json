@@ -1437,6 +1437,18 @@
       "io.k8s.api.core.v1.ContainerStatus": {
         "description": "ContainerStatus contains details for the current status of this container.",
         "properties": {
+          "allocatedResources": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "AllocatedResources represents the compute resources allocated for this container by the node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission and after successfully admitting desired pod resize.",
+            "type": "object"
+          },
           "containerID": {
             "description": "ContainerID is the ID of the container in the format '<type>://<container_id>'. Where type is a container runtime identifier, returned from Version call of CRI API (for example \"containerd\").",
             "type": "string"
@@ -1477,18 +1489,6 @@
               }
             ],
             "description": "Resources represents the compute resource requests and limits that have been successfully enacted on the running container after it has been started or has been successfully resized."
-          },
-          "resourcesAllocated": {
-            "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-                }
-              ],
-              "default": {}
-            },
-            "description": "ResourcesAllocated represents the compute resources allocated for this container by the node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission and after successfully admitting desired pod resize.",
-            "type": "object"
           },
           "restartCount": {
             "default": 0,
