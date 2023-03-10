@@ -1102,7 +1102,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 
-	genericfeatures.AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
