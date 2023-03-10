@@ -418,6 +418,12 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			}
 			csiMounter := mounter.(*csiMountMgr)
 
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
+
 			// rebuild spec
 			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
@@ -452,7 +458,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			if spec.Name() != tc.specVolID {
 				t.Errorf("Unexpected spec name constructed %s", spec.Name())
 			}
-
 		})
 	}
 }
@@ -546,6 +551,12 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 				t.Fatal("failed to create CSI mounter")
 			}
 			csiMounter := mounter.(*csiMountMgr)
+
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
 
 			// rebuild spec
 			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
@@ -672,36 +683,6 @@ func TestPluginNewMounter(t *testing.T) {
 			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
 			}
-
-			// ensure data file is created
-			dataDir := filepath.Dir(mounter.GetPath())
-			dataFile := filepath.Join(dataDir, volDataFileName)
-			if _, err := os.Stat(dataFile); err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("data file not created %s", dataFile)
-				} else {
-					t.Fatal(err)
-				}
-			}
-			data, err := loadVolumeData(dataDir, volDataFileName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-			}
-			if data[volDataKey.volHandle] != csiMounter.volumeID {
-				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-			}
-			if data[volDataKey.driverName] != string(csiMounter.driverName) {
-				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-			}
-			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-			}
-			if data[volDataKey.volumeLifecycleMode] != string(test.volumeLifecycleMode) {
-				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
-			}
 		})
 	}
 }
@@ -808,36 +789,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
-				}
-
-				// ensure data file is created
-				dataDir := filepath.Dir(mounter.GetPath())
-				dataFile := filepath.Join(dataDir, volDataFileName)
-				if _, err := os.Stat(dataFile); err != nil {
-					if os.IsNotExist(err) {
-						t.Errorf("data file not created %s", dataFile)
-					} else {
-						t.Fatal(err)
-					}
-				}
-				data, err := loadVolumeData(dataDir, volDataFileName)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-					t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-				}
-				if data[volDataKey.volHandle] != csiMounter.volumeID {
-					t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-				}
-				if data[volDataKey.driverName] != string(csiMounter.driverName) {
-					t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-				}
-				if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-					t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-				}
-				if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
-					t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 				}
 			})
 		}

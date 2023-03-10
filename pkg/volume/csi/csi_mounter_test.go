@@ -61,6 +61,25 @@ var (
 	testAccount = "test-service-account"
 )
 
+func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, volumeID, driverName, lifecycleMode string) error {
+	nodeName := string(plug.host.GetNodeName())
+	volData := map[string]string{
+		volDataKey.specVolID:           specVolumeName,
+		volDataKey.volHandle:           volumeID,
+		volDataKey.driverName:          driverName,
+		volDataKey.nodeName:            nodeName,
+		volDataKey.attachmentID:        getAttachmentName(volumeID, driverName, nodeName),
+		volDataKey.volumeLifecycleMode: lifecycleMode,
+	}
+	if err := os.MkdirAll(mountPath, 0755); err != nil {
+		return fmt.Errorf("failed to create dir for volume info file: %s", err)
+	}
+	if err := saveVolumeData(mountPath, volDataFileName, volData); err != nil {
+		return fmt.Errorf("failed to save volume info file: %s", err)
+	}
+	return nil
+}
+
 func TestMounterGetPath(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -301,6 +320,37 @@ func TestMounterSetUp(t *testing.T) {
 			if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
 				t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
 			}
+
+			// ensure data file is created
+			dataDir := filepath.Dir(mounter.GetPath())
+			dataFile := filepath.Join(dataDir, volDataFileName)
+			if _, err := os.Stat(dataFile); err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("data file not created %s", dataFile)
+				} else {
+					t.Fatal(err)
+				}
+			}
+			data, err := loadVolumeData(dataDir, volDataFileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
+				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
+			}
+			if data[volDataKey.volHandle] != csiMounter.volumeID {
+				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
+			}
+			if data[volDataKey.driverName] != string(csiMounter.driverName) {
+				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
+			}
+			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
+				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
+			}
+			if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
+				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
+			}
+
 		})
 	}
 }
@@ -424,6 +474,36 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			if vol.Path != csiMounter.GetPath() {
 				t.Error("csi server may not have received NodePublishVolume call")
+			}
+
+			// ensure data file is created
+			dataDir := filepath.Dir(mounter.GetPath())
+			dataFile := filepath.Join(dataDir, volDataFileName)
+			if _, err := os.Stat(dataFile); err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("data file not created %s", dataFile)
+				} else {
+					t.Fatal(err)
+				}
+			}
+			data, err := loadVolumeData(dataDir, volDataFileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
+				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
+			}
+			if data[volDataKey.volHandle] != csiMounter.volumeID {
+				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
+			}
+			if data[volDataKey.driverName] != string(csiMounter.driverName) {
+				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
+			}
+			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
+				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
+			}
+			if data[volDataKey.volumeLifecycleMode] != string(tc.mode) {
+				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 		})
 	}
