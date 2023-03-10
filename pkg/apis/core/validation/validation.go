@@ -3189,6 +3189,9 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 			if opts.AllowSidecarContainers {
 				allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
 			} else {
+				// You should not disable the SidecarContainers feature until deleting
+				// all pods with this field set, as the kubelet may never start the
+				// pods.
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("restartPolicy"), "may not be set for init containers without the SidecarContainers feature"))
 			}
 		}
