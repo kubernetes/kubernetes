@@ -64,6 +64,7 @@ type PodSpecApplyConfiguration struct {
 	HostUsers                     *bool                                        `json:"hostUsers,omitempty"`
 	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty"`
 	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
+	DisruptionPolicy              *DisruptionPolicyApplyConfiguration          `json:"disruptionPolicy,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with
@@ -442,5 +443,13 @@ func (b *PodSpecApplyConfiguration) WithResourceClaims(values ...*PodResourceCla
 		}
 		b.ResourceClaims = append(b.ResourceClaims, *values[i])
 	}
+	return b
+}
+
+// WithDisruptionPolicy sets the DisruptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionPolicy field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithDisruptionPolicy(value *DisruptionPolicyApplyConfiguration) *PodSpecApplyConfiguration {
+	b.DisruptionPolicy = value
 	return b
 }

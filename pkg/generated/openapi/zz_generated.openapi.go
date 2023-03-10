@@ -364,6 +364,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.ContainerStateWaiting":                                                        schema_k8sio_api_core_v1_ContainerStateWaiting(ref),
 		"k8s.io/api/core/v1.ContainerStatus":                                                              schema_k8sio_api_core_v1_ContainerStatus(ref),
 		"k8s.io/api/core/v1.DaemonEndpoint":                                                               schema_k8sio_api_core_v1_DaemonEndpoint(ref),
+		"k8s.io/api/core/v1.DisruptionPolicy":                                                             schema_k8sio_api_core_v1_DisruptionPolicy(ref),
 		"k8s.io/api/core/v1.DownwardAPIProjection":                                                        schema_k8sio_api_core_v1_DownwardAPIProjection(ref),
 		"k8s.io/api/core/v1.DownwardAPIVolumeFile":                                                        schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref),
 		"k8s.io/api/core/v1.DownwardAPIVolumeSource":                                                      schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref),
@@ -17701,6 +17702,36 @@ func schema_k8sio_api_core_v1_DaemonEndpoint(ref common.ReferenceCallback) commo
 	}
 }
 
+func schema_k8sio_api_core_v1_DisruptionPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"policy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Policy applicable to the specified policy name. If not specified, it defaults to PDBBestEffort.\n\nPossible enum values:\n - `\"PDBBestEffort\"` indicates that the associated PDB should be protected as much as possible from being violated when this Pod is preempted during scheduling.\n - `\"PDBIgnore\"` indicates that the associated PDB will not be considered when this Pod is preempted during scheduling.\n - `\"PDBStrict\"` indicates that the associated PDB should be protected strictly from being violated when this Pod is preempted during scheduling. But if the preempter has a priority class name of `system-cluster-critical` or `system-node-critical`, it may still potentially violate the victim's PDB.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"PDBBestEffort", "PDBIgnore", "PDBStrict"},
+						},
+					},
+					"priorityGreaterThanOrEqual": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to. PriorityGreaterThanOrEqual during a preemption process. The value of PriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. PriorityGreaterThanOrEqual only takes effect when Policy is set to PDBStrict A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pods with a higher priority.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"policy"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_DownwardAPIProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -23799,12 +23830,18 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							},
 						},
 					},
+					"disruptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.",
+							Ref:         ref("k8s.io/api/core/v1.DisruptionPolicy"),
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.Container", "k8s.io/api/core/v1.EphemeralContainer", "k8s.io/api/core/v1.HostAlias", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.PodOS", "k8s.io/api/core/v1.PodReadinessGate", "k8s.io/api/core/v1.PodResourceClaim", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.TopologySpreadConstraint", "k8s.io/api/core/v1.Volume", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.Container", "k8s.io/api/core/v1.DisruptionPolicy", "k8s.io/api/core/v1.EphemeralContainer", "k8s.io/api/core/v1.HostAlias", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.PodOS", "k8s.io/api/core/v1.PodReadinessGate", "k8s.io/api/core/v1.PodResourceClaim", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.TopologySpreadConstraint", "k8s.io/api/core/v1.Volume", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -41857,12 +41894,18 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
 						},
 					},
+					"disruptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.",
+							Ref:         ref("k8s.io/api/core/v1.DisruptionPolicy"),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/core/v1.DisruptionPolicy", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -41975,12 +42018,18 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCall
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
 						},
 					},
+					"disruptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.",
+							Ref:         ref("k8s.io/api/core/v1.DisruptionPolicy"),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/core/v1.DisruptionPolicy", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -42093,12 +42142,18 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
 						},
 					},
+					"disruptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.",
+							Ref:         ref("k8s.io/api/core/v1.DisruptionPolicy"),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/core/v1.DisruptionPolicy", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 

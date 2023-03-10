@@ -36,6 +36,11 @@ func (in *PriorityClass) DeepCopyInto(out *PriorityClass) {
 		*out = new(corev1.PreemptionPolicy)
 		**out = **in
 	}
+	if in.DisruptionPolicy != nil {
+		in, out := &in.DisruptionPolicy, &out.DisruptionPolicy
+		*out = new(corev1.DisruptionPolicy)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

@@ -396,6 +396,9 @@ spec:
           subPath: subPathValue
           subPathExpr: subPathExprValue
         workingDir: workingDirValue
+      disruptionPolicy:
+        policy: policyValue
+        priorityGreaterThanOrEqual: 2
       dnsConfig:
         nameservers:
         - nameserversValue

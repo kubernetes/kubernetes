@@ -1680,7 +1680,11 @@
               "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
             }
           }
-        ]
+        ],
+        "disruptionPolicy": {
+          "policy": "policyValue",
+          "priorityGreaterThanOrEqual": 2
+        }
       }
     },
     "volumeClaimTemplates": [

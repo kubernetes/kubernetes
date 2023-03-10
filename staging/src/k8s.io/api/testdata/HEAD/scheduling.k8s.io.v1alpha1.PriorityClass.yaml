@@ -1,5 +1,8 @@
 apiVersion: scheduling.k8s.io/v1alpha1
 description: descriptionValue
+disruptionPolicy:
+  policy: policyValue
+  priorityGreaterThanOrEqual: 2
 globalDefault: true
 kind: PriorityClass
 metadata:

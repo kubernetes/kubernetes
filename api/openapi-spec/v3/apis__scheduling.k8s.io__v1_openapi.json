@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.core.v1.DisruptionPolicy": {
+        "description": "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.",
+        "properties": {
+          "policy": {
+            "default": "",
+            "description": "Policy applicable to the specified policy name. If not specified, it defaults to PDBBestEffort.",
+            "type": "string"
+          },
+          "priorityGreaterThanOrEqual": {
+            "description": "PriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to. PriorityGreaterThanOrEqual during a preemption process. The value of PriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. PriorityGreaterThanOrEqual only takes effect when Policy is set to PDBStrict A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pods with a higher priority.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1.PriorityClass": {
         "description": "PriorityClass defines mapping from a priority class name to the priority integer value. The value can be any valid integer.",
         "properties": {
@@ -11,6 +30,14 @@
           "description": {
             "description": "description is an arbitrary string that usually provides guidelines on when this priority class should be used.",
             "type": "string"
+          },
+          "disruptionPolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.DisruptionPolicy"
+              }
+            ],
+            "description": "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate."
           },
           "globalDefault": {
             "description": "globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class. Only one PriorityClass can be marked as `globalDefault`. However, if more than one PriorityClasses exists with their `globalDefault` field set to true, the smallest value of such global default PriorityClasses will be used as the default priority.",

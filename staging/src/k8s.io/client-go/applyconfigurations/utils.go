@@ -599,6 +599,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CSIVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("DaemonEndpoint"):
 		return &applyconfigurationscorev1.DaemonEndpointApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("DisruptionPolicy"):
+		return &applyconfigurationscorev1.DisruptionPolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("DownwardAPIProjection"):
 		return &applyconfigurationscorev1.DownwardAPIProjectionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("DownwardAPIVolumeFile"):

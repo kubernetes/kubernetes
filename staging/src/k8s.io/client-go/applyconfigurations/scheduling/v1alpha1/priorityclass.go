@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -33,10 +34,11 @@ import (
 type PriorityClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Value                            *int32                   `json:"value,omitempty"`
-	GlobalDefault                    *bool                    `json:"globalDefault,omitempty"`
-	Description                      *string                  `json:"description,omitempty"`
-	PreemptionPolicy                 *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	Value                            *int32                                                        `json:"value,omitempty"`
+	GlobalDefault                    *bool                                                         `json:"globalDefault,omitempty"`
+	Description                      *string                                                       `json:"description,omitempty"`
+	PreemptionPolicy                 *corev1.PreemptionPolicy                                      `json:"preemptionPolicy,omitempty"`
+	DisruptionPolicy                 *applyconfigurationscorev1.DisruptionPolicyApplyConfiguration `json:"disruptionPolicy,omitempty"`
 }
 
 // PriorityClass constructs an declarative configuration of the PriorityClass type for use with
@@ -271,5 +273,13 @@ func (b *PriorityClassApplyConfiguration) WithDescription(value string) *Priorit
 // If called multiple times, the PreemptionPolicy field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithPreemptionPolicy(value corev1.PreemptionPolicy) *PriorityClassApplyConfiguration {
 	b.PreemptionPolicy = &value
+	return b
+}
+
+// WithDisruptionPolicy sets the DisruptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionPolicy field is set to the value of the last call.
+func (b *PriorityClassApplyConfiguration) WithDisruptionPolicy(value *applyconfigurationscorev1.DisruptionPolicyApplyConfiguration) *PriorityClassApplyConfiguration {
+	b.DisruptionPolicy = value
 	return b
 }

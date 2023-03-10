@@ -60,6 +60,11 @@ message PriorityClass {
   // Defaults to PreemptLowerPriority if unset.
   // +optional
   optional string preemptionPolicy = 5;
+
+  // DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.
+  // This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.
+  // +optional
+  optional k8s.io.api.core.v1.DisruptionPolicy disruptionPolicy = 6;
 }
 
 // PriorityClassList is a collection of priority classes.

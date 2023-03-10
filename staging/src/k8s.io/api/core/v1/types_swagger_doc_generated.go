@@ -472,6 +472,16 @@ func (DaemonEndpoint) SwaggerDoc() map[string]string {
 	return map_DaemonEndpoint
 }
 
+var map_DisruptionPolicy = map[string]string{
+	"":                           "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.",
+	"policy":                     "Policy applicable to the specified policy name. If not specified, it defaults to PDBBestEffort.",
+	"priorityGreaterThanOrEqual": "PriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to. PriorityGreaterThanOrEqual during a preemption process. The value of PriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. PriorityGreaterThanOrEqual only takes effect when Policy is set to PDBStrict A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pods with a higher priority.",
+}
+
+func (DisruptionPolicy) SwaggerDoc() map[string]string {
+	return map_DisruptionPolicy
+}
+
 var map_DownwardAPIProjection = map[string]string{
 	"":      "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
 	"items": "Items is a list of DownwardAPIVolume file",
@@ -1717,6 +1727,7 @@ var map_PodSpec = map[string]string{
 	"hostUsers":                     "Use the host's user namespace. Optional: Default to true. If set to true or not present, the pod will be run in the host user namespace, useful for when the pod needs a feature only available to the host user namespace, such as loading a kernel module with CAP_SYS_MODULE. When set to false, a new userns is created for the pod. Setting false is useful for mitigating container breakout vulnerabilities even allowing users to run their containers as root without actually having root privileges on the host. This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.",
 	"schedulingGates":               "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.\n\nThis is a beta feature enabled by the PodSchedulingReadiness feature gate.",
 	"resourceClaims":                "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable.",
+	"disruptionPolicy":              "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {

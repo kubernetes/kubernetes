@@ -46,5 +46,9 @@
   "value": 2,
   "globalDefault": true,
   "description": "descriptionValue",
-  "preemptionPolicy": "preemptionPolicyValue"
+  "preemptionPolicy": "preemptionPolicyValue",
+  "disruptionPolicy": {
+    "policy": "policyValue",
+    "priorityGreaterThanOrEqual": 2
+  }
 }

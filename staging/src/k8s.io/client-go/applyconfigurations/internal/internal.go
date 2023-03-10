@@ -4352,6 +4352,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.core.v1.DisruptionPolicy
+  map:
+    fields:
+    - name: policy
+      type:
+        scalar: string
+      default: ""
+    - name: priorityGreaterThanOrEqual
+      type:
+        scalar: numeric
 - name: io.k8s.api.core.v1.DownwardAPIProjection
   map:
     fields:
@@ -6024,6 +6034,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: disruptionPolicy
+      type:
+        namedType: io.k8s.api.core.v1.DisruptionPolicy
     - name: dnsConfig
       type:
         namedType: io.k8s.api.core.v1.PodDNSConfig
@@ -11551,6 +11564,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: description
       type:
         scalar: string
+    - name: disruptionPolicy
+      type:
+        namedType: io.k8s.api.core.v1.DisruptionPolicy
     - name: globalDefault
       type:
         scalar: boolean
@@ -11577,6 +11593,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: description
       type:
         scalar: string
+    - name: disruptionPolicy
+      type:
+        namedType: io.k8s.api.core.v1.DisruptionPolicy
     - name: globalDefault
       type:
         scalar: boolean
@@ -11603,6 +11622,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: description
       type:
         scalar: string
+    - name: disruptionPolicy
+      type:
+        namedType: io.k8s.api.core.v1.DisruptionPolicy
     - name: globalDefault
       type:
         scalar: boolean

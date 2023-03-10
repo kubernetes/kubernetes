@@ -1929,6 +1929,25 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.DisruptionPolicy": {
+        "description": "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.",
+        "properties": {
+          "policy": {
+            "default": "",
+            "description": "Policy applicable to the specified policy name. If not specified, it defaults to PDBBestEffort.",
+            "type": "string"
+          },
+          "priorityGreaterThanOrEqual": {
+            "description": "PriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to. PriorityGreaterThanOrEqual during a preemption process. The value of PriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. PriorityGreaterThanOrEqual only takes effect when Policy is set to PDBStrict A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pods with a higher priority.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.DownwardAPIProjection": {
         "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
         "properties": {
@@ -3515,6 +3534,14 @@
             "type": "array",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
+          },
+          "disruptionPolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.DisruptionPolicy"
+              }
+            ],
+            "description": "DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted. This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate."
           },
           "dnsConfig": {
             "allOf": [
