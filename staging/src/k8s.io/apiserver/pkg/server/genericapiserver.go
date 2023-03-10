@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -44,7 +45,6 @@ import (
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -737,11 +737,11 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels map[string]*spec.Schema) error {
-	var typeConverter fieldmanager.TypeConverter
+	var typeConverter managedfields.TypeConverter
 
 	if len(openAPIModels) > 0 {
 		var err error
-		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, false)
+		typeConverter, err = managedfields.NewTypeConverter(openAPIModels, false)
 		if err != nil {
 			return err
 		}

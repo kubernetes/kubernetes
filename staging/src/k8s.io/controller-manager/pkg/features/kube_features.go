@@ -21,23 +21,16 @@ import (
 )
 
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature featuregate.Feature = "MyFeature"
-	//
-	// Feature gates should be listed in alphabetical, case-sensitive
-	// (upper before any lower case character) order. This reduces the risk
-	// of code conflicts because changes are more likely to be scattered
-	// across the file.
-
-	// owner: @khenidak
-	// alpha: v1.15
-	//
-	// Enables ipv6 dual stack
-	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+// Every feature gate should add method here following this template:
+//
+// // owner: @username
+// // alpha: v1.4
+// MyFeature featuregate.Feature = "MyFeature"
+//
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -46,6 +39,4 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
-var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	IPv6DualStack: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-}
+var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

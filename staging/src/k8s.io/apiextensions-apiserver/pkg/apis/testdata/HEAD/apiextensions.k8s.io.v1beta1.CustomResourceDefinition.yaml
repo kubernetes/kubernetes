@@ -130,6 +130,7 @@ spec:
       x-kubernetes-preserve-unknown-fields: true
       x-kubernetes-validations:
       - message: messageValue
+        messageExpression: messageExpressionValue
         rule: ruleValue
   version: versionValue
   versions:
@@ -203,6 +204,7 @@ spec:
         x-kubernetes-preserve-unknown-fields: true
         x-kubernetes-validations:
         - message: messageValue
+          messageExpression: messageExpressionValue
           rule: ruleValue
     served: true
     storage: true

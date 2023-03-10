@@ -72,7 +72,7 @@ func printModelDescriptionWithGenerator(
 	gv, exists := paths[resourcePath]
 
 	if !exists {
-		return fmt.Errorf("could not locate schema for %s", resourcePath)
+		return fmt.Errorf("couldn't find resource for \"%v\"", gvr)
 	}
 
 	openAPISchemaBytes, err := gv.Schema(runtime.ContentTypeJSON)

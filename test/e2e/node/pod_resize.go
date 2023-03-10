@@ -1487,8 +1487,12 @@ func doPodResizeSchedulerTests() {
 			nodeAllocatableMilliCPU := n.Status.Allocatable.Cpu().MilliValue()
 			gomega.Expect(n.Status.Allocatable != nil)
 			podAllocatedMilliCPU := int64(0)
-			listOptions := metav1.ListOptions{FieldSelector: "spec.nodeName=" + n.Name}
+
+			// Exclude pods that are in the Succeeded or Failed states
+			selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
+			listOptions := metav1.ListOptions{FieldSelector: selector}
 			podList, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), listOptions)
+
 			framework.ExpectNoError(err, "failed to get running pods")
 			framework.Logf("Found %d pods on node '%s'", len(podList.Items), n.Name)
 			for _, pod := range podList.Items {
@@ -1560,7 +1564,7 @@ func doPodResizeSchedulerTests() {
 		framework.ExpectEqual(testPod2.Status.Phase, v1.PodPending)
 
 		ginkgo.By(fmt.Sprintf("TEST1: Resize pod '%s' to fit in node '%s'", testPod2.Name, node.Name))
-		testPod2, pErr := f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(context.TODO(),
+		testPod2, pErr := f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(ctx,
 			testPod2.Name, types.StrategicMergePatchType, []byte(patchTestpod2ToFitNode), metav1.PatchOptions{})
 		framework.ExpectNoError(pErr, "failed to patch pod for resize")
 
@@ -1629,7 +1633,7 @@ func doPodResizeSchedulerTests() {
 	})
 }
 
-var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focussed) [Feature:InPlacePodVerticalScaling]", func() {
+var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling]", func() {
 	doPodResizeSchedulerTests()
 })
 

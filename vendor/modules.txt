@@ -105,55 +105,6 @@ github.com/armon/go-socks5
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 ## explicit
 github.com/asaskevich/govalidator
-# github.com/aws/aws-sdk-go v1.44.147
-## explicit; go 1.11
-github.com/aws/aws-sdk-go/aws
-github.com/aws/aws-sdk-go/aws/awserr
-github.com/aws/aws-sdk-go/aws/awsutil
-github.com/aws/aws-sdk-go/aws/client
-github.com/aws/aws-sdk-go/aws/client/metadata
-github.com/aws/aws-sdk-go/aws/corehandlers
-github.com/aws/aws-sdk-go/aws/credentials
-github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds
-github.com/aws/aws-sdk-go/aws/credentials/endpointcreds
-github.com/aws/aws-sdk-go/aws/credentials/processcreds
-github.com/aws/aws-sdk-go/aws/credentials/ssocreds
-github.com/aws/aws-sdk-go/aws/credentials/stscreds
-github.com/aws/aws-sdk-go/aws/csm
-github.com/aws/aws-sdk-go/aws/defaults
-github.com/aws/aws-sdk-go/aws/ec2metadata
-github.com/aws/aws-sdk-go/aws/endpoints
-github.com/aws/aws-sdk-go/aws/request
-github.com/aws/aws-sdk-go/aws/session
-github.com/aws/aws-sdk-go/aws/signer/v4
-github.com/aws/aws-sdk-go/internal/context
-github.com/aws/aws-sdk-go/internal/ini
-github.com/aws/aws-sdk-go/internal/sdkio
-github.com/aws/aws-sdk-go/internal/sdkmath
-github.com/aws/aws-sdk-go/internal/sdkrand
-github.com/aws/aws-sdk-go/internal/sdkuri
-github.com/aws/aws-sdk-go/internal/shareddefaults
-github.com/aws/aws-sdk-go/internal/strings
-github.com/aws/aws-sdk-go/internal/sync/singleflight
-github.com/aws/aws-sdk-go/private/protocol
-github.com/aws/aws-sdk-go/private/protocol/ec2query
-github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
-github.com/aws/aws-sdk-go/private/protocol/jsonrpc
-github.com/aws/aws-sdk-go/private/protocol/query
-github.com/aws/aws-sdk-go/private/protocol/query/queryutil
-github.com/aws/aws-sdk-go/private/protocol/rest
-github.com/aws/aws-sdk-go/private/protocol/restjson
-github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
-github.com/aws/aws-sdk-go/service/autoscaling
-github.com/aws/aws-sdk-go/service/ec2
-github.com/aws/aws-sdk-go/service/ecr
-github.com/aws/aws-sdk-go/service/elb
-github.com/aws/aws-sdk-go/service/elbv2
-github.com/aws/aws-sdk-go/service/kms
-github.com/aws/aws-sdk-go/service/sso
-github.com/aws/aws-sdk-go/service/sso/ssoiface
-github.com/aws/aws-sdk-go/service/sts
-github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -388,7 +339,6 @@ github.com/google/cadvisor/third_party/containerd/api/types
 github.com/google/cadvisor/third_party/containerd/api/types/task
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
-github.com/google/cadvisor/utils/cloudinfo/aws
 github.com/google/cadvisor/utils/cloudinfo/azure
 github.com/google/cadvisor/utils/cloudinfo/gce
 github.com/google/cadvisor/utils/cpuload
@@ -481,9 +431,6 @@ github.com/inconshreveable/mousetrap
 # github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 ## explicit
 github.com/ishidawataru/sctp
-# github.com/jmespath/go-jmespath v0.4.0
-## explicit; go 1.14
-github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.2.2
 ## explicit; go 1.13
 github.com/jonboulle/clockwork
@@ -703,13 +650,9 @@ github.com/spf13/pflag
 # github.com/stoewer/go-strcase v1.2.0
 ## explicit; go 1.11
 github.com/stoewer/go-strcase
-# github.com/stretchr/objx v0.5.0
-## explicit; go 1.12
-github.com/stretchr/objx
 # github.com/stretchr/testify v1.8.1
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
-github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 # github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 ## explicit
@@ -1418,6 +1361,7 @@ k8s.io/apimachinery/pkg/util/intstr
 k8s.io/apimachinery/pkg/util/json
 k8s.io/apimachinery/pkg/util/jsonmergepatch
 k8s.io/apimachinery/pkg/util/managedfields
+k8s.io/apimachinery/pkg/util/managedfields/internal
 k8s.io/apimachinery/pkg/util/mergepatch
 k8s.io/apimachinery/pkg/util/naming
 k8s.io/apimachinery/pkg/util/net
@@ -1483,6 +1427,7 @@ k8s.io/apiserver/pkg/apis/audit
 k8s.io/apiserver/pkg/apis/audit/install
 k8s.io/apiserver/pkg/apis/audit/v1
 k8s.io/apiserver/pkg/apis/audit/validation
+k8s.io/apiserver/pkg/apis/cel
 k8s.io/apiserver/pkg/apis/config
 k8s.io/apiserver/pkg/apis/config/v1
 k8s.io/apiserver/pkg/apis/config/validation
@@ -1522,7 +1467,6 @@ k8s.io/apiserver/pkg/endpoints/filterlatency
 k8s.io/apiserver/pkg/endpoints/filters
 k8s.io/apiserver/pkg/endpoints/handlers
 k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager
-k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
 k8s.io/apiserver/pkg/endpoints/handlers/finisher
 k8s.io/apiserver/pkg/endpoints/handlers/metrics
 k8s.io/apiserver/pkg/endpoints/handlers/negotiation
@@ -1892,6 +1836,8 @@ k8s.io/client-go/metadata/metadatainformer
 k8s.io/client-go/metadata/metadatalister
 k8s.io/client-go/openapi
 k8s.io/client-go/openapi/cached
+k8s.io/client-go/openapi/openapitest
+k8s.io/client-go/openapi3
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/install
 k8s.io/client-go/pkg/apis/clientauthentication/v1
@@ -2141,7 +2087,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.19
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
+# k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a
 ## explicit; go 1.18
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -2149,6 +2095,7 @@ k8s.io/kube-openapi/pkg/aggregator
 k8s.io/kube-openapi/pkg/builder
 k8s.io/kube-openapi/pkg/builder3
 k8s.io/kube-openapi/pkg/builder3/util
+k8s.io/kube-openapi/pkg/cached
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/common/restfuladapter
 k8s.io/kube-openapi/pkg/generators
@@ -2156,7 +2103,6 @@ k8s.io/kube-openapi/pkg/generators/rules
 k8s.io/kube-openapi/pkg/handler
 k8s.io/kube-openapi/pkg/handler3
 k8s.io/kube-openapi/pkg/internal
-k8s.io/kube-openapi/pkg/internal/handler
 k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 k8s.io/kube-openapi/pkg/openapiconv
 k8s.io/kube-openapi/pkg/schemaconv
@@ -2284,7 +2230,6 @@ k8s.io/kubelet/pkg/apis/podresources/v1alpha1
 k8s.io/kubelet/pkg/apis/stats/v1alpha1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
 ## explicit; go 1.19
-k8s.io/legacy-cloud-providers/aws
 k8s.io/legacy-cloud-providers/azure
 k8s.io/legacy-cloud-providers/azure/auth
 k8s.io/legacy-cloud-providers/azure/cache

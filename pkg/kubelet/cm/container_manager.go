@@ -148,14 +148,14 @@ type NodeConfig struct {
 	QOSReserved                              map[v1.ResourceName]int64
 	CPUManagerPolicy                         string
 	CPUManagerPolicyOptions                  map[string]string
-	ExperimentalTopologyManagerScope         string
+	TopologyManagerScope                     string
 	CPUManagerReconcilePeriod                time.Duration
 	ExperimentalMemoryManagerPolicy          string
 	ExperimentalMemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
-	ExperimentalPodPidsLimit                 int64
+	PodPidsLimit                             int64
 	EnforceCPULimits                         bool
 	CPUCFSQuotaPeriod                        time.Duration
-	ExperimentalTopologyManagerPolicy        string
+	TopologyManagerPolicy                    string
 	ExperimentalTopologyManagerPolicyOptions map[string]string
 }
 

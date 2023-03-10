@@ -523,8 +523,8 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("Expected create of invalid custom resource to fail")
 			} else {
-				if !strings.Contains(err.Error(), "failed rule: self.spec.x + self.spec.y") {
-					t.Fatalf("Expected error to contain %s but got %v", "failed rule: self.spec.x + self.spec.y", err.Error())
+				if !strings.Contains(err.Error(), "self.spec.x + self.spec.y must be greater than or equal to 0") {
+					t.Fatalf("Expected error to contain %s but got %v", "self.spec.x + self.spec.y must be greater than or equal to 0", err.Error())
 				}
 			}
 		})
@@ -837,7 +837,8 @@ var structuralSchemaWithBlockingErr = []byte(`
     "type": "object",
 	"x-kubernetes-validations": [
 	  {
-		"rule": "self.spec.x + self.spec.y >= (has(self.status) ? self.status.z : 0)"
+		"rule": "self.spec.x + self.spec.y >= (has(self.status) ? self.status.z : 0)",
+		"messageExpression": "\"self.spec.x + self.spec.y must be greater than or equal to 0\""
 	  }
 	],
     "properties": {

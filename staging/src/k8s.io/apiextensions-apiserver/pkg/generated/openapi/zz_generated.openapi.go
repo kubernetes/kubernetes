@@ -215,7 +215,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -1022,7 +1022,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selector is the label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is the label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"string"},
 							Format:      "",
 						},

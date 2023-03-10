@@ -21,7 +21,6 @@ package app
 
 import (
 	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 
@@ -30,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -69,7 +67,6 @@ type pluginInfo struct {
 
 func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
-	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginUnregisterFeature: features.InTreePluginAWSUnregister, pluginProbeFunction: awsebs.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginUnregisterFeature: features.InTreePluginGCEUnregister, pluginProbeFunction: gcepd.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginUnregisterFeature: features.InTreePluginAzureDiskUnregister, pluginProbeFunction: azuredd.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginUnregisterFeature: features.InTreePluginAzureFileUnregister, pluginProbeFunction: azure_file.ProbeVolumePlugins}

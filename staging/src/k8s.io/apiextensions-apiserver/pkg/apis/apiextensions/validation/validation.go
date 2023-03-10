@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 
@@ -1004,6 +1005,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		for i, rule := range schema.XValidations {
 			trimmedRule := strings.TrimSpace(rule.Rule)
 			trimmedMsg := strings.TrimSpace(rule.Message)
+			trimmedMsgExpr := strings.TrimSpace(rule.MessageExpression)
 			if len(trimmedRule) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), "rule is not specified"))
 			} else if len(rule.Message) > 0 && len(trimmedMsg) == 0 {
@@ -1012,6 +1014,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must not contain line breaks"))
 			} else if hasNewlines(trimmedRule) && len(trimmedMsg) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), "message must be specified if rule contains line breaks"))
+			}
+			if len(rule.MessageExpression) > 0 && len(trimmedMsgExpr) == 0 {
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), "messageExpression must be non-empty if specified"))
 			}
 		}
 
@@ -1026,7 +1031,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			} else if typeInfo == nil {
 				allErrs.CELErrors = append(allErrs.CELErrors, field.InternalError(fldPath.Child("x-kubernetes-validations"), fmt.Errorf("internal error: failed to retrieve type information for x-kubernetes-validations")))
 			} else {
-				compResults, err := cel.Compile(typeInfo.Schema, typeInfo.DeclType, cel.PerCallLimit)
+				compResults, err := cel.Compile(typeInfo.Schema, typeInfo.DeclType, celconfig.PerCallLimit)
 				if err != nil {
 					allErrs.CELErrors = append(allErrs.CELErrors, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 				} else {
@@ -1044,6 +1049,19 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 								allErrs.CELErrors = append(allErrs.CELErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
 							} else {
 								allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i], cr.Error.Detail))
+							}
+						}
+						if cr.MessageExpressionError != nil {
+							allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), schema.XValidations[i], cr.MessageExpressionError.Detail))
+						} else {
+							if cr.MessageExpression != nil {
+								if cr.MessageExpressionMaxCost > StaticEstimatedCostLimit {
+									costErrorMsg := getCostErrorMessage("estimated messageExpression cost", cr.MessageExpressionMaxCost, StaticEstimatedCostLimit)
+									allErrs.CELErrors = append(allErrs.CELErrors, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), costErrorMsg))
+								}
+								if celContext.TotalCost != nil {
+									celContext.TotalCost.ObserveExpressionCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), cr.MessageExpressionMaxCost)
+								}
 							}
 						}
 						if cr.TransitionRule {

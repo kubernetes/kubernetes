@@ -368,6 +368,10 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 	return f, nil
 }
 
+func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
+	f.PodNominator = n
+}
+
 // getScoreWeights makes sure that, between MultiPoint-Score plugin weights and individual Score
 // plugin weights there is not an overflow of MaxTotalScore.
 func getScoreWeights(f *frameworkImpl, pluginsMap map[string]framework.Plugin, plugins []config.Plugin) error {
@@ -617,6 +621,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			skipPlugins.Insert(pl.Name())
 			continue
 		}
+		metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), preFilter, f.profileName).Inc()
 		if !s.IsSuccess() {
 			s.SetFailedPlugin(pl.Name())
 			if s.IsUnschedulable() {
@@ -734,6 +739,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 		if state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
+		metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), Filter, f.profileName).Inc()
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
@@ -952,8 +958,8 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	if len(plugins) > 0 {
 		// Run Score method for each node in parallel.
 		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+			nodeName := nodes[index].Name
 			for _, pl := range plugins {
-				nodeName := nodes[index].Name
 				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())

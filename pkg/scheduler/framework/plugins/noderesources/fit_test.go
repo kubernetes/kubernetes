@@ -535,25 +535,25 @@ func TestNotEnoughRequests(t *testing.T) {
 		{
 			pod:        &v1.Pod{},
 			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 10, Memory: 20})),
-			name:       "even without specified resources predicate fails when there's no space for additional pod",
+			name:       "even without specified resources, predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
 			pod:        newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 5, Memory: 5})),
-			name:       "even if both resources fit predicate fails when there's no space for additional pod",
+			name:       "even if both resources fit, predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
 			pod:        newResourcePod(framework.Resource{MilliCPU: 5, Memory: 1}),
 			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
-			name:       "even for equal edge case predicate fails when there's no space for additional pod",
+			name:       "even for equal edge case, predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
 			pod:        newResourceInitPod(newResourcePod(framework.Resource{MilliCPU: 5, Memory: 1}), framework.Resource{MilliCPU: 5, Memory: 1}),
 			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
-			name:       "even for equal edge case predicate fails when there's no space for additional pod due to init container",
+			name:       "even for equal edge case, predicate fails when there's no space for additional pod due to init container",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 	}
@@ -591,15 +591,8 @@ func TestStorageRequests(t *testing.T) {
 		{
 			pod: newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: framework.NewNodeInfo(
-				newResourcePod(framework.Resource{MilliCPU: 10, Memory: 10})),
-			name:       "due to container scratch disk",
-			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
-		},
-		{
-			pod: newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: framework.NewNodeInfo(
 				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 10})),
-			name: "pod fit",
+			name: "empty storage requested, and pod fits",
 		},
 		{
 			pod: newResourcePod(framework.Resource{EphemeralStorage: 25}),

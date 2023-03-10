@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -117,4 +118,14 @@ type TLSConfig struct {
 	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string `json:"clientCert,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TracingConfiguration provides versioned configuration for tracing clients.
+type TracingConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration `json:",inline"`
 }

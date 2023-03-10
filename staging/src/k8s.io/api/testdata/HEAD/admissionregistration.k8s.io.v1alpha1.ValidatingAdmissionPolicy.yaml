@@ -33,6 +33,9 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  auditAnnotations:
+  - key: keyValue
+    valueExpression: valueExpressionValue
   failurePolicy: failurePolicyValue
   matchConstraints:
     excludeResourceRules:

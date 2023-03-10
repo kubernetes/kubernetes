@@ -63,8 +63,7 @@ type CloudControllerManagerOptions struct {
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 
-	Master     string
-	Kubeconfig string
+	Master string
 
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
@@ -133,7 +132,7 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
-	fs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&o.Generic.ClientConnection.Kubeconfig, "kubeconfig", o.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
@@ -148,7 +147,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
 	// goroutines (started from initializing secure serving - which underneath
 	// creates a queue which in its constructor starts a goroutine).
-	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
+	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Generic.ClientConnection.Kubeconfig)
 	if err != nil {
 		return err
 	}

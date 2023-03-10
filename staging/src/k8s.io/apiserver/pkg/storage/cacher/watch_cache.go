@@ -686,11 +686,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 		// current state and only then start watching from that point.
 		//
 		// TODO: In v2 api, we should stop returning the current state - #13969.
-		ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, w.getAttrsFunc)
-		if err != nil {
-			return nil, err
-		}
-		return ci, nil
+		return w.getIntervalFromStoreLocked()
 	}
 	if resourceVersion < oldest-1 {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
@@ -705,5 +701,16 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 		return w.cache[i%w.capacity]
 	}
 	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, &w.RWMutex)
+	return ci, nil
+}
+
+// getIntervalFromStoreLocked returns a watchCacheInterval
+// that covers the entire storage state.
+// This function assumes to be called under the watchCache lock.
+func (w *watchCache) getIntervalFromStoreLocked() (*watchCacheInterval, error) {
+	ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, w.getAttrsFunc)
+	if err != nil {
+		return nil, err
+	}
 	return ci, nil
 }

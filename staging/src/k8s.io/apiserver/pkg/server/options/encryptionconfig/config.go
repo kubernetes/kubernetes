@@ -218,8 +218,22 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 		for _, resource := range resourceConfig.Resources {
 			resource := resource
 			gr := schema.ParseGroupResource(resource)
-			resourceToPrefixTransformer[gr] = append(
-				resourceToPrefixTransformer[gr], transformers...)
+
+			// check if resource is masked by *.group rule
+			anyResourceInGroup := schema.GroupResource{Group: gr.Group, Resource: "*"}
+			if _, masked := resourceToPrefixTransformer[anyResourceInGroup]; masked {
+				// an earlier rule already configured a transformer for *.group, masking this rule
+				// return error since this is not allowed
+				return nil, nil, nil, fmt.Errorf("resource %q is masked by earlier rule %q", grYAMLString(gr), grYAMLString(anyResourceInGroup))
+			}
+
+			if _, masked := resourceToPrefixTransformer[anyGroupAnyResource]; masked {
+				// an earlier rule already configured a transformer for *.*, masking this rule
+				// return error since this is not allowed
+				return nil, nil, nil, fmt.Errorf("resource %q is masked by earlier rule %q", grYAMLString(gr), grYAMLString(anyGroupAnyResource))
+			}
+
+			resourceToPrefixTransformer[gr] = append(resourceToPrefixTransformer[gr], transformers...)
 		}
 
 		probes = append(probes, p...)
@@ -777,10 +791,34 @@ func (s StaticTransformers) TransformerForResource(resource schema.GroupResource
 	return transformerFromOverrides(s, resource)
 }
 
+var anyGroupAnyResource = schema.GroupResource{
+	Group:    "*",
+	Resource: "*",
+}
+
 func transformerFromOverrides(transformerOverrides map[schema.GroupResource]value.Transformer, resource schema.GroupResource) value.Transformer {
-	transformer := transformerOverrides[resource]
-	if transformer == nil {
-		return identity.NewEncryptCheckTransformer()
+	if transformer := transformerOverrides[resource]; transformer != nil {
+		return transformer
 	}
-	return transformer
+
+	if transformer := transformerOverrides[schema.GroupResource{
+		Group:    resource.Group,
+		Resource: "*",
+	}]; transformer != nil {
+		return transformer
+	}
+
+	if transformer := transformerOverrides[anyGroupAnyResource]; transformer != nil {
+		return transformer
+	}
+
+	return identity.NewEncryptCheckTransformer()
+}
+
+func grYAMLString(gr schema.GroupResource) string {
+	if gr.Group == "" && gr.Resource == "*" {
+		return "*."
+	}
+
+	return gr.String()
 }

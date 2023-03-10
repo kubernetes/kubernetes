@@ -137,8 +137,11 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// State returns a read-only interface to the internal status manager state.
-	State() state.Reader
+	// GetContainerResourceAllocation returns checkpointed ResourcesAllocated value for the container
+	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
+
+	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
+	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
 
 	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
 	SetPodAllocation(pod *v1.Pod) error
@@ -183,21 +186,23 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 }
 
 func (m *manager) Start() {
+	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of ResourcesAllocated & Resize
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
+		if err != nil {
+			// This is a crictical, non-recoverable failure.
+			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
+			panic(err)
+		}
+		m.state = stateImpl
+	}
+
 	// Don't start the status manager if we don't have a client. This will happen
 	// on the master, where the kubelet is responsible for bootstrapping the pods
 	// of the master components.
 	if m.kubeClient == nil {
 		klog.InfoS("Kubernetes client is nil, not starting status manager")
 		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
-		if err != nil {
-			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
-			return
-		}
-		m.state = stateImpl
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
@@ -227,9 +232,20 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-// State returns the pod resources checkpoint state of the pod status manager
-func (m *manager) State() state.Reader {
-	return m.state
+// GetContainerResourceAllocation returns the last checkpointed ResourcesAllocated values
+// If checkpoint manager has not been initialized, it returns nil, false
+func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	return m.state.GetContainerResourceAllocation(podUID, containerName)
+}
+
+// GetPodResizeStatus returns the last checkpointed ResizeStaus value
+// If checkpoint manager has not been initialized, it returns nil, false
+func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	return m.state.GetPodResizeStatus(podUID)
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers

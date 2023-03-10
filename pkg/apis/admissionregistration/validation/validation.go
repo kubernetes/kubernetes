@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"regexp"
 	"strings"
 
@@ -30,11 +29,15 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
+
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 func hasWildcard(slice []string) bool {
@@ -581,6 +584,14 @@ func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistratio
 	})
 }
 
+const (
+	maxAuditAnnotations = 20
+	// use a 5kb limit the CEL expression, note that this is less than the length limit
+	// for the audit annotation value limit (10kb) since an expressions that concatenates
+	// strings will often produce a longer value than the expression
+	maxAuditAnnotationValueExpressionLength = 5 * 1024
+)
+
 // ValidateValidatingAdmissionPolicy validates a ValidatingAdmissionPolicy before creation.
 func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
 	return validateValidatingAdmissionPolicy(p)
@@ -588,11 +599,11 @@ func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmiss
 
 func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(&p.Spec, field.NewPath("spec"))...)
+	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, field.NewPath("spec"))...)
 	return allErrors
 }
 
-func validateValidatingAdmissionPolicySpec(spec *admissionregistration.ValidatingAdmissionPolicySpec, fldPath *field.Path) field.ErrorList {
+func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.ValidatingAdmissionPolicySpec, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if spec.FailurePolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
@@ -611,14 +622,27 @@ func validateValidatingAdmissionPolicySpec(spec *admissionregistration.Validatin
 			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
 		}
 	}
-	if len(spec.Validations) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), ""))
+	if len(spec.Validations) == 0 && len(spec.AuditAnnotations) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), "validations or auditAnnotations must contain at least one item"))
+		allErrors = append(allErrors, field.Required(fldPath.Child("auditAnnotations"), "validations or auditAnnotations must contain at least one item"))
 	} else {
 		for i, validation := range spec.Validations {
 			allErrors = append(allErrors, validateValidation(&validation, spec.ParamKind, fldPath.Child("validations").Index(i))...)
 		}
+		if spec.AuditAnnotations != nil {
+			keys := sets.NewString()
+			if len(spec.AuditAnnotations) > maxAuditAnnotations {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("auditAnnotations"), spec.AuditAnnotations, fmt.Sprintf("must not have more than %d auditAnnotations", maxAuditAnnotations)))
+			}
+			for i, auditAnnotation := range spec.AuditAnnotations {
+				allErrors = append(allErrors, validateAuditAnnotation(meta, &auditAnnotation, spec.ParamKind, fldPath.Child("auditAnnotations").Index(i))...)
+				if keys.Has(auditAnnotation.Key) {
+					allErrors = append(allErrors, field.Duplicate(fldPath.Child("auditAnnotations").Index(i).Child("key"), auditAnnotation.Key))
+				}
+				keys.Insert(auditAnnotation.Key)
+			}
+		}
 	}
-
 	return allErrors
 }
 
@@ -710,6 +734,33 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	return allErrors
 }
 
+var validValidationActions = sets.NewString(
+	string(admissionregistration.Deny),
+	string(admissionregistration.Warn),
+	string(admissionregistration.Audit),
+)
+
+func validateValidationActions(va []admissionregistration.ValidationAction, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	actions := sets.NewString()
+	for i, action := range va {
+		if !validValidationActions.Has(string(action)) {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Index(i), action, validValidationActions.List()))
+		}
+		if actions.Has(string(action)) {
+			allErrors = append(allErrors, field.Duplicate(fldPath.Index(i), action))
+		}
+		actions.Insert(string(action))
+	}
+	if actions.Has(string(admissionregistration.Deny)) && actions.Has(string(admissionregistration.Warn)) {
+		allErrors = append(allErrors, field.Invalid(fldPath, va, "must not contain both Deny and Warn (repeating the same validation failure information in the API response and headers serves no purpose)"))
+	}
+	if len(actions) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath, "at least one validation action is required"))
+	}
+	return allErrors
+}
+
 func validateNamedRuleWithOperations(n *admissionregistration.NamedRuleWithOperations, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	resourceNames := sets.NewString()
@@ -738,7 +789,7 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 			Expression: trimmedExpression,
 			Message:    v.Message,
 			Reason:     v.Reason,
-		}, paramKind != nil)
+		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true}, celconfig.PerCallLimit)
 		if result.Error != nil {
 			switch result.Error.Type {
 			case cel.ErrorTypeRequired:
@@ -761,6 +812,38 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	}
 	if v.Reason != nil && !supportedValidationPolicyReason.Has(string(*v.Reason)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reason"), *v.Reason, supportedValidationPolicyReason.List()))
+	}
+	return allErrors
+}
+
+func validateAuditAnnotation(meta metav1.ObjectMeta, v *admissionregistration.AuditAnnotation, paramKind *admissionregistration.ParamKind, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(meta.GetName()) != 0 {
+		name := meta.GetName()
+		allErrors = append(allErrors, apivalidation.ValidateQualifiedName(name+"/"+v.Key, fldPath.Child("key"))...)
+	} else {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("key"), v.Key, "requires metadata.name be non-empty"))
+	}
+
+	trimmedValueExpression := strings.TrimSpace(v.ValueExpression)
+	if len(trimmedValueExpression) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("valueExpression"), "valueExpression is not specified"))
+	} else if len(trimmedValueExpression) > maxAuditAnnotationValueExpressionLength {
+		allErrors = append(allErrors, field.Required(fldPath.Child("valueExpression"), fmt.Sprintf("must not exceed %d bytes in length", maxAuditAnnotationValueExpressionLength)))
+	} else {
+		result := plugincel.CompileCELExpression(&validatingadmissionpolicy.AuditAnnotationCondition{
+			ValueExpression: trimmedValueExpression,
+		}, plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true}, celconfig.PerCallLimit)
+		if result.Error != nil {
+			switch result.Error.Type {
+			case cel.ErrorTypeRequired:
+				allErrors = append(allErrors, field.Required(fldPath.Child("valueExpression"), result.Error.Detail))
+			case cel.ErrorTypeInvalid:
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("valueExpression"), v.ValueExpression, result.Error.Detail))
+			default:
+				allErrors = append(allErrors, field.InternalError(fldPath.Child("valueExpression"), result.Error))
+			}
+		}
 	}
 	return allErrors
 }
@@ -794,6 +877,7 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 	}
 	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
 	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResouces"))...)
+	allErrors = append(allErrors, validateValidationActions(spec.ValidationActions, fldPath.Child("validationActions"))...)
 
 	return allErrors
 }

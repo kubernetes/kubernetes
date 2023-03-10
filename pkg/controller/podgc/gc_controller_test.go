@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -55,8 +56,9 @@ func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (
 
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
-		name  string
-		phase v1.PodPhase
+		name   string
+		phase  v1.PodPhase
+		reason string
 	}
 
 	testCases := []struct {
@@ -127,6 +129,24 @@ func TestGCTerminated(t *testing.T) {
 			threshold:       5,
 			deletedPodNames: sets.NewString(),
 		},
+		{
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed},
+				{name: "b", phase: v1.PodSucceeded},
+				{name: "c", phase: v1.PodFailed, reason: eviction.Reason},
+			},
+			threshold:       1,
+			deletedPodNames: sets.NewString("c", "a"),
+		},
+		{
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodRunning},
+				{name: "b", phase: v1.PodSucceeded},
+				{name: "c", phase: v1.PodFailed, reason: eviction.Reason},
+			},
+			threshold:       1,
+			deletedPodNames: sets.NewString("c"),
+		},
 	}
 
 	for _, test := range testCases {
@@ -140,7 +160,7 @@ func TestGCTerminated(t *testing.T) {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
-					Status:     v1.PodStatus{Phase: pod.phase},
+					Status:     v1.PodStatus{Phase: pod.phase, Reason: pod.reason},
 					Spec:       v1.PodSpec{NodeName: "node"},
 				})
 			}

@@ -47,6 +47,29 @@ type PolicyDecision struct {
 	Elapsed    time.Duration
 }
 
+type PolicyAuditAnnotationAction string
+
+const (
+	// AuditAnnotationActionPublish indicates that the audit annotation should be
+	// published with the audit event.
+	AuditAnnotationActionPublish PolicyAuditAnnotationAction = "publish"
+	// AuditAnnotationActionError indicates that the valueExpression resulted
+	// in an error.
+	AuditAnnotationActionError PolicyAuditAnnotationAction = "error"
+	// AuditAnnotationActionExclude indicates that the audit annotation should be excluded
+	// because the valueExpression evaluated to null, or because FailurePolicy is Ignore
+	// and the expression failed with a parse error, type check error, or runtime error.
+	AuditAnnotationActionExclude PolicyAuditAnnotationAction = "exclude"
+)
+
+type PolicyAuditAnnotation struct {
+	Key     string
+	Value   string
+	Elapsed time.Duration
+	Action  PolicyAuditAnnotationAction
+	Error   string
+}
+
 func reasonToCode(r metav1.StatusReason) int32 {
 	switch r {
 	case metav1.StatusReasonForbidden:

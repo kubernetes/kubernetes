@@ -699,8 +699,8 @@ func (c *Controller) syncNodes(ctx context.Context, workers int) sets.String {
 // there's no need. This function returns true if we tried to update load balancers and
 // failed, indicating to the caller that we should try again.
 func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.Node) bool {
-	retSuccess := false
-	retNeedRetry := true
+	const retSuccess = false
+	const retNeedRetry = true
 	if svc == nil || !wantsLoadBalancer(svc) {
 		return retSuccess
 	}

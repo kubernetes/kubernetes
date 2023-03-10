@@ -520,7 +520,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using grpc call, success
 		Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
@@ -543,7 +543,7 @@ var _ = SIGDescribe("Probing container", func() {
 			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
 		                 When liveness probe does  fail then the restart count should +1.
 	*/
-	ginkgo.It("should be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{

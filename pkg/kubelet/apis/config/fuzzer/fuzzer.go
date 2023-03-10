@@ -90,8 +90,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 			obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
 			obj.ContentType = "application/vnd.kubernetes.protobuf"
-			obj.KubeAPIQPS = 5
-			obj.KubeAPIBurst = 10
+			obj.KubeAPIQPS = 50
+			obj.KubeAPIBurst = 100
 			obj.HairpinMode = v1beta1.PromiscuousBridge
 			obj.EvictionHard = eviction.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}

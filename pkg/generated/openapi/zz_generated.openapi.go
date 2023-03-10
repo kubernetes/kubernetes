@@ -45,6 +45,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/admissionregistration/v1.ValidatingWebhookConfiguration":                              schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfiguration(ref),
 		"k8s.io/api/admissionregistration/v1.ValidatingWebhookConfigurationList":                          schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfigurationList(ref),
 		"k8s.io/api/admissionregistration/v1.WebhookClientConfig":                                         schema_k8sio_api_admissionregistration_v1_WebhookClientConfig(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation":                                       schema_k8sio_api_admissionregistration_v1alpha1_AuditAnnotation(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.MatchResources":                                        schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.NamedRuleWithOperations":                               schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ParamKind":                                             schema_k8sio_api_admissionregistration_v1alpha1_ParamKind(ref),
@@ -171,6 +172,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/authentication/v1.UserInfo":                                                           schema_k8sio_api_authentication_v1_UserInfo(ref),
 		"k8s.io/api/authentication/v1alpha1.SelfSubjectReview":                                            schema_k8sio_api_authentication_v1alpha1_SelfSubjectReview(ref),
 		"k8s.io/api/authentication/v1alpha1.SelfSubjectReviewStatus":                                      schema_k8sio_api_authentication_v1alpha1_SelfSubjectReviewStatus(ref),
+		"k8s.io/api/authentication/v1beta1.SelfSubjectReview":                                             schema_k8sio_api_authentication_v1beta1_SelfSubjectReview(ref),
+		"k8s.io/api/authentication/v1beta1.SelfSubjectReviewStatus":                                       schema_k8sio_api_authentication_v1beta1_SelfSubjectReviewStatus(ref),
 		"k8s.io/api/authentication/v1beta1.TokenReview":                                                   schema_k8sio_api_authentication_v1beta1_TokenReview(ref),
 		"k8s.io/api/authentication/v1beta1.TokenReviewSpec":                                               schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref),
 		"k8s.io/api/authentication/v1beta1.TokenReviewStatus":                                             schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref),
@@ -1856,6 +1859,36 @@ func schema_k8sio_api_admissionregistration_v1_WebhookClientConfig(ref common.Re
 	}
 }
 
+func schema_k8sio_api_admissionregistration_v1alpha1_AuditAnnotation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuditAnnotation describes how to produce an audit annotation for an API request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "key specifies the audit annotation key. The audit annotation keys of a ValidatingAdmissionPolicy must be unique. The key must be a qualified name ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.\n\nThe key is combined with the resource name of the ValidatingAdmissionPolicy to construct an audit annotation key: \"{ValidatingAdmissionPolicy name}/{key}\".\n\nIf an admission webhook uses the same resource name as this ValidatingAdmissionPolicy and the same audit annotation key, the annotation key will be identical. In this case, the first annotation written with the key will be included in the audit event and all subsequent annotations with the same key will be discarded.\n\nRequired.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"valueExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "valueExpression represents the expression which is evaluated by CEL to produce an audit annotation value. The expression must evaluate to either a string or null value. If the expression evaluates to a string, the audit annotation is included with the string value. If the expression evaluates to null or empty string the audit annotation will be omitted. The valueExpression may be no longer than 5kb in length. If the result of the valueExpression is more than 10kb in length, it will be truncated to 10kb.\n\nIf multiple ValidatingAdmissionPolicyBinding resources match an API request, then the valueExpression will be evaluated for each binding. All unique values produced by the valueExpressions will be joined together in a comma-separated list.\n\nRequired.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"key", "valueExpression"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2285,6 +2318,26 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 							Ref:         ref("k8s.io/api/admissionregistration/v1alpha1.MatchResources"),
 						},
 					},
+					"validationActions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "validationActions declares how Validations of the referenced ValidatingAdmissionPolicy are enforced. If a validation evaluates to false it is always enforced according to these actions.\n\nFailures defined by the ValidatingAdmissionPolicy's FailurePolicy are enforced according to these actions only if the FailurePolicy is set to Fail, otherwise the failures are ignored. This includes compilation errors, runtime errors and misconfigurations of the policy.\n\nvalidationActions is declared as a set of action values. Order does not matter. validationActions may not contain duplicates of the same action.\n\nThe supported actions values are:\n\n\"Deny\" specifies that a validation failure results in a denied request.\n\n\"Warn\" specifies that a validation failure is reported to the request client in HTTP Warning headers, with a warning code of 299. Warnings can be sent both for allowed or denied admission responses.\n\n\"Audit\" specifies that a validation failure is included in the published audit event for the request. The audit event will contain a `validation.policy.admission.k8s.io/validation_failure` audit annotation with a value containing the details of the validation failures, formatted as a JSON list of objects, each with the following fields: - message: The validation failure message string - policy: The resource name of the ValidatingAdmissionPolicy - binding: The resource name of the ValidatingAdmissionPolicyBinding - expressionIndex: The index of the failed validations in the ValidatingAdmissionPolicy - validationActions: The enforcement actions enacted for the validation failure Example audit annotation: `\"validation.policy.admission.k8s.io/validation_failure\": \"[{\"message\": \"Invalid value\", {\"policy\": \"policy.example.com\", {\"binding\": \"policybinding.example.com\", {\"expressionIndex\": \"1\", {\"validationActions\": [\"Audit\"]}]\"`\n\nClients should expect to handle additional values by ignoring any values not recognized.\n\n\"Deny\" and \"Warn\" may not be used together since this combination needlessly duplicates the validation failure both in the API response body and the HTTP warning headers.\n\nRequired.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -2369,7 +2422,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Validations contain CEL expressions which is used to apply the validation. A minimum of one validation is required for a policy definition. Required.",
+							Description: "Validations contain CEL expressions which is used to apply the validation. Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -2383,18 +2436,36 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 					},
 					"failurePolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "FailurePolicy defines how to handle failures for the admission policy. Failures can occur from invalid or mis-configured policy definitions or bindings. A policy is invalid if spec.paramKind refers to a non-existent Kind. A binding is invalid if spec.paramRef.name refers to a non-existent resource. Allowed values are Ignore or Fail. Defaults to Fail.\n\nPossible enum values:\n - `\"Fail\"` means that an error calling the webhook causes the admission to fail.\n - `\"Ignore\"` means that an error calling the webhook is ignored.",
+							Description: "failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings.\n\nA policy is invalid if spec.paramKind refers to a non-existent Kind. A binding is invalid if spec.paramRef.name refers to a non-existent resource.\n\nfailurePolicy does not define how validations that evaluate to false are handled.\n\nWhen failurePolicy is set to Fail, ValidatingAdmissionPolicyBinding validationActions define how failures are enforced.\n\nAllowed values are Ignore or Fail. Defaults to Fail.\n\nPossible enum values:\n - `\"Fail\"` means that an error calling the webhook causes the admission to fail.\n - `\"Ignore\"` means that an error calling the webhook is ignored.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Fail", "Ignore"},
 						},
 					},
+					"auditAnnotations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "auditAnnotations contains CEL expressions which are used to produce audit annotations for the audit event of the API request. validations and auditAnnotations may not both be empty; a least one of validations or auditAnnotations is required.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation"),
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"validations"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Validation"},
+			"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Validation"},
 	}
 }
 
@@ -2407,7 +2478,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Validation(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec CEL expressions have access to the contents of the Admission request/response, organized into CEL variables as well as some other useful variables:\n\n'object' - The object from the incoming request. The value is null for DELETE requests. 'oldObject' - The existing object. The value is null for CREATE requests. 'request' - Attributes of the admission request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Expression accessing a property named \"namespace\": {\"Expression\": \"object.__namespace__ > 0\"}\n  - Expression accessing a property named \"x-prop\": {\"Expression\": \"object.x__dash__prop > 0\"}\n  - Expression accessing a property named \"redact__d\": {\"Expression\": \"object.redact__underscores__d > 0\"}\n\nEquality on arrays with list type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.\nRequired.",
+							Description: "Expression represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Expression accessing a property named \"namespace\": {\"Expression\": \"object.__namespace__ > 0\"}\n  - Expression accessing a property named \"x-prop\": {\"Expression\": \"object.x__dash__prop > 0\"}\n  - Expression accessing a property named \"redact__d\": {\"Expression\": \"object.redact__underscores__d > 0\"}\n\nEquality on arrays with list type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.\nRequired.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -5013,7 +5084,7 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is beta.",
 							Ref:         ref("k8s.io/api/apps/v1.StatefulSetOrdinals"),
 						},
 					},
@@ -5186,14 +5257,14 @@ func schema_k8sio_api_apps_v1beta1_ControllerRevision(ref common.ReferenceCallba
 					},
 					"data": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Data is the serialized representation of the state.",
+							Description: "data is the serialized representation of the state.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
 						},
 					},
 					"revision": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Revision indicates the revision of the state represented by Data.",
+							Description: "revision indicates the revision of the state represented by Data.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
@@ -5490,14 +5561,14 @@ func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+							Description: "replicas is the number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
+							Description: "selector is the label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 						},
 					},
@@ -5522,34 +5593,34 @@ func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) 
 					},
 					"minReadySeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Description: "minReadySeconds is the minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"revisionHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 2.",
+							Description: "revisionHistoryLimit is the number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 2.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"paused": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates that the deployment is paused.",
+							Description: "paused indicates that the deployment is paused.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"rollbackTo": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
+							Description: "DEPRECATED. rollbackTo is the config this deployment is rolling back to. Will be cleared after rollback is done.",
 							Ref:         ref("k8s.io/api/apps/v1beta1.RollbackConfig"),
 						},
 					},
 					"progressDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
+							Description: "progressDeadlineSeconds is the maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -5572,21 +5643,21 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The generation observed by the deployment controller.",
+							Description: "observedGeneration is the generation observed by the deployment controller.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+							Description: "replicas is the total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"updatedReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+							Description: "updatedReplicas is the total number of non-terminated pods targeted by this deployment that have the desired template spec.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -5607,7 +5678,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 					},
 					"unavailableReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
+							Description: "unavailableReplicas is the total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -5620,7 +5691,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the latest available observations of a deployment's current state.",
+							Description: "Conditions represent the latest available observations of a deployment's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -5634,7 +5705,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 					},
 					"collisionCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
+							Description: "collisionCount is the count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -5738,7 +5809,7 @@ func schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref common.R
 					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
+							Description: "maxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -5780,14 +5851,14 @@ func schema_k8sio_api_apps_v1beta1_Scale(ref common.ReferenceCallback) common.Op
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
+							Description: "spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/apps/v1beta1.ScaleSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
+							Description: "status defines current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/apps/v1beta1.ScaleStatus"),
 						},
@@ -5809,7 +5880,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleSpec(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desired number of instances for the scaled object.",
+							Description: "replicas is the number of observed instances of the scaled object.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -5829,7 +5900,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "actual number of observed instances of the scaled object.",
+							Description: "replias is the actual number of observed instances of the scaled object.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -5837,7 +5908,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) com
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -5853,7 +5924,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) com
 					},
 					"targetSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+							Description: "targetSelector is the label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -6046,14 +6117,14 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetPersistentVolumeClaimRetentionPoli
 				Properties: map[string]spec.Schema{
 					"whenDeleted": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted. The default policy of `Retain` causes PVCs to not be affected by StatefulSet deletion. The `Delete` policy causes those PVCs to be deleted.",
+							Description: "whenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted. The default policy of `Retain` causes PVCs to not be affected by StatefulSet deletion. The `Delete` policy causes those PVCs to be deleted.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"whenScaled": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down. The default policy of `Retain` causes PVCs to not be affected by a scaledown. The `Delete` policy causes the associated PVCs for any excess pods above the replica count to be deleted.",
+							Description: "whenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down. The default policy of `Retain` causes PVCs to not be affected by a scaledown. The `Delete` policy causes the associated PVCs for any excess pods above the replica count to be deleted.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -6136,7 +6207,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"minReadySeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Description: "minReadySeconds is the minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -6149,7 +6220,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is beta.",
 							Ref:         ref("k8s.io/api/apps/v1beta1.StatefulSetOrdinals"),
 						},
 					},
@@ -6234,7 +6305,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallbac
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the latest available observations of a statefulset's current state.",
+							Description: "conditions represent the latest available observations of a statefulset's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -6248,7 +6319,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallbac
 					},
 					"availableReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.",
+							Description: "availableReplicas is the total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -7521,7 +7592,7 @@ func schema_k8sio_api_apps_v1beta2_ScaleStatus(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -7833,7 +7904,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is beta.",
 							Ref:         ref("k8s.io/api/apps/v1beta2.StatefulSetOrdinals"),
 						},
 					},
@@ -8348,7 +8419,7 @@ func schema_k8sio_api_authentication_v1alpha1_SelfSubjectReview(ref common.Refer
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.",
+				Description: "SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or request header authentication is used, any extra keys will have their case ignored and returned as lowercase.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -8388,6 +8459,71 @@ func schema_k8sio_api_authentication_v1alpha1_SelfSubjectReview(ref common.Refer
 }
 
 func schema_k8sio_api_authentication_v1alpha1_SelfSubjectReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SelfSubjectReviewStatus is filled by the kube-apiserver and sent back to a user.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"userInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "User attributes of the user making this request.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/authentication/v1.UserInfo"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/authentication/v1.UserInfo"},
+	}
+}
+
+func schema_k8sio_api_authentication_v1beta1_SelfSubjectReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or request header authentication is used, any extra keys will have their case ignored and returned as lowercase.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is filled in by the server with the user attributes.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/authentication/v1beta1.SelfSubjectReviewStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/authentication/v1beta1.SelfSubjectReviewStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_authentication_v1beta1_SelfSubjectReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9997,7 +10133,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -10804,7 +10940,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selector is the label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is the label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -10911,7 +11047,7 @@ func schema_k8sio_api_autoscaling_v2_CrossVersionObjectReference(ref common.Refe
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -11927,7 +12063,7 @@ func schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref common
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "Name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -12763,7 +12899,7 @@ func schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref common
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -13763,7 +13899,7 @@ func schema_k8sio_api_batch_v1_CronJobSpec(ref common.ReferenceCallback) common.
 					},
 					"timeZone": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones This is beta field and must be enabled via the `CronJobTimeZone` feature gate.",
+							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -14573,7 +14709,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 					},
 					"timeZone": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones This is beta field and must be enabled via the `CronJobTimeZone` feature gate.",
+							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -30991,7 +31127,7 @@ func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallbac
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -45577,6 +45713,13 @@ func schema_pkg_apis_apiextensions_v1_ValidationRule(ref common.ReferenceCallbac
 							Format:      "",
 						},
 					},
+					"messageExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a rule, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the rule; the only difference is the return type. Example: \"x must be less than max (\"+string(self.max)+\")\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"rule"},
 			},
@@ -46964,6 +47107,13 @@ func schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref common.ReferenceCa
 					"message": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Message represents the message displayed when validation fails. The message is required if the Rule contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"messageExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a rule, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the rule; the only difference is the return type. Example: \"x must be less than max (\"+string(self.max)+\")\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -57366,14 +57516,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"eventRecordQPS": {
 						SchemaProps: spec.SchemaProps{
-							Description: "eventRecordQPS is the maximum event creations per second. If 0, there is no limit enforced. The value cannot be a negative number. Default: 5",
+							Description: "eventRecordQPS is the maximum event creations per second. If 0, there is no limit enforced. The value cannot be a negative number. Default: 50",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"eventBurst": {
 						SchemaProps: spec.SchemaProps{
-							Description: "eventBurst is the maximum size of a burst of event creations, temporarily allows event creations to burst to this number, while still not exceeding eventRecordQPS. This field canot be a negative number and it is only used when eventRecordQPS > 0. Default: 10",
+							Description: "eventBurst is the maximum size of a burst of event creations, temporarily allows event creations to burst to this number, while still not exceeding eventRecordQPS. This field canot be a negative number and it is only used when eventRecordQPS > 0. Default: 100",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -57559,14 +57709,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"topologyManagerPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "topologyManagerPolicy is the name of the topology manager policy to use. Valid values include:\n\n- `restricted`: kubelet only allows pods with optimal NUMA node alignment for\n  requested resources;\n- `best-effort`: kubelet will favor pods with NUMA alignment of CPU and device\n  resources;\n- `none`: kubelet has no knowledge of NUMA alignment of a pod's CPU and device resources. - `single-numa-node`: kubelet only allows pods with a single NUMA alignment\n  of CPU and device resources.\n\nPolicies other than \"none\" require the TopologyManager feature gate to be enabled. Default: \"none\"",
+							Description: "topologyManagerPolicy is the name of the topology manager policy to use. Valid values include:\n\n- `restricted`: kubelet only allows pods with optimal NUMA node alignment for\n  requested resources;\n- `best-effort`: kubelet will favor pods with NUMA alignment of CPU and device\n  resources;\n- `none`: kubelet has no knowledge of NUMA alignment of a pod's CPU and device resources. - `single-numa-node`: kubelet only allows pods with a single NUMA alignment\n  of CPU and device resources.\n\nDefault: \"none\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"topologyManagerScope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "topologyManagerScope represents the scope of topology hint generation that topology manager requests and hint providers generate. Valid values include:\n\n- `container`: topology policy is applied on a per-container basis. - `pod`: topology policy is applied on a per-pod basis.\n\n\"pod\" scope requires the TopologyManager feature gate to be enabled. Default: \"container\"",
+							Description: "topologyManagerScope represents the scope of topology hint generation that topology manager requests and hint providers generate. Valid values include:\n\n- `container`: topology policy is applied on a per-container basis. - `pod`: topology policy is applied on a per-pod basis.\n\nDefault: \"container\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -57687,14 +57837,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"kubeAPIQPS": {
 						SchemaProps: spec.SchemaProps{
-							Description: "kubeAPIQPS is the QPS to use while talking with kubernetes apiserver. Default: 5",
+							Description: "kubeAPIQPS is the QPS to use while talking with kubernetes apiserver. Default: 50",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"kubeAPIBurst": {
 						SchemaProps: spec.SchemaProps{
-							Description: "kubeAPIBurst is the burst to allow while talking with kubernetes API server. This field cannot be a negative number. Default: 10",
+							Description: "kubeAPIBurst is the burst to allow while talking with kubernetes API server. This field cannot be a negative number. Default: 100",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -58071,7 +58221,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"memoryThrottlingFactor": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.8",
+							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.9",
 							Type:        []string{"number"},
 							Format:      "double",
 						},

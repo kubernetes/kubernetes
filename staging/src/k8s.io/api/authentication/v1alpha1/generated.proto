@@ -30,7 +30,8 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/authentication/v1alpha1";
 
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
-// When using impersonation, users will receive the user info of the user being impersonated.
+// When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
+// request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
 message SelfSubjectReview {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

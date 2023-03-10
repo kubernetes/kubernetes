@@ -93,10 +93,7 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		i++
 	}
 
-	handler, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return s, err
-	}
+	handler := handler3.NewOpenAPIService()
 	s.openAPIV2ConverterHandler = handler
 	openAPIV2ConverterMux := mux.NewPathRecorderMux(openAPIV2Converter)
 	s.openAPIV2ConverterHandler.RegisterOpenAPIV3VersionedService("/openapi/v3", openAPIV2ConverterMux)

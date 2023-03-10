@@ -189,6 +189,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "profile"})
 
+	PluginEvaluationTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "plugin_evaluation_total",
+			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter and Filter.).",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"plugin", "extension_point", "profile"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		e2eSchedulingLatency,
@@ -207,6 +215,7 @@ var (
 		PermitWaitDuration,
 		CacheSize,
 		unschedulableReasons,
+		PluginEvaluationTotal,
 	}
 )
 

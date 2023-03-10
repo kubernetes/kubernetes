@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -321,6 +322,8 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	options.AddKubeletConfigFlags(fs, kc)
 	// Remember original feature gates, so we can merge with flag gates later
 	original := kc.FeatureGates
+	// avoid duplicate printing the flag deprecation warnings during re-parsing
+	fs.SetOutput(io.Discard)
 	// re-parse flags
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -711,13 +714,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
-				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
-			} else if s.TopologyManagerPolicyOptions != nil {
-				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
-					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
-			}
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+		} else if s.TopologyManagerPolicyOptions != nil {
+			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
+				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
@@ -748,11 +749,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
-				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				PodPidsLimit:                             s.PodPidsLimit,
 				EnforceCPULimits:                         s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				TopologyManagerPolicy:                    s.TopologyManagerPolicy,
+				TopologyManagerScope:                     s.TopologyManagerScope,
 				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
@@ -1231,7 +1232,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.MinimumGCAge,
 		kubeServer.MaxPerPodContainerCount,
 		kubeServer.MaxContainerCount,
-		kubeServer.MasterServiceNamespace,
 		kubeServer.RegisterSchedulable,
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,

@@ -218,7 +218,6 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
 TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -713,7 +712,6 @@ function start_kubelet {
     all_kubelet_flags=(
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
-      "--container-runtime=${CONTAINER_RUNTIME}"
       "--hostname-override=${HOSTNAME_OVERRIDE}"
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
@@ -1151,6 +1149,7 @@ echo "Using GO_OUT ${GO_OUT}"
 export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
+  trap cleanup INT
 fi
 
 echo "Starting services now!"

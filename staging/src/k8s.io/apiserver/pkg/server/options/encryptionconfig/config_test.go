@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	kmsservice "k8s.io/kms/pkg/service"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -700,6 +702,584 @@ func TestKMSPluginHealthz(t *testing.T) {
 				}),
 			); d != "" {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// tests for masking rules
+func TestWildcardMasking(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		config        *apiserverconfig.EncryptionConfiguration
+		expectedError string
+	}{
+		{
+			desc: "resources masked by *. group",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "*. masked by *. group",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "*.foo masked by *.foo",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.foo",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.foo",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.foo\" is masked by earlier rule \"*.foo\"",
+		},
+		{
+			desc: "*.* masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.*\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources masked by *. group in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "resources masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources masked by *.* in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources *. masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources *. masked by *.* in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources not masked by any rule",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"secrets",
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "resources not masked by any rule in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			_, _, _, err := getTransformerOverridesAndKMSPluginProbes(ctx, tc.config)
+			if errString(err) != tc.expectedError {
+				t.Errorf("expected error %s but got %s", tc.expectedError, errString(err))
+			}
+		})
+	}
+}
+
+func TestWildcardStructure(t *testing.T) {
+	testCases := []struct {
+		desc                         string
+		expectedResourceTransformers map[string]string
+		config                       *apiserverconfig.EncryptionConfiguration
+		errorValue                   string
+	}{
+		{
+			desc: "should not result in error",
+			expectedResourceTransformers: map[string]string{
+				"configmaps":       "k8s:enc:kms:v1:kms:",
+				"secrets":          "k8s:enc:kms:v1:another-kms:",
+				"events":           "k8s:enc:kms:v1:fancy:",
+				"deployments.apps": "k8s:enc:kms:v1:kms:",
+				"pods":             "k8s:enc:kms:v1:fancy:",
+				"pandas":           "k8s:enc:kms:v1:fancy:",
+				"pandas.bears":     "k8s:enc:kms:v1:yet-another-provider:",
+				"jobs.apps":        "k8s:enc:kms:v1:kms:",
+			},
+
+			errorValue: "",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.apps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+							{
+								Identity: &apiserverconfig.IdentityConfiguration{},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "fancy",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "yet-another-provider",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:       "should result in error",
+			errorValue: "resource \"secrets\" is masked by earlier rule \"*.\"",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+							{
+								Identity: &apiserverconfig.IdentityConfiguration{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			transformers, _, _, err := getTransformerOverridesAndKMSPluginProbes(ctx, tc.config)
+			if errString(err) != tc.errorValue {
+				t.Errorf("expected error %s but got %s", tc.errorValue, errString(err))
+			}
+
+			if len(tc.errorValue) > 0 {
+				return
+			}
+
+			// check if expectedResourceTransformers are present
+			for resource, expectedTransformerName := range tc.expectedResourceTransformers {
+				transformer := transformerFromOverrides(transformers, schema.ParseGroupResource(resource))
+				transformerName := string(
+					reflect.ValueOf(transformer).Elem().FieldByName("transformers").Index(0).FieldByName("Prefix").Bytes(),
+				)
+
+				if transformerName != expectedTransformerName {
+					t.Errorf("resource %s: expected same transformer name but got %v", resource, cmp.Diff(transformerName, expectedTransformerName))
+				}
 			}
 		})
 	}

@@ -24,13 +24,14 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -105,6 +106,7 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 func dcSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	logger, _ := ktesting.NewTestContext(t)
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)
@@ -124,6 +126,7 @@ func dcSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.Repli
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 	rm := replicaset.NewReplicaSetController(
+		logger,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),

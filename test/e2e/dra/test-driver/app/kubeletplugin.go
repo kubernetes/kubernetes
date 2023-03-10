@@ -145,7 +145,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	vendor := ex.driverName
 	class := "test"
 	spec := &spec{
-		Version: "0.2.0", // This has to be a version accepted by the runtimes.
+		Version: "0.3.0", // This has to be a version accepted by the runtimes.
 		Kind:    vendor + "/" + class,
 		// At least one device is required and its entry must have more
 		// than just the name.

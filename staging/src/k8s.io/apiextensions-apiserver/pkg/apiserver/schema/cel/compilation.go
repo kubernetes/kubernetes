@@ -27,6 +27,7 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/metrics"
@@ -40,22 +41,6 @@ const (
 	// OldScopedVarName is the variable name assigned to the existing value of the locally scoped data element of a
 	// CEL validation expression.
 	OldScopedVarName = "oldSelf"
-
-	// PerCallLimit specify the actual cost limit per CEL validation call
-	// current PerCallLimit gives roughly 0.1 second for each expression validation call
-	PerCallLimit = 1000000
-
-	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
-	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
-	RuntimeCELCostBudget = 10000000
-
-	// checkFrequency configures the number of iterations within a comprehension to evaluate
-	// before checking whether the function evaluation has been interrupted
-	checkFrequency = 100
-
-	// maxRequestSizeBytes is the maximum size of a request to the API server
-	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
-	maxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
 )
 
 // CompilationResult represents the cel compilation result for one rule
@@ -70,6 +55,15 @@ type CompilationResult struct {
 	// MaxCardinality represents the worse case number of times this validation rule could be invoked if contained under an
 	// unbounded map or list in an OpenAPIv3 schema.
 	MaxCardinality uint64
+	// MessageExpression represents the cel Program that should be evaluated to generate an error message if the rule
+	// fails to validate. If no MessageExpression was given, or if this expression failed to compile, this will be nil.
+	MessageExpression cel.Program
+	// MessageExpressionError represents an error encountered during compilation of MessageExpression. If no error was
+	// encountered, this will be nil.
+	MessageExpressionError *apiservercel.Error
+	// MessageExpressionMaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MessageExpressionMaxCost uint64
 }
 
 var (
@@ -103,7 +97,7 @@ func getBaseEnv() (*cel.Env, error) {
 //   - nil Program, non-nil Error: Compilation resulted in an error
 //   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 //
-// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()
 	defer func() {
@@ -195,7 +189,7 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		cel.CostLimit(perCallLimit),
 		cel.CostTracking(estimator),
 		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
-		cel.InterruptCheckFrequency(checkFrequency),
+		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "program instantiation failed: " + err.Error()}
@@ -209,6 +203,42 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	compilationResult.MaxCost = costEst.Max
 	compilationResult.MaxCardinality = maxCardinality
 	compilationResult.Program = prog
+	if rule.MessageExpression != "" {
+		ast, issues := env.Compile(rule.MessageExpression)
+		if issues != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression compilation failed: " + issues.String()}
+			return
+		}
+		if ast.OutputType() != cel.StringType {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression must evaluate to a string"}
+			return
+		}
+
+		_, err := cel.AstToCheckedExpr(ast)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "unexpected messageExpression compilation error: " + err.Error()}
+			return
+		}
+
+		msgProg, err := env.Program(ast,
+			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
+			cel.CostLimit(perCallLimit),
+			cel.CostTracking(estimator),
+			cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
+			cel.InterruptCheckFrequency(celconfig.CheckFrequency),
+		)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression instantiation failed: " + err.Error()}
+			return
+		}
+		costEst, err := env.EstimateCost(ast, estimator)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed for messageExpression: " + err.Error()}
+			return
+		}
+		compilationResult.MessageExpression = msgProg
+		compilationResult.MessageExpressionMaxCost = costEst.Max
+	}
 	return
 }
 
@@ -274,5 +304,5 @@ func (c *sizeEstimator) EstimateCallCost(function, overloadID string, target *ch
 // this function.
 func maxCardinality(minSize int64) uint64 {
 	sz := minSize + 1 // assume at least one comma between elements
-	return uint64(maxRequestSizeBytes / sz)
+	return uint64(celconfig.MaxRequestSizeBytes / sz)
 }

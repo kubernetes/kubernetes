@@ -135,7 +135,7 @@ func nextScheduleTimeDuration(cj *batchv1.CronJob, now time.Time, schedule cron.
 // nextScheduleTime returns the time.Time of the next schedule after the last scheduled
 // and before now, or nil if no unmet schedule times, and an error.
 // If there are too many (>100) unstarted times, it will also record a warning.
-func nextScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
+func nextScheduleTime(logger klog.Logger, cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
 	_, mostRecentTime, numberOfMissedSchedules, err := mostRecentScheduleTime(cj, now, schedule, true)
 
 	if mostRecentTime == nil || mostRecentTime.After(now) {
@@ -161,7 +161,7 @@ func nextScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule
 		// I've somewhat arbitrarily picked 100, as more than 80,
 		// but less than "lots".
 		recorder.Eventf(cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", numberOfMissedSchedules)
-		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missedTimes", numberOfMissedSchedules)
+		logger.Info("too many missed times", "cronjob", klog.KObj(cj), "missedTimes", numberOfMissedSchedules)
 	}
 	return mostRecentTime, err
 }

@@ -92,7 +92,6 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
@@ -211,7 +210,6 @@ func newTestKubeletWithImageList(
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
-	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeHasSynced = func() bool { return true }
@@ -270,7 +268,7 @@ func newTestKubeletWithImageList(
 	kubelet.reasonCache = NewReasonCache()
 	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: kubelet.syncPod,
+		syncPodFn: kubelet.SyncPod,
 		cache:     kubelet.podCache,
 		t:         t,
 	}
@@ -368,7 +366,6 @@ func newTestKubeletWithImageList(
 	if initFakeVolumePlugin {
 		allPlugins = append(allPlugins, plug)
 	} else {
-		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, azuredd.ProbeVolumePlugins()...)
 	}
@@ -1350,7 +1347,7 @@ func TestCreateMirrorPod(t *testing.T) {
 			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			pods := []*v1.Pod{pod}
 			kl.podManager.SetPods(pods)
-			isTerminal, err := kl.syncPod(context.Background(), tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, err := kl.SyncPod(context.Background(), tt.updateType, pod, nil, &kubecontainer.PodStatus{})
 			assert.NoError(t, err)
 			if isTerminal {
 				t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1386,7 +1383,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	isTerminal, err := kl.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	isTerminal, err := kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
 	assert.NoError(t, err)
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1548,7 +1545,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	})
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	isTerminal, err := kubelet.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
 	assert.Error(t, err, "expected pod with hostNetwork=false to fail when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1556,7 +1553,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 	pod.Spec.HostNetwork = true
-	isTerminal, err = kubelet.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	isTerminal, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
 	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -2681,7 +2678,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 	kl.podManager.SetPods(pods)
 	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
 	gracePeriodOverride := int64(0)
-	err := kl.syncTerminatingPod(context.Background(), pod, podStatus, nil, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+	err := kl.SyncTerminatingPod(context.Background(), pod, podStatus, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
 		podStatus.Phase = v1.PodFailed
 		podStatus.Reason = "reason"
 		podStatus.Message = "message"
@@ -2986,7 +2983,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		metav1.Duration{Duration: time.Minute},
 		1024,
 		110,
-		"default",
 		true,
 		true,
 		map[string]string{},

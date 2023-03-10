@@ -52,6 +52,7 @@ const (
 
 	// owner: @nabokihms
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables API to get self subject attributes after authentication.
 	APISelfSubjectReview featuregate.Feature = "APISelfSubjectReview"
@@ -107,14 +108,6 @@ const (
 	//
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
-
-	// owner: @leakingtapan
-	// alpha: v1.14
-	// beta: v1.17
-	// GA: v1.25
-	//
-	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
-	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
 
 	// owner: @andyzhangx
 	// alpha: v1.15
@@ -196,6 +189,7 @@ const (
 	// kep: https://kep.k8s.io/3140
 	// alpha: v1.24
 	// beta: v1.25
+	// GA: 1.27
 	//
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
@@ -497,6 +491,7 @@ const (
 	// owner: @denkensk
 	// kep: https://kep.k8s.io/3243
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
@@ -558,6 +553,13 @@ const (
 	//
 	// Enables NetworkPolicy status subresource
 	NetworkPolicyStatus featuregate.Feature = "NetworkPolicyStatus"
+
+	// owner: @jsafrane
+	// kep: https://kep.k8s.io/3756
+	// alpha: v1.25 (as part of SELinuxMountReadWriteOncePod)
+	// beta: v1.27
+	// Robust VolumeManager reconstruction after kubelet restart.
+	NewVolumeManagerReconstruction featuregate.Feature = "NewVolumeManagerReconstruction"
 
 	// owner: @xing-yang @sonasingh46
 	// kep: https://kep.k8s.io/2268
@@ -745,6 +747,7 @@ const (
 
 	// owner: @psch
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
@@ -757,9 +760,10 @@ const (
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
 
-	// owner: @lmdaly
+	// owner: @lmdaly, @swatisehgal (for GA graduation)
 	// alpha: v1.16
 	// beta: v1.18
+	// GA: v1.27
 	//
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
@@ -871,7 +875,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
-	APISelfSubjectReview: {Default: false, PreRelease: featuregate.Alpha},
+	APISelfSubjectReview: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.27
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
@@ -885,8 +889,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CPUManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
-	CSIMigrationAWS: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
-
 	CSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIMigrationAzureFile: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
@@ -897,7 +899,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
 
-	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
+	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA}, // LockToDefault when CSI driver with GA support for Windows, raw block and xfs features are available
 
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -909,7 +911,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
 
-	CronJobTimeZone: {Default: true, PreRelease: featuregate.Beta},
+	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
@@ -989,7 +991,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
 
-	MatchLabelKeysInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
+	MatchLabelKeysInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1006,6 +1008,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
+
+	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1055,11 +1059,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StatefulSetAutoDeletePVC: {Default: false, PreRelease: featuregate.Alpha},
 
-	StatefulSetStartOrdinal: {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 
-	TopologyManager: {Default: true, PreRelease: featuregate.Beta},
+	TopologyManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.27; remove in 1.29
 
 	TopologyManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1106,7 +1110,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.OpenAPIV3: {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 

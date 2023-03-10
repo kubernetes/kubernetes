@@ -137,7 +137,7 @@ func SetDefaults_Service(obj *v1.Service) {
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
 		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
-			obj.Spec.AllocateLoadBalancerNodePorts = pointer.BoolPtr(true)
+			obj.Spec.AllocateLoadBalancerNodePorts = pointer.Bool(true)
 		}
 	}
 }

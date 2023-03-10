@@ -411,7 +411,7 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	// excludeCIDRs has been validated before, here we just parse it to IPNet list
 	parsedExcludeCIDRs, _ := netutils.ParseCIDRs(excludeCIDRs)

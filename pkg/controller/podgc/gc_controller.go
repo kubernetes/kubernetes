@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
@@ -172,7 +173,7 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 
 	klog.V(4).Infof("Garbage collecting %v pods that are terminating on node tainted with node.kubernetes.io/out-of-service", deleteCount)
 	// sort only when necessary
-	sort.Sort(byCreationTimestamp(terminatingPods))
+	sort.Sort(byEvictionAndCreationTimestamp(terminatingPods))
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
@@ -206,7 +207,7 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 
 	klog.InfoS("Garbage collecting pods", "numPods", deleteCount)
 	// sort only when necessary
-	sort.Sort(byCreationTimestamp(terminatedPods))
+	sort.Sort(byEvictionAndCreationTimestamp(terminatedPods))
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
@@ -308,13 +309,20 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 	}
 }
 
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*v1.Pod
+// byEvictionAndCreationTimestamp sorts a list by Evicted status and then creation timestamp,
+// using their names as a tie breaker.
+// Evicted pods will be deleted first to avoid impact on terminated pods created by controllers.
+type byEvictionAndCreationTimestamp []*v1.Pod
 
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o byEvictionAndCreationTimestamp) Len() int      { return len(o) }
+func (o byEvictionAndCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-func (o byCreationTimestamp) Less(i, j int) bool {
+func (o byEvictionAndCreationTimestamp) Less(i, j int) bool {
+	iEvicted, jEvicted := eviction.PodIsEvicted(o[i].Status), eviction.PodIsEvicted(o[j].Status)
+	// Evicted pod is smaller
+	if iEvicted != jEvicted {
+		return iEvicted
+	}
 	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}

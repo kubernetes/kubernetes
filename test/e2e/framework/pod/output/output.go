@@ -121,6 +121,15 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 	})
 }
 
+// LookForStringInLogWithoutKubectl looks for the given string in the log of a specific pod container
+func LookForStringInLogWithoutKubectl(ctx context.Context, client clientset.Interface, ns string, podName string, container string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		podLogs, err := e2epod.GetPodLogs(ctx, client, ns, podName, container)
+		framework.ExpectNoError(err)
+		return podLogs
+	})
+}
+
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))

@@ -19,7 +19,6 @@ package discovery
 import (
 	"encoding/json"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -516,8 +515,6 @@ func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Serv
 			return
 		}
 
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
-
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
 			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
@@ -557,8 +554,6 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
-
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
@@ -1435,6 +1430,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		expectedGroupNames    []string
 		expectedGroupVersions []string
 		expectedGVKs          []string
+		expectedFailedGVs     []string
 	}{
 		{
 			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/1 resources at /apis",
@@ -1564,6 +1560,78 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			},
 		},
 		{
+			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/2 versions/1 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps"},
+			expectedGroupVersions: []string{"v1", "apps/v1"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+			expectedFailedGVs: []string{"apps/v2"},
+		},
+		{
 			name: "Aggregated discovery: 1 group/2 resources at /api, 1 group/2 resources at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
@@ -1603,6 +1671,31 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 							Name: "apps",
 						},
 						Versions: []apidiscovery.APIVersionDiscovery{
+							// Stale "v2" version not included.
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 							{
 								Version: "v1",
 								Resources: []apidiscovery.APIResourceDiscovery{
@@ -1638,9 +1731,10 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
 			},
+			expectedFailedGVs: []string{"apps/v2"},
 		},
 		{
-			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources at /apis",
+			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources/1 stale GV at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
 					{
@@ -1709,6 +1803,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 							Name: "batch",
 						},
 						Versions: []apidiscovery.APIVersionDiscovery{
+							// Stale Group/Version is not included
 							{
 								Version: "v1",
 								Resources: []apidiscovery.APIResourceDiscovery{
@@ -1731,21 +1826,46 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 										Scope: apidiscovery.ScopeNamespace,
 									},
 								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
 							},
 						},
 					},
 				},
 			},
 			expectedGroupNames:    []string{"", "apps", "batch"},
-			expectedGroupVersions: []string{"v1", "apps/v1", "batch/v1"},
+			expectedGroupVersions: []string{"v1", "apps/v1", "batch/v1beta1"},
 			expectedGVKs: []string{
 				"/v1/Pod",
 				"/v1/Service",
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
-				"batch/v1/Job",
-				"batch/v1/CronJob",
+				"batch/v1beta1/Job",
+				"batch/v1beta1/CronJob",
 			},
+			expectedFailedGVs: []string{"batch/v1"},
 		},
 		{
 			name:   "Aggregated discovery: /api returns nothing, 2 groups/2 resources at /apis",
@@ -1810,6 +1930,31 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								// Stale "v1beta1" not included.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 				},
@@ -1822,6 +1967,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"batch/v1/Job",
 				"batch/v1/CronJob",
 			},
+			expectedFailedGVs: []string{"batch/v1beta1"},
 		},
 	}
 
@@ -1847,7 +1993,15 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		apiGroups, resources, err := client.ServerGroupsAndResources()
-		require.NoError(t, err)
+		if len(test.expectedFailedGVs) > 0 {
+			require.Error(t, err)
+			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
+			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+		} else {
+			require.NoError(t, err)
+		}
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNames(apiGroups)...)
@@ -1874,12 +2028,138 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 	}
 }
 
+func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
+	tests := []struct {
+		name              string
+		corev1            *apidiscovery.APIGroupDiscoveryList
+		coreHttpStatus    int
+		apis              *apidiscovery.APIGroupDiscoveryList
+		apisHttpStatus    int
+		expectedGroups    []string
+		expectedResources []string
+		expectedErr       bool
+	}{
+		{
+			name:           "Aggregated Discovery: 404 for core/v1 is tolerated",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusNotFound,
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "daemonsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "DaemonSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apisHttpStatus:    http.StatusOK,
+			expectedGroups:    []string{"apps"},
+			expectedResources: []string{"apps/v1/Deployment", "apps/v1/DaemonSet"},
+			expectedErr:       false,
+		},
+		{
+			name:           "Aggregated Discovery: 403 for core/v1 causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusForbidden,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusOK,
+			expectedErr:    true,
+		},
+		{
+			name:           "Aggregated Discovery: 404 for /apis causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusOK,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusNotFound,
+			expectedErr:    true,
+		},
+		{
+			name:           "Aggregated Discovery: 403 for /apis causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusOK,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusForbidden,
+			expectedErr:    true,
+		},
+	}
+
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var agg *apidiscovery.APIGroupDiscoveryList
+			var status int
+			switch req.URL.Path {
+			case "/api":
+				agg = test.corev1
+				status = test.coreHttpStatus
+			case "/apis":
+				agg = test.apis
+				status = test.apisHttpStatus
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(agg)
+			require.NoError(t, err)
+			// Content-type is "aggregated" discovery format.
+			w.Header().Set("Content-Type", AcceptV2Beta1)
+			w.WriteHeader(status)
+			w.Write(output)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		apiGroups, resources, err := client.ServerGroupsAndResources()
+		if test.expectedErr {
+			require.Error(t, err)
+			require.Nil(t, apiGroups)
+			require.Nil(t, resources)
+			continue
+		}
+		require.NoError(t, err)
+		// First check the returned groups
+		expectedGroups := sets.NewString(test.expectedGroups...)
+		actualGroups := sets.NewString(groupNames(apiGroups)...)
+		assert.True(t, expectedGroups.Equal(actualGroups),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroups.List(), actualGroups.List())
+		// Next check the returned resources
+		expectedGVKs := sets.NewString(test.expectedResources...)
+		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
+		assert.True(t, expectedGVKs.Equal(actualGVKs),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
 func TestAggregatedServerPreferredResources(t *testing.T) {
 	tests := []struct {
-		name         string
-		corev1       *apidiscovery.APIGroupDiscoveryList
-		apis         *apidiscovery.APIGroupDiscoveryList
-		expectedGVKs []string
+		name              string
+		corev1            *apidiscovery.APIGroupDiscoveryList
+		apis              *apidiscovery.APIGroupDiscoveryList
+		expectedGVKs      []string
+		expectedFailedGVs []string
 	}{
 		{
 			name: "Aggregated discovery: basic corev1 and apps/v1 preferred resources returned",
@@ -2006,6 +2286,78 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			},
 		},
 		{
+			name: "Aggregated discovery: stale Group/Version can not produce preferred version",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							// v2 is "stale", so it can not be "preferred".
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// Only v1 resources from apps group; v2 would be preferred but it is "stale".
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+			expectedFailedGVs: []string{"apps/v2"},
+		},
+		{
 			name: "Aggregated discovery: preferred multiple resources from multiple group/versions",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
@@ -2068,6 +2420,30 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 				},
@@ -2078,6 +2454,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
 			},
+			expectedFailedGVs: []string{"apps/v1beta1"},
 		},
 		{
 			name: "Aggregated discovery: resources from multiple preferred group versions at /apis",
@@ -2136,6 +2513,30 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 										ResponseKind: &metav1.GroupVersionKind{
 											Group:   "apps",
 											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								// Not included because "v1" is preferred.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
 											Kind:    "StatefulSet",
 										},
 										Scope: apidiscovery.ScopeNamespace,
@@ -2279,6 +2680,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 								},
 							},
 							{
+								// Not included, since "v1" is preferred.
 								Version: "v1beta1",
 								Resources: []apidiscovery.APIResourceDiscovery{
 									{
@@ -2339,7 +2741,15 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredResources()
-		require.NoError(t, err)
+		if len(test.expectedFailedGVs) > 0 {
+			require.Error(t, err)
+			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
+			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+		} else {
+			require.NoError(t, err)
+		}
 		// Test the expected preferred GVKs are returned from the aggregated discovery.
 		expectedGVKs := sets.NewString(test.expectedGVKs...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
@@ -2418,6 +2828,18 @@ func groupVersionKinds(resources []*metav1.APIResourceList) []string {
 			gvk := fmt.Sprintf("%s/%s/%s", resource.Group, resource.Version, resource.Kind)
 			result = append(result, gvk)
 		}
+	}
+	return result
+}
+
+func failedGroupVersions(err error) []string {
+	result := []string{}
+	ferr, ok := err.(*ErrGroupDiscoveryFailed)
+	if !ok {
+		return result
+	}
+	for gv := range ferr.Groups {
+		result = append(result, gv.String())
 	}
 	return result
 }

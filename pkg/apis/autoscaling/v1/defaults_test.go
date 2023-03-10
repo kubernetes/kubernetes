@@ -46,7 +46,7 @@ func TestSetDefaultHPA(t *testing.T) {
 		{
 			hpa: autoscalingv1.HorizontalPodAutoscaler{
 				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 				},
 			},
 			expectReplicas: 3,

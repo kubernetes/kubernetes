@@ -34,7 +34,7 @@ import (
 )
 
 func TestReconstructVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
 
 	tests := []struct {
 		name                                string
@@ -146,7 +146,7 @@ func TestReconstructVolumes(t *testing.T) {
 }
 
 func TestCleanOrphanVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
 
 	type podInfo struct {
 		podName         string
@@ -261,7 +261,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 	// Since the volume is reconstructed, it must be marked as uncertain
 	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
 	// and https://github.com/kubernetes/kubernetes/pull/110670.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
 
 	tests := []struct {
 		name        string

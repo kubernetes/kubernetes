@@ -54,6 +54,7 @@ import (
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -557,10 +558,10 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 		serviceName := service.Name
 
 		// We always want to add environment variabled for master services
-		// from the master service namespace, even if enableServiceLinks is false.
+		// from the default namespace, even if enableServiceLinks is false.
 		// We also add environment variables for other services in the same
 		// namespace, if enableServiceLinks is true.
-		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
+		if service.Namespace == metav1.NamespaceDefault && masterServices.Has(serviceName) {
 			if _, exists := serviceMap[serviceName]; !exists {
 				serviceMap[serviceName] = service
 			}
@@ -1057,7 +1058,7 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 			if err != nil {
 				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
 			} else {
-				klog.V(3).InfoS("Deleted pod", "podName", podFullname)
+				klog.V(3).InfoS("Deleted mirror pod", "podName", podFullname)
 			}
 		}
 	}
@@ -1066,9 +1067,16 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 // HandlePodCleanups performs a series of cleanup work, including terminating
 // pod workers, killing unwanted pods, and removing orphaned volumes/pod
 // directories. No config changes are sent to pod workers while this method
-// is executing which means no new pods can appear.
-// NOTE: This function is executed by the main sync loop, so it
-// should not contain any blocking calls.
+// is executing which means no new pods can appear. After this method completes
+// the desired state of the kubelet should be reconciled with the actual state
+// in the pod worker and other pod-related components.
+//
+// This function is executed by the main sync loop, so it must execute quickly
+// and all nested calls should be asynchronous. Any slow reconciliation actions
+// should be performed by other components (like the volume manager). The duration
+// of this call is the minimum latency for static pods to be restarted if they
+// are updated with a fixed UID (most should use a dynamic UID), and no config
+// updates are delivered to the pod workers while this method is running.
 func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
@@ -1087,6 +1095,15 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	}
 
 	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
+	activePods := kl.filterOutInactivePods(allPods)
+	allRegularPods, allStaticPods := splitPodsByStatic(allPods)
+	activeRegularPods, activeStaticPods := splitPodsByStatic(activePods)
+	metrics.DesiredPodCount.WithLabelValues("").Set(float64(len(allRegularPods)))
+	metrics.DesiredPodCount.WithLabelValues("true").Set(float64(len(allStaticPods)))
+	metrics.ActivePodCount.WithLabelValues("").Set(float64(len(activeRegularPods)))
+	metrics.ActivePodCount.WithLabelValues("true").Set(float64(len(activeStaticPods)))
+	metrics.MirrorPodCount.Set(float64(len(mirrorPods)))
+
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave regardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
@@ -1102,6 +1119,10 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	klog.V(3).InfoS("Clean up pod workers for terminated pods")
 	workingPods := kl.podWorkers.SyncKnownPods(allPods)
 
+	// Reconcile: At this point the pod workers have been pruned to the set of
+	// desired pods. Pods that must be restarted due to UID reuse, or leftover
+	// pods from previous runs, are not known to the pod worker.
+
 	allPodsByUID := make(map[types.UID]*v1.Pod)
 	for _, pod := range allPods {
 		allPodsByUID[pod.UID] = pod
@@ -1112,70 +1133,45 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// that have already been removed from config. Pods that are terminating
 	// will be added to possiblyRunningPods, to prevent overly aggressive
 	// cleanup of pod cgroups.
+	stringIfTrue := func(t bool) string {
+		if t {
+			return "true"
+		}
+		return ""
+	}
 	runningPods := make(map[types.UID]sets.Empty)
 	possiblyRunningPods := make(map[types.UID]sets.Empty)
-	restartablePods := make(map[types.UID]sets.Empty)
 	for uid, sync := range workingPods {
-		switch sync {
+		switch sync.State {
 		case SyncPod:
 			runningPods[uid] = struct{}{}
 			possiblyRunningPods[uid] = struct{}{}
 		case TerminatingPod:
 			possiblyRunningPods[uid] = struct{}{}
-		case TerminatedAndRecreatedPod:
-			restartablePods[uid] = struct{}{}
+		default:
 		}
+	}
+
+	// Retrieve the list of running containers from the runtime to perform cleanup.
+	// We need the latest state to avoid delaying restarts of static pods that reuse
+	// a UID.
+	if err := kl.runtimeCache.ForceUpdateIfOlder(ctx, kl.clock.Now()); err != nil {
+		klog.ErrorS(err, "Error listing containers")
+		return err
+	}
+	runningRuntimePods, err := kl.runtimeCache.GetPods(ctx)
+	if err != nil {
+		klog.ErrorS(err, "Error listing containers")
+		return err
 	}
 
 	// Stop probing pods that are not running
 	klog.V(3).InfoS("Clean up probes for terminated pods")
 	kl.probeManager.CleanupPods(possiblyRunningPods)
 
-	// Terminate any pods that are observed in the runtime but not
-	// present in the list of known running pods from config.
-	runningRuntimePods, err := kl.runtimeCache.GetPods(ctx)
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
-	for _, runningPod := range runningRuntimePods {
-		switch workerState, ok := workingPods[runningPod.ID]; {
-		case ok && workerState == SyncPod, ok && workerState == TerminatingPod:
-			// if the pod worker is already in charge of this pod, we don't need to do anything
-			continue
-		default:
-			// If the pod isn't in the set that should be running and isn't already terminating, terminate
-			// now. This termination is aggressive because all known pods should already be in a known state
-			// (i.e. a removed static pod should already be terminating), so these are pods that were
-			// orphaned due to kubelet restart or bugs. Since housekeeping blocks other config changes, we
-			// know that another pod wasn't started in the background so we are safe to terminate the
-			// unknown pods.
-			if _, ok := allPodsByUID[runningPod.ID]; !ok {
-				klog.V(3).InfoS("Clean up orphaned pod containers", "podUID", runningPod.ID)
-				one := int64(1)
-				kl.podWorkers.UpdatePod(UpdatePodOptions{
-					UpdateType: kubetypes.SyncPodKill,
-					RunningPod: runningPod,
-					KillPodOptions: &KillPodOptions{
-						PodTerminationGracePeriodSecondsOverride: &one,
-					},
-				})
-			}
-		}
-	}
-
 	// Remove orphaned pod statuses not in the total list of known config pods
 	klog.V(3).InfoS("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
-	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cache to get the latest set of
-	// running pods to clean up the volumes.
-	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningRuntimePods, err = kl.containerRuntime.GetPods(ctx, false)
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
@@ -1204,6 +1200,102 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
 	kl.deleteOrphanedMirrorPods()
 
+	// At this point, the pod worker is aware of which pods are not desired (SyncKnownPods).
+	// We now look through the set of active pods for those that the pod worker is not aware of
+	// and deliver an update. The most common reason a pod is not known is because the pod was
+	// deleted and recreated with the same UID while the pod worker was driving its lifecycle (very
+	// very rare for API pods, common for static pods with fixed UIDs). Containers that may still
+	// be running from a previous execution must be reconciled by the pod worker's sync method.
+	// We must use active pods because that is the set of admitted pods (podManager includes pods
+	// that will never be run, and statusManager tracks already rejected pods).
+	var restartCount, restartCountStatic int
+	for _, desiredPod := range activePods {
+		if _, knownPod := workingPods[desiredPod.UID]; knownPod {
+			continue
+		}
+
+		klog.V(3).InfoS("Pod will be restarted because it is in the desired set and not known to the pod workers (likely due to UID reuse)", "podUID", desiredPod.UID)
+		isStatic := kubetypes.IsStaticPod(desiredPod)
+		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(desiredPod)
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			UpdateType: kubetypes.SyncPodCreate,
+			Pod:        desiredPod,
+			MirrorPod:  mirrorPod,
+		})
+
+		// the desired pod is now known as well
+		workingPods[desiredPod.UID] = PodWorkerSync{State: SyncPod, HasConfig: true, Static: isStatic}
+		if isStatic {
+			// restartable static pods are the normal case
+			restartCountStatic++
+		} else {
+			// almost certainly means shenanigans, as API pods should never have the same UID after being deleted and recreated
+			// unless there is a major API violation
+			restartCount++
+		}
+	}
+	metrics.RestartedPodTotal.WithLabelValues("true").Add(float64(restartCountStatic))
+	metrics.RestartedPodTotal.WithLabelValues("").Add(float64(restartCount))
+
+	// Finally, terminate any pods that are observed in the runtime but not present in the list of
+	// known running pods from config. If we do terminate running runtime pods that will happen
+	// asynchronously in the background and those will be processed in the next invocation of
+	// HandlePodCleanups.
+	var orphanCount int
+	for _, runningPod := range runningRuntimePods {
+		// If there are orphaned pod resources in CRI that are unknown to the pod worker, terminate them
+		// now. Since housekeeping is exclusive to other pod worker updates, we know that no pods have
+		// been added to the pod worker in the meantime. Note that pods that are not visible in the runtime
+		// but which were previously known are terminated by SyncKnownPods().
+		_, knownPod := workingPods[runningPod.ID]
+		if !knownPod {
+			one := int64(1)
+			killPodOptions := &KillPodOptions{
+				PodTerminationGracePeriodSecondsOverride: &one,
+			}
+			klog.V(2).InfoS("Clean up containers for orphaned pod we had not seen before", "podUID", runningPod.ID, "killPodOptions", killPodOptions)
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				UpdateType:     kubetypes.SyncPodKill,
+				RunningPod:     runningPod,
+				KillPodOptions: killPodOptions,
+			})
+
+			// the running pod is now known as well
+			workingPods[runningPod.ID] = PodWorkerSync{State: TerminatingPod, Orphan: true}
+			orphanCount++
+		}
+	}
+	metrics.OrphanedRuntimePodTotal.Add(float64(orphanCount))
+
+	// Now that we have recorded any terminating pods, and added new pods that should be running,
+	// record a summary here. Not all possible combinations of PodWorkerSync values are valid.
+	counts := make(map[PodWorkerSync]int)
+	for _, sync := range workingPods {
+		counts[sync]++
+	}
+	for validSync, configState := range map[PodWorkerSync]string{
+		{HasConfig: true, Static: true}:                "desired",
+		{HasConfig: true, Static: false}:               "desired",
+		{Orphan: true, HasConfig: true, Static: true}:  "orphan",
+		{Orphan: true, HasConfig: true, Static: false}: "orphan",
+		{Orphan: true, HasConfig: false}:               "runtime_only",
+	} {
+		for _, state := range []PodWorkerState{SyncPod, TerminatingPod, TerminatedPod} {
+			validSync.State = state
+			count := counts[validSync]
+			delete(counts, validSync)
+			staticString := stringIfTrue(validSync.Static)
+			if !validSync.HasConfig {
+				staticString = "unknown"
+			}
+			metrics.WorkingPodCount.WithLabelValues(state.String(), configState, staticString).Set(float64(count))
+		}
+	}
+	if len(counts) > 0 {
+		// in case a combination is lost
+		klog.V(3).InfoS("Programmer error, did not report a kubelet_working_pods metric for a value returned by SyncKnownPods", "counts", counts)
+	}
+
 	// Remove any cgroups in the hierarchy for pods that are definitely no longer
 	// running (not in the container runtime).
 	if kl.cgroupsPerQOS {
@@ -1212,31 +1304,29 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 		kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, possiblyRunningPods)
 	}
 
+	// Cleanup any backoff entries.
 	kl.backOff.GC()
 
-	// If two pods with the same UID are observed in rapid succession, we need to
-	// resynchronize the pod worker after the first pod completes and decide whether
-	// to restart the pod. This happens last to avoid confusing the desired state
-	// in other components and to increase the likelihood transient OS failures during
-	// container start are mitigated. In general only static pods will ever reuse UIDs
-	// since the apiserver uses randomly generated UUIDv4 UIDs with a very low
-	// probability of collision.
-	for uid := range restartablePods {
-		pod, ok := allPodsByUID[uid]
-		if !ok {
-			continue
-		}
-		if kl.isAdmittedPodTerminal(pod) {
-			klog.V(3).InfoS("Pod is restartable after termination due to UID reuse, but pod phase is terminal", "pod", klog.KObj(pod), "podUID", pod.UID)
-			continue
-		}
-		start := kl.clock.Now()
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		klog.V(3).InfoS("Pod is restartable after termination due to UID reuse", "pod", klog.KObj(pod), "podUID", pod.UID)
-		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
-	}
-
 	return nil
+}
+
+// splitPodsByStatic separates a list of desired pods from the pod manager into
+// regular or static pods. Mirror pods are not valid config sources (a mirror pod
+// being created cannot cause the Kubelet to start running a static pod) and are
+// excluded.
+func splitPodsByStatic(pods []*v1.Pod) (regular, static []*v1.Pod) {
+	regular, static = make([]*v1.Pod, 0, len(pods)), make([]*v1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		if kubetypes.IsMirrorPod(pod) {
+			continue
+		}
+		if kubetypes.IsStaticPod(pod) {
+			static = append(static, pod)
+		} else {
+			regular = append(regular, pod)
+		}
+	}
+	return regular, static
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
@@ -1472,8 +1562,7 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
 		}
 	} else {
-		checkpointState := kl.statusManager.State()
-		if resizeStatus, found := checkpointState.GetPodResizeStatus(string(pod.UID)); found {
+		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
 			podResizeStatus = resizeStatus
 		}
 	}
@@ -1769,8 +1858,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		container := kubecontainer.GetContainerSpec(pod, cName)
 		// ResourcesAllocated values come from checkpoint. It is the source-of-truth.
 		found := false
-		checkpointState := kl.statusManager.State()
-		status.ResourcesAllocated, found = checkpointState.GetContainerResourceAllocation(string(pod.UID), cName)
+		status.ResourcesAllocated, found = kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
 		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
 			// Log error and fallback to ResourcesAllocated in oldStatus if it exists
 			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)

@@ -188,7 +188,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
-	dc.recorder = record.NewFakeRecorder(10)
+	dc.recorder = record.NewFakeRecorder(100)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -487,7 +487,7 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
-	verifyUnsupportedControllerEventEmitted(t, dc)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
 
 }
 
@@ -560,7 +560,36 @@ func TestNakedPod(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
-	verifyUnsupportedControllerEventEmitted(t, dc)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
+}
+
+// Create a pod  with unsupported controller, and verify that a PDB with a percentage
+// specified won't allow a disruption.
+func TestUnsupportedControllerPod(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
+	add(t, dc.pdbStore, pdb)
+	ctx := context.TODO()
+	dc.sync(ctx, pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "naked")
+	isController := true
+	pod.OwnerReferences = append(pod.OwnerReferences, metav1.OwnerReference{
+		APIVersion: "apps.test.io/v1",
+		Kind:       "TestWorkload",
+		Name:       "fake-controller",
+		UID:        "b7329742-8daa-493a-8881-6ca07139172b",
+		Controller: &isController,
+	})
+
+	add(t, dc.podStore, pod)
+	dc.sync(ctx, pdbName)
+
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyEventEmitted(t, dc, "CalculateExpectedPodCountFailed")
 }
 
 // Verify that disruption controller is not erroring when unmanaged pods are found
@@ -578,7 +607,7 @@ func TestStatusForUnmanagedPod(t *testing.T) {
 	add(t, dc.podStore, pod)
 	dc.sync(ctx, pdbName)
 	ps.VerifyNoStatusError(t, pdbName)
-	verifyUnsupportedControllerEventEmitted(t, dc)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
 }
 
 // Check if the unmanaged pods are correctly collected or not
@@ -602,7 +631,7 @@ func TestTotalUnmanagedPods(t *testing.T) {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}
 	ps.VerifyNoStatusError(t, pdbName)
-	verifyUnsupportedControllerEventEmitted(t, dc)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
 }
 
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
@@ -1542,17 +1571,17 @@ func waitForCacheCount(store cache.Store, n int) error {
 	})
 }
 
-func verifyUnsupportedControllerEventEmitted(t *testing.T, dc *disruptionController) {
-	// Verify that an UnmanagedPod event is generated
-	found := false
-	for e := range dc.recorder.(*record.FakeRecorder).Events {
-		if strings.Contains(e, "managed by an unsupported controller") {
-			found = true
-			break
+func verifyEventEmitted(t *testing.T, dc *disruptionController, expectedEvent string) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	for {
+		select {
+		case e := <-dc.recorder.(*record.FakeRecorder).Events:
+			if strings.Contains(e, expectedEvent) {
+				return
+			}
+		case <-ticker.C:
+			t.Fatalf("Timed out: expected event not generated: %v", expectedEvent)
 		}
-	}
-	if !found {
-		t.Fatalf("UnmanagedPod event not generated")
 	}
 }
 

@@ -154,7 +154,9 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		clusterCIDRInformer = controllerContext.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
 	}
 
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "NodeIpamController"))
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		clusterCIDRInformer,
 		controllerContext.Cloud,
@@ -168,7 +170,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.RunWithMetrics(ctx.Done(), controllerContext.ControllerManagerMetrics)
+	go nodeIpamController.RunWithMetrics(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -490,7 +492,9 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 }
 
 func startTTLController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "ttl"))
 	go ttlcontroller.NewTTLController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-controller"),
 	).Run(ctx, 5)
@@ -563,7 +567,9 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 }
 
 func startTTLAfterFinishedController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "ttlafterfinished"))
 	go ttlafterfinished.New(
+		ctx,
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
@@ -687,7 +693,9 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 }
 
 func startStorageVersionGCController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "storageVersionGC"))
 	go storageversiongc.NewStorageVersionGC(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("storage-version-garbage-collector"),
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Internal().V1alpha1().StorageVersions(),

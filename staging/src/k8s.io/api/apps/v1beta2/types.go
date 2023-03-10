@@ -43,7 +43,7 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 	// +optional
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
@@ -308,7 +308,7 @@ type StatefulSetSpec struct {
 	// default ordinals behavior assigns a "0" index to the first replica and
 	// increments the index by one for each additional replica requested. Using
 	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-	// enabled, which is alpha.
+	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
 }

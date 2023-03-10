@@ -1075,14 +1075,14 @@ func TestJobStrategy_Validate(t *testing.T) {
 func TestStrategy_ResetFields(t *testing.T) {
 	resetFields := Strategy.GetResetFields()
 	if len(resetFields) != 1 {
-		t.Error("ResetFields should have 1 element")
+		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
 	}
 }
 
 func TestJobStatusStrategy_ResetFields(t *testing.T) {
 	resetFields := StatusStrategy.GetResetFields()
 	if len(resetFields) != 1 {
-		t.Error("ResetFields should have 1 element")
+		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
 	}
 }
 

@@ -1306,6 +1306,7 @@ func Convert_apiextensions_ServiceReference_To_v1beta1_ServiceReference(in *apie
 func autoConvert_v1beta1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *apiextensions.ValidationRule, s conversion.Scope) error {
 	out.Rule = in.Rule
 	out.Message = in.Message
+	out.MessageExpression = in.MessageExpression
 	return nil
 }
 
@@ -1317,6 +1318,7 @@ func Convert_v1beta1_ValidationRule_To_apiextensions_ValidationRule(in *Validati
 func autoConvert_apiextensions_ValidationRule_To_v1beta1_ValidationRule(in *apiextensions.ValidationRule, out *ValidationRule, s conversion.Scope) error {
 	out.Rule = in.Rule
 	out.Message = in.Message
+	out.MessageExpression = in.MessageExpression
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -524,6 +526,209 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
 	})
+
+	ginkgo.It("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "port80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					},
+					{
+						Name:     "port81",
+						Port:     81,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		})
+
+		// Add a backend pod to the service in the other node
+		port8090 := []v1.ContainerPort{
+			{
+				ContainerPort: 8090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+		port9090 := []v1.ContainerPort{
+			{
+				ContainerPort: 9090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", "pod-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+			e2epod.NewAgnhostContainer("container-handle-9090-request", nil, port9090, "netexec", "--http-port", "9090", "--udp-port", "-1"),
+		)
+
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, serverPod)
+
+		if pod.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod.Name)
+		}
+
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
+
+		// create custom endpoint slices
+		tcpProtocol := v1.ProtocolTCP
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+			Endpoints: []discoveryv1.Endpoint{
+				{Addresses: []string{pod.Status.PodIP}},
+			},
+		}
+
+		ginkgo.By("creating")
+		eps1 := epsTemplate.DeepCopy()
+		eps1.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port80"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		eps2 := epsTemplate.DeepCopy()
+		eps2.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port81"),
+			Port:     pointer.Int32(9090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// connect to the service must work
+		ginkgo.By("Creating a pause pods that will try to connect to the webserver")
+		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, pausePod0)
+
+		dest1 := net.JoinHostPort(svc.Spec.ClusterIP, "80")
+		dest2 := net.JoinHostPort(svc.Spec.ClusterIP, "81")
+		execHostnameTest(*pausePod0, dest1, serverPod.Name)
+		execHostnameTest(*pausePod0, dest2, serverPod.Name)
+
+	})
+
+	ginkgo.It("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "port80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					},
+					{
+						Name:     "port81",
+						Port:     81,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		})
+
+		// Add a backend pod to the service in the other node
+		port8090 := []v1.ContainerPort{
+			{
+				ContainerPort: 8090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+
+		serverPod1 := e2epod.NewAgnhostPodFromContainers(
+			"", "pod1-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+		)
+		pod1 := e2epod.NewPodClient(f).CreateSync(ctx, serverPod1)
+
+		if pod1.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod1.Name)
+		}
+
+		serverPod2 := e2epod.NewAgnhostPodFromContainers(
+			"", "pod2-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+		)
+		pod2 := e2epod.NewPodClient(f).CreateSync(ctx, serverPod2)
+
+		if pod2.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod2.Name)
+		}
+
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
+
+		// create custom endpoint slices
+		tcpProtocol := v1.ProtocolTCP
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+		}
+
+		ginkgo.By("creating")
+		eps1 := epsTemplate.DeepCopy()
+		eps1.Endpoints = []discoveryv1.Endpoint{
+			{Addresses: []string{pod1.Status.PodIP}},
+		}
+		eps1.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port80"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		eps2 := epsTemplate.DeepCopy()
+		eps2.Endpoints = []discoveryv1.Endpoint{
+			{Addresses: []string{pod2.Status.PodIP}},
+		}
+		eps2.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port81"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// connect to the service must work
+		ginkgo.By("Creating a pause pods that will try to connect to the webserver")
+		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, pausePod0)
+
+		dest1 := net.JoinHostPort(svc.Spec.ClusterIP, "80")
+		dest2 := net.JoinHostPort(svc.Spec.ClusterIP, "81")
+		execHostnameTest(*pausePod0, dest1, serverPod1.Name)
+		execHostnameTest(*pausePod0, dest2, serverPod2.Name)
+
+	})
+
 })
 
 // expectEndpointsAndSlices verifies that Endpoints and EndpointSlices exist for

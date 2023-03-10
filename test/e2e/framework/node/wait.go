@@ -143,10 +143,10 @@ func WaitForNodeToBeReady(ctx context.Context, c clientset.Interface, name strin
 	return WaitConditionToBe(ctx, c, name, v1.NodeReady, true, timeout)
 }
 
-func WaitForNodeSchedulable(c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
+func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
 	framework.Logf("Waiting up to %v for node %s to be schedulable: %t", timeout, name, wantSchedulable)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Couldn't get node %s", name)
 			continue

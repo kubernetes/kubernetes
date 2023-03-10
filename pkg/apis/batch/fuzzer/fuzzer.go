@@ -44,7 +44,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Parallelism = &parallelism
 			j.BackoffLimit = &backoffLimit
 			if c.Rand.Int31()%2 == 0 {
-				j.ManualSelector = pointer.BoolPtr(true)
+				j.ManualSelector = pointer.Bool(true)
 			} else {
 				j.ManualSelector = nil
 			}
@@ -55,7 +55,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.CompletionMode = &mode
 			// We're fuzzing the internal JobSpec type, not the v1 type, so we don't
 			// need to fuzz the nil value.
-			j.Suspend = pointer.BoolPtr(c.RandBool())
+			j.Suspend = pointer.Bool(c.RandBool())
 		},
 		func(sj *batch.CronJobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(sj)

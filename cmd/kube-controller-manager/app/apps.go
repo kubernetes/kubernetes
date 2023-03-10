@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -49,7 +50,9 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 }
 
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "statefulset"))
 	go statefulset.NewStatefulSetController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
@@ -61,6 +64,7 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 
 func startReplicaSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go replicaset.NewReplicaSetController(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),

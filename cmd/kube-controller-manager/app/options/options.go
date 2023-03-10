@@ -92,7 +92,6 @@ type KubeControllerManagerOptions struct {
 	Logs           *logs.Options
 
 	Master                      string
-	Kubeconfig                  string
 	ShowHiddenMetricsForVersion string
 }
 
@@ -260,7 +259,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
@@ -414,7 +413,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Generic.ClientConnection.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

@@ -268,7 +268,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	klog.V(2).InfoS("Using iptables mark for masquerade", "ipFamily", ipt.Protocol(), "mark", masqueradeMark)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
 		svcPortMap:               make(proxy.ServicePortMap),

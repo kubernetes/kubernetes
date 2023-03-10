@@ -17,7 +17,9 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -28,11 +30,10 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 var _ cel.Filter = &fakeCelFilter{}
@@ -42,7 +43,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(versionedAttr *generic.VersionedAttributes, versionedParams runtime.Object, request *admissionv1.AdmissionRequest) ([]cel.EvaluationResult, error) {
+func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, error) {
 	if f.throwError {
 		return nil, errors.New("test error")
 	}
@@ -61,14 +62,16 @@ func TestValidate(t *testing.T) {
 	unauthorizedReason := metav1.StatusReasonUnauthorized
 
 	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
-	fakeVersionedAttr, _ := generic.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
 
 	cases := []struct {
-		name           string
-		failPolicy     *v1.FailurePolicyType
-		evaluations    []cel.EvaluationResult
-		policyDecision []PolicyDecision
-		throwError     bool
+		name             string
+		failPolicy       *v1.FailurePolicyType
+		evaluations      []cel.EvaluationResult
+		auditEvaluations []cel.EvaluationResult
+		policyDecision   []PolicyDecision
+		auditAnnotations []PolicyAuditAnnotation
+		throwError       bool
 	}{
 		{
 			name: "test pass",
@@ -455,31 +458,187 @@ func TestValidate(t *testing.T) {
 			failPolicy: &fail,
 			throwError: true,
 		},
+		{
+			name: "test empty validations with non-empty audit annotations",
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
+				},
+			},
+			failPolicy: &fail,
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
+			},
+		},
+		{
+			name: "test non-empty validations with non-empty audit annotations",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+					ExpressionAccessor: &ValidationCondition{
+						Reason:     &forbiddenReason,
+						Expression: "this.expression == unit.test",
+						Message:    "test1",
+					},
+				},
+			},
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test audit annotations with null return",
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					EvalResult: celtypes.NullValue,
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "null",
+					},
+				},
+				{
+					EvalResult: celtypes.String("string value"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'string value'",
+					},
+				},
+			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionExclude,
+				},
+				{
+					Action: AuditAnnotationActionPublish,
+					Value:  "string value",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test audit annotations with failPolicy=fail",
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					Error: fmt.Errorf("valueExpression ''this is not valid CEL' resulted in error: <nil>"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'this is not valid CEL",
+					},
+				},
+			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionError,
+					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+				},
+			},
+			failPolicy: &fail,
+		},
+		{
+			name: "test audit annotations with failPolicy=ignore",
+			auditEvaluations: []cel.EvaluationResult{
+				{
+					Error: fmt.Errorf("valueExpression ''this is not valid CEL' resulted in error: <nil>"),
+					ExpressionAccessor: &AuditAnnotationCondition{
+						ValueExpression: "'this is not valid CEL",
+					},
+				},
+			},
+			auditAnnotations: []PolicyAuditAnnotation{
+				{
+					Action: AuditAnnotationActionExclude, // TODO: is this right?
+					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+				},
+			},
+			failPolicy: &ignore,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			v := validator{
 				failPolicy: tc.failPolicy,
-				filter: &fakeCelFilter{
+				validationFilter: &fakeCelFilter{
 					evaluations: tc.evaluations,
 					throwError:  tc.throwError,
 				},
+				auditAnnotationFilter: &fakeCelFilter{
+					evaluations: tc.auditEvaluations,
+					throwError:  tc.throwError,
+				},
 			}
-			policyResults := v.Validate(fakeVersionedAttr, nil)
+			ctx := context.TODO()
+			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
 
-			require.Equal(t, len(policyResults), len(tc.policyDecision))
+			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
 			for i, policyDecision := range tc.policyDecision {
-				if policyDecision.Action != policyResults[i].Action {
-					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.Action, policyResults[i].Action)
+				if policyDecision.Action != validateResult.Decisions[i].Action {
+					t.Errorf("Expected policy decision kind '%v' but got '%v'", policyDecision.Action, validateResult.Decisions[i].Action)
 				}
-				if !strings.Contains(policyResults[i].Message, policyDecision.Message) {
-					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.Message, policyResults[i].Message)
+				if !strings.Contains(validateResult.Decisions[i].Message, policyDecision.Message) {
+					t.Errorf("Expected policy decision message contains '%v' but got '%v'", policyDecision.Message, validateResult.Decisions[i].Message)
 				}
-				if policyDecision.Reason != policyResults[i].Reason {
-					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, policyResults[i].Reason)
+				if policyDecision.Reason != validateResult.Decisions[i].Reason {
+					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, validateResult.Decisions[i].Reason)
+				}
+			}
+			require.Equal(t, len(tc.auditEvaluations), len(validateResult.AuditAnnotations))
+
+			for i, auditAnnotation := range tc.auditAnnotations {
+				actual := validateResult.AuditAnnotations[i]
+				if auditAnnotation.Action != actual.Action {
+					t.Errorf("Expected policy audit annotation action '%v' but got '%v'", auditAnnotation.Action, actual.Action)
+				}
+				if auditAnnotation.Error != actual.Error {
+					t.Errorf("Expected audit annotation error '%v' but got '%v'", auditAnnotation.Error, actual.Error)
+				}
+				if auditAnnotation.Value != actual.Value {
+					t.Errorf("Expected policy audit annotation value '%v' but got '%v'", auditAnnotation.Value, actual.Value)
 				}
 			}
 		})
+	}
+}
+
+func TestContextCanceled(t *testing.T) {
+	fail := v1.Fail
+
+	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
+	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+	fc := cel.NewFilterCompiler()
+	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+	v := validator{
+		failPolicy:       &fail,
+		validationFilter: f,
+		auditAnnotationFilter: &fakeCelFilter{
+			evaluations: nil,
+			throwError:  false,
+		},
+	}
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
+		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}
 }

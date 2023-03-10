@@ -31,7 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -296,7 +297,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
+				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&
