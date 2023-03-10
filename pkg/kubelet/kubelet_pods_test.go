@@ -4220,7 +4220,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					Image:              "img",
 					ImageID:            "img1234",
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					ResourcesAllocated: CPU1AndMem1G,
+					AllocatedResources: CPU1AndMem1G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
 				},
 			},
@@ -4243,7 +4243,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					Image:              "img",
 					ImageID:            "img1234",
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					ResourcesAllocated: CPU1AndMem1G,
+					AllocatedResources: CPU1AndMem1G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
 				},
 			},
@@ -4266,7 +4266,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					Image:              "img",
 					ImageID:            "img1234",
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					ResourcesAllocated: CPU1AndMem1GAndStorage2G,
+					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
 				},
 			},
@@ -4289,7 +4289,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					Image:              "img",
 					ImageID:            "img1234",
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					ResourcesAllocated: CPU1AndMem1GAndStorage2G,
+					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
 				},
 			},
@@ -4311,7 +4311,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					Image:              "img",
 					ImageID:            "img1234",
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					ResourcesAllocated: CPU1AndMem1GAndStorage2G,
+					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
 				},
 			},
@@ -4346,7 +4346,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			}
 			kubelet.statusManager.SetPodAllocation(tPod)
 			if tc.Resources != nil {
-				tPod.Status.ContainerStatuses[i].ResourcesAllocated = tc.Resources[i].Requests
+				tPod.Status.ContainerStatuses[i].AllocatedResources = tc.Resources[i].Requests
 				testPodStatus.ContainerStatuses[i].Resources = &kubecontainer.ContainerResources{
 					MemoryLimit: tc.Resources[i].Limits.Memory(),
 					CPULimit:    tc.Resources[i].Limits.Cpu(),

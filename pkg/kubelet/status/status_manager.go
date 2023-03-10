@@ -137,7 +137,7 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetContainerResourceAllocation returns checkpointed ResourcesAllocated value for the container
+	// GetContainerResourceAllocation returns checkpointed AllocatedResources value for the container
 	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
 
 	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
@@ -186,7 +186,7 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 }
 
 func (m *manager) Start() {
-	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of ResourcesAllocated & Resize
+	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of AllocatedResources & Resize
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
 		if err != nil {
@@ -232,7 +232,7 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-// GetContainerResourceAllocation returns the last checkpointed ResourcesAllocated values
+// GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
 	m.podStatusesLock.RLock()

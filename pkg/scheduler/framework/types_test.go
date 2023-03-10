@@ -1488,7 +1488,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			ContainerStatuses: []v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 				},
 			},
 		},
@@ -1497,7 +1497,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	tests := []struct {
 		name               string
 		requests           v1.ResourceList
-		resourcesAllocated v1.ResourceList
+		allocatedResources v1.ResourceList
 		resizeStatus       v1.PodResizeStatus
 		expectedResource   Resource
 		expectedNon0CPU    int64
@@ -1506,7 +1506,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with no pending resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       "",
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1515,7 +1515,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with resize in progress",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInProgress,
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1524,7 +1524,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with deferred resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusDeferred,
 			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
 			expectedNon0CPU:    cpu700m.MilliValue(),
@@ -1533,7 +1533,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with infeasible resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInfeasible,
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1545,7 +1545,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := testpod.DeepCopy()
 			pod.Spec.Containers[0].Resources.Requests = tt.requests
-			pod.Status.ContainerStatuses[0].ResourcesAllocated = tt.resourcesAllocated
+			pod.Status.ContainerStatuses[0].AllocatedResources = tt.allocatedResources
 			pod.Status.Resize = tt.resizeStatus
 
 			res, non0CPU, non0Mem := calculateResource(pod)

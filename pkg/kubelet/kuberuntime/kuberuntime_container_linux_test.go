@@ -804,27 +804,27 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
 		},
 		{
-			"requests & limits, cpu & memory, guaranteed qos - container status with resourcesAllocated",
+			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
 			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
 		},
 		{
-			"requests & limits, cpu & memory, burstable qos - container status with resourcesAllocated",
+			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
 			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
@@ -838,27 +838,27 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
 		},
 		{
-			"requests & limits, cpu & memory, burstable qos - container status with resourcesAllocated",
+			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
 			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
 		},
 		{
-			"requests & limits, cpu & memory, guaranteed qos - container status with resourcesAllocated",
+			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
 			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},

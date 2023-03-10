@@ -532,13 +532,13 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 
 	// Determine if the *running* container needs resource update by comparing v1.Spec.Resources (desired)
 	// with v1.Status.Resources / runtime.Status.Resources (last known actual).
-	// Proceed only when kubelet has accepted the resize a.k.a v1.Spec.Resources.Requests == v1.Status.ResourcesAllocated.
+	// Proceed only when kubelet has accepted the resize a.k.a v1.Spec.Resources.Requests == v1.Status.AllocatedResources.
 	// Skip if runtime containerID doesn't match pod.Status containerID (container is restarting)
 	apiContainerStatus, exists := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
 	if !exists || apiContainerStatus.State.Running == nil || apiContainerStatus.Resources == nil ||
 		kubeContainerStatus.State != kubecontainer.ContainerStateRunning ||
 		kubeContainerStatus.ID.String() != apiContainerStatus.ContainerID ||
-		len(diff.ObjectDiff(container.Resources.Requests, apiContainerStatus.ResourcesAllocated)) != 0 {
+		len(diff.ObjectDiff(container.Resources.Requests, apiContainerStatus.AllocatedResources)) != 0 {
 		return true
 	}
 
@@ -569,7 +569,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 
 	desiredResources := containerResources{
 		memoryLimit:   desiredMemoryLimit,
-		memoryRequest: apiContainerStatus.ResourcesAllocated.Memory().Value(),
+		memoryRequest: apiContainerStatus.AllocatedResources.Memory().Value(),
 		cpuLimit:      desiredCPULimit,
 		cpuRequest:    desiredCPURequest,
 	}

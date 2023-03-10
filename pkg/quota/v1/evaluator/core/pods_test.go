@@ -763,7 +763,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 		usageFgEnabled  corev1.ResourceList
 		usageFgDisabled corev1.ResourceList
 	}{
-		"verify Max(Container.Spec.Requests, ContainerStatus.ResourcesAllocated) for memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -782,7 +782,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							ResourcesAllocated: api.ResourceList{
+							AllocatedResources: api.ResourceList{
 								api.ResourceMemory: resource.MustParse("150Mi"),
 							},
 						},
@@ -804,7 +804,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.ResourcesAllocated) for CPU resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -823,7 +823,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							ResourcesAllocated: api.ResourceList{
+							AllocatedResources: api.ResourceList{
 								api.ResourceCPU: resource.MustParse("150m"),
 							},
 						},
@@ -845,7 +845,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.ResourcesAllocated) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -866,7 +866,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							ResourcesAllocated: api.ResourceList{
+							AllocatedResources: api.ResourceList{
 								api.ResourceCPU:    resource.MustParse("150m"),
 								api.ResourceMemory: resource.MustParse("250Mi"),
 							},
@@ -895,7 +895,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.ResourcesAllocated==nil) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources==nil) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
