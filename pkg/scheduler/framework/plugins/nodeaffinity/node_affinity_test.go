@@ -517,6 +517,11 @@ func TestNodeAffinity(t *testing.T) {
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node1"},
 											},
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node2"},
+											},
 										},
 									},
 									{
