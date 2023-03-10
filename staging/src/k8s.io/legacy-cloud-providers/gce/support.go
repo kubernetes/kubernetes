@@ -66,6 +66,9 @@ func (l *gceRateLimiter) Accept(ctx context.Context, key *cloud.RateLimitKey) er
 	return nil
 }
 
+// Observe is a no-op func to satisfy cloud.RateLimiter
+func (*gceRateLimiter) Observe(context.Context, error, *cloud.RateLimitKey) {}
+
 // CreateGCECloudWithCloud is a helper function to create an instance of Cloud with the
 // given Cloud interface implementation. Typical usage is to use cloud.NewMockGCE to get a
 // handle to a mock Cloud instance and then use that for testing.
