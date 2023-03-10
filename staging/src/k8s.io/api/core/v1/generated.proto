@@ -729,8 +729,7 @@ message Container {
   repeated ContainerResizePolicy resizePolicy = 23;
 
   // Restart policy for the container.
-  // Always is the only supported value.
-  // It MUST be set only for init containers.
+  // This MUST be set only for init containers.
   // +featureGate=SidecarContainers
   // +optional
   optional string restartPolicy = 24;
@@ -1386,8 +1385,7 @@ message EphemeralContainerCommon {
   repeated ContainerResizePolicy resizePolicy = 23;
 
   // Restart policy for the container.
-  // Always is the only supported value.
-  // It MUST be set only for init containers.
+  // This MUST be set only for init containers.
   // +featureGate=SidecarContainers
   // +optional
   optional string restartPolicy = 24;

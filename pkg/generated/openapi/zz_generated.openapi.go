@@ -17319,10 +17319,9 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. Always is the only supported value. It MUST be set only for init containers.\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
+							Description: "Restart policy for the container. This MUST be set only for init containers.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Always", "Never", "OnFailure"},
 						},
 					},
 					"volumeMounts": {
@@ -18488,10 +18487,9 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. Always is the only supported value. It MUST be set only for init containers.\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
+							Description: "Restart policy for the container. This MUST be set only for init containers.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Always", "Never", "OnFailure"},
 						},
 					},
 					"volumeMounts": {
@@ -18770,10 +18768,9 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy for the container. Always is the only supported value. It MUST be set only for init containers.\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
+							Description: "Restart policy for the container. This MUST be set only for init containers.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Always", "Never", "OnFailure"},
 						},
 					},
 					"volumeMounts": {

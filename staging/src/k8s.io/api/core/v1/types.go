@@ -2445,11 +2445,10 @@ type Container struct {
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// Restart policy for the container.
-	// Always is the only supported value.
-	// It MUST be set only for init containers.
+	// This MUST be set only for init containers.
 	// +featureGate=SidecarContainers
 	// +optional
-	RestartPolicy *RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
+	RestartPolicy *ContainerRestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
 	// Pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
 	// +optional
@@ -2844,6 +2843,20 @@ const (
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
 	RestartPolicyNever     RestartPolicy = "Never"
+)
+
+// ContainerRestartPolicy is the restart policy for a single container.
+// Always is the only supported policy for now.
+type ContainerRestartPolicy string
+
+const (
+	// The container with ContainerRestartPolicyAlways will be restarted
+	// regardless of pod's RestartPolicy. And Kubernetes will start the container
+	// in order with the other init containers, but instead of waiting for its
+	// completion, it will wait for the container startup completion. And the
+	// container will not block the pod from completing.
+	// This MUST be set only for init containers.
+	ContainerRestartPolicyAlways ContainerRestartPolicy = "Always"
 )
 
 // DNSPolicy defines how a pod's DNS will be configured.
@@ -3977,11 +3990,10 @@ type EphemeralContainerCommon struct {
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// Restart policy for the container.
-	// Always is the only supported value.
-	// It MUST be set only for init containers.
+	// This MUST be set only for init containers.
 	// +featureGate=SidecarContainers
 	// +optional
-	RestartPolicy *RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
+	RestartPolicy *ContainerRestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy"`
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// Cannot be updated.
 	// +optional
