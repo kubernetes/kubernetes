@@ -125,16 +125,16 @@ var (
 			ResourceClassName(className).
 			Obj()
 
-	scheduling = st.MakePodScheduling().Name(podName).Namespace(namespace).
+	scheduling = st.MakePodSchedulingHints().Name(podName).Namespace(namespace).
 			OwnerReference(podName, podUID, podKind).
 			Obj()
-	schedulingPotential = st.FromPodScheduling(scheduling).
+	schedulingPotential = st.FromPodSchedulingHints(scheduling).
 				PotentialNodes(workerNode.Name).
 				Obj()
-	schedulingSelectedPotential = st.FromPodScheduling(schedulingPotential).
+	schedulingSelectedPotential = st.FromPodSchedulingHints(schedulingPotential).
 					SelectedNode(workerNode.Name).
 					Obj()
-	schedulingInfo = st.FromPodScheduling(schedulingPotential).
+	schedulingInfo = st.FromPodSchedulingHints(schedulingPotential).
 			ResourceClaims(resourcev1alpha2.ResourceClaimSchedulingStatus{Name: resourceName},
 			resourcev1alpha2.ResourceClaimSchedulingStatus{Name: resourceName2}).
 		Obj()
@@ -160,7 +160,7 @@ type result struct {
 // functions will get called for all objects of that type. If they needs to
 // make changes only to a particular instance, then it must check the name.
 type change struct {
-	scheduling func(*resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling
+	scheduling func(*resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints
 	claim      func(*resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim
 }
 type perNodeResult map[string]result
@@ -203,7 +203,7 @@ func TestPlugin(t *testing.T) {
 		pod         *v1.Pod
 		claims      []*resourcev1alpha2.ResourceClaim
 		classes     []*resourcev1alpha2.ResourceClass
-		schedulings []*resourcev1alpha2.PodScheduling
+		schedulings []*resourcev1alpha2.PodSchedulingHints
 
 		prepare prepare
 		want    want
@@ -269,7 +269,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"delayed-allocation-scheduling-select-immediately": {
-			// Create the PodScheduling object, ask for information
+			// Create the PodSchedulingHints object, ask for information
 			// and select a node.
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
@@ -282,7 +282,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"delayed-allocation-scheduling-ask": {
-			// Create the PodScheduling object, ask for
+			// Create the PodSchedulingHints object, ask for
 			// information, but do not select a node because
 			// there are multiple claims.
 			pod:     podWithTwoClaimNames,
@@ -296,18 +296,18 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"delayed-allocation-scheduling-finish": {
-			// Use the populated PodScheduling object to select a
+			// Use the populated PodSchedulingHints object to select a
 			// node.
 			pod:         podWithClaimName,
 			claims:      []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			schedulings: []*resourcev1alpha2.PodScheduling{schedulingInfo},
+			schedulings: []*resourcev1alpha2.PodSchedulingHints{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
 					changes: change{
-						scheduling: func(in *resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling {
-							return st.FromPodScheduling(in).
+						scheduling: func(in *resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints {
+							return st.FromPodSchedulingHints(in).
 								SelectedNode(workerNode.Name).
 								Obj()
 						},
@@ -316,19 +316,19 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"delayed-allocation-scheduling-finish-concurrent-label-update": {
-			// Use the populated PodScheduling object to select a
+			// Use the populated PodSchedulingHints object to select a
 			// node.
 			pod:         podWithClaimName,
 			claims:      []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			schedulings: []*resourcev1alpha2.PodScheduling{schedulingInfo},
+			schedulings: []*resourcev1alpha2.PodSchedulingHints{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			prepare: prepare{
 				reserve: change{
-					scheduling: func(in *resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling {
+					scheduling: func(in *resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints {
 						// This does not actually conflict with setting the
 						// selected node, but because the plugin is not using
 						// patching yet, Update nonetheless fails.
-						return st.FromPodScheduling(in).
+						return st.FromPodSchedulingHints(in).
 							Label("hello", "world").
 							Obj()
 					},
@@ -341,10 +341,10 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"delayed-allocation-scheduling-completed": {
-			// Remove PodScheduling object once the pod is scheduled.
+			// Remove PodSchedulingHints object once the pod is scheduled.
 			pod:         podWithClaimName,
 			claims:      []*resourcev1alpha2.ResourceClaim{allocatedClaim},
-			schedulings: []*resourcev1alpha2.PodScheduling{schedulingInfo},
+			schedulings: []*resourcev1alpha2.PodSchedulingHints{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
@@ -366,7 +366,7 @@ func TestPlugin(t *testing.T) {
 			pod:         otherPodWithClaimName,
 			claims:      []*resourcev1alpha2.ResourceClaim{inUseClaim},
 			classes:     []*resourcev1alpha2.ResourceClass{},
-			schedulings: []*resourcev1alpha2.PodScheduling{},
+			schedulings: []*resourcev1alpha2.PodSchedulingHints{},
 			prepare:     prepare{},
 			want: want{
 				prefilter: result{
@@ -591,7 +591,7 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	for _, claim := range claims.Items {
 		objects = append(objects, &claim)
 	}
-	schedulings, err := tc.client.ResourceV1alpha2().PodSchedulings("").List(tc.ctx, metav1.ListOptions{})
+	schedulings, err := tc.client.ResourceV1alpha2().PodSchedulingHints("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list pod scheduling")
 	for _, scheduling := range schedulings.Items {
 		objects = append(objects, &scheduling)
@@ -615,8 +615,8 @@ func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, up
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
 				modified[i] = obj
-			case *resourcev1alpha2.PodScheduling:
-				obj, err := tc.client.ResourceV1alpha2().PodSchedulings(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+			case *resourcev1alpha2.PodSchedulingHints:
+				obj, err := tc.client.ResourceV1alpha2().PodSchedulingHints(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
@@ -650,7 +650,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 			if updates.claim != nil {
 				obj = updates.claim(in)
 			}
-		case *resourcev1alpha2.PodScheduling:
+		case *resourcev1alpha2.PodSchedulingHints:
 			if updates.scheduling != nil {
 				obj = updates.scheduling(in)
 			}
@@ -661,7 +661,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceClaim, classes []*resourcev1alpha2.ResourceClass, schedulings []*resourcev1alpha2.PodScheduling) (result *testContext) {
+func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceClaim, classes []*resourcev1alpha2.ResourceClass, schedulings []*resourcev1alpha2.PodSchedulingHints) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -702,7 +702,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		require.NoError(t, err, "create resource class")
 	}
 	for _, scheduling := range schedulings {
-		_, err := tc.client.ResourceV1alpha2().PodSchedulings(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1alpha2().PodSchedulingHints(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
 		require.NoError(t, err, "create pod scheduling")
 	}
 

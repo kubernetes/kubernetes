@@ -55,10 +55,10 @@ func TestController(t *testing.T) {
 	delayedClaim := claim.DeepCopy()
 	delayedClaim.Spec.AllocationMode = resourcev1alpha2.AllocationModeWaitForFirstConsumer
 	podName := "pod"
-	podKey := "podscheduling:default/pod"
+	podKey := "hints:default/pod"
 	pod := createPod(podName, claimNamespace, nil)
 	podClaimName := "my-pod-claim"
-	podScheduling := createPodScheduling(pod)
+	podSchedulingHints := createPodSchedulingHints(pod)
 	podWithClaim := createPod(podName, claimNamespace, map[string]string{podClaimName: claimName})
 	nodeName := "worker"
 	otherNodeName := "worker-2"
@@ -96,34 +96,34 @@ func TestController(t *testing.T) {
 		claim.Status.DeallocationRequested = true
 		return claim
 	}
-	withSelectedNode := func(podScheduling *resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling {
-		podScheduling = podScheduling.DeepCopy()
-		podScheduling.Spec.SelectedNode = nodeName
-		return podScheduling
+	withSelectedNode := func(podSchedulingHints *resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints {
+		podSchedulingHints = podSchedulingHints.DeepCopy()
+		podSchedulingHints.Spec.SelectedNode = nodeName
+		return podSchedulingHints
 	}
-	withUnsuitableNodes := func(podScheduling *resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling {
-		podScheduling = podScheduling.DeepCopy()
-		podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
+	withUnsuitableNodes := func(podSchedulingHints *resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints {
+		podSchedulingHints = podSchedulingHints.DeepCopy()
+		podSchedulingHints.Status.ResourceClaims = append(podSchedulingHints.Status.ResourceClaims,
 			resourcev1alpha2.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
 		)
-		return podScheduling
+		return podSchedulingHints
 	}
-	withPotentialNodes := func(podScheduling *resourcev1alpha2.PodScheduling) *resourcev1alpha2.PodScheduling {
-		podScheduling = podScheduling.DeepCopy()
-		podScheduling.Spec.PotentialNodes = potentialNodes
-		return podScheduling
+	withPotentialNodes := func(podSchedulingHints *resourcev1alpha2.PodSchedulingHints) *resourcev1alpha2.PodSchedulingHints {
+		podSchedulingHints = podSchedulingHints.DeepCopy()
+		podSchedulingHints.Spec.PotentialNodes = potentialNodes
+		return podSchedulingHints
 	}
 
 	var m mockDriver
 
 	for name, test := range map[string]struct {
-		key                                  string
-		driver                               mockDriver
-		classes                              []*resourcev1alpha2.ResourceClass
-		pod                                  *corev1.Pod
-		podScheduling, expectedPodScheduling *resourcev1alpha2.PodScheduling
-		claim, expectedClaim                 *resourcev1alpha2.ResourceClaim
-		expectedError                        string
+		key                  string
+		driver               mockDriver
+		classes              []*resourcev1alpha2.ResourceClass
+		pod                  *corev1.Pod
+		hints, expectedHints *resourcev1alpha2.PodSchedulingHints
+		claim, expectedClaim *resourcev1alpha2.ResourceClaim
+		expectedError        string
 	}{
 		"invalid-key": {
 			key:           "claim:x/y/z",
@@ -306,33 +306,33 @@ func TestController(t *testing.T) {
 
 		// pod with no claims -> shouldn't occur, check again anyway
 		"pod-nop": {
-			key:                   podKey,
-			pod:                   pod,
-			podScheduling:         withSelectedNode(podScheduling),
-			expectedPodScheduling: withSelectedNode(podScheduling),
-			expectedError:         errPeriodic.Error(),
+			key:           podKey,
+			pod:           pod,
+			hints:         withSelectedNode(podSchedulingHints),
+			expectedHints: withSelectedNode(podSchedulingHints),
+			expectedError: errPeriodic.Error(),
 		},
 
 		// pod with immediate allocation and selected node -> shouldn't occur, check again in case that claim changes
 		"pod-immediate": {
-			key:                   podKey,
-			claim:                 claim,
-			expectedClaim:         claim,
-			pod:                   podWithClaim,
-			podScheduling:         withSelectedNode(podScheduling),
-			expectedPodScheduling: withSelectedNode(podScheduling),
-			expectedError:         errPeriodic.Error(),
+			key:           podKey,
+			claim:         claim,
+			expectedClaim: claim,
+			pod:           podWithClaim,
+			hints:         withSelectedNode(podSchedulingHints),
+			expectedHints: withSelectedNode(podSchedulingHints),
+			expectedError: errPeriodic.Error(),
 		},
 
 		// pod with delayed allocation, no potential nodes -> shouldn't occur
 		"pod-delayed-no-nodes": {
-			key:                   podKey,
-			classes:               classes,
-			claim:                 delayedClaim,
-			expectedClaim:         delayedClaim,
-			pod:                   podWithClaim,
-			podScheduling:         podScheduling,
-			expectedPodScheduling: podScheduling,
+			key:           podKey,
+			classes:       classes,
+			claim:         delayedClaim,
+			expectedClaim: delayedClaim,
+			pod:           podWithClaim,
+			hints:         podSchedulingHints,
+			expectedHints: podSchedulingHints,
 		},
 
 		// pod with delayed allocation, potential nodes -> provide unsuitable nodes
@@ -342,23 +342,23 @@ func TestController(t *testing.T) {
 			claim:         delayedClaim,
 			expectedClaim: delayedClaim,
 			pod:           podWithClaim,
-			podScheduling: withPotentialNodes(podScheduling),
+			hints:         withPotentialNodes(podSchedulingHints),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil),
-			expectedPodScheduling: withUnsuitableNodes(withPotentialNodes(podScheduling)),
-			expectedError:         errPeriodic.Error(),
+			expectedHints: withUnsuitableNodes(withPotentialNodes(podSchedulingHints)),
+			expectedError: errPeriodic.Error(),
 		},
 
 		// pod with delayed allocation, potential nodes, selected node, missing class -> failure
 		"pod-delayed-missing-class": {
-			key:                   podKey,
-			claim:                 delayedClaim,
-			expectedClaim:         delayedClaim,
-			pod:                   podWithClaim,
-			podScheduling:         withSelectedNode(withPotentialNodes(podScheduling)),
-			expectedPodScheduling: withSelectedNode(withPotentialNodes(podScheduling)),
-			expectedError:         `pod claim my-pod-claim: resourceclass.resource.k8s.io "mock-class" not found`,
+			key:           podKey,
+			claim:         delayedClaim,
+			expectedClaim: delayedClaim,
+			pod:           podWithClaim,
+			hints:         withSelectedNode(withPotentialNodes(podSchedulingHints)),
+			expectedHints: withSelectedNode(withPotentialNodes(podSchedulingHints)),
+			expectedError: `pod claim my-pod-claim: resourceclass.resource.k8s.io "mock-class" not found`,
 		},
 
 		// pod with delayed allocation, potential nodes, selected node -> allocate
@@ -368,13 +368,13 @@ func TestController(t *testing.T) {
 			claim:         delayedClaim,
 			expectedClaim: withReservedFor(withAllocate(delayedClaim), pod),
 			pod:           podWithClaim,
-			podScheduling: withSelectedNode(withPotentialNodes(podScheduling)),
+			hints:         withSelectedNode(withPotentialNodes(podSchedulingHints)),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil).
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, selectedNode: nodeName, allocErr: nil}}),
-			expectedPodScheduling: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podScheduling))),
-			expectedError:         errPeriodic.Error(),
+			expectedHints: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingHints))),
+			expectedError: errPeriodic.Error(),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -388,8 +388,8 @@ func TestController(t *testing.T) {
 			if test.pod != nil {
 				initialObjects = append(initialObjects, test.pod)
 			}
-			if test.podScheduling != nil {
-				initialObjects = append(initialObjects, test.podScheduling)
+			if test.hints != nil {
+				initialObjects = append(initialObjects, test.hints)
 			}
 			if test.claim != nil {
 				initialObjects = append(initialObjects, test.claim)
@@ -398,7 +398,7 @@ func TestController(t *testing.T) {
 			rcInformer := informerFactory.Resource().V1alpha2().ResourceClasses()
 			claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
 			podInformer := informerFactory.Core().V1().Pods()
-			podSchedulingInformer := informerFactory.Resource().V1alpha2().PodSchedulings()
+			podSchedulingInformer := informerFactory.Resource().V1alpha2().PodSchedulingHints()
 			// Order is important: on function exit, we first must
 			// cancel, then wait (last-in-first-out).
 			defer informerFactory.Shutdown()
@@ -412,7 +412,7 @@ func TestController(t *testing.T) {
 					require.NoError(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
 				case *corev1.Pod:
 					require.NoError(t, podInformer.Informer().GetStore().Add(obj), "add pod")
-				case *resourcev1alpha2.PodScheduling:
+				case *resourcev1alpha2.PodSchedulingHints:
 					require.NoError(t, podSchedulingInformer.Informer().GetStore().Add(obj), "add pod scheduling")
 				default:
 					t.Fatalf("unknown initialObject type: %+v", obj)
@@ -427,7 +427,7 @@ func TestController(t *testing.T) {
 			if !cache.WaitForCacheSync(ctx.Done(),
 				informerFactory.Resource().V1alpha2().ResourceClasses().Informer().HasSynced,
 				informerFactory.Resource().V1alpha2().ResourceClaims().Informer().HasSynced,
-				informerFactory.Resource().V1alpha2().PodSchedulings().Informer().HasSynced,
+				informerFactory.Resource().V1alpha2().PodSchedulingHints().Informer().HasSynced,
 			) {
 				t.Fatal("could not sync caches")
 			}
@@ -449,11 +449,11 @@ func TestController(t *testing.T) {
 			}
 			assert.Equal(t, expectedClaims, claims.Items)
 
-			podSchedulings, err := kubeClient.ResourceV1alpha2().PodSchedulings("").List(ctx, metav1.ListOptions{})
+			podSchedulings, err := kubeClient.ResourceV1alpha2().PodSchedulingHints("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list pod schedulings")
-			var expectedPodSchedulings []resourcev1alpha2.PodScheduling
-			if test.expectedPodScheduling != nil {
-				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedPodScheduling)
+			var expectedPodSchedulings []resourcev1alpha2.PodSchedulingHints
+			if test.expectedHints != nil {
+				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedHints)
 			}
 			assert.Equal(t, expectedPodSchedulings, podSchedulings.Items)
 
@@ -620,9 +620,9 @@ func createPod(podName, podNamespace string, claims map[string]string) *corev1.P
 	return pod
 }
 
-func createPodScheduling(pod *corev1.Pod) *resourcev1alpha2.PodScheduling {
+func createPodSchedulingHints(pod *corev1.Pod) *resourcev1alpha2.PodSchedulingHints {
 	controller := true
-	return &resourcev1alpha2.PodScheduling{
+	return &resourcev1alpha2.PodSchedulingHints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
@@ -646,7 +646,21 @@ func fakeK8s(objs []runtime.Object) (kubernetes.Interface, informers.SharedInfor
 	//
 	// Interactions with the fake apiserver also never fail. TODO:
 	// simulate update errors.
-	client := fake.NewSimpleClientset(objs...)
+	client := fake.NewSimpleClientset()
+	tracker := client.Tracker()
+	for _, obj := range objs {
+		switch obj := obj.(type) {
+		case *resourcev1alpha2.PodSchedulingHints:
+			// Add() selects "podschedulingses" as resource name because of
+			// https://github.com/kubernetes/kubernetes/blob/3489796d5cb5e8d90f98443579ff4ff0d741cea9/staging/src/k8s.io/client-go/testing/fixture.go#L336-L341
+			// We have to specify the right gvr explicitly.
+			if err := tracker.Create(resourcev1alpha2.SchemeGroupVersion.WithResource("podschedulinghints"), obj, obj.Namespace); err != nil {
+				panic(err)
+			}
+		default:
+			tracker.Add(obj)
+		}
+	}
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return client, informerFactory
 }

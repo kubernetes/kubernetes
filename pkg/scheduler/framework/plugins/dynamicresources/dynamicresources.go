@@ -74,14 +74,14 @@ type stateData struct {
 	// protected by the mutex. Used by PostFilter.
 	unavailableClaims sets.Int
 
-	// A pointer to the PodScheduling object for the pod, if one exists.
+	// A pointer to the PodSchedulingHints object for the pod, if one exists.
 	// Gets set on demand.
 	//
 	// Conceptually, this object belongs into the scheduler framework
 	// where it might get shared by different plugins. But in practice,
 	// it is currently only used by dynamic provisioning and thus
 	// managed entirely here.
-	podScheduling *resourcev1alpha2.PodScheduling
+	hints *resourcev1alpha2.PodSchedulingHints
 
 	// podSchedulingDirty is true if the current copy was locally modified.
 	podSchedulingDirty bool
@@ -112,23 +112,23 @@ func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.
 	return nil
 }
 
-// initializePodScheduling can be called concurrently. It returns an existing PodScheduling
+// initializePodSchedulingHints can be called concurrently. It returns an existing PodSchedulingHints
 // object if there is one already, retrieves one if not, or as a last resort creates
 // one from scratch.
-func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, podSchedulingLister resourcev1alpha2listers.PodSchedulingLister) (*resourcev1alpha2.PodScheduling, error) {
-	// TODO (#113701): check if this mutex locking can be avoided by calling initializePodScheduling during PreFilter.
+func (d *stateData) initializePodSchedulingHints(ctx context.Context, pod *v1.Pod, podSchedulingLister resourcev1alpha2listers.PodSchedulingHintsLister) (*resourcev1alpha2.PodSchedulingHints, error) {
+	// TODO (#113701): check if this mutex locking can be avoided by calling initializePodSchedulingHints during PreFilter.
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	if d.podScheduling != nil {
-		return d.podScheduling, nil
+	if d.hints != nil {
+		return d.hints, nil
 	}
 
-	podScheduling, err := podSchedulingLister.PodSchedulings(pod.Namespace).Get(pod.Name)
+	hints, err := podSchedulingLister.PodSchedulingHints(pod.Namespace).Get(pod.Name)
 	switch {
 	case apierrors.IsNotFound(err):
 		controller := true
-		podScheduling = &resourcev1alpha2.PodScheduling{
+		hints = &resourcev1alpha2.PodSchedulingHints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
@@ -148,56 +148,56 @@ func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, po
 		return nil, err
 	default:
 		// We have an object, but it might be obsolete.
-		if !metav1.IsControlledBy(podScheduling, pod) {
-			return nil, fmt.Errorf("PodScheduling object with UID %s is not owned by Pod %s/%s", podScheduling.UID, pod.Namespace, pod.Name)
+		if !metav1.IsControlledBy(hints, pod) {
+			return nil, fmt.Errorf("PodSchedulingHints object with UID %s is not owned by Pod %s/%s", hints.UID, pod.Namespace, pod.Name)
 		}
 	}
-	d.podScheduling = podScheduling
-	return podScheduling, err
+	d.hints = hints
+	return hints, err
 }
 
-// publishPodScheduling creates or updates the PodScheduling object.
-func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernetes.Interface, podScheduling *resourcev1alpha2.PodScheduling) error {
+// publishPodSchedulingHints creates or updates the PodSchedulingHints object.
+func (d *stateData) publishPodSchedulingHints(ctx context.Context, clientset kubernetes.Interface, hints *resourcev1alpha2.PodSchedulingHints) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	var err error
 	logger := klog.FromContext(ctx)
-	msg := "Updating PodScheduling"
-	if podScheduling.UID == "" {
-		msg = "Creating PodScheduling"
+	msg := "Updating PodSchedulingHints"
+	if hints.UID == "" {
+		msg = "Creating PodSchedulingHints"
 	}
 	if loggerV := logger.V(6); loggerV.Enabled() {
 		// At a high enough log level, dump the entire object.
-		loggerV.Info(msg, "podschedulingDump", podScheduling)
+		loggerV.Info(msg, "podSchedulingHintsDump", hints)
 	} else {
-		logger.V(5).Info(msg, "podscheduling", klog.KObj(podScheduling))
+		logger.V(5).Info(msg, "podSchedulingHints", klog.KObj(hints))
 	}
-	if podScheduling.UID == "" {
-		podScheduling, err = clientset.ResourceV1alpha2().PodSchedulings(podScheduling.Namespace).Create(ctx, podScheduling, metav1.CreateOptions{})
+	if hints.UID == "" {
+		hints, err = clientset.ResourceV1alpha2().PodSchedulingHints(hints.Namespace).Create(ctx, hints, metav1.CreateOptions{})
 	} else {
 		// TODO (#113700): patch here to avoid racing with drivers which update the status.
-		podScheduling, err = clientset.ResourceV1alpha2().PodSchedulings(podScheduling.Namespace).Update(ctx, podScheduling, metav1.UpdateOptions{})
+		hints, err = clientset.ResourceV1alpha2().PodSchedulingHints(hints.Namespace).Update(ctx, hints, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
 	}
-	d.podScheduling = podScheduling
+	d.hints = hints
 	d.podSchedulingDirty = false
 	return nil
 }
 
-// storePodScheduling replaces the pod scheduling object in the state.
-func (d *stateData) storePodScheduling(podScheduling *resourcev1alpha2.PodScheduling) {
+// storePodSchedulingHints replaces the pod hints object in the state.
+func (d *stateData) storePodSchedulingHints(hints *resourcev1alpha2.PodSchedulingHints) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	d.podScheduling = podScheduling
+	d.hints = hints
 	d.podSchedulingDirty = true
 }
 
-func statusForClaim(podScheduling *resourcev1alpha2.PodScheduling, podClaimName string) *resourcev1alpha2.ResourceClaimSchedulingStatus {
-	for _, status := range podScheduling.Status.ResourceClaims {
+func statusForClaim(hints *resourcev1alpha2.PodSchedulingHints, podClaimName string) *resourcev1alpha2.ResourceClaimSchedulingStatus {
+	for _, status := range hints.Status.ResourceClaims {
 		if status.Name == podClaimName {
 			return &status
 		}
@@ -211,7 +211,7 @@ type dynamicResources struct {
 	clientset           kubernetes.Interface
 	claimLister         resourcev1alpha2listers.ResourceClaimLister
 	classLister         resourcev1alpha2listers.ResourceClassLister
-	podSchedulingLister resourcev1alpha2listers.PodSchedulingLister
+	podSchedulingLister resourcev1alpha2listers.PodSchedulingHintsLister
 }
 
 // New initializes a new plugin and returns it.
@@ -226,7 +226,7 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		clientset:           fh.ClientSet(),
 		claimLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
 		classLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
-		podSchedulingLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulings().Lister(),
+		podSchedulingLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingHints().Lister(),
 	}, nil
 }
 
@@ -257,7 +257,7 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 		// may be schedulable.
 		// TODO (#113702): can we change this so that such an event does not trigger *all* pods?
 		// Yes: https://github.com/kubernetes/kubernetes/blob/abcbaed0784baf5ed2382aae9705a8918f2daa18/pkg/scheduler/eventhandlers.go#L70
-		{Resource: framework.PodScheduling, ActionType: framework.Add | framework.Update},
+		{Resource: framework.PodSchedulingHints, ActionType: framework.Add | framework.Update},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
@@ -436,11 +436,11 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			}
 
 			// Now we need information from drivers.
-			podScheduling, err := state.initializePodScheduling(ctx, pod, pl.podSchedulingLister)
+			hints, err := state.initializePodSchedulingHints(ctx, pod, pl.podSchedulingLister)
 			if err != nil {
 				return statusError(logger, err)
 			}
-			status := statusForClaim(podScheduling, pod.Spec.ResourceClaims[index].Name)
+			status := statusForClaim(hints, pod.Spec.ResourceClaims[index].Name)
 			if status != nil {
 				for _, unsuitableNode := range status.UnsuitableNodes {
 					if node.Name == unsuitableNode {
@@ -530,7 +530,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	}
 
 	logger := klog.FromContext(ctx)
-	podScheduling, err := state.initializePodScheduling(ctx, pod, pl.podSchedulingLister)
+	hints, err := state.initializePodSchedulingHints(ctx, pod, pl.podSchedulingLister)
 	if err != nil {
 		return statusError(logger, err)
 	}
@@ -540,22 +540,22 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 			pending = true
 		}
 	}
-	if pending && !haveAllNodes(podScheduling.Spec.PotentialNodes, nodes) {
+	if pending && !haveAllNodes(hints.Spec.PotentialNodes, nodes) {
 		// Remember the potential nodes. The object will get created or
 		// updated in Reserve. This is both an optimization and
 		// covers the case that PreScore doesn't get called when there
 		// is only a single node.
 		logger.V(5).Info("remembering potential nodes", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
-		podScheduling = podScheduling.DeepCopy()
+		hints = hints.DeepCopy()
 		numNodes := len(nodes)
 		if numNodes > resourcev1alpha2.PodSchedulingNodeListMaxSize {
 			numNodes = resourcev1alpha2.PodSchedulingNodeListMaxSize
 		}
-		podScheduling.Spec.PotentialNodes = make([]string, 0, numNodes)
+		hints.Spec.PotentialNodes = make([]string, 0, numNodes)
 		if numNodes == len(nodes) {
 			// Copy all node names.
 			for _, node := range nodes {
-				podScheduling.Spec.PotentialNodes = append(podScheduling.Spec.PotentialNodes, node.Name)
+				hints.Spec.PotentialNodes = append(hints.Spec.PotentialNodes, node.Name)
 			}
 		} else {
 			// Select a random subset of the nodes to comply with
@@ -567,14 +567,14 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 				nodeNames[node.Name] = struct{}{}
 			}
 			for nodeName := range nodeNames {
-				if len(podScheduling.Spec.PotentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
+				if len(hints.Spec.PotentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
 					break
 				}
-				podScheduling.Spec.PotentialNodes = append(podScheduling.Spec.PotentialNodes, nodeName)
+				hints.Spec.PotentialNodes = append(hints.Spec.PotentialNodes, nodeName)
 			}
 		}
-		sort.Strings(podScheduling.Spec.PotentialNodes)
-		state.storePodScheduling(podScheduling)
+		sort.Strings(hints.Spec.PotentialNodes)
+		state.storePodSchedulingHints(hints)
 	}
 	logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", nodes)
 	return nil
@@ -614,7 +614,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	numDelayedAllocationPending := 0
 	numClaimsWithStatusInfo := 0
 	logger := klog.FromContext(ctx)
-	podScheduling, err := state.initializePodScheduling(ctx, pod, pl.podSchedulingLister)
+	hints, err := state.initializePodSchedulingHints(ctx, pod, pl.podSchedulingLister)
 	if err != nil {
 		return statusError(logger, err)
 	}
@@ -639,7 +639,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 				return statusError(logger, err)
 			}
 			// If we get here, we know that reserving the claim for
-			// the pod worked and we can proceed with scheduling
+			// the pod worked and we can proceed with hints
 			// it.
 		} else {
 			// Must be delayed allocation.
@@ -647,7 +647,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 
 			// Did the driver provide information that steered node
 			// selection towards a node that it can support?
-			if statusForClaim(podScheduling, pod.Spec.ResourceClaims[index].Name) != nil {
+			if statusForClaim(hints, pod.Spec.ResourceClaims[index].Name) != nil {
 				numClaimsWithStatusInfo++
 			}
 		}
@@ -659,13 +659,13 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	}
 
 	podSchedulingDirty := state.podSchedulingDirty
-	if len(podScheduling.Spec.PotentialNodes) == 0 {
+	if len(hints.Spec.PotentialNodes) == 0 {
 		// PreScore was not called, probably because there was
 		// only one candidate. We need to ask whether that
 		// node is suitable, otherwise the scheduler will pick
 		// it forever even when it cannot satisfy the claim.
-		podScheduling = podScheduling.DeepCopy()
-		podScheduling.Spec.PotentialNodes = []string{nodeName}
+		hints = hints.DeepCopy()
+		hints.Spec.PotentialNodes = []string{nodeName}
 		logger.V(5).Info("asking for information about single potential node", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 		podSchedulingDirty = true
 	}
@@ -675,16 +675,16 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// the driver yet. Otherwise we wait for information before blindly
 	// making a decision that might have to be reversed later.
 	if numDelayedAllocationPending == 1 || numClaimsWithStatusInfo == numDelayedAllocationPending {
-		podScheduling = podScheduling.DeepCopy()
+		hints = hints.DeepCopy()
 		// TODO: can we increase the chance that the scheduler picks
 		// the same node as before when allocation is on-going,
 		// assuming that that node still fits the pod?  Picking a
 		// different node may lead to some claims being allocated for
 		// one node and others for another, which then would have to be
 		// resolved with deallocation.
-		podScheduling.Spec.SelectedNode = nodeName
+		hints.Spec.SelectedNode = nodeName
 		logger.V(5).Info("start allocation", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
-		if err := state.publishPodScheduling(ctx, pl.clientset, podScheduling); err != nil {
+		if err := state.publishPodSchedulingHints(ctx, pl.clientset, hints); err != nil {
 			return statusError(logger, err)
 		}
 		return statusUnschedulable(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
@@ -692,14 +692,14 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 
 	// May have been modified earlier in PreScore or above.
 	if podSchedulingDirty {
-		if err := state.publishPodScheduling(ctx, pl.clientset, podScheduling); err != nil {
+		if err := state.publishPodSchedulingHints(ctx, pl.clientset, hints); err != nil {
 			return statusError(logger, err)
 		}
 	}
 
 	// More than one pending claim and not enough information about all of them.
 	//
-	// TODO: can or should we ensure that scheduling gets aborted while
+	// TODO: can or should we ensure that hints gets aborted while
 	// waiting for resources *before* triggering delayed volume
 	// provisioning?  On the one hand, volume provisioning is currently
 	// irreversible, so it better should come last. On the other hand,
@@ -737,7 +737,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 			claim.Status.ReservedFor = reservedFor
 			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim))
 			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
-				// We will get here again when pod scheduling
+				// We will get here again when pod hints
 				// is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
@@ -746,7 +746,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 }
 
 // PostBind is called after a pod is successfully bound to a node. Now we are
-// sure that a PodScheduling object, if it exists, is definitely not going to
+// sure that a PodSchedulingHints object, if it exists, is definitely not going to
 // be needed anymore and can delete it. This is a one-shot thing, there won't
 // be any retries.  This is okay because it should usually work and in those
 // cases where it doesn't, the garbage collector will eventually clean up.
@@ -762,19 +762,19 @@ func (pl *dynamicResources) PostBind(ctx context.Context, cs *framework.CycleSta
 		return
 	}
 
-	// We cannot know for sure whether the PodScheduling object exists. We
-	// might have created it in the previous pod scheduling cycle and not
+	// We cannot know for sure whether the PodSchedulingHints object exists. We
+	// might have created it in the previous pod hints cycle and not
 	// have it in our informer cache yet. Let's try to delete, just to be
 	// on the safe side.
 	logger := klog.FromContext(ctx)
-	err = pl.clientset.ResourceV1alpha2().PodSchedulings(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	err = pl.clientset.ResourceV1alpha2().PodSchedulingHints(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
-		logger.V(5).Info("no PodScheduling object to delete")
+		logger.V(5).Info("no PodSchedulingHints object to delete")
 	case err != nil:
-		logger.Error(err, "delete PodScheduling")
+		logger.Error(err, "delete PodSchedulingHints")
 	default:
-		logger.V(5).Info("PodScheduling object deleted")
+		logger.V(5).Info("PodSchedulingHints object deleted")
 	}
 }
 
