@@ -411,6 +411,12 @@ type PersistentVolumeStatus struct {
 	// for machine parsing and tidy display in the CLI.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// lastPhaseTransitionTime is the time the phase transitioned from one to another
+	// and automatically resets to current time everytime a volume phase transitions.
+	// This is an alpha field and requires enabling PersistentVolumeLastPhaseTransitionTime feature.
+	// +featureGate=PersistentVolumeLastPhaseTransitionTime
+	// +optional
+	LastPhaseTransitionTime *metav1.Time `json:"lastPhaseTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastPhaseTransitionTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
