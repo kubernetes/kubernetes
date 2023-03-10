@@ -1202,6 +1202,46 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			},
 		},
 		{
+			name: "baseline profile not share process when user explicitly disables it",
+			opts: &DebugOptions{
+				CopyTo:                "debugger",
+				Container:             "debugger",
+				Image:                 "busybox",
+				PullPolicy:            corev1.PullIfNotPresent,
+				Profile:               ProfileBaseline,
+				ShareProcesses:        false,
+				shareProcessedChanged: true,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(false),
+				},
+			},
+		},
+		{
 			name: "restricted profile",
 			opts: &DebugOptions{
 				CopyTo:     "debugger",
