@@ -847,8 +847,10 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// findNextInitContainerToRun returns the status of the last failed container, the
-// index of next init container to start, or done if there are no further init containers.
+// findNextInitContainerToRun returns the status of the first failed container, the
+// index of next init container to start, or done if there are no further init
+// containers to start right now. Note that, sidecar containers can re-run even
+// after done once.
 // Status is only returned if an init container is failed, in which case next will
 // point to the current container.
 func (m *kubeGenericRuntimeManager) findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
@@ -882,6 +884,7 @@ func (m *kubeGenericRuntimeManager) findNextInitContainerToRun(pod *v1.Pod, podS
 	// There are no failed containers now.
 	for _, container := range pod.Spec.InitContainers {
 		if hasInitialized && !types.IsSidecarContainer(&container) {
+			// after initialization, only sidecar containers need to be kept running
 			continue
 		}
 
@@ -908,6 +911,8 @@ func (m *kubeGenericRuntimeManager) findNextInitContainerToRun(pod *v1.Pod, podS
 			if types.IsSidecarContainer(&container) {
 				return nil, &container, false
 			}
+			// init container has finished, continue
+
 		default:
 			return nil, &container, false
 		}
