@@ -238,7 +238,7 @@ type StatefulSetSpec struct {
 	// default ordinals behavior assigns a "0" index to the first replica and
 	// increments the index by one for each additional replica requested. Using
 	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-	// enabled, which is alpha.
+	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals
 }
