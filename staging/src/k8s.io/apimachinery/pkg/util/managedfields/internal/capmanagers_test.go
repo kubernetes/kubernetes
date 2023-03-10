@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	internaltesting "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
+	internaltesting "k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -252,7 +252,7 @@ func TestCapUpdateManagers(t *testing.T) {
 }
 
 // expectIdempotence does a no-op update and ensures that managedFields doesn't change by calling capUpdateManagers.
-func expectIdempotence(t *testing.T, f fieldmanagertest.TestFieldManager) {
+func expectIdempotence(t *testing.T, f managedfieldstest.TestFieldManager) {
 	before := []metav1.ManagedFieldsEntry{}
 	for _, m := range f.ManagedFields() {
 		before = append(before, *m.DeepCopy())
@@ -268,7 +268,7 @@ func expectIdempotence(t *testing.T, f fieldmanagertest.TestFieldManager) {
 }
 
 // expectManagesField ensures that manager m currently manages field path p.
-func expectManagesField(t *testing.T, f fieldmanagertest.TestFieldManager, m string, p fieldpath.Path) {
+func expectManagesField(t *testing.T, f managedfieldstest.TestFieldManager, m string, p fieldpath.Path) {
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
 			var s fieldpath.Set

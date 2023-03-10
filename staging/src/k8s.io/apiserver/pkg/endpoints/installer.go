@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
@@ -683,7 +683,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resetFields = resetFieldsStrategy.GetResetFields()
 		}
 
-		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
+		reqScope.FieldManager, err = managedfields.NewDefaultFieldManager(
 			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,

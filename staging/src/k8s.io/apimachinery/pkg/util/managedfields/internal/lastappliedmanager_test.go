@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/yaml"
@@ -46,7 +46,7 @@ type testArgs struct {
 // created with the client-side apply last-applied annotation
 // will not give conflicts
 func TestApplyUsingLastAppliedAnnotation(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	tests := []testArgs{
 		{
@@ -566,7 +566,7 @@ spec:
 }
 
 func TestServiceApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Service"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Service"))
 
 	tests := []testArgs{
 		{
@@ -677,7 +677,7 @@ spec:
 }
 
 func TestReplicationControllerApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ReplicationController"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ReplicationController"))
 
 	tests := []testArgs{
 		{
@@ -740,7 +740,7 @@ spec:
 }
 
 func TestPodApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	tests := []testArgs{
 		{
@@ -917,7 +917,7 @@ spec:
 	testConflicts(t, f, tests)
 }
 
-func testConflicts(t *testing.T, f fieldmanagertest.TestFieldManager, tests []testArgs) {
+func testConflicts(t *testing.T, f managedfieldstest.TestFieldManager, tests []testArgs) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
 			f.Reset()
