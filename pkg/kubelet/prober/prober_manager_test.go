@@ -133,6 +133,85 @@ func TestAddRemovePods(t *testing.T) {
 	}
 }
 
+func TestAddRemovePodsWithSidecar(t *testing.T) {
+	m := newTestManager()
+	defer cleanup(t, m)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	if err := expectProbes(m, nil); err != nil {
+		t.Error(err)
+	}
+
+	testCases := []struct {
+		desc              string
+		probePaths        []probeKey
+		sidecarContainers bool
+	}{
+		{
+			desc:              "pod with sidecar (no sidecar containers feature enabled)",
+			probePaths:        nil,
+			sidecarContainers: false,
+		},
+		{
+			desc:              "pod with sidecar (sidecar containers feature enabled)",
+			probePaths:        []probeKey{{"sidecar_pod", "sidecar", readiness}},
+			sidecarContainers: true,
+		},
+	}
+
+	containerRestartPolicy := func(isSidecar bool) *v1.ContainerRestartPolicy {
+		if !isSidecar {
+			return nil
+		}
+		restartPolicy := v1.ContainerRestartPolicyAlways
+		return &restartPolicy
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.sidecarContainers)()
+
+			probePod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "sidecar_pod",
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{{
+						Name: "init",
+					}, {
+						Name:           "sidecar",
+						ReadinessProbe: defaultProbe,
+						RestartPolicy:  containerRestartPolicy(tc.sidecarContainers),
+					}},
+					Containers: []v1.Container{{
+						Name: "main",
+					}},
+				},
+			}
+
+			// Adding a pod with probes.
+			m.AddPod(&probePod)
+			if err := expectProbes(m, tc.probePaths); err != nil {
+				t.Error(err)
+			}
+
+			// Removing probed pod.
+			m.RemovePod(&probePod)
+			if err := waitForWorkerExit(t, m, tc.probePaths); err != nil {
+				t.Fatal(err)
+			}
+			if err := expectProbes(m, nil); err != nil {
+				t.Error(err)
+			}
+
+			// Removing already removed pods should be a no-op.
+			m.RemovePod(&probePod)
+			if err := expectProbes(m, nil); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
 func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)

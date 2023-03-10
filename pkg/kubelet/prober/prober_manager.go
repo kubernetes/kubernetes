@@ -167,12 +167,22 @@ func (t probeType) String() string {
 	}
 }
 
+func getSidecars(pod *v1.Pod) []v1.Container {
+	var sidecarContainers []v1.Container
+	for _, c := range pod.Spec.InitContainers {
+		if kubetypes.IsSidecarContainer(&c) {
+			sidecarContainers = append(sidecarContainers, c)
+		}
+	}
+	return sidecarContainers
+}
+
 func (m *manager) AddPod(pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, getSidecars(pod)...) {
 		key.containerName = c.Name
 
 		if c.StartupProbe != nil {
@@ -234,7 +244,7 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	defer m.workerLock.RUnlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, getSidecars(pod)...) {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{readiness, liveness, startup} {
 			key.probeType = probeType
