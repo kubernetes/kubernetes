@@ -21,6 +21,33 @@ import (
 	"time"
 )
 
+// PollUntilContextCancel tries a condition func until it returns true, an error, or the context
+// is cancelled or hits a deadline. condition will be invoked after the first interval if the
+// context is not cancelled first. The returned error will be from ctx.Err(), the condition's
+// err return value, or nil. If invoking condition takes longer than interval the next condition
+// will be invoked immediately. When using very short intervals, condition may be invoked multiple
+// times before a context cancellation is detected. If immediate is true, condition will be
+// invoked before waiting and guarantees that condition is invoked at least once, regardless of
+// whether the context has been cancelled.
+func PollUntilContextCancel(ctx context.Context, interval time.Duration, immediate bool, condition ConditionWithContextFunc) error {
+	return loopConditionUntilContext(ctx, Backoff{Duration: interval}.Timer(), immediate, false, condition)
+}
+
+// PollUntilContextTimeout will terminate polling after timeout duration by setting a context
+// timeout. This is provided as a convenience function for callers not currently executing under
+// a deadline and is equivalent to:
+//
+//	deadlineCtx, deadlineCancel := context.WithTimeout(ctx, timeout)
+//	err := PollUntilContextCancel(ctx, interval, immediate, condition)
+//
+// The deadline context will be cancelled if the Poll succeeds before the timeout, simplifying
+// inline usage. All other behavior is identical to PollWithContextTimeout.
+func PollUntilContextTimeout(ctx context.Context, interval, timeout time.Duration, immediate bool, condition ConditionWithContextFunc) error {
+	deadlineCtx, deadlineCancel := context.WithTimeout(ctx, timeout)
+	defer deadlineCancel()
+	return loopConditionUntilContext(deadlineCtx, Backoff{Duration: interval}.Timer(), immediate, false, condition)
+}
+
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached.
 //
@@ -31,6 +58,10 @@ import (
 // window is too short.
 //
 // If you want to Poll something forever, see PollInfinite.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextTimeout.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 	return PollWithContext(context.Background(), interval, timeout, condition.WithContext())
 }
@@ -46,6 +77,10 @@ func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 // window is too short.
 //
 // If you want to Poll something forever, see PollInfinite.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextTimeout.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollWithContext(ctx context.Context, interval, timeout time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, false, poller(interval, timeout), condition)
 }
@@ -55,6 +90,10 @@ func PollWithContext(ctx context.Context, interval, timeout time.Duration, condi
 //
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	return PollUntilWithContext(ContextForChannel(stopCh), interval, condition.WithContext())
 }
@@ -64,6 +103,10 @@ func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan st
 //
 // PollUntilWithContext always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, false, poller(interval, 0), condition)
 }
@@ -74,6 +117,10 @@ func PollUntilWithContext(ctx context.Context, interval time.Duration, condition
 //
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 	return PollInfiniteWithContext(context.Background(), interval, condition.WithContext())
 }
@@ -84,6 +131,10 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 //
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollInfiniteWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, false, poller(interval, 0), condition)
 }
@@ -98,6 +149,10 @@ func PollInfiniteWithContext(ctx context.Context, interval time.Duration, condit
 // window is too short.
 //
 // If you want to immediately Poll something forever, see PollImmediateInfinite.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextTimeout.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
 	return PollImmediateWithContext(context.Background(), interval, timeout, condition.WithContext())
 }
@@ -112,6 +167,10 @@ func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) err
 // window is too short.
 //
 // If you want to immediately Poll something forever, see PollImmediateInfinite.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextTimeout.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediateWithContext(ctx context.Context, interval, timeout time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, true, poller(interval, timeout), condition)
 }
@@ -120,6 +179,10 @@ func PollImmediateWithContext(ctx context.Context, interval, timeout time.Durati
 //
 // PollImmediateUntil runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	return PollImmediateUntilWithContext(ContextForChannel(stopCh), interval, condition.WithContext())
 }
@@ -129,6 +192,10 @@ func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh 
 //
 // PollImmediateUntilWithContext runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediateUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, true, poller(interval, 0), condition)
 }
@@ -139,6 +206,10 @@ func PollImmediateUntilWithContext(ctx context.Context, interval time.Duration, 
 //
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
 	return PollImmediateInfiniteWithContext(context.Background(), interval, condition.WithContext())
 }
@@ -150,6 +221,10 @@ func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) erro
 //
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
+//
+// Deprecated: This method does not return errors from context, use PollWithContextCancel.
+// Note that the new method will no longer return ErrWaitTimeout and instead return errors
+// defined by the context package. Will be removed in a future release.
 func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
 	return poll(ctx, true, poller(interval, 0), condition)
 }
@@ -163,6 +238,8 @@ func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duratio
 // wait: user specified WaitFunc function that controls at what interval the condition
 // function should be invoked periodically and whether it is bound by a timeout.
 // condition: user specified ConditionWithContextFunc function.
+//
+// Deprecated: will be removed in favor of loopConditionUntilContext.
 func poll(ctx context.Context, immediate bool, wait waitWithContextFunc, condition ConditionWithContextFunc) error {
 	if immediate {
 		done, err := runConditionWithCrashProtectionWithContext(ctx, condition)
@@ -176,7 +253,8 @@ func poll(ctx context.Context, immediate bool, wait waitWithContextFunc, conditi
 
 	select {
 	case <-ctx.Done():
-		// returning ctx.Err() will break backward compatibility
+		// returning ctx.Err() will break backward compatibility, use new PollUntilContext*
+		// methods instead
 		return ErrWaitTimeout
 	default:
 		return waitForWithContext(ctx, wait, condition)
@@ -193,6 +271,8 @@ func poll(ctx context.Context, immediate bool, wait waitWithContextFunc, conditi
 //
 // Output ticks are not buffered. If the channel is not ready to receive an
 // item, the tick is skipped.
+//
+// Deprecated: Will be removed in a future release.
 func poller(interval, timeout time.Duration) waitWithContextFunc {
 	return waitWithContextFunc(func(ctx context.Context) <-chan struct{} {
 		ch := make(chan struct{})
