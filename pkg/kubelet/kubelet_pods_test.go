@@ -60,7 +60,7 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-var alwaysRestartPolicy = v1.RestartPolicyAlways
+var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
 
 func TestNodeHostsFileContent(t *testing.T) {
 	testCases := []struct {
@@ -2350,7 +2350,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
-			{Name: "containerX", RestartPolicy: &alwaysRestartPolicy},
+			{Name: "containerX", RestartPolicy: &containerRestartPolicyAlways},
 		},
 		Containers: []v1.Container{
 			{Name: "containerA"},
@@ -2689,7 +2689,7 @@ func TestPodPhaseWithRestartNeverSidecarContainers(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
-			{Name: "containerX", RestartPolicy: &alwaysRestartPolicy},
+			{Name: "containerX", RestartPolicy: &containerRestartPolicyAlways},
 		},
 		Containers: []v1.Container{
 			{Name: "containerA"},
