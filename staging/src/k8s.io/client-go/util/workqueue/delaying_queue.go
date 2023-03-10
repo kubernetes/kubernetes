@@ -71,7 +71,7 @@ func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
 		})
 	}
 
-	return newDelayingQueue(config.Clock, config.Queue, config.Name)
+	return newDelayingQueue(config.Clock, config.Queue, config.Name, config.MetricsProvider)
 }
 
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to
@@ -100,14 +100,14 @@ func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) Delayi
 	})
 }
 
-func newDelayingQueue(clock clock.WithTicker, q Interface, name string) *delayingType {
+func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
 	ret := &delayingType{
 		Interface:       q,
 		clock:           clock,
 		heartbeat:       clock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics(name),
+		metrics:         newRetryMetrics(name, provider),
 	}
 
 	go ret.waitingLoop()
