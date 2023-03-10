@@ -488,10 +488,19 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 			break
 		}
 		c.sendWatchCacheEvent(event)
+
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
 		// to this watcher second time causing going back in time.
-		resourceVersion = event.ResourceVersion
+		//
+		// There is one case where events are not necessary ordered by
+		// resourceVersion, being a case of watching from resourceVersion=0,
+		// which at the beginning returns the state of each objects.
+		// For the purpose of it, we need to max it with the resource version
+		// that we have so far.
+		if event.ResourceVersion > resourceVersion {
+			resourceVersion = event.ResourceVersion
+		}
 		initEventCount++
 	}
 
