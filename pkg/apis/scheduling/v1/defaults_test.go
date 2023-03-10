@@ -58,3 +58,12 @@ func TestSetDefaultPreemptionPolicy(t *testing.T) {
 		t.Errorf("Expected PriorityClass.PreemptionPolicy value: %+v\ngot: %+v\n", apiv1.PreemptLowerPriority, output.PreemptionPolicy)
 	}
 }
+
+func TestSetDefaultDisruptionPolicy(t *testing.T) {
+	priorityClass := &v1.PriorityClass{}
+
+	output := roundTrip(t, runtime.Object(priorityClass)).(*v1.PriorityClass)
+	if output.DisruptionPolicy == nil || output.DisruptionPolicy.Policy != apiv1.PDBBestEffort {
+		t.Errorf("Expected PriorityClass.DisruptionPolicy.Policy value: %+v\ngot: %+v\n", apiv1.PDBBestEffort, output.DisruptionPolicy.Policy)
+	}
+}

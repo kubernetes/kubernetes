@@ -33,4 +33,11 @@ func SetDefaults_PriorityClass(obj *v1beta1.PriorityClass) {
 		preemptLowerPriority := apiv1.PreemptLowerPriority
 		obj.PreemptionPolicy = &preemptLowerPriority
 	}
+
+	if obj.DisruptionPolicy == nil {
+		pdbBestEffort := apiv1.DisruptionPolicy{
+			Policy: apiv1.PDBBestEffort,
+		}
+		obj.DisruptionPolicy = &pdbBestEffort
+	}
 }

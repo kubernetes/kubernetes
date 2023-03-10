@@ -3344,6 +3344,19 @@ func ValidatePreemptionPolicy(preemptionPolicy *core.PreemptionPolicy, fldPath *
 	return allErrors
 }
 
+func ValidateDisruptionPolicy(disruptionPolicy *core.DisruptionPolicy, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	switch (*disruptionPolicy).Policy {
+	case core.PDBStrict, core.PDBBestEffort, core.PDBIgnore:
+	case "":
+		allErrors = append(allErrors, field.Required(fldPath, ""))
+	default:
+		validValues := []string{string(core.PDBStrict), string(core.PDBBestEffort), string(core.PDBIgnore)}
+		allErrors = append(allErrors, field.NotSupported(fldPath, disruptionPolicy, validValues))
+	}
+	return allErrors
+}
+
 func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
@@ -3822,6 +3835,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.PreemptionPolicy != nil {
 		allErrs = append(allErrs, ValidatePreemptionPolicy(spec.PreemptionPolicy, fldPath.Child("preemptionPolicy"))...)
+	}
+
+	if spec.DisruptionPolicy != nil {
+		allErrs = append(allErrs, ValidateDisruptionPolicy(spec.DisruptionPolicy, fldPath.Child("disruptionPolicy"))...)
 	}
 
 	if spec.Overhead != nil {

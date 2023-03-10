@@ -231,6 +231,13 @@ const (
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
 
+	// owner: @denkensk
+	// kep: https://kep.k8s.io/3280
+	// alpha: v1.27
+	//
+	// Enable DisruptionPolicy in PriorityClass.
+	DisruptionPolicyInPriorityClass featuregate.Feature = "DisruptionPolicyInPriorityClass"
+
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	// beta: v1.21 (off by default until 1.22)
@@ -931,6 +938,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+
+	DisruptionPolicyInPriorityClass: {Default: false, PreRelease: featuregate.Alpha},
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.29
 

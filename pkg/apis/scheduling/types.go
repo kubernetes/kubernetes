@@ -69,9 +69,13 @@ type PriorityClass struct {
 	Description string
 
 	// preemptionPolicy it the Policy for preempting pods with lower priority.
-	// This field is beta-level.
 	// +optional
 	PreemptionPolicy *core.PreemptionPolicy
+
+	// DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.
+	// This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.
+	// +optional
+	DisruptionPolicy *core.DisruptionPolicy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

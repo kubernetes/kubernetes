@@ -61,6 +61,11 @@ type PriorityClass struct {
 	// Defaults to PreemptLowerPriority if unset.
 	// +optional
 	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
+
+	// DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.
+	// This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.
+	// +optional
+	DisruptionPolicy *apiv1.DisruptionPolicy `json:"disruptionPolicy,omitempty" protobuf:"bytes,6,rep,name=disruptionPolicy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

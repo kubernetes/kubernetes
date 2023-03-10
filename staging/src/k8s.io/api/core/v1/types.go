@@ -2301,6 +2301,42 @@ const (
 	PreemptNever PreemptionPolicy = "Never"
 )
 
+// DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.
+type DisruptionPolicy struct {
+	// Policy applicable to the specified policy name.
+	// If not specified, it defaults to PDBBestEffort.
+	Policy PDBDisruptionPolicy `json:"policy" protobuf:"bytes,1,opt,name=policy"`
+	// PriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated
+	// with this priority class can only be violated by pods with a priority value greater than or equal to.
+	// PriorityGreaterThanOrEqual during a preemption process. The value of PriorityGreaterThanOrEqual
+	// cannot be greater than the priority value of system-cluster-critical or system-node-critical.
+	// When Priority Admission Controller is enabled, it prevents users from setting this field.
+	// The admission controller populates this field from PriorityClassName.
+	// PriorityGreaterThanOrEqual only takes effect when Policy is set to PDBStrict
+	// A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pods with a higher priority.
+	// +optional
+	PriorityGreaterThanOrEqual *int32 `json:"priorityGreaterThanOrEqual,omitempty" protobuf:"varint,2,opt,name=priorityGreaterThanOrEqual"`
+}
+
+// PDBDisruptionPolicy specifies how the associated PDB may be disrupted when this
+// Pod is preempted during scheduling.
+// +enum
+type PDBDisruptionPolicy string
+
+const (
+	// PDBIgnore indicates that the associated PDB will not be considered
+	// when this Pod is preempted during scheduling.
+	PDBIgnore PDBDisruptionPolicy = "PDBIgnore"
+	// PDBBestEffort indicates that the associated PDB should be protected as
+	// much as possible from being violated when this Pod is preempted during scheduling.
+	PDBBestEffort PDBDisruptionPolicy = "PDBBestEffort"
+	// PDBStrict indicates that the associated PDB should be protected strictly from
+	// being violated when this Pod is preempted during scheduling.
+	// But if the preempter has a priority class name of `system-cluster-critical` or
+	// `system-node-critical`, it may still potentially violate the victim's PDB.
+	PDBStrict PDBDisruptionPolicy = "PDBStrict"
+)
+
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
 // +enum
 type TerminationMessagePolicy string
@@ -3494,6 +3530,10 @@ type PodSpec struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
+	// DisruptionPolicy specifies how pods with this priority class may be disrupted when being preempted.
+	// This field is alpha-level, gated by the DisruptionPolicyInPriorityClass feature-gate.
+	// +optional
+	DisruptionPolicy *DisruptionPolicy `json:"disruptionPolicy,omitempty" protobuf:"bytes,40,rep,name=disruptionPolicy"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

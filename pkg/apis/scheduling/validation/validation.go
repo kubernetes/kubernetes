@@ -45,6 +45,9 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	if pc.PreemptionPolicy != nil {
 		allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(pc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	}
+	if pc.DisruptionPolicy != nil {
+		allErrs = append(allErrs, apivalidation.ValidateDisruptionPolicy(pc.DisruptionPolicy, field.NewPath("disruptionPolicy"))...)
+	}
 	return allErrs
 }
 
@@ -59,5 +62,6 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	}
 	// preemptionPolicy is immutable.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.DisruptionPolicy, oldPc.DisruptionPolicy, field.NewPath("disruptionPolicy"))...)
 	return allErrs
 }
