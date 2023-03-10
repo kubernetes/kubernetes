@@ -52,8 +52,8 @@ import (
 )
 
 var (
-	fakeCreatedAt       int64            = 1
-	restartPolicyAlways v1.RestartPolicy = v1.RestartPolicyAlways
+	fakeCreatedAt                int64 = 1
+	containerRestartPolicyAlways       = v1.ContainerRestartPolicyAlways
 )
 
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
@@ -1571,17 +1571,17 @@ func makeBasePodAndStatusWithSidecarContainers() (*v1.Pod, *kubecontainer.PodSta
 		{
 			Name:          "sidecar1",
 			Image:         "bar-image",
-			RestartPolicy: &restartPolicyAlways,
+			RestartPolicy: &containerRestartPolicyAlways,
 		},
 		{
 			Name:          "sidecar2",
 			Image:         "bar-image",
-			RestartPolicy: &restartPolicyAlways,
+			RestartPolicy: &containerRestartPolicyAlways,
 		},
 		{
 			Name:          "sidecar3",
 			Image:         "bar-image",
-			RestartPolicy: &restartPolicyAlways,
+			RestartPolicy: &containerRestartPolicyAlways,
 		},
 	}
 	// Replace the original statuses of the containers with those for the init

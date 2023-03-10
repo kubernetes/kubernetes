@@ -2840,14 +2840,14 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateInitContainerRestartPolicy(restartPolicy *core.RestartPolicy, fldPath *field.Path) field.ErrorList {
+func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 
 	switch *restartPolicy {
-	case core.RestartPolicyAlways:
+	case core.ContainerRestartPolicyAlways:
 		break
 	default:
-		validValues := []string{string(core.RestartPolicyAlways)}
+		validValues := []string{string(core.ContainerRestartPolicyAlways)}
 		allErrors = append(allErrors, field.NotSupported(fldPath, *restartPolicy, validValues))
 	}
 

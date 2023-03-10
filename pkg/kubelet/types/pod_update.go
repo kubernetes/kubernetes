@@ -196,7 +196,7 @@ func IsNodeCriticalPod(pod *v1.Pod) bool {
 }
 
 // IsSidecarContainer returns true, if the SidecarContainers feature gate
-// is enabled and the container has RestartPolicyAlways.
+// is enabled and the container has ContainerRestartPolicyAlways.
 func IsSidecarContainer(initContainer *v1.Container) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		return false
@@ -206,5 +206,5 @@ func IsSidecarContainer(initContainer *v1.Container) bool {
 		return false
 	}
 
-	return *initContainer.RestartPolicy == v1.RestartPolicyAlways
+	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }

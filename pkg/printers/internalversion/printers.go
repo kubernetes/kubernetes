@@ -3016,5 +3016,5 @@ func isSidecarContainer(initContainer *api.Container) bool {
 		return false
 	}
 
-	return *initContainer.RestartPolicy == api.RestartPolicyAlways
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
 }
