@@ -33,4 +33,8 @@ const (
 	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
 	// Note that even if server_run_options.go becomes configurable in the future, this cost constant should be fixed and it should be the max allowed request size for the server
 	MaxRequestSizeBytes = int64(3 * 1024 * 1024)
+
+	// MaxEvaluatedMessageExpressionSizeBytes represents the largest-allowable string generated
+	// by a messageExpression field
+	MaxEvaluatedMessageExpressionSizeBytes = 5 * 1024
 )

@@ -55,6 +55,15 @@ type CompilationResult struct {
 	// MaxCardinality represents the worse case number of times this validation rule could be invoked if contained under an
 	// unbounded map or list in an OpenAPIv3 schema.
 	MaxCardinality uint64
+	// MessageExpression represents the cel Program that should be evaluated to generate an error message if the rule
+	// fails to validate. If no MessageExpression was given, or if this expression failed to compile, this will be nil.
+	MessageExpression cel.Program
+	// MessageExpressionError represents an error encountered during compilation of MessageExpression. If no error was
+	// encountered, this will be nil.
+	MessageExpressionError *apiservercel.Error
+	// MessageExpressionMaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MessageExpressionMaxCost uint64
 }
 
 var (
@@ -194,6 +203,42 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	compilationResult.MaxCost = costEst.Max
 	compilationResult.MaxCardinality = maxCardinality
 	compilationResult.Program = prog
+	if rule.MessageExpression != "" {
+		ast, issues := env.Compile(rule.MessageExpression)
+		if issues != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression compilation failed: " + issues.String()}
+			return
+		}
+		if ast.OutputType() != cel.StringType {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression must evaluate to a string"}
+			return
+		}
+
+		_, err := cel.AstToCheckedExpr(ast)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "unexpected messageExpression compilation error: " + err.Error()}
+			return
+		}
+
+		msgProg, err := env.Program(ast,
+			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
+			cel.CostLimit(perCallLimit),
+			cel.CostTracking(estimator),
+			cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
+			cel.InterruptCheckFrequency(celconfig.CheckFrequency),
+		)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression instantiation failed: " + err.Error()}
+			return
+		}
+		costEst, err := env.EstimateCost(ast, estimator)
+		if err != nil {
+			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed for messageExpression: " + err.Error()}
+			return
+		}
+		compilationResult.MessageExpression = msgProg
+		compilationResult.MessageExpressionMaxCost = costEst.Max
+	}
 	return
 }
 
