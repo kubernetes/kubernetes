@@ -647,6 +647,7 @@ func TestFitScore(t *testing.T) {
 		existingPods         []*v1.Pod
 		expectedPriorities   framework.NodeScoreList
 		nodeResourcesFitArgs config.NodeResourcesFitArgs
+		runPreScore          bool
 	}{
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
@@ -674,6 +675,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case2",
@@ -701,6 +703,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy MostAllocated",
@@ -722,6 +725,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy LeastAllocated",
@@ -743,6 +747,79 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
+		},
+		{
+			name: "test case for ScoringStrategy RequestedToCapacityRatio case1 if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 10}, {Name: "node2", Score: 32}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: defaultResources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 10},
+							{Utilization: 100, Score: 0},
+						},
+					},
+				},
+			},
+			runPreScore: false,
+		},
+		{
+			name: "test case for ScoringStrategy MostAllocated if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 67}, {Name: "node2", Score: 36}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: false,
+		},
+		{
+			name: "test case for ScoringStrategy LeastAllocated if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 63}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: false,
 		},
 	}
 
@@ -762,9 +839,15 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
+				if !test.runPreScore {
+					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+					if !status.IsSuccess() {
+						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+					}
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
 			}
@@ -879,6 +962,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
+
 				_, status := p.Score(context.Background(), state, requestedPod, nodes[0].Name)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)
