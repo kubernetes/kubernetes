@@ -35,7 +35,7 @@ func TestLatencyTrackersFrom(t *testing.T) {
 		SumDurations: 1600,
 		MaxDuration:  400,
 	}
-	t.Run("TestWebhookDurationFrom", func(t *testing.T) {
+	t.Run("TestLatencyTrackersFrom", func(t *testing.T) {
 		parent := context.TODO()
 		_, ok := LatencyTrackersFrom(parent)
 		if ok {
@@ -48,13 +48,14 @@ func TestLatencyTrackersFrom(t *testing.T) {
 		if !ok {
 			t.Error("expected LatencyTrackersFrom to be initialized")
 		}
-		if wd.MutatingWebhookTracker.GetLatency() != 0 || wd.ValidatingWebhookTracker.GetLatency() != 0 {
+		if wd.MutatingWebhookTracker.GetLatency() != 0 || wd.ValidatingWebhookTracker.GetLatency() != 0 || wd.APFQueueWaitTracker.GetLatency() != 0 {
 			t.Error("expected values to be initialized to 0")
 		}
 
 		for _, d := range tc.Durations {
 			wd.MutatingWebhookTracker.Track(func() { clk.Step(d) })
 			wd.ValidatingWebhookTracker.Track(func() { clk.Step(d) })
+			wd.APFQueueWaitTracker.Track(func() { clk.Step(d) })
 		}
 
 		wd, ok = LatencyTrackersFrom(ctx)
@@ -68,6 +69,10 @@ func TestLatencyTrackersFrom(t *testing.T) {
 
 		if wd.ValidatingWebhookTracker.GetLatency() != tc.MaxDuration {
 			t.Errorf("expected validate duration: %q, but got: %q", tc.MaxDuration, wd.ValidatingWebhookTracker.GetLatency())
+		}
+
+		if wd.APFQueueWaitTracker.GetLatency() != tc.MaxDuration {
+			t.Errorf("expected priority & fairness duration: %q, but got: %q", tc.MaxDuration, wd.APFQueueWaitTracker.GetLatency())
 		}
 	})
 }
