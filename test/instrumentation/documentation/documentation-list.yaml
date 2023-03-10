@@ -1661,32 +1661,6 @@
   stabilityLevel: ALPHA
   labels:
   - usage
-- name: e2e_scheduling_duration_seconds
-  subsystem: scheduler
-  help: E2e scheduling latency in seconds (scheduling algorithm + binding). This metric
-    is replaced by scheduling_attempt_duration_seconds.
-  type: Histogram
-  deprecatedVersion: 1.23.0
-  stabilityLevel: ALPHA
-  labels:
-  - profile
-  - result
-  buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
 - name: goroutines
   subsystem: scheduler
   help: Number of running goroutines split by the work they do such as binding.
