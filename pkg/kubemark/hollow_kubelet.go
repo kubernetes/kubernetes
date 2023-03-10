@@ -206,6 +206,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
+	c.WarningInvalidKernelDefaults = false
 	c.RegisterWithTaints = opt.RegisterWithTaints
 	c.RegisterNode = true
 	c.LocalStorageCapacityIsolation = true

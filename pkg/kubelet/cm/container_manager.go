@@ -135,16 +135,18 @@ type ContainerManager interface {
 }
 
 type NodeConfig struct {
-	RuntimeCgroupsName    string
-	SystemCgroupsName     string
-	KubeletCgroupsName    string
-	KubeletOOMScoreAdj    int32
-	ContainerRuntime      string
-	CgroupsPerQOS         bool
-	CgroupRoot            string
-	CgroupDriver          string
-	KubeletRootDir        string
-	ProtectKernelDefaults bool
+	RuntimeCgroupsName           string
+	SystemCgroupsName            string
+	KubeletCgroupsName           string
+	KubeletOOMScoreAdj           int32
+	ContainerRuntime             string
+	CgroupsPerQOS                bool
+	CgroupRoot                   string
+	CgroupDriver                 string
+	KubeletRootDir               string
+	ProtectKernelDefaults        bool
+	WarningInvalidKernelDefaults bool
+
 	NodeAllocatableConfig
 	QOSReserved                             map[v1.ResourceName]int64
 	CPUManagerPolicy                        string

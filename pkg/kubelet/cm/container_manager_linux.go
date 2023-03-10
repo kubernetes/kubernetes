@@ -456,6 +456,8 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	b := KernelTunableModify
 	if cm.GetNodeConfig().ProtectKernelDefaults {
 		b = KernelTunableError
+	} else if cm.GetNodeConfig().WarningInvalidKernelDefaults {
+		b = KernelTunableWarn
 	}
 	if err := setupKernelTunables(b); err != nil {
 		return err

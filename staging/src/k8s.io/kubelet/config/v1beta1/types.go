@@ -548,6 +548,12 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ProtectKernelDefaults bool `json:"protectKernelDefaults,omitempty"`
+	// warningInvalidKernelDefaults, if ProtectKernelDefaults is set to true, this flag will be ignored.
+	// It only takes effects if ProtectKernelDefaults is false or not set.
+	// If true, kubelet will not override sysctls and only logs warning for those sysctls.
+	// Default: false
+	// +optional
+	WarningInvalidKernelDefaults bool `json:"warningInvalidKernelDefaults,omitempty"`
 	// makeIPTablesUtilChains, if true, causes the Kubelet to create the
 	// KUBE-IPTABLES-HINT chain in iptables as a hint to other components about the
 	// configuration of iptables on the system.

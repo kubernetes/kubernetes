@@ -319,6 +319,10 @@ type KubeletConfiguration struct {
 	// flags are not as it expects. Otherwise the Kubelet will attempt to modify
 	// kernel flags to match its expectation.
 	ProtectKernelDefaults bool
+	// warningInvalidKernelDefaults, if ProtectKernelDefaults is set to true, this flag will be ignored.
+	// It only takes effects if ProtectKernelDefaults is false or not set.
+	// If true, kubelet will not override sysctls and only logs warning for those sysctls.
+	WarningInvalidKernelDefaults bool
 	// If true, Kubelet creates the KUBE-IPTABLES-HINT chain in iptables as a hint to
 	// other components about the configuration of iptables on the system.
 	MakeIPTablesUtilChains bool

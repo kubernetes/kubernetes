@@ -255,6 +255,7 @@ var (
 		"PodsPerCore",
 		"Port",
 		"ProtectKernelDefaults",
+		"WarningInvalidKernelDefaults",
 		"ProviderID",
 		"ReadOnlyPort",
 		"RegisterNode",
