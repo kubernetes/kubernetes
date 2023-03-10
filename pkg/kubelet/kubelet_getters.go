@@ -170,11 +170,14 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 	pods := kl.podManager.GetPods()
 	// a kubelet running without apiserver requires an additional
 	// update of the static pod status. See #57106
-	for _, p := range pods {
+	for i, p := range pods {
 		if kubelettypes.IsStaticPod(p) {
 			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
 				klog.V(2).InfoS("Pod status updated", "pod", klog.KObj(p), "status", status.Phase)
+				// do not mutate the cache
+				p = p.DeepCopy()
 				p.Status = status
+				pods[i] = p
 			}
 		}
 	}
