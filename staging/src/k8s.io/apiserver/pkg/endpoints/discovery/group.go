@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"net/http"
+	"path"
 
 	"github.com/emicklei/go-restful/v3"
 
@@ -52,7 +53,7 @@ func NewAPIGroupHandler(serializer runtime.NegotiatedSerializer, group metav1.AP
 func (s *APIGroupHandler) WebService() *restful.WebService {
 	mediaTypes, _ := negotiation.MediaTypesForSerializer(s.serializer)
 	ws := new(restful.WebService)
-	ws.Path(APIGroupPrefix + "/" + s.group.Name)
+	ws.Path(path.Join(APIGroupPrefix, s.group.Name))
 	ws.Doc("get information of a group")
 	ws.Route(ws.GET("/").To(s.handle).
 		Doc("get information of a group").

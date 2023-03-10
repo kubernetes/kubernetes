@@ -6,7 +6,7 @@ go 1.19
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/emicklei/go-restful/v3 v3.9.0
+	github.com/emicklei/go-restful/v3 v3.10.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v1.6.0
