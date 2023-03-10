@@ -822,6 +822,32 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(len(jobs.Items), 0, "Found job %v", jobName)
 	})
 
+	ginkgo.It("should complete with running sidecar containers [Feature:SidecarContainers]", func(ctx context.Context) {
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Template.Spec.InitContainers = []v1.Container{
+			sidecarContainer("sidecar-1"),
+			sidecarContainer("sidecar-2"),
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		successes := int32(0)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodSucceeded {
+				successes++
+			}
+		}
+		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
+	})
+
 })
 
 // waitForJobEvent is used to track and log Job events.
@@ -878,4 +904,19 @@ func waitForJobFailure(ctx context.Context, c clientset.Interface, ns, jobName s
 		}
 		return false, nil
 	})
+}
+
+func sidecarContainer(name string) v1.Container {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+
+	return v1.Container{
+		Name:  name,
+		Image: framework.BusyBoxImage,
+		Command: []string{
+			"sh",
+			"-c",
+			"sleep 100000",
+		},
+		RestartPolicy: &containerRestartPolicyAlways,
+	}
 }
