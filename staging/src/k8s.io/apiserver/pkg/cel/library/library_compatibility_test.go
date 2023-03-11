@@ -48,7 +48,7 @@ func TestLibraryCompatibility(t *testing.T) {
 		"isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "find", "findAll", "url", "getScheme", "getHost", "getHostname",
 		"getPort", "getEscapedPath", "getQuery", "isURL",
 		// Kubernetes <1.27>:
-		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "denied", "reason",
+		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "reason", "isError",
 		// Kubernetes <1.??>:
 	}
 	for _, fn := range knownFunctions {

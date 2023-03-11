@@ -351,6 +351,12 @@ func TestAuthzLibrary(t *testing.T) {
 			expectEstimatedCost: checker.CostEstimate{Min: 350007, Max: 350007},
 			expectRuntimeCost:   350007,
 		},
+		{
+			name:                "resource check isError",
+			expr:                "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').isError()",
+			expectEstimatedCost: checker.CostEstimate{Min: 350007, Max: 350007},
+			expectRuntimeCost:   350007,
+		},
 	}
 
 	for _, tc := range cases {

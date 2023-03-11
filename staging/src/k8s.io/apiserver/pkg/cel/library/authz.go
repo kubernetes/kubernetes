@@ -155,8 +155,8 @@ import (
 //
 // allowed
 //
-// Returns true if the authorizer's decision for the check is "allow".  Note that if the authorizer's decision is
-// "no opinion", that both the 'allowed' and 'denied' functions will return false.
+// Returns true if the authorizer's decision for the check is "allow". If the authorizer's decision is
+// "no opinion", "denied", or if the authorization check resulted in an error, this function returns false.
 //
 //	<Decision>.allowed() <bool>
 //
@@ -168,12 +168,23 @@ import (
 // reason
 //
 // Returns a string reason for the authorization decision
+// If the authorization check resulted in an error, returns the error as a string.
 //
 //	<Decision>.reason() <string>
 //
 // Examples:
 //
 //	authorizer.path('/healthz').check('GET').reason()
+//
+// isError
+//
+// Returns true if the authorization check resulted in an error.
+//
+//	<Decision>.isError() <bool>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').namespace('default').check('create').isError() // Returns true if the authorization check resulted in an error
 func Authz() cel.EnvOption {
 	return cel.Lib(authzLib)
 }
@@ -209,6 +220,9 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 			cel.BinaryBinding(pathCheckCheck)),
 		cel.MemberOverload("resourcecheck_check", []*cel.Type{ResourceCheckType, cel.StringType}, DecisionType,
 			cel.BinaryBinding(resourceCheckCheck))},
+	"isError": {
+		cel.MemberOverload("decision_iserror", []*cel.Type{DecisionType}, cel.BoolType,
+			cel.UnaryBinding(decisionIsError))},
 	"allowed": {
 		cel.MemberOverload("decision_allowed", []*cel.Type{DecisionType}, cel.BoolType,
 			cel.UnaryBinding(decisionAllowed))},
@@ -384,10 +398,23 @@ func resourceCheckCheck(arg1, arg2 ref.Val) ref.Val {
 	return resourceCheck.Authorize(context.TODO(), apiVerb)
 }
 
+func decisionIsError(arg ref.Val) ref.Val {
+	decision, ok := arg.(decisionVal)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	return types.Bool(decision.err != nil)
+}
+
 func decisionAllowed(arg ref.Val) ref.Val {
 	decision, ok := arg.(decisionVal)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	if decision.err != nil {
+		return types.False
 	}
 
 	return types.Bool(decision.authDecision == authorizer.DecisionAllow)
@@ -397,6 +424,10 @@ func decisionReason(arg ref.Val) ref.Val {
 	decision, ok := arg.(decisionVal)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	if decision.err != nil {
+		return types.String(fmt.Sprintf("authorization check error: %v", decision.err))
 	}
 
 	return types.String(decision.reason)
@@ -478,10 +509,7 @@ func (a pathCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 	}
 
 	decision, reason, err := a.authorizer.authAuthorizer.Authorize(ctx, attr)
-	if err != nil {
-		return types.NewErr("error in authorization check: %v", err)
-	}
-	return newDecision(decision, reason)
+	return newDecision(decision, err, reason)
 }
 
 type groupCheckVal struct {
@@ -516,18 +544,16 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		User:            a.groupCheck.authorizer.userInfo,
 	}
 	decision, reason, err := a.groupCheck.authorizer.authAuthorizer.Authorize(ctx, attr)
-	if err != nil {
-		return types.NewErr("error in authorization check: %v", err)
-	}
-	return newDecision(decision, reason)
+	return newDecision(decision, err, reason)
 }
 
-func newDecision(authDecision authorizer.Decision, reason string) decisionVal {
-	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, reason: reason}
+func newDecision(authDecision authorizer.Decision, err error, reason string) decisionVal {
+	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, err: err, reason: reason}
 }
 
 type decisionVal struct {
 	receiverOnlyObjectVal
+	err          error
 	authDecision authorizer.Decision
 	reason       string
 }
