@@ -23,7 +23,6 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 # The server platform we are building on.
 readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -32,7 +31,6 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
 # The node platforms we build for
 readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -59,7 +57,6 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
 # Not all client platforms need these tests
 readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -251,6 +248,8 @@ kube::golang::setup_platforms() {
   fi
 }
 
+kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
+kube::log::status "         support for linux/arm will be removed in a subsequent release."
 kube::golang::setup_platforms
 
 # The set of client targets that we are building for all platforms
