@@ -1214,7 +1214,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		}
 	})
 
-	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC]", func() {
+	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -1320,7 +1320,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]", func(ctx context.Context) {
+		ginkgo.It("should delete PVCs after adopting pod (WhenScaled)", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
