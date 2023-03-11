@@ -43,6 +43,9 @@ const (
 	PLEGDiscardEventsKey               = "pleg_discard_events"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
+	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
+	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
+	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
 	EvictionsKey                       = "evictions"
 	EvictionStatsAgeKey                = "eviction_stats_age_seconds"
 	PreemptionsKey                     = "preemptions"
@@ -250,6 +253,41 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// EventedPLEGConnErr is a Counter that tracks the number of errors encountered during
+	// the establishment of streaming connection with the CRI runtime.
+	EventedPLEGConnErr = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnErrKey,
+			Help:           "The number of errors encountered during the establishment of streaming connection with the CRI runtime.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// EventedPLEGConn is a Counter that tracks the number of times a streaming client
+	// was obtained to receive CRI Events.
+	EventedPLEGConn = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnKey,
+			Help:           "The number of times a streaming client was obtained to receive CRI Events.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// EventedPLEGConnLatency is a Histogram that tracks the latency of streaming connection
+	// with the CRI runtime, measured in seconds.
+	EventedPLEGConnLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnLatencyKey,
+			Help:           "The latency of streaming connection with the CRI runtime, measured in seconds.",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// RuntimeOperations is a Counter that tracks the cumulative number of remote runtime operations.
 	// Broken down by operation type.
 	RuntimeOperations = metrics.NewCounterVec(
@@ -692,6 +730,9 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PLEGDiscardEvents)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
+		legacyregistry.MustRegister(EventedPLEGConnErr)
+		legacyregistry.MustRegister(EventedPLEGConn)
+		legacyregistry.MustRegister(EventedPLEGConnLatency)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)

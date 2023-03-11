@@ -259,6 +259,7 @@ const (
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Allows using event-driven PLEG (pod lifecycle event generator) through kubelet
 	// which avoids frequent relisting of containers which helps optimize performance.
@@ -937,7 +938,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
-	EventedPLEG: {Default: false, PreRelease: featuregate.Alpha},
+	EventedPLEG: {Default: false, PreRelease: featuregate.Beta}, // off by default, requires CRI Runtime support
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
