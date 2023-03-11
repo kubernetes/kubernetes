@@ -23,7 +23,7 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset_generated \
-"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,client,lister,informer" \
+"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,defaulter,client,lister,informer" \
   k8s.io/kube-aggregator/pkg/client \
   k8s.io/kube-aggregator/pkg/apis \
   "apiregistration:v1beta1,v1" \
