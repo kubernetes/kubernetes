@@ -1217,7 +1217,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:         true,
 				storageframework.CapTopology:          true,
 				storageframework.CapBlock:             true,
-				storageframework.CapMultiplePVsSameID: true,
+				storageframework.CapMultiplePVsSameID: false,
 			},
 		},
 	}
