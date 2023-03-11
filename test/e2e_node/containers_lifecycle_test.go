@@ -81,6 +81,8 @@ const (
 	PostStartPrefix = "PostStart"
 )
 
+var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+
 func prefixedName(namePrefix string, name string) string {
 	return fmt.Sprintf("%s-%s", namePrefix, name)
 }
@@ -604,12 +606,11 @@ func preparePod(pod *v1.Pod) {
 	}
 }
 
-
 var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should launch init container and sidecar containers serially before a regular container", func() {
+	ginkgo.When("using a Pod with restartPolicy=Never, three init container and two sidecars", func() {
 
 		init1 := "init-1"
 		sidecar1 := "sidecar-1"
@@ -617,8 +618,6 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		sidecar2 := "sidecar-2"
 		init3 := "init-3"
 		regular1 := "regular-1"
-
-		alwaysPolicy := v1.ContainerRestartPolicyAlways
 
 		podSpec := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -642,7 +641,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 							Delay:    600, // replacing to 1 will make test fail
 							ExitCode: 0,
 						}),
-						RestartPolicy: &alwaysPolicy,
+						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
 						Name:  init2,
@@ -659,7 +658,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 							Delay:    600,
 							ExitCode: 0,
 						}),
-						RestartPolicy: &alwaysPolicy,
+						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
 						Name:  init3,
@@ -684,37 +683,156 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		}
 
 		preparePod(podSpec)
+		var results containerOutputList
 
-		client := e2epod.NewPodClient(f)
-		podSpec = client.Create(context.TODO(), podSpec)
-		ginkgo.By("Waiting for the pod to finish")
-		err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-		framework.ExpectNoError(err)
+		ginkgo.It("should finish and produce log", func() {
+			client := e2epod.NewPodClient(f)
+			podSpec = client.Create(context.TODO(), podSpec)
 
-		ginkgo.By("Parsing results")
-		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+			err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
+			framework.ExpectNoError(err)
 
-		// which we then use to make assertions regarding container ordering
-		ginkgo.By("Analyzing results")
-		framework.ExpectNoError(results.StartsBefore(init1, sidecar1))
-		framework.ExpectNoError(results.ExitsBefore(init1, sidecar1))
+			podSpec, err := client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			results = parseOutput(podSpec)
+		})
 
-		framework.ExpectNoError(results.StartsBefore(sidecar1, init2))
-		framework.ExpectNoError(results.RunTogether(sidecar1, init2))
 
-		framework.ExpectNoError(results.StartsBefore(init2, sidecar2))
-		framework.ExpectNoError(results.ExitsBefore(init2, sidecar2))
+		ginkgo.It("should run the first init container to completion before starting first sidecar", func() {
+			framework.ExpectNoError(results.StartsBefore(init1, sidecar1))
+			framework.ExpectNoError(results.ExitsBefore(init1, sidecar1))
+		})
 
-		framework.ExpectNoError(results.StartsBefore(sidecar2, init3))
-		framework.ExpectNoError(results.RunTogether(sidecar2, sidecar1))
-		framework.ExpectNoError(results.RunTogether(sidecar1, init3))
-		framework.ExpectNoError(results.RunTogether(sidecar2, init3))
+		ginkgo.It("should start first sidecar before starting second init container", func() {
+			framework.ExpectNoError(results.StartsBefore(sidecar1, init2))
+		})
 
-		framework.ExpectNoError(results.StartsBefore(init3, regular1))
-		framework.ExpectNoError(results.ExitsBefore(init3, regular1))
-		framework.ExpectNoError(results.RunTogether(sidecar1, regular1))
-		framework.ExpectNoError(results.RunTogether(sidecar2, regular1))
+		ginkgo.It("should run first init container and first sidecar together", func() {
+			framework.ExpectNoError(results.RunTogether(sidecar1, init2))
+		})
+
+		ginkgo.It("should run second init container to completion before starting second sidecar", func() {
+			framework.ExpectNoError(results.StartsBefore(init2, sidecar2))
+			framework.ExpectNoError(results.ExitsBefore(init2, sidecar2))
+		})
+
+		ginkgo.It("should start second sidecar before third init container", func() {
+			framework.ExpectNoError(results.StartsBefore(sidecar2, init3))
+		})
+
+		ginkgo.It("should run both sidecar containers and third init container together", func() {
+			framework.ExpectNoError(results.RunTogether(sidecar2, sidecar1))
+			framework.ExpectNoError(results.RunTogether(sidecar1, init3))
+			framework.ExpectNoError(results.RunTogether(sidecar2, init3))
+		})
+
+		ginkgo.It("should run third init container to completion before starting regular container", func() {
+			framework.ExpectNoError(results.StartsBefore(init3, regular1))
+			framework.ExpectNoError(results.ExitsBefore(init3, regular1))
+		})
+
+		ginkgo.It("should run both sidecar containers and a regular container together", func() {
+			framework.ExpectNoError(results.RunTogether(sidecar1, regular1))
+			framework.ExpectNoError(results.RunTogether(sidecar2, regular1))
+		})
+	})
+
+	ginkgo.When("using a sidecar in a Pod with restartPolicy=Never", func() {
+		ginkgo.When("a sidecar runs continuously", func() {
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should not restart a sidecar", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+			ginkgo.It("should mark a Pod as failed and produce log", func() {})
+			ginkgo.It("should not restart a sidecar", func() {})
+			ginkgo.It("should not start a regular container", func() {})
+		})
+
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+	})
+
+	ginkgo.When("using a sidecar in a Pod with restartPolicy=OnFailure", func() {
+		// this test case the same as for restartPolicy=Never
+		ginkgo.When("a sidecar runs continuously", func() {
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should not restart a sidecar", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			// this is different from restartPolicy=Never
+			ginkgo.It("should restart a sidecar", func() {})
+			ginkgo.It("should not start a regular container", func() {})
+		})
+
+		// this test case the same as for restartPolicy=Never
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		// this test case the same as for restartPolicy=Never
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should complete a Pod successfully and produce log", func() {})
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should run a regular container to completion", func() {})
+		})
+	})
+
+	ginkgo.When("using a sidecar in a Pod with restartPolicy=Always", func() {
+		ginkgo.When("a sidecar runs continuously", func() {
+			// regular container should exit at least once so we can get it's termination log
+			// this test case is different from restartPolicy=Never
+			ginkgo.It("should keep running a Pod continuously and produce log", func() { /* check the regular container restartCount > 0 */ })
+			ginkgo.It("should not restart a sidecar", func() {})
+			// this test case is different from restartPolicy=Never
+			ginkgo.It("should start a regular container", func() {})
+		})
+
+		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+			ginkgo.It("should continuously run Pod keeping it Pending and produce log", func() { /* check the restartCount > 5 */})
+			// this is different from restartPolicy=Never
+			ginkgo.It("should restart a sidecar", func() {})
+			ginkgo.It("should not start a regular container", func() {})
+		})
+
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should keep running a Pod continuously and produce log", func() { /* check the regular container restartCount > 0 */ })
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should start a regular container", func() {})
+		})
+
+		// this test case the same as for restartPolicy=Never
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.It("should keep running a Pod continuously and produce log", func() { /* check the regular container restartCount > 0 */ })
+			ginkgo.It("should restart a sidecar before the regular container started", func() {})
+			ginkgo.It("should restart a sidecar after the regular container started", func() {})
+			ginkgo.It("should start a regular container", func() {})
+		})
 	})
 })
