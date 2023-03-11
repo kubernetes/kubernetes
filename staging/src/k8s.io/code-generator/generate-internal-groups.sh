@@ -80,21 +80,24 @@ done
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.deepcopy \
+      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      -O zz_generated.deepcopy \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
   echo "Generating defaulters"
   "${gobin}/defaulter-gen"  \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" -O zz_generated.defaults \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
+      -O zz_generated.defaults \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
   echo "Generating conversions"
   "${gobin}/conversion-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.conversion \
+      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      -O zz_generated.conversion \
       "$@"
 fi
 
