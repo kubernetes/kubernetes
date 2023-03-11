@@ -25,7 +25,7 @@ if [ "$#" -lt 4 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename "$0") <generators> <output-package> <apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy, defaulter,applyconfiguration,client,lister,informer) or "all".
+  <generators>        the generators comma separated to run (deepcopy, defaulter,applyconfiguration,client,lister,informer).
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
   <apis-package>      the external types dir (e.g. github.com/example/api or github.com/example/project/pkg/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
@@ -33,9 +33,12 @@ Usage: $(basename "$0") <generators> <output-package> <apis-package> <groups-ver
   ...                 arbitrary flags passed to all generator binaries.
 
 
-Examples:
-  $(basename "$0") all             github.com/example/project/pkg/client github.com/example/project/pkg/apis "foo:v1 bar:v1alpha1,v1beta1"
-  $(basename "$0") deepcopy,client github.com/example/project/pkg/client github.com/example/project/pkg/apis "foo:v1 bar:v1alpha1,v1beta1"
+Example:
+  $(basename "$0") \
+      deepcopy,client \
+      github.com/example/project/pkg/client \
+      github.com/example/project/pkg/apis \
+      "foo:v1 bar:v1alpha1,v1beta1"
 EOF
   exit 0
 fi
@@ -45,6 +48,15 @@ OUTPUT_PKG="$2"
 APIS_PKG="$3"
 GROUPS_WITH_VERSIONS="$4"
 shift 4
+
+if [ "${GENS}" = "all" ] || grep -qw "all" <<<"${GENS}"; then
+    ALL="applyconfiguration,client,deepcopy,informer,lister"
+    echo "WARNING: Specifying \"all\" as a generator is deprecated."
+    echo "WARNING: Please list the specific generators needed."
+    echo "WARNING: \"all\" is now an alias for \"${ALL}\""
+    echo
+    GENS="${ALL}"
+fi
 
 (
   # To support running this script from anywhere, first cd into this directory,
@@ -69,7 +81,7 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
   done
 done
 
-if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
+if grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
       --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
@@ -77,7 +89,7 @@ if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
+if grep -qw "defaulter" <<<"${GENS}"; then
   echo "Generating defaulters"
   "${gobin}/defaulter-gen"  \
       --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
@@ -85,7 +97,7 @@ if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "applyconfiguration" <<<"${GENS}"; then
+if grep -qw "applyconfiguration" <<<"${GENS}"; then
   echo "Generating apply configuration for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
   "${gobin}/applyconfiguration-gen" \
       --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
@@ -93,9 +105,9 @@ if [ "${GENS}" = "all" ] || grep -qw "applyconfiguration" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
+if grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-  if [ "${GENS}" = "all" ] || grep -qw "applyconfiguration" <<<"${GENS}"; then
+  if grep -qw "applyconfiguration" <<<"${GENS}"; then
     APPLY_CONFIGURATION_PACKAGE="${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
   fi
   "${gobin}/client-gen" \
@@ -107,7 +119,7 @@ if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
+if grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
   "${gobin}/lister-gen" \
       --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
@@ -115,7 +127,7 @@ if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
+if grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   "${gobin}/informer-gen" \
       --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
