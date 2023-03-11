@@ -225,7 +225,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 			cliflag.PrintFlags(cleanFlagSet)
 
 			// We always validate the local configuration (command line + config file).
-			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, utilfeature.DefaultFeatureGate); err != nil {
 				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, kubeletConfig)
 			}
@@ -381,7 +380,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 	tp := oteltrace.NewNoopTracerProvider()
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if featureGate.Enabled(features.KubeletTracing) {
 		tp, err = newTracerProvider(s)
 		if err != nil {
 			return nil, err
@@ -490,18 +489,8 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 }
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
-	// Set global feature gates based on the value on the initial KubeletServer
-	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
-	if err != nil {
-		return err
-	}
-	// validate the initial KubeletServer (we set feature gates first, because this validation depends on feature gates)
-	if err := options.ValidateKubeletServer(s); err != nil {
-		return err
-	}
-
 	// Warn if MemoryQoS enabled with cgroups v1
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
+	if featureGate.Enabled(features.MemoryQoS) &&
 		!isCgroup2UnifiedMode() {
 		klog.InfoS("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
 	}
@@ -706,7 +695,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+		if featureGate.Enabled(features.CPUManagerPolicyOptions) {
 			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
 		} else if s.CPUManagerPolicyOptions != nil {
 			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
@@ -714,7 +703,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+		if featureGate.Enabled(features.TopologyManagerPolicyOptions) {
 			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
 		} else if s.TopologyManagerPolicyOptions != nil {
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",

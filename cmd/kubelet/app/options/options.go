@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
@@ -241,18 +240,6 @@ func NewKubeletServer() (*KubeletServer, error) {
 		KubeletFlags:         *NewKubeletFlags(),
 		KubeletConfiguration: *config,
 	}, nil
-}
-
-// ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
-func ValidateKubeletServer(s *KubeletServer) error {
-	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
-	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration, utilfeature.DefaultFeatureGate); err != nil {
-		return err
-	}
-	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {
-		return err
-	}
-	return nil
 }
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
