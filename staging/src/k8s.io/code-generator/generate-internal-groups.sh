@@ -25,9 +25,9 @@ if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,client,lister,informer,openapi).
+  <generators>        the generators comma separated to run (applyconfiguration,client,conversion,deepcopy,defaulter,informer,lister,openapi).
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
-  <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis).
+  <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis) or "" if none.
   <ext-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
                       to <api-package>.
@@ -64,7 +64,19 @@ fi
   # To support running this script from anywhere, first cd into this directory,
   # and then install with forced module mode on and fully qualified name.
   cd "$(dirname "${0}")"
-  GO111MODULE=on go install k8s.io/code-generator/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,openapi-gen}
+  BINS=(
+      applyconfiguration-gen
+      client-gen
+      conversion-gen
+      deepcopy-gen
+      defaulter-gen
+      informer-gen
+      lister-gen
+      openapi-gen
+  )
+  # Compile all the tools at once - it's slightly faster but also just simpler.
+  # shellcheck disable=2046 # printf word-splitting is intentional
+  GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
 )
 
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
@@ -114,6 +126,15 @@ if grep -qw "conversion" <<<"${GENS}"; then
       "$@"
 fi
 
+if grep -qw "applyconfiguration" <<<"${GENS}"; then
+  echo "Generating apply configuration for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
+  APPLY_CONFIGURATION_PACKAGE="${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
+  "${gobin}/applyconfiguration-gen" \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
+      --output-package "${APPLY_CONFIGURATION_PACKAGE}" \
+      "$@"
+fi
+
 if grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
   "${gobin}/client-gen" \
@@ -121,6 +142,7 @@ if grep -qw "client" <<<"${GENS}"; then
       --input-base "" \
       --input "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --apply-configuration-package "${APPLY_CONFIGURATION_PACKAGE:-}" \
       "$@"
 fi
 
