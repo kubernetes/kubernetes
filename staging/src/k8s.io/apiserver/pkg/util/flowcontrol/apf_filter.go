@@ -162,8 +162,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	queued := startWaitingTime != time.Time{}
 	if req == nil {
 		if queued {
-			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
-			endpointsrequest.TrackAPFQueueWaitLatency(ctx, time.Since(startWaitingTime))
+			observeQueueWaitTime(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
 		klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, reject", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt)
 		return
@@ -180,8 +179,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	}()
 	idle = req.Finish(func() {
 		if queued {
-			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
-			endpointsrequest.TrackAPFQueueWaitLatency(ctx, time.Since(startWaitingTime))
+			observeQueueWaitTime(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
 		metrics.AddDispatch(ctx, pl.Name, fs.Name)
 		fqs.OnRequestDispatched(req)
@@ -195,8 +193,12 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 		execFn()
 	})
 	if queued && !executed {
-		metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
-		endpointsrequest.TrackAPFQueueWaitLatency(ctx, time.Since(startWaitingTime))
+		observeQueueWaitTime(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 	}
 	panicking = false
+}
+
+func observeQueueWaitTime(ctx context.Context, priorityLevelName, flowSchemaName, execute string, waitTime time.Duration) {
+	metrics.ObserveWaitingDuration(ctx, priorityLevelName, flowSchemaName, execute, waitTime)
+	endpointsrequest.TrackAPFQueueWaitLatency(ctx, waitTime)
 }
