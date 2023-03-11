@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -57,11 +58,13 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -319,7 +322,7 @@ func (o *Options) Run() error {
 		return cleanupAndExit()
 	}
 
-	proxyServer, err := NewProxyServer(o)
+	proxyServer, err := newProxyServer(o.config, o.master)
 	if err != nil {
 		return err
 	}
@@ -516,8 +519,59 @@ type ProxyServer struct {
 	Recorder      events.EventRecorder
 	NodeRef       *v1.ObjectReference
 	HealthzServer healthcheck.ProxierHealthUpdater
+	Hostname      string
+	NodeIP        net.IP
 
 	Proxier proxy.Provider
+}
+
+// newProxyServer creates a ProxyServer based on the given config
+func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master string) (*ProxyServer, error) {
+	s := &ProxyServer{Config: config}
+
+	cz, err := configz.New(kubeproxyconfig.GroupName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to register configz: %s", err)
+	}
+	cz.Set(config)
+
+	if len(config.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
+
+	s.Hostname, err = nodeutil.GetHostname(config.HostnameOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	s.Client, err = createClient(config.ClientConnection, master)
+	if err != nil {
+		return nil, err
+	}
+
+	s.NodeIP = detectNodeIP(s.Client, s.Hostname, config.BindAddress)
+	klog.InfoS("Detected node IP", "address", s.NodeIP.String())
+
+	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
+	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
+
+	s.NodeRef = &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      s.Hostname,
+		UID:       types.UID(s.Hostname),
+		Namespace: "",
+	}
+
+	if len(config.HealthzBindAddress) > 0 {
+		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, s.Recorder, s.NodeRef)
+	}
+
+	s.Proxier, err = s.createProxier(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 // createClient creates a kube client from the given config and masterOverride.
