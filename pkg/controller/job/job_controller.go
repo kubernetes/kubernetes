@@ -1110,7 +1110,6 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 			return job, needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
 		}
 
-		//key, _ := controller.KeyFunc(job)
 		err = jm.backoffRecordStore.updateBackoffRecord(newBackoffRecord)
 
 		if err != nil {

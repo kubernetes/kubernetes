@@ -167,8 +167,8 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 	for _, pod := range newPodList(succeededPods, v1.PodSucceeded, job) {
 		pod.Status.ContainerStatuses = []v1.ContainerStatus{
 			{
-				// This sets ContainerState.Terminated.FinishedAt to 0001-01-01 00:00:00 +0000 UTC
-				// This ensures that the active back-offs does not affect the test cases
+				// This sets ContainerState.Terminated.FinishedAt to unix epoch
+				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
 				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
 			},
 		}
@@ -177,8 +177,8 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 	for _, pod := range newPodList(failedPods, v1.PodFailed, job) {
 		pod.Status.ContainerStatuses = []v1.ContainerStatus{
 			{
-				// This sets ContainerState.Terminated.FinishedAt to 0001-01-01 00:00:00 +0000 UTC
-				// This ensures that the active back-offs does not affect the test cases
+				// This sets ContainerState.Terminated.FinishedAt to unix epoch
+				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
 				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
 			},
 		}
@@ -217,6 +217,7 @@ func TestControllerSyncJob(t *testing.T) {
 	jobConditionComplete := batch.JobComplete
 	jobConditionFailed := batch.JobFailed
 	jobConditionSuspended := batch.JobSuspended
+	referenceTime := time.Now()
 
 	testCases := map[string]struct {
 		// job setup
@@ -230,6 +231,7 @@ func TestControllerSyncJob(t *testing.T) {
 		suspend        bool
 		initialStatus  *jobInitialStatus
 		backoffRecord  *backoffRecord
+		controllerTime *time.Time
 
 		// pod setup
 
@@ -325,6 +327,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit: 6,
 			backoffRecord: &backoffRecord{
 				failuresAfterLastSuccess: 1,
+				lastFailureTime:          &referenceTime,
 			},
 			initialStatus: &jobInitialStatus{
 				startTime: func() *time.Time {
@@ -338,6 +341,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     0,
 			expectedSucceeded:  0,
 			expectedPodPatches: 0,
+			controllerTime:     &referenceTime,
 		},
 		"too few active pods and no back-offs": {
 			parallelism:  1,
@@ -345,6 +349,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit: 6,
 			backoffRecord: &backoffRecord{
 				failuresAfterLastSuccess: 0,
+				lastFailureTime:          &referenceTime,
 			},
 			activePods:         0,
 			succeededPods:      0,
@@ -352,6 +357,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedSucceeded:  0,
 			expectedPodPatches: 0,
+			controllerTime:     &referenceTime,
 		},
 		"too few active pods with a dynamic job": {
 			parallelism:       2,
@@ -767,7 +773,15 @@ func TestControllerSyncJob(t *testing.T) {
 
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
+
+			var fakeClock clock.WithTicker
+			if tc.controllerTime != nil {
+				fakeClock = clocktesting.NewFakeClock(*tc.controllerTime)
+			} else {
+				fakeClock = clocktesting.NewFakeClock(time.Now())
+			}
+
+			manager, sharedInformerFactory := newControllerFromClientWithClock(clientSet, controller.NoResyncPeriodFunc, fakeClock)
 			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
@@ -794,8 +808,6 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 
 			if tc.backoffRecord != nil {
-				now := manager.clock.Now()
-				tc.backoffRecord.lastFailureTime = &now
 				tc.backoffRecord.key = key
 				manager.backoffRecordStore.updateBackoffRecord(*tc.backoffRecord)
 			}
