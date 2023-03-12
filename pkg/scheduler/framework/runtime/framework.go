@@ -215,18 +215,26 @@ func WithCaptureProfile(c CaptureProfile) Option {
 	}
 }
 
+// WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
+func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+	return func(o *frameworkOptions) {
+		o.clusterEventMap = m
+	}
+}
+
+// WithMetricsRecorder sets metrics recorder for the scheduling frameworkImpl.
+func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
+	return func(o *frameworkOptions) {
+		o.metricsRecorder = r
+	}
+}
+
+// defaultFrameworkOptions are applied when no option corresponding to those fields exist.
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
 		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
-	}
-}
-
-// WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
-	return func(o *frameworkOptions) {
-		o.clusterEventMap = m
 	}
 }
 
