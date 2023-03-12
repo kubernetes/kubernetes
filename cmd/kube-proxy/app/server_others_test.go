@@ -44,34 +44,66 @@ import (
 	utiliptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
-func Test_getDetectLocalMode(t *testing.T) {
-	cases := []struct {
-		detectLocal string
-		expected    proxyconfigapi.LocalMode
+func Test_platformApplyDefaults(t *testing.T) {
+	testCases := []struct {
+		name                string
+		mode                proxyconfigapi.ProxyMode
+		expectedMode        proxyconfigapi.ProxyMode
+		detectLocal         proxyconfigapi.LocalMode
+		expectedDetectLocal proxyconfigapi.LocalMode
 	}{
 		{
-			detectLocal: "",
-			expected:    proxyconfigapi.LocalModeClusterCIDR,
+			name:                "defaults",
+			mode:                "",
+			expectedMode:        proxyconfigapi.ProxyModeIPTables,
+			detectLocal:         "",
+			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
 		},
 		{
-			detectLocal: string(proxyconfigapi.LocalModeClusterCIDR),
-			expected:    proxyconfigapi.LocalModeClusterCIDR,
+			name:                "explicit",
+			mode:                proxyconfigapi.ProxyModeIPTables,
+			expectedMode:        proxyconfigapi.ProxyModeIPTables,
+			detectLocal:         proxyconfigapi.LocalModeClusterCIDR,
+			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
 		},
 		{
-			detectLocal: string(proxyconfigapi.LocalModeInterfaceNamePrefix),
-			expected:    proxyconfigapi.LocalModeInterfaceNamePrefix,
+			name:                "override mode",
+			mode:                "ipvs",
+			expectedMode:        proxyconfigapi.ProxyModeIPVS,
+			detectLocal:         "",
+			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
 		},
 		{
-			detectLocal: string(proxyconfigapi.LocalModeBridgeInterface),
-			expected:    proxyconfigapi.LocalModeBridgeInterface,
+			name:                "override detect-local",
+			mode:                "",
+			expectedMode:        proxyconfigapi.ProxyModeIPTables,
+			detectLocal:         "NodeCIDR",
+			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
+		},
+		{
+			name:                "override both",
+			mode:                "ipvs",
+			expectedMode:        proxyconfigapi.ProxyModeIPVS,
+			detectLocal:         "NodeCIDR",
+			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
 		},
 	}
-	for i, c := range cases {
-		proxyConfig := &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalMode(c.detectLocal)}
-		r := getDetectLocalMode(proxyConfig)
-		if r != c.expected {
-			t.Errorf("Case[%d] Expected %q got %q", i, c.expected, r)
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			config := &proxyconfigapi.KubeProxyConfiguration{
+				Mode:            tc.mode,
+				DetectLocalMode: tc.detectLocal,
+			}
+
+			options.platformApplyDefaults(config)
+			if config.Mode != tc.expectedMode {
+				t.Fatalf("expected mode: %s, but got: %s", tc.expectedMode, config.Mode)
+			}
+			if config.DetectLocalMode != tc.expectedDetectLocal {
+				t.Fatalf("expected detect-local: %s, but got: %s", tc.expectedDetectLocal, config.DetectLocalMode)
+			}
+		})
 	}
 }
 
