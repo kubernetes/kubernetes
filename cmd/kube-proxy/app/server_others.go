@@ -339,10 +339,6 @@ func newProxyServer(
 	return &ProxyServer{
 		Client:                 client,
 		EventClient:            eventClient,
-		IptInterface:           iptInterface,
-		IpvsInterface:          ipvsInterface,
-		IpsetInterface:         ipsetInterface,
-		execer:                 execer,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,

@@ -79,11 +79,7 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
@@ -529,10 +525,6 @@ with the apiserver API to configure the proxy.`,
 type ProxyServer struct {
 	Client                 clientset.Interface
 	EventClient            v1core.EventsGetter
-	IptInterface           utiliptables.Interface
-	IpvsInterface          utilipvs.Interface
-	IpsetInterface         utilipset.Interface
-	execer                 exec.Interface
 	Proxier                proxy.Provider
 	Broadcaster            events.EventBroadcaster
 	Recorder               events.EventRecorder
