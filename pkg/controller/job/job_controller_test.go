@@ -141,6 +141,13 @@ func newPodList(count int, status v1.PodPhase, job *batch.Job) []*v1.Pod {
 	for i := 0; i < count; i++ {
 		newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 		newPod.Status = v1.PodStatus{Phase: status}
+		newPod.Status.ContainerStatuses = []v1.ContainerStatus{
+			{
+				// This sets ContainerState.Terminated.FinishedAt to unix epoch
+				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
+				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
+			},
+		}
 		newPod.Finalizers = append(newPod.Finalizers, batch.JobTrackingFinalizer)
 		pods = append(pods, newPod)
 	}
@@ -165,23 +172,9 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 		podIndexer.Add(pod)
 	}
 	for _, pod := range newPodList(succeededPods, v1.PodSucceeded, job) {
-		pod.Status.ContainerStatuses = []v1.ContainerStatus{
-			{
-				// This sets ContainerState.Terminated.FinishedAt to unix epoch
-				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
-				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
-			},
-		}
 		podIndexer.Add(pod)
 	}
 	for _, pod := range newPodList(failedPods, v1.PodFailed, job) {
-		pod.Status.ContainerStatuses = []v1.ContainerStatus{
-			{
-				// This sets ContainerState.Terminated.FinishedAt to unix epoch
-				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
-				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
-			},
-		}
 		podIndexer.Add(pod)
 	}
 }
