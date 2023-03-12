@@ -122,13 +122,9 @@ func newProxyServer(
 	}
 
 	var proxier proxy.Provider
-	var detectLocalMode proxyconfigapi.LocalMode
 
 	proxyMode := getProxyMode(config.Mode)
-	detectLocalMode, err = getDetectLocalMode(config)
-	if err != nil {
-		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
-	}
+	detectLocalMode := getDetectLocalMode(config)
 
 	var nodeInfo *v1.Node
 	if detectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
@@ -400,23 +396,19 @@ func detectNumCPU() int {
 	return numCPU
 }
 
-func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxyconfigapi.LocalMode, error) {
-	mode := config.DetectLocalMode
-	switch mode {
-	case proxyconfigapi.LocalModeClusterCIDR, proxyconfigapi.LocalModeNodeCIDR, proxyconfigapi.LocalModeBridgeInterface, proxyconfigapi.LocalModeInterfaceNamePrefix:
-		return mode, nil
-	default:
-		if strings.TrimSpace(mode.String()) != "" {
-			return mode, fmt.Errorf("unknown detect-local-mode: %v", mode)
-		}
+func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) proxyconfigapi.LocalMode {
+	if config.DetectLocalMode == "" {
 		klog.V(4).InfoS("Defaulting detect-local-mode", "localModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
-		return proxyconfigapi.LocalModeClusterCIDR, nil
+		return proxyconfigapi.LocalModeClusterCIDR
 	}
+	return config.DetectLocalMode
 }
 
 func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, ipt utiliptables.Interface, nodeInfo *v1.Node) (proxyutiliptables.LocalTrafficDetector, error) {
 	switch mode {
 	case proxyconfigapi.LocalModeClusterCIDR:
+		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
+		// but --cluster-cidr is optional.
 		if len(strings.TrimSpace(config.ClusterCIDR)) == 0 {
 			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no cluster CIDR defined")
 			break
@@ -429,14 +421,8 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 		}
 		return proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt)
 	case proxyconfigapi.LocalModeBridgeInterface:
-		if len(strings.TrimSpace(config.DetectLocal.BridgeInterface)) == 0 {
-			return nil, fmt.Errorf("Detect-local-mode set to BridgeInterface, but no bridge-interface-name %s is defined", config.DetectLocal.BridgeInterface)
-		}
 		return proxyutiliptables.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
 	case proxyconfigapi.LocalModeInterfaceNamePrefix:
-		if len(strings.TrimSpace(config.DetectLocal.InterfaceNamePrefix)) == 0 {
-			return nil, fmt.Errorf("Detect-local-mode set to InterfaceNamePrefix, but no interface-prefix %s is defined", config.DetectLocal.InterfaceNamePrefix)
-		}
 		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
 	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
@@ -448,6 +434,8 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 	localDetectors := [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()}
 	switch mode {
 	case proxyconfigapi.LocalModeClusterCIDR:
+		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
+		// but --cluster-cidr is optional.
 		if len(strings.TrimSpace(config.ClusterCIDR)) == 0 {
 			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no cluster CIDR defined")
 			break
@@ -471,7 +459,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 		return localDetectors, err
 	case proxyconfigapi.LocalModeNodeCIDR:
-		if nodeInfo == nil || len(strings.TrimSpace(nodeInfo.Spec.PodCIDR)) == 0 {
+		if len(strings.TrimSpace(nodeInfo.Spec.PodCIDR)) == 0 {
 			klog.InfoS("No node info available to configure detect-local-mode NodeCIDR")
 			break
 		}
