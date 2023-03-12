@@ -433,7 +433,7 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 			// If the container resource metrics feature is disabled but the object has the one,
 			// that means the user enabled the feature once,
 			// created some HPAs with the container resource metrics, and disabled it finally.
-			return 0, "", time.Time{}, condition, fmt.Errorf("the container resource metrics feature is disabled by the feature gate")
+			return 0, "", time.Time{}, condition, fmt.Errorf("ContainerResource metric type is not supported: disabled by the feature gate")
 		}
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForContainerResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
