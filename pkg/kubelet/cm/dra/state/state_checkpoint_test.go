@@ -50,7 +50,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		},
 		{
 			"Restore valid checkpoint",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CdiDevices":["example.com/example=cdi-example"]}],"checksum":2939981547}`,
+			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":["example.com/example=cdi-example"]}],"checksum":2242470059}`,
 			"",
 			[]ClaimInfoState{{
 				DriverName: "test-driver.cdi.k8s.io",
@@ -58,13 +58,13 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 				ClaimName:  "example",
 				Namespace:  "default",
 				PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-				CdiDevices: []string{"example.com/example=cdi-example"},
+				CDIDevices: []string{"example.com/example=cdi-example"},
 			},
 			},
 		},
 		{
 			"Restore checkpoint with invalid checksum",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CdiDevices":["example.com/example=cdi-example"]}],"checksum":2939981548}`,
+			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":["example.com/example=cdi-example"]}],"checksum":2242470060}`,
 			"checkpoint is corrupted",
 			[]ClaimInfoState{},
 		},
@@ -123,10 +123,10 @@ func TestCheckpointStateStore(t *testing.T) {
 		ClaimName:  "example",
 		Namespace:  "default",
 		PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-		CdiDevices: []string{"example.com/example=cdi-example"},
+		CDIDevices: []string{"example.com/example=cdi-example"},
 	}
 
-	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CdiDevices":["example.com/example=cdi-example"]}],"checksum":2939981547}`
+	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":["example.com/example=cdi-example"]}],"checksum":2242470059}`
 
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "dramanager_state_test")
