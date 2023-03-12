@@ -153,7 +153,7 @@ name | architectures
 - PodSpec.Container.Resources becomes mutable for CPU and memory resource types.
   - PodSpec.Container.ResizePolicy (new object) gives users control over how their containers are resized.
   - PodStatus.Resize status describes the state of a requested Pod resize.
-  - PodStatus.ResourcesAllocated describes node resources allocated to Pod.
+  - PodStatus.AllocatedResources describes node resources allocated to Pod.
   - PodStatus.Resources describes node resources applied to running containers by CRI.
   - UpdateContainerResources CRI API now supports both Linux and Windows.
   

@@ -2129,10 +2129,10 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 		for _, p := range pods {
 			op := p.DeepCopy()
 			for _, c := range op.Spec.Containers {
-				resourcesAllocated, found := kl.statusManager.GetContainerResourceAllocation(string(p.UID), c.Name)
+				allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(p.UID), c.Name)
 				if c.Resources.Requests != nil && found {
-					c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
-					c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+					c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
+					c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
 				}
 			}
 			otherPods = append(otherPods, op)
@@ -2422,14 +2422,14 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			activePods := kl.filterOutInactivePods(existingPods)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				// To handle kubelet restarts, test pod admissibility using ResourcesAllocated values
+				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				podCopy := pod.DeepCopy()
 				for _, c := range podCopy.Spec.Containers {
-					resourcesAllocated, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
+					allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
 					if c.Resources.Requests != nil && found {
-						c.Resources.Requests[v1.ResourceCPU] = resourcesAllocated[v1.ResourceCPU]
-						c.Resources.Requests[v1.ResourceMemory] = resourcesAllocated[v1.ResourceMemory]
+						c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
+						c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
 					}
 				}
 				// Check if we can admit the pod; if not, reject it.
@@ -2529,7 +2529,7 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 				continue
 			}
 			if diff.ObjectDiff(c.Resources.Limits, cs.Resources.Limits) != "" ||
-				diff.ObjectDiff(cs.ResourcesAllocated, cs.Resources.Requests) != "" {
+				diff.ObjectDiff(cs.AllocatedResources, cs.Resources.Requests) != "" {
 				return true
 			}
 		}
@@ -2574,7 +2574,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		idx, found := podutil.GetIndexOfContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
 		if found {
 			for rName, rQuantity := range container.Resources.Requests {
-				podCopy.Status.ContainerStatuses[idx].ResourcesAllocated[rName] = rQuantity
+				podCopy.Status.ContainerStatuses[idx].AllocatedResources[rName] = rQuantity
 			}
 		}
 	}
@@ -2595,11 +2595,11 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
 			break
 		}
-		if len(containerStatus.ResourcesAllocated) != len(container.Resources.Requests) {
-			klog.V(5).InfoS("ContainerStatus.ResourcesAllocated length mismatch", "pod", pod.Name, "container", container.Name)
+		if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
+			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
 			break
 		}
-		if len(diff.ObjectDiff(container.Resources.Requests, containerStatus.ResourcesAllocated)) > 0 {
+		if len(diff.ObjectDiff(container.Resources.Requests, containerStatus.AllocatedResources)) > 0 {
 			podResized = true
 			break
 		}

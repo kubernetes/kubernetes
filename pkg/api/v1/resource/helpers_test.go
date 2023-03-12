@@ -737,7 +737,7 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
 					},
 				},
@@ -762,7 +762,7 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
 					},
 				},
@@ -788,7 +788,7 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
 					},
 				},

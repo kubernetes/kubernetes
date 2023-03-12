@@ -2134,7 +2134,7 @@ func TestEvictonMessageWithResourceResize(t *testing.T) {
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				Name:               "testcontainer",
-				ResourcesAllocated: newResourceList("", "100Mi", ""),
+				AllocatedResources: newResourceList("", "100Mi", ""),
 			},
 		},
 	}

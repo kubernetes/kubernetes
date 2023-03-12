@@ -2492,12 +2492,12 @@ type ContainerStatus struct {
 	// same as false.
 	// +optional
 	Started *bool
-	// ResourcesAllocated represents the compute resources allocated for this container by the
+	// AllocatedResources represents the compute resources allocated for this container by the
 	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
 	// and after successfully admitting desired pod resize.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
-	ResourcesAllocated ResourceList
+	AllocatedResources ResourceList
 	// Resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
 	// +featureGate=InPlacePodVerticalScaling

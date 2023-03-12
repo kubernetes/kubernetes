@@ -200,7 +200,7 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 
 	tcStatus := v1.ContainerStatus{
 		Name:               tcInfo.Name,
-		ResourcesAllocated: alloc,
+		AllocatedResources: alloc,
 	}
 	return tc, tcStatus
 }
@@ -279,9 +279,9 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo, flagError boo
 
 		_, tcStatus := makeTestContainer(ci)
 		if flagError {
-			framework.ExpectEqual(tcStatus.ResourcesAllocated, cStatus.ResourcesAllocated)
+			framework.ExpectEqual(tcStatus.AllocatedResources, cStatus.AllocatedResources)
 		}
-		if diff.ObjectDiff(cStatus.ResourcesAllocated, tcStatus.ResourcesAllocated) != "" {
+		if diff.ObjectDiff(cStatus.AllocatedResources, tcStatus.AllocatedResources) != "" {
 			return false
 		}
 	}

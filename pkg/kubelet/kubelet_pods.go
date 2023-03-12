@@ -1856,14 +1856,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		}
 		container := kubecontainer.GetContainerSpec(pod, cName)
-		// ResourcesAllocated values come from checkpoint. It is the source-of-truth.
+		// AllocatedResources values come from checkpoint. It is the source-of-truth.
 		found := false
-		status.ResourcesAllocated, found = kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
+		status.AllocatedResources, found = kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
 		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
-			// Log error and fallback to ResourcesAllocated in oldStatus if it exists
+			// Log error and fallback to AllocatedResources in oldStatus if it exists
 			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)
 			if oldStatusFound {
-				status.ResourcesAllocated = oldStatus.ResourcesAllocated
+				status.AllocatedResources = oldStatus.AllocatedResources
 			}
 		}
 		if oldStatus.Resources == nil {
@@ -1887,17 +1887,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		}
 		// Convert Requests
-		if status.ResourcesAllocated != nil {
+		if status.AllocatedResources != nil {
 			requests = make(v1.ResourceList)
 			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
 				requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
 			} else {
-				determineResource(v1.ResourceCPU, status.ResourcesAllocated, oldStatus.Resources.Requests, requests)
+				determineResource(v1.ResourceCPU, status.AllocatedResources, oldStatus.Resources.Requests, requests)
 			}
-			if memory, found := status.ResourcesAllocated[v1.ResourceMemory]; found {
+			if memory, found := status.AllocatedResources[v1.ResourceMemory]; found {
 				requests[v1.ResourceMemory] = memory.DeepCopy()
 			}
-			if ephemeralStorage, found := status.ResourcesAllocated[v1.ResourceEphemeralStorage]; found {
+			if ephemeralStorage, found := status.AllocatedResources[v1.ResourceEphemeralStorage]; found {
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
 		}

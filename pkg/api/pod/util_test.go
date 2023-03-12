@@ -2302,7 +2302,7 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 					{
 						Name:               "c1",
 						Image:              "image",
-						ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
 						Resources: &api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
@@ -2573,12 +2573,12 @@ func TestMarkPodProposedForResize(t *testing.T) {
 						{
 							Name:               "c1",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
 						},
 						{
 							Name:               "c2",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
 						},
 					},
 				},
@@ -2609,12 +2609,12 @@ func TestMarkPodProposedForResize(t *testing.T) {
 						{
 							Name:               "c1",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
 						},
 						{
 							Name:               "c2",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
 						},
 					},
 				},
@@ -2646,12 +2646,12 @@ func TestMarkPodProposedForResize(t *testing.T) {
 						{
 							Name:               "c1",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
 						},
 						{
 							Name:               "c2",
 							Image:              "image",
-							ResourcesAllocated: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
 						},
 					},
 				},
