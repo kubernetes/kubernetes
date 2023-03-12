@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -29,26 +30,7 @@ import (
 // to prepare and unprepare a resource claim.
 type claimInfo struct {
 	sync.RWMutex
-
-	// name of the DRA driver
-	driverName string
-
-	// claimUID is an UID of the resource claim
-	claimUID types.UID
-
-	// claimName is a name of the resource claim
-	claimName string
-
-	// namespace is a claim namespace
-	namespace string
-
-	// podUIDs is a set of pod UIDs that reference a resource
-	podUIDs sets.Set[string]
-
-	// cdiDevices is a list of CDI devices returned by the
-	// GRPC API call NodePrepareResource
-	cdiDevices []string
-
+	state.ClaimInfoState
 	// annotations is a list of container annotations associated with
 	// a prepared resource
 	annotations []kubecontainer.Annotation
@@ -58,41 +40,86 @@ func (res *claimInfo) addPodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
-	res.podUIDs.Insert(string(podUID))
+	res.PodUIDs.Insert(string(podUID))
 }
 
 func (res *claimInfo) deletePodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
-	res.podUIDs.Delete(string(podUID))
+	res.PodUIDs.Delete(string(podUID))
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
 type claimInfoCache struct {
 	sync.RWMutex
+	state     state.CheckpointState
 	claimInfo map[string]*claimInfo
 }
 
-// newClaimInfoCache is a function that returns an instance of the claimInfoCache.
-func newClaimInfoCache() *claimInfoCache {
-	return &claimInfoCache{
-		claimInfo: make(map[string]*claimInfo),
+func newClaimInfo(driverName string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string], cdiDevice []string) (*claimInfo, error) {
+	claimInfoState := state.ClaimInfoState{
+		DriverName: driverName,
+		ClaimUID:   claimUID,
+		ClaimName:  claimName,
+		Namespace:  namespace,
+		PodUIDs:    podUIDs,
+		CdiDevices: cdiDevice,
 	}
+	// NOTE: Passing CDI device names as annotations is a temporary solution
+	// It will be removed after all runtimes are updated
+	// to get CDI device names from the ContainerConfig.CDIDevices field
+	annotations, err := generateCDIAnnotations(claimUID, driverName, cdiDevice)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate container annotations, err: %+v", err)
+	}
+	claimInfo := claimInfo{
+		ClaimInfoState: claimInfoState,
+		annotations:    annotations,
+	}
+	return &claimInfo, nil
 }
 
-func (cache *claimInfoCache) add(claim, namespace string, res *claimInfo) error {
+// newClaimInfoCache is a function that returns an instance of the claimInfoCache.
+func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
+	stateImpl, err := state.NewCheckpointState(stateDir, checkpointName)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %+v", err)
+	}
+
+	curState, err := stateImpl.GetOrCreate()
+	if err != nil {
+		return nil, fmt.Errorf("error calling GetOrCreate() on checkpoint state: %v", err)
+	}
+
+	cache := &claimInfoCache{
+		state:     stateImpl,
+		claimInfo: make(map[string]*claimInfo),
+	}
+
+	for _, entry := range curState {
+		info, err := newClaimInfo(
+			entry.DriverName,
+			entry.ClaimUID,
+			entry.ClaimName,
+			entry.Namespace,
+			entry.PodUIDs,
+			entry.CdiDevices,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create claimInfo %+v: %+v", info, err)
+		}
+		cache.add(info)
+	}
+
+	return cache, nil
+}
+
+func (cache *claimInfoCache) add(res *claimInfo) {
 	cache.Lock()
 	defer cache.Unlock()
 
-	key := claim + namespace
-	if _, ok := cache.claimInfo[key]; ok {
-		return fmt.Errorf("claim %s, namespace %s already cached", claim, namespace)
-	}
-
-	cache.claimInfo[claim+namespace] = res
-
-	return nil
+	cache.claimInfo[res.ClaimName+res.Namespace] = res
 }
 
 func (cache *claimInfoCache) get(claimName, namespace string) *claimInfo {
@@ -118,10 +145,22 @@ func (cache *claimInfoCache) hasPodReference(UID types.UID) bool {
 	defer cache.RUnlock()
 
 	for _, claimInfo := range cache.claimInfo {
-		if claimInfo.podUIDs.Has(string(UID)) {
+		if claimInfo.PodUIDs.Has(string(UID)) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (cache *claimInfoCache) syncToCheckpoint() error {
+	cache.RLock()
+	defer cache.RUnlock()
+
+	claimInfoStateList := make(state.ClaimInfoStateList, 0, len(cache.claimInfo))
+	for _, infoClaim := range cache.claimInfo {
+		claimInfoStateList = append(claimInfoStateList, infoClaim.ClaimInfoState)
+	}
+
+	return cache.state.Store(claimInfoStateList)
 }

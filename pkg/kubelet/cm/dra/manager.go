@@ -31,6 +31,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// draManagerStateFileName is the file name where dra manager stores its state
+const draManagerStateFileName = "dra_manager_state"
+
 // ManagerImpl is the structure in charge of managing DRA resource Plugins.
 type ManagerImpl struct {
 	// cache contains cached claim info
@@ -41,34 +44,20 @@ type ManagerImpl struct {
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
+func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
+	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create claimInfo cache: %+v", err)
+	}
+
 	manager := &ManagerImpl{
-		cache:      newClaimInfoCache(),
+		cache:      claimInfoCache,
 		kubeClient: kubeClient,
 	}
 
 	return manager, nil
-}
-
-// Generate container annotations using CDI UpdateAnnotations API.
-func generateCDIAnnotations(
-	claimUID types.UID,
-	driverName string,
-	cdiDevices []string,
-) ([]kubecontainer.Annotation, error) {
-	annotations, err := updateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
-	if err != nil {
-		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)
-	}
-
-	kubeAnnotations := []kubecontainer.Annotation{}
-	for key, value := range annotations {
-		kubeAnnotations = append(kubeAnnotations, kubecontainer.Annotation{Name: key, Value: value})
-	}
-
-	return kubeAnnotations, nil
 }
 
 // PrepareResources attempts to prepare all of the required resource
@@ -83,10 +72,14 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 				klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
+				// Resource is already prepared, add pod UID to it
 				if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
-					// resource is already prepared, add pod UID to it
+					// We delay checkpointing of this change until this call returns successfully.
+					// It is OK to do this because we will only return successfully from this call if
+					// the checkpoint has succeeded. That means if the kubelet is ever restarted
+					// before this checkpoint succeeds, the pod whose resources are being prepared
+					// would never have started, so it's OK (actually correct) to not include it in the cache.
 					claimInfo.addPodReference(pod.UID)
-
 					continue
 				}
 
@@ -126,39 +119,36 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 				klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
 
-				// NOTE: Passing CDI device names as annotations is a temporary solution
-				// It will be removed after all runtimes are updated
-				// to get CDI device names from the ContainerConfig.CDIDevices field
-				annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
-				if err != nil {
-					return fmt.Errorf("failed to generate container annotations, err: %+v", err)
-				}
-
-				// Cache prepared resource
-				err = m.cache.add(
+				// TODO: We are adding the claimInfo struct to the cache and syncing it to the checkpoint *after* the NodePrepareResource
+				// call has completed. This will cause issues if the kubelet gets restarted between NodePrepareResource and syncToCheckpoint.
+				// It will result in not calling NodeUnprepareResource for this claim because no claimInfo will be synced back to the cache
+				// for it after the restart. We need to resolve this issue before moving to beta.
+				claimInfo, err := newClaimInfo(
+					driverName,
+					resourceClaim.UID,
 					resourceClaim.Name,
 					resourceClaim.Namespace,
-					&claimInfo{
-						driverName:  driverName,
-						claimUID:    resourceClaim.UID,
-						claimName:   resourceClaim.Name,
-						namespace:   resourceClaim.Namespace,
-						podUIDs:     sets.New(string(pod.UID)),
-						cdiDevices:  response.CdiDevices,
-						annotations: annotations,
-					})
+					sets.New(string(pod.UID)),
+					response.CdiDevices)
 				if err != nil {
-					return fmt.Errorf(
-						"failed to cache prepared resource, claim: %s(%s), err: %+v",
-						resourceClaim.Name,
-						resourceClaim.UID,
-						err,
-					)
+					return fmt.Errorf("newClaimInfo failed, claim UID: %s, claim name: %s, claim namespace: %s, err: %+v",
+						resourceClaim.UID, resourceClaim.Name, resourceClaim.Namespace, err)
+				}
+
+				m.cache.add(claimInfo)
+				// Checkpoint to reduce redundant calls to NodePrepareResource() after a kubelet restart.
+				err = m.cache.syncToCheckpoint()
+				if err != nil {
+					return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
 				}
 			}
 		}
 	}
-
+	// Checkpoint to capture all of the previous addPodReference() calls.
+	err := m.cache.syncToCheckpoint()
+	if err != nil {
+		return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
+	}
 	return nil
 }
 
@@ -181,9 +171,9 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
 			}
 
-			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
+			klog.V(3).InfoS("Add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
 			annotations = append(annotations, claimInfo.annotations...)
-			for _, cdiDevice := range claimInfo.cdiDevices {
+			for _, cdiDevice := range claimInfo.CdiDevices {
 				cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: cdiDevice})
 			}
 		}
@@ -208,31 +198,35 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		}
 
 		// Skip calling NodeUnprepareResource if other pods are still referencing it
-		if len(claimInfo.podUIDs) > 1 {
+		if len(claimInfo.PodUIDs) > 1 {
+			// We delay checkpointing of this change until this call returns successfully.
+			// It is OK to do this because we will only return successfully from this call if
+			// the checkpoint has succeeded. That means if the kubelet is ever restarted
+			// before this checkpoint succeeds, we will simply call into this (idempotent)
+			// function again.
 			claimInfo.deletePodReference(pod.UID)
 			continue
 		}
 
 		// Call NodeUnprepareResource only for the last pod that references the claim
-		client, err := dra.NewDRAPluginClient(claimInfo.driverName)
+		client, err := dra.NewDRAPluginClient(claimInfo.DriverName)
 		if err != nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
+			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.DriverName, err)
 		}
 
 		response, err := client.NodeUnprepareResource(
 			context.Background(),
-			claimInfo.namespace,
-			claimInfo.claimUID,
-			claimInfo.claimName,
-			claimInfo.cdiDevices)
+			claimInfo.Namespace,
+			claimInfo.ClaimUID,
+			claimInfo.ClaimName,
+			claimInfo.CdiDevices)
 		if err != nil {
 			return fmt.Errorf(
 				"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v",
-				pod.Name,
-				claimInfo.claimUID,
-				claimInfo.claimName,
-				claimInfo.cdiDevices, err)
+				pod.Name, claimInfo.ClaimUID, claimInfo.ClaimName, claimInfo.CdiDevices, err)
 		}
+
+		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 
 		// Delete last pod UID only if NodeUnprepareResource call succeeds.
 		// This ensures that status manager doesn't enter termination status
@@ -240,11 +234,18 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		// and in the claimInfo.hasPodReference.
 		claimInfo.deletePodReference(pod.UID)
 
-		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
-		// delete resource from the cache
-		m.cache.delete(claimInfo.claimName, pod.Namespace)
+		m.cache.delete(claimInfo.ClaimName, pod.Namespace)
+		// Checkpoint to reduce redundant calls to NodeUnPrepareResource() after a kubelet restart.
+		err = m.cache.syncToCheckpoint()
+		if err != nil {
+			return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
+		}
 	}
-
+	// Checkpoint to capture all of the previous deletePodReference() calls.
+	err := m.cache.syncToCheckpoint()
+	if err != nil {
+		return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
+	}
 	return nil
 }
 
