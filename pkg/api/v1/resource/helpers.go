@@ -53,7 +53,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	var containerStatuses map[string]*v1.ContainerStatus
 	if opts.InPlacePodVerticalScalingEnabled {
-		containerStatuses = map[string]*v1.ContainerStatus{}
+		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses))
 		for i := range pod.Status.ContainerStatuses {
 			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
 		}
