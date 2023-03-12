@@ -610,7 +610,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.When("using a Pod with restartPolicy=Never, three init container and two sidecars", func() {
+	ginkgo.When("using a Pod with restartPolicy=Never, three init container and two sidecars", ginkgo.Ordered, func() {
 
 		init1 := "init-1"
 		sidecar1 := "sidecar-1"
@@ -689,6 +689,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 			client := e2epod.NewPodClient(f)
 			podSpec = client.Create(context.TODO(), podSpec)
 
+			// TODO: check for Pod to be succeeded
 			err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
 			framework.ExpectNoError(err)
 
@@ -738,19 +739,21 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 	})
 
 	ginkgo.When("using a sidecar in a Pod with restartPolicy=Never", func() {
-		ginkgo.When("a sidecar runs continuously", func() {
+		ginkgo.When("a sidecar runs continuously", ginkgo.Ordered, func() {
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
 			ginkgo.It("should not restart a sidecar", func() {})
 			ginkgo.It("should run a regular container to completion", func() {})
 		})
 
-		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+		ginkgo.When("a sidecar fails to start because of a bad image", ginkgo.Ordered, func() {
 			ginkgo.It("should mark a Pod as failed and produce log", func() {})
 			ginkgo.It("should not restart a sidecar", func() {})
 			ginkgo.It("should not start a regular container", func() {})
 		})
 
-		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+		// TODO: add a test case similar to one above, but with startup probe never succeeding
+
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
@@ -758,16 +761,30 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 			ginkgo.It("should run a regular container to completion", func() {})
 		})
 
-		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
 			ginkgo.It("should restart a sidecar after the regular container started", func() {})
 			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		ginkgo.When("an Init container before sidecar fails", ginkgo.Ordered, func() {
+			ginkgo.It("should mark a Pod as failed and produce log", func() {})
+			ginkgo.It("should mark an Init container as failed", func() {})
+			ginkgo.It("should not start sidecar", func() {})
+		})
+
+		ginkgo.When("an Init container after sidecar fails", ginkgo.Ordered, func() {
+			ginkgo.It("should mark a Pod as failed and produce log", func() {})
+			ginkgo.It("should mark an Init container as failed", func() {})
+			// TODO: how will we be able to test it if sidecar will never fail and there will be no termination log? Or will be?
+			ginkgo.It("should be running sidecar and a failed Init container in parallel", func() {})
+			// TODO: check preStop hooks when they are enabled
 		})
 	})
 
-	ginkgo.When("using a sidecar in a Pod with restartPolicy=OnFailure", func() {
+	ginkgo.When("using a sidecar in a Pod with restartPolicy=OnFailure", ginkgo.Ordered, func() {
 		// this test case the same as for restartPolicy=Never
 		ginkgo.When("a sidecar runs continuously", func() {
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
@@ -775,15 +792,17 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 			ginkgo.It("should run a regular container to completion", func() {})
 		})
 
-		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+		ginkgo.When("a sidecar fails to start because of a bad image", ginkgo.Ordered, func() {
 			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
 			// this is different from restartPolicy=Never
 			ginkgo.It("should restart a sidecar", func() {})
 			ginkgo.It("should not start a regular container", func() {})
 		})
 
+		// TODO: add a test case similar to one above, but with startup probe never succeeding
+
 		// this test case the same as for restartPolicy=Never
-		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
@@ -792,16 +811,30 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		// this test case the same as for restartPolicy=Never
-		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should complete a Pod successfully and produce log", func() {})
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
 			ginkgo.It("should restart a sidecar after the regular container started", func() {})
 			ginkgo.It("should run a regular container to completion", func() {})
+		})
+
+		ginkgo.When("an Init container before sidecar continuously fails", ginkgo.Ordered, func() {
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should have Init container restartCount greater than 0", func() {})
+			ginkgo.It("should not start sidecar", func() {})
+		})
+
+		ginkgo.When("an Init container after sidecar fails", ginkgo.Ordered, func() {
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should have Init container restartCount greater than 0", func() {})
+			// TODO: how will we be able to test it if sidecar will never fail and there will be no termination log? Or will be?
+			ginkgo.It("should be running sidecar and a failed Init container in parallel", func() {})
+			// TODO: check preStop hooks when they are enabled
 		})
 	})
 
-	ginkgo.When("using a sidecar in a Pod with restartPolicy=Always", func() {
+	ginkgo.When("using a sidecar in a Pod with restartPolicy=Always", ginkgo.Ordered, func() {
 		ginkgo.When("a sidecar runs continuously", func() {
 			// regular container should exit at least once so we can get it's termination log
 			// this test case is different from restartPolicy=Never
@@ -811,14 +844,16 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 			ginkgo.It("should start a regular container", func() {})
 		})
 
-		ginkgo.When("a sidecar fails to start because of a bad image", func() {
+		ginkgo.When("a sidecar fails to start because of a bad image", ginkgo.Ordered, func() {
 			ginkgo.It("should continuously run Pod keeping it Pending and produce log", func() { /* check the restartCount > 5 */})
 			// this is different from restartPolicy=Never
 			ginkgo.It("should restart a sidecar", func() {})
 			ginkgo.It("should not start a regular container", func() {})
 		})
 
-		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", func() {
+		// TODO: add a test case similar to one above, but with startup probe never succeeding
+
+		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should keep running a Pod continuously and produce log", func() { /* check the regular container restartCount > 0 */ })
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
@@ -827,12 +862,26 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		// this test case the same as for restartPolicy=Never
-		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", func() {
+		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 			ginkgo.It("should keep running a Pod continuously and produce log", func() { /* check the regular container restartCount > 0 */ })
 			ginkgo.It("should restart a sidecar before the regular container started", func() {})
 			ginkgo.It("should restart a sidecar after the regular container started", func() {})
 			ginkgo.It("should start a regular container", func() {})
+		})
+
+		ginkgo.When("an Init container before sidecar continuously fails", ginkgo.Ordered, func() {
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should have Init container restartCount greater than 0", func() {})
+			ginkgo.It("should not start sidecar", func() {})
+		})
+
+		ginkgo.When("an Init container after sidecar fails", ginkgo.Ordered, func() {
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should have Init container restartCount greater than 0", func() {})
+			// TODO: how will we be able to test it if sidecar will never fail and there will be no termination log? Or will be?
+			ginkgo.It("should be running sidecar and a failed Init container in parallel", func() {})
+			// TODO: check preStop hooks when they are enabled
 		})
 	})
 })
