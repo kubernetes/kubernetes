@@ -546,7 +546,7 @@ function indirect_array() {
 function codegen::openapi() {
     # Build the tool.
     GO111MODULE=on GOPROXY=off go install \
-        k8s.io/kube-openapi/cmd/openapi-gen
+        k8s.io/code-generator/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
     local output_base="${GENERATED_FILE_PREFIX}openapi"
