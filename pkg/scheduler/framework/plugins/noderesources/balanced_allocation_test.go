@@ -390,7 +390,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{})
 			state := framework.NewCycleState()
 			for i := range test.nodes {
-				if !test.runPreScore {
+				if test.runPreScore {
 					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
