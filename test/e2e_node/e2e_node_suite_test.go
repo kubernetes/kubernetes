@@ -130,6 +130,12 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
+
+	if err := services.SetFeatureGatesForInProcessComponents(featureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates: %v", err)
+		os.Exit(1)
+	}
+
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
