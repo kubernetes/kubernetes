@@ -61,6 +61,7 @@ import (
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/util/async"
+	netutils "k8s.io/utils/net"
 )
 
 // Config provides information needed to build RESTStorage for core.
@@ -350,7 +351,16 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, err
 		}
-		primaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&serviceClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+		// TODO(aojea) Revisit the initialization of the allocators
+		// since right now it depends on the service-cidr flags and
+		// sets the default IPFamily that may not be coherent with the
+		// existing default ServiceCIDR
+		primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+			networkingv1alphaClient,
+			c.Informers.Networking().V1alpha1().ServiceCIDRs(),
+			c.Informers.Networking().V1alpha1().IPAddresses(),
+			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+		)
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
@@ -381,7 +391,16 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, err
 			}
-			secondaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.Services.SecondaryClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+			// TODO(aojea) Revisit the initialization of the allocators
+			// since right now it depends on the service-cidr flags and
+			// sets the default IPFamily that may not be coherent with the
+			// existing default ServiceCIDR
+			secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+				networkingv1alphaClient,
+				c.Informers.Networking().V1alpha1().ServiceCIDRs(),
+				c.Informers.Networking().V1alpha1().IPAddresses(),
+				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+			)
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
