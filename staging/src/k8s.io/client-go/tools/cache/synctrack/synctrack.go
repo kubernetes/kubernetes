@@ -78,9 +78,13 @@ func (t *AsyncTracker[T]) HasSynced() bool {
 // SingleFileTracker helps propagate HasSynced when events are processed in
 // order (i.e. via a queue).
 type SingleFileTracker struct {
-	UpstreamHasSynced func() bool
-
+	// Important: count is used with atomic operations so it must be 64-bit
+	// aligned, otherwise atomic operations will panic. Having it at the top of
+	// the struct will guarantee that, even on 32-bit arches.
+	// See https://pkg.go.dev/sync/atomic#pkg-note-BUG for more information.
 	count int64
+
+	UpstreamHasSynced func() bool
 }
 
 // Start should be called prior to processing each key which is part of the
