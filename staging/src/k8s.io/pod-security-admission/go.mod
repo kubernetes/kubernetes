@@ -2,7 +2,7 @@
 
 module k8s.io/pod-security-admission
 
-go 1.19
+go 1.20
 
 require (
 	github.com/blang/semver/v4 v4.0.0

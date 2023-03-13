@@ -2,7 +2,7 @@
 
 module k8s.io/noderesourcetopology-api
 
-go 1.19
+go 1.20
 
 require k8s.io/code-generator v0.0.0
 
