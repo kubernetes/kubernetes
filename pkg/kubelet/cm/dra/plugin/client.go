@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -131,6 +132,9 @@ func (r *draPluginClient) NodePrepareResource(
 		ResourceHandle: resourceHandle,
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	return nodeClient.NodePrepareResource(ctx, req)
 }
 
@@ -164,6 +168,9 @@ func (r *draPluginClient) NodeUnprepareResource(
 		ClaimName:  claimName,
 		CdiDevices: cdiDevices,
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
 	return nodeClient.NodeUnprepareResource(ctx, req)
 }
