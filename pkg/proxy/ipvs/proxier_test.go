@@ -2543,19 +2543,20 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		t.Errorf("expected service map length 12, got %v", fp.svcPortMap)
 	}
 
-	// The only-local-loadbalancer ones get added
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected 1 healthcheck port, got %v", result.HCServiceNodePorts)
-	} else {
-		nsn := makeNSN("somewhere", "only-local-load-balancer")
-		if port, found := result.HCServiceNodePorts[nsn]; !found || port != 345 {
-			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, result.HCServiceNodePorts)
-		}
-	}
-
 	if len(result.UDPStaleClusterIP) != 0 {
 		// Services only added, so nothing stale yet
 		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	}
+
+	// The only-local-loadbalancer ones get added
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected 1 healthcheck port, got %v", healthCheckNodePorts)
+	} else {
+		nsn := makeNSN("somewhere", "only-local-load-balancer")
+		if port, found := healthCheckNodePorts[nsn]; !found || port != 345 {
+			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, healthCheckNodePorts)
+		}
 	}
 
 	// Remove some stuff
@@ -2576,10 +2577,6 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		t.Errorf("expected service map length 1, got %v", fp.svcPortMap)
 	}
 
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected 0 healthcheck ports, got %v", result.HCServiceNodePorts)
-	}
-
 	// All services but one were deleted. While you'd expect only the ClusterIPs
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
@@ -2591,6 +2588,11 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		if !result.UDPStaleClusterIP.Has(ip) {
 			t.Errorf("expected stale UDP service service %s", ip)
 		}
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected 0 healthcheck ports, got %v", healthCheckNodePorts)
 	}
 }
 
@@ -2623,13 +2625,14 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 		t.Errorf("expected service map length 0, got %d", len(fp.svcPortMap))
 	}
 
-	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %d", len(result.HCServiceNodePorts))
-	}
-
 	if len(result.UDPStaleClusterIP) != 0 {
 		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	}
+
+	// No proxied services, so no healthchecks
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %d", len(healthCheckNodePorts))
 	}
 }
 
@@ -2652,12 +2655,14 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	if len(fp.svcPortMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.svcPortMap)
 	}
-	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
-	}
 	if len(result.UDPStaleClusterIP) != 0 {
 		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP)
+	}
+
+	// No proxied services, so no healthchecks
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 }
 
@@ -2694,12 +2699,14 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
-	}
 	if len(result.UDPStaleClusterIP) != 0 {
 		// Services only added, so nothing stale yet
 		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	}
+
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 
 	// Change service to load-balancer
@@ -2708,11 +2715,13 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
-	}
 	if len(result.UDPStaleClusterIP) != 0 {
 		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.List())
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", healthCheckNodePorts)
 	}
 
 	// No change; make sure the service map stays the same and there are
@@ -2722,11 +2731,13 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
-	}
 	if len(result.UDPStaleClusterIP) != 0 {
 		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.List())
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", healthCheckNodePorts)
 	}
 
 	// And back to ClusterIP
@@ -2735,12 +2746,14 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
-	}
 	if len(result.UDPStaleClusterIP) != 0 {
 		// Services only added, so nothing stale yet
 		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 }
 
@@ -3142,7 +3155,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedResult            map[proxy.ServicePortName][]*proxy.BaseEndpointInfo
 		expectedStaleEndpoints    []proxy.ServiceEndpoint
 		expectedStaleServiceNames map[proxy.ServicePortName]bool
-		expectedHealthchecks      map[types.NamespacedName]int
+		expectedReadyEndpoints    map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
 		name:                      "nothing",
@@ -3150,7 +3163,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedResult:            map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[1]: no change, named port, local
 		name:              "no change, named port, local",
@@ -3168,7 +3181,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
@@ -3194,7 +3207,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[3]: no change, multiple subsets, multiple ports, local
 		name:              "no change, multiple subsets, multiple ports, local",
@@ -3224,7 +3237,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
@@ -3286,7 +3299,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 2,
 			makeNSN("ns2", "ep2"): 1,
 		},
@@ -3305,7 +3318,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
@@ -3324,7 +3337,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[7]: add an IP and port
 		name:              "add an IP and port",
@@ -3349,7 +3362,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
@@ -3383,7 +3396,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[9]: add a subset
 		name:              "add a subset",
@@ -3406,7 +3419,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
@@ -3432,7 +3445,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[11]: rename a port
 		name:              "rename a port",
@@ -3455,7 +3468,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{},
+		expectedReadyEndpoints: map[types.NamespacedName]int{},
 	}, {
 		// Case[12]: renumber a port
 		name:              "renumber a port",
@@ -3476,7 +3489,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedReadyEndpoints:    map[types.NamespacedName]int{},
 	}, {
 		// Case[13]: complex add and remove
 		name:              "complex add and remove",
@@ -3540,7 +3553,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
 		},
 	}, {
@@ -3558,7 +3571,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{},
+		expectedReadyEndpoints: map[types.NamespacedName]int{},
 	},
 	}
 
@@ -3629,8 +3642,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
 				}
 			}
-			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+			localReadyEndpoints := fp.endpointsMap.LocalReadyEndpoints()
+			if !reflect.DeepEqual(localReadyEndpoints, tc.expectedReadyEndpoints) {
+				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedReadyEndpoints, localReadyEndpoints)
 			}
 		})
 	}
@@ -4539,9 +4553,10 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 	}
 
 	fp.OnEndpointSliceAdd(endpointSlice)
-	result := fp.endpointsMap.Update(fp.endpointsChanges)
-	if len(result.HCEndpointsLocalIPSize) != 1 {
-		t.Errorf("unexpected number of health check node ports, expected 1 but got: %d", len(result.HCEndpointsLocalIPSize))
+	_ = fp.endpointsMap.Update(fp.endpointsChanges)
+	localReadyEndpoints := fp.endpointsMap.LocalReadyEndpoints()
+	if len(localReadyEndpoints) != 1 {
+		t.Errorf("unexpected number of health check node ports, expected 1 but got: %d", len(localReadyEndpoints))
 	}
 
 	// set all endpoints to terminating
@@ -4593,9 +4608,10 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 	}
 
 	fp.OnEndpointSliceUpdate(endpointSlice, endpointSliceTerminating)
-	result = fp.endpointsMap.Update(fp.endpointsChanges)
-	if len(result.HCEndpointsLocalIPSize) != 0 {
-		t.Errorf("unexpected number of health check node ports, expected 0 but got: %d", len(result.HCEndpointsLocalIPSize))
+	_ = fp.endpointsMap.Update(fp.endpointsChanges)
+	localReadyEndpoints = fp.endpointsMap.LocalReadyEndpoints()
+	if len(localReadyEndpoints) != 0 {
+		t.Errorf("unexpected number of health check node ports, expected 0 but got: %d", len(localReadyEndpoints))
 	}
 }
 

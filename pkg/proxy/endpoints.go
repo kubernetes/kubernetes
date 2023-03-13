@@ -293,8 +293,6 @@ type endpointsChange struct {
 
 // UpdateEndpointMapResult is the updated results after applying endpoints changes.
 type UpdateEndpointMapResult struct {
-	// HCEndpointsLocalIPSize maps an endpoints name to the length of its local IPs.
-	HCEndpointsLocalIPSize map[types.NamespacedName]int
 	// StaleEndpoints identifies if an endpoints service pair is stale.
 	StaleEndpoints []ServiceEndpoint
 	// StaleServiceNames identifies if a service is stale.
@@ -313,15 +311,6 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 
 	em.apply(
 		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
-
-	// TODO: If this will appear to be computationally expensive, consider
-	// computing this incrementally similarly to endpointsMap.
-	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := em.getLocalReadyEndpointIPs()
-	for nsn, ips := range localIPs {
-		result.HCEndpointsLocalIPSize[nsn] = len(ips)
-	}
-
 	return result
 }
 
@@ -366,7 +355,7 @@ func (em EndpointsMap) unmerge(other EndpointsMap) {
 	}
 }
 
-// GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
+// getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
 func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
 	for svcPortName, epList := range em {
@@ -387,6 +376,25 @@ func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.
 		}
 	}
 	return localIPs
+}
+
+// LocalReadyEndpoints returns a map of Service names to the number of local ready
+// endpoints for that service.
+func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
+	// TODO: If this will appear to be computationally expensive, consider
+	// computing this incrementally similarly to endpointsMap.
+
+	// (Note that we need to call getLocalEndpointIPs first to squash the data by IP,
+	// because the EndpointsMap is sorted by IP+port, not just IP, and we want to
+	// consider a Service pointing to 10.0.0.1:80 and 10.0.0.1:443 to have 1 endpoint,
+	// not 2.)
+
+	eps := make(map[types.NamespacedName]int)
+	localIPs := em.getLocalReadyEndpointIPs()
+	for nsn, ips := range localIPs {
+		eps[nsn] = len(ips)
+	}
+	return eps
 }
 
 // detectStaleConnections modifies <staleEndpoints> and <staleServices> with detected stale connections. <staleServiceNames>

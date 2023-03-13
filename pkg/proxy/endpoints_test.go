@@ -505,7 +505,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedResult            map[ServicePortName][]*BaseEndpointInfo
 		expectedStaleEndpoints    []ServiceEndpoint
 		expectedStaleServiceNames map[ServicePortName]bool
-		expectedHealthchecks      map[types.NamespacedName]int
+		expectedLocalEndpoints    map[types.NamespacedName]int
 		expectedChangedEndpoints  sets.String
 	}{{
 		name:                      "empty",
@@ -513,7 +513,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedResult:            map[ServicePortName][]*BaseEndpointInfo{},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString(),
 	}, {
 		name: "no change, unnamed port",
@@ -535,7 +535,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString(),
 	}, {
 		name: "no change, named port, local",
@@ -557,7 +557,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString(),
@@ -589,7 +589,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString(),
 	}, {
 		name: "no change, multiple slices, multiple ports, local",
@@ -625,7 +625,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString(),
@@ -695,7 +695,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 2,
 			makeNSN("ns2", "ep2"): 1,
 		},
@@ -718,7 +718,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -741,7 +741,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
 	}, {
 		name: "add an IP and port",
@@ -770,7 +770,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -808,7 +808,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
 	}, {
 		name: "add a slice to an endpoint",
@@ -837,7 +837,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -869,7 +869,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
 	}, {
 		name: "rename a port",
@@ -896,7 +896,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks:     map[types.NamespacedName]int{},
+		expectedLocalEndpoints:   map[types.NamespacedName]int{},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
 	}, {
 		name: "renumber a port",
@@ -921,7 +921,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
+		expectedLocalEndpoints:    map[types.NamespacedName]int{},
 		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
 	}, {
 		name: "complex add and remove",
@@ -1009,7 +1009,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1", "ns2/ep2", "ns3/ep3", "ns4/ep4"),
@@ -1031,7 +1031,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks:     map[types.NamespacedName]int{},
+		expectedLocalEndpoints:   map[types.NamespacedName]int{},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
 	},
 	}
@@ -1108,8 +1108,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
 				}
 			}
-			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+
+			localReadyEndpoints := fp.endpointsMap.LocalReadyEndpoints()
+			if !reflect.DeepEqual(localReadyEndpoints, tc.expectedLocalEndpoints) {
+				t.Errorf("[%d] expected local ready endpoints %v, got %v", tci, tc.expectedLocalEndpoints, localReadyEndpoints)
 			}
 		})
 	}

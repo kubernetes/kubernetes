@@ -337,9 +337,6 @@ func (sct *ServiceChangeTracker) PendingChanges() sets.String {
 
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
-	// HCServiceNodePorts is a map of Service names to node port numbers which indicate the health of that Service on this Node.
-	// The value(uint16) of HCServices map is the service health check node port.
-	HCServiceNodePorts map[types.NamespacedName]uint16
 	// UDPStaleClusterIP holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
 	// Callers can use this to abort timeout-waits or clear connection-tracking information.
 	UDPStaleClusterIP sets.String
@@ -349,17 +346,21 @@ type UpdateServiceMapResult struct {
 func (sm ServicePortMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
 	result.UDPStaleClusterIP = sets.NewString()
 	sm.apply(changes, result.UDPStaleClusterIP)
+	return result
+}
 
+// HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
+// for all Services in sm with non-zero HealthCheckNodePort.
+func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to svcPortMap.
-	result.HCServiceNodePorts = make(map[types.NamespacedName]uint16)
+	ports := make(map[types.NamespacedName]uint16)
 	for svcPortName, info := range sm {
 		if info.HealthCheckNodePort() != 0 {
-			result.HCServiceNodePorts[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
+			ports[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
 		}
 	}
-
-	return result
+	return ports
 }
 
 // ServicePortMap maps a service to its ServicePort.
