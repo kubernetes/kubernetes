@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"encoding/json"
 	"fmt"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
@@ -91,7 +92,10 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		}
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
+		a, _ := json.Marshal(v)
+		fmt.Printf("resourceList: %s\n", a)
 		for _, r := range v.Resources {
+			fmt.Printf("resource: %s\n", r.Resource)
 			resource := convertAPIResource(r)
 			resourceList.APIResources = append(resourceList.APIResources, resource)
 			// Subresources field in new format get transformed into full APIResources.
