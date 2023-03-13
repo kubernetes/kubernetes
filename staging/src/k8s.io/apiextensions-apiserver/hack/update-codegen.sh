@@ -21,21 +21,17 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
-CLIENTSET_NAME_VERSIONED=clientset \
-CLIENTSET_PKG_NAME=clientset \
-"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,defaulter,client,lister,informer" \
-  k8s.io/apiextensions-apiserver/pkg/client \
-  k8s.io/apiextensions-apiserver/pkg/apis \
-  "apiextensions:v1beta1,v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+source "${CODEGEN_PKG}/kube_codegen.sh"
 
-CLIENTSET_NAME_VERSIONED=clientset \
-CLIENTSET_PKG_NAME=clientset \
-"${CODEGEN_PKG}/generate-internal-groups.sh" "deepcopy,conversion" \
-  k8s.io/apiextensions-apiserver/pkg/client \
-  k8s.io/apiextensions-apiserver/pkg/apis \
-  k8s.io/apiextensions-apiserver/pkg/apis \
-  "apiextensions:v1beta1,v1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+kube::codegen::gen_helpers \
+    --input-pkg-root k8s.io/apiextensions-apiserver/pkg \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --input-pkg-root k8s.io/apiextensions-apiserver/pkg/apis \
+    --output-pkg-root k8s.io/apiextensions-apiserver/pkg/client \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --versioned-name clientset \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
