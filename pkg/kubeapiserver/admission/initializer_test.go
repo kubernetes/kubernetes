@@ -49,7 +49,7 @@ func (p *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(cloudConfig, nil, nil, nil)
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 
@@ -94,7 +94,7 @@ func (p *WantsRESTMapperAdmissionPlugin) SetRESTMapper(mapper meta.RESTMapper) {
 
 func TestRESTMapperAdmissionPlugin(t *testing.T) {
 	mapper := doNothingRESTMapper{}
-	initializer := NewPluginInitializer(nil, mapper, nil)
+	initializer := NewPluginInitializer(nil, mapper, nil, nil)
 	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}
 	initializer.Initialize(wantsRESTMapperAdmission)
 
@@ -121,7 +121,7 @@ func (p *WantsQuotaConfigurationAdmissionPlugin) SetQuotaConfiguration(config qu
 
 func TestQuotaConfigurationAdmissionPlugin(t *testing.T) {
 	config := doNothingQuotaConfiguration{}
-	initializer := NewPluginInitializer(nil, nil, config)
+	initializer := NewPluginInitializer(nil, nil, config, nil)
 	wantsQuotaConfigurationAdmission := &WantsQuotaConfigurationAdmissionPlugin{}
 	initializer.Initialize(wantsQuotaConfigurationAdmission)
 
