@@ -1090,7 +1090,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.GCEPDInTreePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 	case csiplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		return true
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
