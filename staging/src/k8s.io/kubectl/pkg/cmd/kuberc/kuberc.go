@@ -192,7 +192,8 @@ func LoadKubeRC(path string) (Preferences, error) {
 	var preferences Preferences
 	// TODO: (mpuckett159) This probably should be UnmarshalStrict but I'm not sure
 	if err := yaml.Unmarshal(kubercBytes, &preferences); err != nil {
-		klog.Warningf("error unmarshalling the yaml for kuberc")
+		klog.Errorf("error unmarshalling the yaml for kuberc")
+		return Preferences{}, err
 	}
 
 	return preferences, nil
