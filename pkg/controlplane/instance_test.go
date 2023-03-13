@@ -430,7 +430,6 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
 		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):         true,
 	}
 
 	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
@@ -438,7 +437,6 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
 	// are no more beta resources enabled by default.
 	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities").GroupResource():         true,
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
 	}
