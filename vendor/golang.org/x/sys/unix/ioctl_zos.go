@@ -27,9 +27,7 @@ func IoctlSetInt(fd int, req uint, value int) error {
 func IoctlSetWinsize(fd int, req uint, value *Winsize) error {
 	// TODO: if we get the chance, remove the req parameter and
 	// hardcode TIOCSWINSZ.
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-	runtime.KeepAlive(value)
-	return err
+	return ioctlPtr(fd, req, unsafe.Pointer(value))
 }
 
 // IoctlSetTermios performs an ioctl on fd with a *Termios.
@@ -51,13 +49,13 @@ func IoctlSetTermios(fd int, req uint, value *Termios) error {
 // for those, IoctlRetInt should be used instead of this function.
 func IoctlGetInt(fd int, req uint) (int, error) {
 	var value int
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
+	err := ioctlPtr(fd, req, unsafe.Pointer(&value))
 	return value, err
 }
 
 func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
 	var value Winsize
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
+	err := ioctlPtr(fd, req, unsafe.Pointer(&value))
 	return &value, err
 }
 

@@ -14,7 +14,6 @@ package unix
 
 import (
 	"fmt"
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -376,11 +375,10 @@ func Flistxattr(fd int, dest []byte) (sz int, err error) {
 func Kill(pid int, signum syscall.Signal) (err error) { return kill(pid, int(signum), 1) }
 
 //sys	ioctl(fd int, req uint, arg uintptr) (err error)
+//sys	ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) = SYS_IOCTL
 
 func IoctlCtlInfo(fd int, ctlInfo *CtlInfo) error {
-	err := ioctl(fd, CTLIOCGINFO, uintptr(unsafe.Pointer(ctlInfo)))
-	runtime.KeepAlive(ctlInfo)
-	return err
+	return ioctlPtr(fd, CTLIOCGINFO, unsafe.Pointer(ctlInfo))
 }
 
 // IfreqMTU is struct ifreq used to get or set a network device's MTU.
@@ -394,16 +392,14 @@ type IfreqMTU struct {
 func IoctlGetIfreqMTU(fd int, ifname string) (*IfreqMTU, error) {
 	var ifreq IfreqMTU
 	copy(ifreq.Name[:], ifname)
-	err := ioctl(fd, SIOCGIFMTU, uintptr(unsafe.Pointer(&ifreq)))
+	err := ioctlPtr(fd, SIOCGIFMTU, unsafe.Pointer(&ifreq))
 	return &ifreq, err
 }
 
 // IoctlSetIfreqMTU performs the SIOCSIFMTU ioctl operation on fd to set the MTU
 // of the network device specified by ifreq.Name.
 func IoctlSetIfreqMTU(fd int, ifreq *IfreqMTU) error {
-	err := ioctl(fd, SIOCSIFMTU, uintptr(unsafe.Pointer(ifreq)))
-	runtime.KeepAlive(ifreq)
-	return err
+	return ioctlPtr(fd, SIOCSIFMTU, unsafe.Pointer(ifreq))
 }
 
 //sys	sysctl(mib []_C_int, old *byte, oldlen *uintptr, new *byte, newlen uintptr) (err error) = SYS_SYSCTL

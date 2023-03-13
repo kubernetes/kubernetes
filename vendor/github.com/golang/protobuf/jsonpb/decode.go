@@ -386,8 +386,14 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 }
 
 func isSingularWellKnownValue(fd protoreflect.FieldDescriptor) bool {
+	if fd.Cardinality() == protoreflect.Repeated {
+		return false
+	}
 	if md := fd.Message(); md != nil {
-		return md.FullName() == "google.protobuf.Value" && fd.Cardinality() != protoreflect.Repeated
+		return md.FullName() == "google.protobuf.Value"
+	}
+	if ed := fd.Enum(); ed != nil {
+		return ed.FullName() == "google.protobuf.NullValue"
 	}
 	return false
 }
