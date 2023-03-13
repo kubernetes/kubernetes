@@ -17,7 +17,7 @@ limitations under the License.
 package apply
 
 import (
-	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -61,9 +61,14 @@ const (
 	ApplySetGRsAnnotation = "applyset.k8s.io/contains-group-resources"
 
 	// ApplySetParentIDLabel is the key of the label that makes object an ApplySet parent object.
-	// Its value MUST be the base64 encoding of the hash of the GKNN of the object it is on,
-	// in the form base64(sha256(<name>.<namespace>.<kind>.<group>)), using the URL safe encoding of RFC4648.
+	// Its value MUST use the format specified in V1ApplySetIdFormat below
 	ApplySetParentIDLabel = "applyset.k8s.io/id"
+
+	// V1ApplySetIdFormat is the format required for the value of ApplySetParentIDLabel (and ApplysetPartOfLabel).
+	// The %s segment is the unique ID of the object itself, which MUST be the base64 encoding
+	// (using the URL safe encoding of RFC4648) of the hash of the GKNN of the object it is on, in the form:
+	// base64(sha256(<name>.<namespace>.<kind>.<group>)).
+	V1ApplySetIdFormat = "applyset-%s-v1"
 
 	// ApplysetPartOfLabel is the key of the label which indicates that the object is a member of an ApplySet.
 	// The value of the label MUST match the value of ApplySetParentIDLabel on the parent object.
@@ -147,20 +152,13 @@ const applySetIDPartDelimiter = "."
 
 // ID is the label value that we are using to identify this applyset.
 // Format: base64(sha256(<name>.<namespace>.<kind>.<group>)), using the URL safe encoding of RFC4648.
+
 func (a ApplySet) ID() string {
-	var unencoded string
-	if a.parentRef.IsNamespaced() {
-		unencoded = strings.Join([]string{a.parentRef.Name, a.parentRef.Namespace, a.parentRef.GroupVersionKind.Kind, a.parentRef.GroupVersionKind.Group}, applySetIDPartDelimiter)
-	} else {
-		unencoded = strings.Join([]string{a.parentRef.Name, a.parentRef.GroupVersionKind.Kind, a.parentRef.GroupVersionKind.Group}, applySetIDPartDelimiter)
-	}
-	w := bytes.Buffer{}
-	encoder := base64.NewEncoder(base64.URLEncoding, &w)
-	_, err := encoder.Write([]byte(unencoded))
-	if err != nil {
-		klog.Fatalf("failed to encode parent ID %s: %w", unencoded, err)
-	}
-	return w.String()
+	unencoded := strings.Join([]string{a.parentRef.Name, a.parentRef.Namespace, a.parentRef.GroupVersionKind.Kind, a.parentRef.GroupVersionKind.Group}, applySetIDPartDelimiter)
+	hashed := sha256.Sum256([]byte(unencoded))
+	b64 := base64.RawURLEncoding.EncodeToString(hashed[:])
+	// Label values must start and end with alphanumeric values, so add a known-safe prefix and suffix.
+	return fmt.Sprintf(V1ApplySetIdFormat, b64)
 }
 
 // Validate imposes restrictions on the parent object that is used to track the applyset.
