@@ -126,12 +126,10 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
 				time.Millisecond, // Node monitor period
-				1,                // Pod eviction timeout
 				100,              // Eviction limiter QPS
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
-				true,             // Run taint manager
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
@@ -279,12 +277,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
 				time.Millisecond, // Node monitor period
-				time.Second,      // Pod eviction timeout
 				100,              // Eviction limiter QPS
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
-				true,             // Run taint manager
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)

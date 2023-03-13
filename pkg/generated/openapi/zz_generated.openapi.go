@@ -52554,13 +52554,6 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 				Description: "NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"EnableTaintManager": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
 					"NodeEvictionRate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy",
@@ -52615,7 +52608,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 						},
 					},
 				},
-				Required: []string{"EnableTaintManager", "NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
 			},
 		},
 		Dependencies: []string{

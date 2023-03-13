@@ -383,9 +383,6 @@ type NodeIPAMControllerConfiguration struct {
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
-	// If set to true enables NoExecute Taints and will evict all not-tolerating
-	// Pod running on Nodes tainted with this kind of Taints.
-	EnableTaintManager *bool
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
 	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
