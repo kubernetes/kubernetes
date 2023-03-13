@@ -1,10 +1,12 @@
-module k8s.io/kms/plugins/mock
+// This is a generated file. Do not edit directly.
 
-go 1.19
+module k8s.io/kms/internal/plugins/mock
+
+go 1.20
 
 require (
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/kms v0.0.0-00010101000000-000000000000
+	k8s.io/kms v0.0.0
 )
 
 require (
@@ -23,7 +25,9 @@ require (
 )
 
 replace (
+	k8s.io/api => ../../../../api
 	k8s.io/apimachinery => ../../../../apimachinery
 	k8s.io/client-go => ../../../../client-go
 	k8s.io/kms => ../../../../kms
+	k8s.io/kms/internal/plugins/mock => ../../../../kms/internal/plugins/mock
 )

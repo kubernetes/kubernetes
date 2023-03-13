@@ -608,7 +608,10 @@ EOF
 function kube::util::list_staging_repos() {
   (
     cd "${KUBE_ROOT}/staging/src/k8s.io" && \
-    find . -mindepth 1 -maxdepth 1 -type d | cut -c 3- | sort
+    find . -type f -name go.mod \
+        | xargs dirname \
+        | cut -c 3- \
+        | sort
   )
 }
 

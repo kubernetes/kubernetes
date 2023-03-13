@@ -238,8 +238,9 @@ for repo in $(kube::util::list_staging_repos); do
         | while read -r X; do echo "-droprequire k8s.io/${X}"; done \
         | xargs -L 100 go mod edit
     # rewrite `replace` directives for staging components to point to peer directories
+    rel_root="$(realpath "${KUBE_ROOT}/staging/src/k8s.io" --relative-to .)"
     kube::util::list_staging_repos \
-        | while read -r X; do echo "-replace k8s.io/${X}=../${X}"; done \
+        | while read -r X; do echo "-replace k8s.io/${X}=${rel_root}/${X}"; done \
         | xargs -L 100 go mod edit
   popd >/dev/null 2>&1
 done
@@ -265,8 +266,8 @@ while IFS= read -r repo; do
 
   pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
     # save the original go.mod, since go list doesn't just add missing entries, it also removes specific required versions from it
-    tmp_go_mod="${TMP_DIR}/tidy_${repo/\//_}_go.mod.original"
-    tmp_go_deps="${TMP_DIR}/tidy_${repo/\//_}_deps.txt"
+    tmp_go_mod="${TMP_DIR}/tidy_${repo//\//_}_go.mod.original"
+    tmp_go_deps="${TMP_DIR}/tidy_${repo//\//_}_deps.txt"
     cp go.mod "${tmp_go_mod}"
 
     {
@@ -389,8 +390,11 @@ go mod vendor >>"${LOG_FILE}" 2>&1
 # create a symlink in vendor directory pointing to the staging components.
 # This lets other packages and tools use the local staging components as if they were vendored.
 for repo in $(kube::util::list_staging_repos); do
-  rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-  ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
+  # ignore repos which are sub-modules
+  if [[ ! "${repo}" =~ "/" ]]; then
+    rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
+    ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
+  fi
 done
 
 kube::log::status "vendor: updating vendor/LICENSES"
