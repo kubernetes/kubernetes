@@ -63,11 +63,9 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
-var kubeletConfigFile string
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate. Deprecated, see: --kubelet-config-file.")
-	flag.StringVar(&kubeletConfigFile, "kubelet-config-file", "./kubeletconfig.yaml", "The base KubeletConfiguration to use when setting up the kubelet. This configuration will then be minimially modified to support requirements from the test suite.")
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
@@ -176,6 +174,11 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		return nil, err
 	}
 
+	kubeletConfigFile := "./kubeletconfig.yaml"
+	lookup := flag.Lookup("kubelet-config-file")
+	if lookup != nil {
+		kubeletConfigFile = lookup.Value.String()
+	}
 	kc, err := baseKubeConfiguration(kubeletConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load base kubelet configuration: %w", err)

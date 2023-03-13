@@ -28,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e_node/system"
-
 	"k8s.io/klog/v2"
 )
 
@@ -45,10 +43,6 @@ var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any i
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
-var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
-var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 var (
 	arc Archive
 )
@@ -58,6 +52,14 @@ type Archive struct {
 	sync.Once
 	path string
 	err  error
+}
+
+func getFlag(name string) string {
+	lookup := flag.Lookup(name)
+	if lookup == nil {
+		return ""
+	}
+	return lookup.Value.String()
 }
 
 func RunRemoteTestSuite(testSuite TestSuite) {
@@ -78,7 +80,9 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		CreateTestArchive(testSuite, *systemSpecName, *kubeletConfigFile)
+		CreateTestArchive(testSuite,
+			getFlag("system-spec-name"),
+			getFlag("kubelet-config-file"))
 		return
 	}
 
@@ -97,9 +101,9 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 		DeleteInstances:    *deleteInstances,
 		Cleanup:            *cleanup,
 		TestArgs:           *testArgs,
-		ExtraEnvs:          *extraEnvs,
-		RuntimeConfig:      *runtimeConfig,
-		SystemSpecName:     *systemSpecName,
+		ExtraEnvs:          getFlag("extra-envs"),
+		RuntimeConfig:      getFlag("runtime-config"),
+		SystemSpecName:     getFlag("system-spec-name"),
 	}
 
 	var sshRunner Runner
@@ -197,7 +201,11 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive(suite TestSuite) (string, error) {
-	a.Do(func() { a.path, a.err = CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile) })
+	a.Do(func() {
+		a.path, a.err = CreateTestArchive(suite,
+			getFlag("system-spec-name"),
+			getFlag("kubelet-config-file"))
+	})
 	return a.path, a.err
 }
 
