@@ -17,11 +17,13 @@ limitations under the License.
 package discovery
 
 import (
+	"encoding/json"
 	"fmt"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 // StaleGroupVersionError encasulates failed GroupVersion marked "stale"
@@ -93,6 +95,8 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
 			if v.Resources.ResponseKind == nil {
+				a, _ := json.Marshal(v.Resources)
+				klog.Infof("ResourceManager no ResponseKind: %s\n", a)
 				continue
 			}
 			resource := convertAPIResource(r)
