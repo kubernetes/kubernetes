@@ -142,9 +142,13 @@ func (p *TextParser) reset(in io.Reader) {
 func (p *TextParser) startOfLine() stateFn {
 	p.lineCount++
 	if p.skipBlankTab(); p.err != nil {
-		// End of input reached. This is the only case where
-		// that is not an error but a signal that we are done.
-		p.err = nil
+		// This is the only place that we expect to see io.EOF,
+		// which is not an error but the signal that we are done.
+		// Any other error that happens to align with the start of
+		// a line is still an error.
+		if p.err == io.EOF {
+			p.err = nil
+		}
 		return nil
 	}
 	switch p.currentByte {

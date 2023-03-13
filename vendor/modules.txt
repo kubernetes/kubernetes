@@ -463,7 +463,7 @@ github.com/lithammer/dedent
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/matttproud/golang_protobuf_extensions v1.0.2
+# github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
@@ -612,8 +612,8 @@ github.com/prometheus/client_golang/prometheus/testutil/promlint
 # github.com/prometheus/client_model v0.3.0
 ## explicit; go 1.9
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.37.0
-## explicit; go 1.16
+# github.com/prometheus/common v0.42.0
+## explicit; go 1.18
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
@@ -959,7 +959,6 @@ golang.org/x/mod/semver
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/context
-golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
@@ -972,8 +971,8 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
-## explicit; go 1.11
+# golang.org/x/oauth2 v0.5.0
+## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
 golang.org/x/oauth2/google

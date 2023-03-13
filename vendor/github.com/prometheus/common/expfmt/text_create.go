@@ -17,7 +17,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
@@ -44,7 +43,7 @@ const (
 var (
 	bufPool = sync.Pool{
 		New: func() interface{} {
-			return bufio.NewWriter(ioutil.Discard)
+			return bufio.NewWriter(io.Discard)
 		},
 	}
 	numBufPool = sync.Pool{

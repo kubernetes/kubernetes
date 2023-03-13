@@ -57,7 +57,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.3.0
-	github.com/prometheus/common v0.37.0
+	github.com/prometheus/common v0.42.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.6.0
 	github.com/spf13/pflag v1.0.5
@@ -78,7 +78,7 @@ require (
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.7.0
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/oauth2 v0.5.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.5.0
 	golang.org/x/term v0.5.0
@@ -188,7 +188,7 @@ require (
 	github.com/karrick/godirwalk v1.17.0 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
 	github.com/mitchellh/go-wordwrap v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
