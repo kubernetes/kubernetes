@@ -258,6 +258,8 @@ type NodeTestContextType struct {
 	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
+	// StandaloneMode indicates whether the test is running kubelet in a standalone mode.
+	StandaloneMode bool
 }
 
 // CloudConfig holds the cloud configuration for e2e test suites.
