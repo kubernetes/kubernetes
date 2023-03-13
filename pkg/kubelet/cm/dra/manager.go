@@ -289,3 +289,24 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 func (m *ManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return m.cache.hasPodReference(UID)
 }
+
+// GetCongtainerClaimInfos gets Container's ClaimInfo
+func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
+	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
+
+	for i, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+
+		for _, claim := range container.Resources.Claims {
+			if podResourceClaim.Name != claim.Name {
+				continue
+			}
+			claimInfo := m.cache.get(claimName, pod.Namespace)
+			if claimInfo == nil {
+				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
+			}
+			claimInfos = append(claimInfos, claimInfo)
+		}
+	}
+	return claimInfos, nil
+}

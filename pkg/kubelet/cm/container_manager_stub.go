@@ -159,6 +159,10 @@ func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.Contai
 	return nil
 }
 
+func (cm *containerManagerStub) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	return nil
+}
+
 func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
