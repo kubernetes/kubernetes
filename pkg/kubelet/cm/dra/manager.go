@@ -122,6 +122,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				// Create a claimInfo object to store the relevant claim info.
 				claimInfo := newClaimInfo(
 					resourceClaim.Status.DriverName,
+					resourceClaim.Spec.ResourceClassName,
 					resourceClaim.UID,
 					resourceClaim.Name,
 					resourceClaim.Namespace,

@@ -134,7 +134,6 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
 			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
 
-
 			providers := PodResourcesProviders{
 				Pods:    mockPodsProvider,
 				Devices: mockDevicesProvider,

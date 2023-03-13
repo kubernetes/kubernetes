@@ -57,9 +57,10 @@ type claimInfoCache struct {
 	claimInfo map[string]*claimInfo
 }
 
-func newClaimInfo(driverName string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string]) *claimInfo {
+func newClaimInfo(driverName, className string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string]) *claimInfo {
 	claimInfoState := state.ClaimInfoState{
 		DriverName: driverName,
+		ClassName:  className,
 		ClaimUID:   claimUID,
 		ClaimName:  claimName,
 		Namespace:  namespace,
@@ -110,6 +111,7 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 	for _, entry := range curState {
 		info := newClaimInfo(
 			entry.DriverName,
+			entry.ClassName,
 			entry.ClaimUID,
 			entry.ClaimName,
 			entry.Namespace,
