@@ -335,8 +335,6 @@ function upload-tars() {
       gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
     fi
 
-    gsutil retention clear "${staging_bucket}"
-
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
 
     echo "+++ Staging tars to Google Storage: ${staging_path}"
