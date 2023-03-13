@@ -383,7 +383,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
 	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.groupPriority, info.versionPriority)
-	return nil
+	return err
 }
 
 // Spwans a goroutune which waits for added/updated apiservices and updates
