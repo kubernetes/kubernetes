@@ -687,19 +687,19 @@ func dropDisabledMatchLabelKeysField(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledDisruptionPolicyField removes disabled fields from PodSpec related
 // to DisruptionPolicy only if it is not already used by the old spec.
 func dropDisabledDisruptionPolicyField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisruptionPolicyInPriorityClass) && !podPriorityInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisruptionPolicyInPriorityClass) && !podDisruptionPolicyInUse(oldPodSpec) {
 		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
 		podSpec.DisruptionPolicy = nil
 	}
 }
 
-// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
-func podPriorityInUse(podSpec *api.PodSpec) bool {
+// podDisruptionPolicyInUse returns true if the pod spec is non-nil and has DisruptionPolicy set.
+func podDisruptionPolicyInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
+	if podSpec.DisruptionPolicy != nil {
 		return true
 	}
 	return false
