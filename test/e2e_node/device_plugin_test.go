@@ -65,12 +65,15 @@ func readDaemonSetV1OrDie(objBytes []byte) *appsv1.DaemonSet {
 	return requiredObj.(*appsv1.DaemonSet)
 }
 
+const (
+	// TODO(vikasc): Instead of hard-coding number of devices, provide number of devices in the sample-device-plugin using configmap
+	// and then use the same here
+	expectedSampleDevsAmount int64 = 2
+)
+
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
-		// TODO(vikasc): Instead of hard-coding number of devices, provide number of devices in the sample-device-plugin using configmap
-		// and then use the same here
-		devsLen := int64(2)
 		var devicePluginPod, dptemplate *v1.Pod
 
 		ginkgo.BeforeEach(func() {
@@ -93,12 +96,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 
-			ginkgo.By("Waiting for the resource exported by the sample device plugin to become available on the local node")
+			ginkgo.By(fmt.Sprintf("Waiting for the resource exported by the sample device plugin to become available on the local node (instances: %d)", expectedSampleDevsAmount))
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
 				return ready &&
-					CountSampleDeviceCapacity(node) == devsLen &&
-					CountSampleDeviceAllocatable(node) == devsLen
+					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
+					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 		})
 
@@ -254,8 +257,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(func() bool {
 				node, ready := getLocalTestNode(f)
 				return ready &&
-					CountSampleDeviceCapacity(node) == devsLen &&
-					CountSampleDeviceAllocatable(node) == devsLen
+					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
+					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Creating another pod")
