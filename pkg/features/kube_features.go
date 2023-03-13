@@ -83,6 +83,12 @@ const (
 	// Enable ClusterTrustBundle objects and Kubelet integration.
 	ClusterTrustBundle featuregate.Feature = "ClusterTrustBundle"
 
+	// owner: @ahmedtd
+	// alpha: v1.28
+	//
+	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
+	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
+
 	// owner: @szuecs
 	// alpha: v1.12
 	//
@@ -995,6 +1001,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.Beta},
 
 	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
+
+	ClusterTrustBundleProjection: {Default: false, PreRelease: featuregate.Alpha},
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
