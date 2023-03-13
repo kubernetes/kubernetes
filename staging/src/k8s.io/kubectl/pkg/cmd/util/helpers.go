@@ -427,6 +427,7 @@ type FeatureGate string
 const (
 	ApplySet         FeatureGate = "KUBECTL_APPLYSET"
 	ExplainOpenapiV3 FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
+	KubeRc           FeatureGate = "KUBECTL_KUBERC"
 )
 
 func (f FeatureGate) IsEnabled() bool {

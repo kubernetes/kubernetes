@@ -327,7 +327,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags
 	}
-	if os.Getenv("ENABLE_KUBERC") != "" {
+	if cmdutil.KubeRc.IsEnabled() {
 		klog.Infoln("kuberc is enabled!")
 		if o.KubercHandler != nil {
 			o.KubercHandler.InjectOverridesRoot(kubeConfigFlags, o.Arguments)
@@ -456,7 +456,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// If the alpha feature of kuberc is enabled then render new command
 	// args using the defined values in the kuberc config file, and
 	// overwrite the args stored in the KubectlOptions object.
-	if os.Getenv("ENABLE_KUBERC") != "" {
+	if cmdutil.KubeRc.IsEnabled() {
 		if o.KubercHandler != nil {
 			// TODO: Determine how to protect against flags that can be supplied multiple times
 			// inheritence for flags is as follows, in ascending order of hierachy:
