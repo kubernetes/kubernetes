@@ -385,45 +385,6 @@ func limitRequestRatioConstraint(limitType string, resourceName string, enforced
 	return nil
 }
 
-// sum takes the total of each named resource across all inputs
-// if a key is not in each input, then the output resource list will omit the key
-func sum(inputs []api.ResourceList) api.ResourceList {
-	result := api.ResourceList{}
-	keys := []api.ResourceName{}
-	for i := range inputs {
-		for k := range inputs[i] {
-			keys = append(keys, k)
-		}
-	}
-	for _, key := range keys {
-		total, isSet := int64(0), true
-
-		for i := range inputs {
-			input := inputs[i]
-			v, exists := input[key]
-			if exists {
-				if key == api.ResourceCPU {
-					total = total + v.MilliValue()
-				} else {
-					total = total + v.Value()
-				}
-			} else {
-				isSet = false
-			}
-		}
-
-		if isSet {
-			if key == api.ResourceCPU {
-				result[key] = *(resource.NewMilliQuantity(total, resource.DecimalSI))
-			} else {
-				result[key] = *(resource.NewQuantity(total, resource.DecimalSI))
-			}
-
-		}
-	}
-	return result
-}
-
 // DefaultLimitRangerActions is the default implementation of LimitRangerActions.
 type DefaultLimitRangerActions struct{}
 
