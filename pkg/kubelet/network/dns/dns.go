@@ -71,19 +71,19 @@ type Configurer struct {
 	// The path to the DNS resolver configuration file used as the base to generate
 	// the container's DNS resolver configuration file. This can be used in
 	// conjunction with clusterDomain and clusterDNS.
-	ResolverConfig string
+	ResolverConfigPath string
 }
 
 // NewConfigurer returns a DNS configurer for launching pods.
-func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
+func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfigPath string) *Configurer {
 	return &Configurer{
-		recorder:         recorder,
-		getHostDNSConfig: getHostDNSConfig,
-		nodeRef:          nodeRef,
-		nodeIPs:          nodeIPs,
-		clusterDNS:       clusterDNS,
-		ClusterDomain:    clusterDomain,
-		ResolverConfig:   resolverConfig,
+		recorder:           recorder,
+		getHostDNSConfig:   getHostDNSConfig,
+		nodeRef:            nodeRef,
+		nodeIPs:            nodeIPs,
+		clusterDNS:         clusterDNS,
+		ClusterDomain:      clusterDomain,
+		ResolverConfigPath: resolverConfigPath,
 	}
 }
 
@@ -180,7 +180,7 @@ func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod
 
 // CheckLimitsForResolvConf checks limits in resolv.conf.
 func (c *Configurer) CheckLimitsForResolvConf() {
-	f, err := os.Open(c.ResolverConfig)
+	f, err := os.Open(c.ResolverConfigPath)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
 		klog.V(4).InfoS("Check limits for resolv.conf failed at file open", "err", err)
@@ -205,7 +205,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	}
 
 	if len(hostSearch) > domainCountLimit {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfig, domainCountLimit)
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfigPath, domainCountLimit)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 		klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 		return
@@ -213,7 +213,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 
 	for _, search := range hostSearch {
 		if len(search) > utilvalidation.DNS1123SubdomainMaxLength {
-			log := fmt.Sprintf("Resolv.conf file %q contains a search path which length is more than allowed %d chars!", c.ResolverConfig, utilvalidation.DNS1123SubdomainMaxLength)
+			log := fmt.Sprintf("Resolv.conf file %q contains a search path which length is more than allowed %d chars!", c.ResolverConfigPath, utilvalidation.DNS1123SubdomainMaxLength)
 			c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 			klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 			return
@@ -221,7 +221,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	}
 
 	if len(strings.Join(hostSearch, " ")) > maxDNSSearchListChars {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, maxDNSSearchListChars)
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfigPath, maxDNSSearchListChars)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 		klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 		return
@@ -364,7 +364,7 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	dnsConfig, err := c.getHostDNSConfig(c.ResolverConfig)
+	dnsConfig, err := c.getHostDNSConfig(c.ResolverConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 		// "nameservers" are not specified is to "use the nameserver on the
 		// local machine". A nameserver setting of localhost is equivalent to
 		// this documented behavior.
-		if c.ResolverConfig == "" {
+		if c.ResolverConfigPath == "" {
 			for _, nodeIP := range c.nodeIPs {
 				if utilnet.IsIPv6(nodeIP) {
 					dnsConfig.Servers = append(dnsConfig.Servers, "::1")
@@ -435,8 +435,8 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 	for _, dns := range c.clusterDNS {
 		dnsString = dnsString + fmt.Sprintf("nameserver %s\n", dns)
 	}
-	if c.ResolverConfig != "" {
-		f, err := os.Open(c.ResolverConfig)
+	if c.ResolverConfigPath != "" {
+		f, err := os.Open(c.ResolverConfigPath)
 		if err != nil {
 			klog.ErrorS(err, "Could not open resolverConf file")
 		} else {

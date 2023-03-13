@@ -2125,7 +2125,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 	// Responsible for checking limits in resolv.conf
 	// The limits do not have anything to do with individual pods
 	// Since this is called in syncLoop, we don't need to call it anywhere else
-	if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+	if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfigPath != "" {
 		kl.dnsConfigurer.CheckLimitsForResolvConf()
 	}
 
