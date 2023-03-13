@@ -606,7 +606,7 @@ func preparePod(pod *v1.Pod) {
 	}
 }
 
-var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() {
+var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle ", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
