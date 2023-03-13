@@ -121,10 +121,10 @@ var (
 
 	whoAmIExample = templates.Examples(`
 		# Get your subject attributes.
-		kubectl alpha auth whoami
+		kubectl auth whoami
 		
 		# Get your subject attributes in JSON format.
-		kubectl alpha auth whoami -o json
+		kubectl auth whoami -o json
 	`)
 )
 
