@@ -32,6 +32,8 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
 )
 
+const PluginClientTimeout = 10 * time.Second
+
 type Client interface {
 	NodePrepareResource(
 		ctx context.Context,
@@ -132,7 +134,7 @@ func (r *draPluginClient) NodePrepareResource(
 		ResourceHandle: resourceHandle,
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
 	defer cancel()
 
 	return nodeClient.NodePrepareResource(ctx, req)
@@ -169,7 +171,7 @@ func (r *draPluginClient) NodeUnprepareResource(
 		CdiDevices: cdiDevices,
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
 	defer cancel()
 
 	return nodeClient.NodeUnprepareResource(ctx, req)
