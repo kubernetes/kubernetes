@@ -2723,7 +2723,7 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
-// PersistentVolumeClaimCondition contails details about state of pvc
+// PersistentVolumeClaimCondition contains details about state of pvc
 message PersistentVolumeClaimCondition {
   optional string type = 1;
 
