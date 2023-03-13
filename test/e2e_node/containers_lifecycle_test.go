@@ -698,7 +698,6 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 			results = parseOutput(podSpec)
 		})
 
-
 		ginkgo.It("should run the first init container to completion before starting first sidecar", func() {
 			framework.ExpectNoError(results.StartsBefore(init1, sidecar1))
 			framework.ExpectNoError(results.ExitsBefore(init1, sidecar1))
@@ -793,7 +792,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		ginkgo.When("a sidecar fails to start because of a bad image", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */ })
 			// this is different from restartPolicy=Never
 			ginkgo.It("should restart a sidecar", func() {})
 			ginkgo.It("should not start a regular container", func() {})
@@ -820,13 +819,13 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		ginkgo.When("an Init container before sidecar continuously fails", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */ })
 			ginkgo.It("should have Init container restartCount greater than 0", func() {})
 			ginkgo.It("should not start sidecar", func() {})
 		})
 
 		ginkgo.When("an Init container after sidecar fails", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */ })
 			ginkgo.It("should have Init container restartCount greater than 0", func() {})
 			// TODO: how will we be able to test it if sidecar will never fail and there will be no termination log? Or will be?
 			ginkgo.It("should be running sidecar and a failed Init container in parallel", func() {})
@@ -845,7 +844,7 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		ginkgo.When("a sidecar fails to start because of a bad image", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending and produce log", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending and produce log", func() { /* check the restartCount > 5 */ })
 			// this is different from restartPolicy=Never
 			ginkgo.It("should restart a sidecar", func() {})
 			ginkgo.It("should not start a regular container", func() {})
@@ -871,13 +870,13 @@ var _ = SIGDescribe("[Feature:SidecarContainers] Containers Lifecycle ", func() 
 		})
 
 		ginkgo.When("an Init container before sidecar continuously fails", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */ })
 			ginkgo.It("should have Init container restartCount greater than 0", func() {})
 			ginkgo.It("should not start sidecar", func() {})
 		})
 
 		ginkgo.When("an Init container after sidecar fails", ginkgo.Ordered, func() {
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */})
+			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */ })
 			ginkgo.It("should have Init container restartCount greater than 0", func() {})
 			// TODO: how will we be able to test it if sidecar will never fail and there will be no termination log? Or will be?
 			ginkgo.It("should be running sidecar and a failed Init container in parallel", func() {})
