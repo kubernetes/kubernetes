@@ -373,6 +373,7 @@ func (dsc *DaemonSetsController) addHistory(obj interface{}) {
 			return
 		}
 		klog.V(4).Infof("ControllerRevision %s added.", history.Name)
+		dsc.enqueueDaemonSet(ds)
 		return
 	}
 
