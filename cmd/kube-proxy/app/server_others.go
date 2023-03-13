@@ -101,7 +101,7 @@ func newProxyServer(
 		return nil, err
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, err := createClient(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,6 @@ func newProxyServer(
 
 	return &ProxyServer{
 		Client:                 client,
-		EventClient:            eventClient,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,

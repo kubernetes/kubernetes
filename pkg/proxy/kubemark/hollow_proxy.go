@@ -125,7 +125,6 @@ func NewHollowProxyOrDie(
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
 			Client:           client,
-			EventClient:      eventClient,
 			Proxier:          proxier,
 			Broadcaster:      broadcaster,
 			Recorder:         recorder,

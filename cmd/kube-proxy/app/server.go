@@ -48,7 +48,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -524,7 +523,6 @@ with the apiserver API to configure the proxy.`,
 // fields are required.
 type ProxyServer struct {
 	Client                 clientset.Interface
-	EventClient            v1core.EventsGetter
 	Proxier                proxy.Provider
 	Broadcaster            events.EventBroadcaster
 	Recorder               events.EventRecorder
@@ -541,9 +539,9 @@ type ProxyServer struct {
 	localDetectorMode      kubeproxyconfig.LocalMode
 }
 
-// createClients creates a kube client and an event client from the given config and masterOverride.
+// createClient creates a kube client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClient(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, error) {
 	var kubeConfig *rest.Config
 	var err error
 
@@ -558,7 +556,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 			&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
@@ -568,15 +566,10 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 
 	client, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	eventClient, err := clientset.NewForConfig(kubeConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return client, eventClient.CoreV1(), nil
+	return client, nil
 }
 
 func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
@@ -659,7 +652,7 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	if s.Broadcaster != nil && s.EventClient != nil {
+	if s.Broadcaster != nil {
 		stopCh := make(chan struct{})
 		s.Broadcaster.StartRecordingToSink(stopCh)
 	}
