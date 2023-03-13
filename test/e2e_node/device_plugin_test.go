@@ -138,7 +138,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			v1alphaPodResources, err := getV1alpha1NodeDevices()
 			framework.ExpectNoError(err)
@@ -194,7 +194,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -226,6 +226,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
+
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -268,7 +270,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			devID2, err := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod2.Name)
 
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal(devID2)))
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal(devID2)), "pod2 requested a device but started successfully without")
 		})
 	})
 }
