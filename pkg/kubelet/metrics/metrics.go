@@ -776,19 +776,16 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(OrphanedRuntimePodTotal)
 		legacyregistry.MustRegister(RestartedPodTotal)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
-			legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
-			}
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+			legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
