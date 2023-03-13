@@ -35,9 +35,8 @@ import (
 // ConformanceRemote contains the specific functions in the node conformance test suite.
 type ConformanceRemote struct{}
 
-// InitConformanceRemote initializes the node conformance test suite.
-func InitConformanceRemote() TestSuite {
-	return &ConformanceRemote{}
+func init() {
+	RegisterTestSuite("conformance", &ConformanceRemote{})
 }
 
 // getConformanceDirectory gets node conformance test build directory.
