@@ -1843,7 +1843,7 @@ func TestReconcileTopology(t *testing.T) {
 
 			service := svc.DeepCopy()
 			service.Annotations = map[string]string{
-				corev1.AnnotationTopologyAwareHints: tc.hintsAnnotation,
+				corev1.DeprecatedAnnotationTopologyAwareHints: tc.hintsAnnotation,
 			}
 			r.reconcile(service, tc.pods, tc.existingSlices, time.Now())
 
