@@ -51,9 +51,9 @@ type ClaimInfoState struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
-	// CdiDevices is a list of CDI devices returned by the
+	// CDIDevices is a map of KubeletPluginName --> CDI devices returned by the
 	// GRPC API call NodePrepareResource
-	CdiDevices []string
+	CDIDevices map[string][]string
 }
 
 type stateCheckpoint struct {

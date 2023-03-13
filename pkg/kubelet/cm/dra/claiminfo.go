@@ -57,27 +57,37 @@ type claimInfoCache struct {
 	claimInfo map[string]*claimInfo
 }
 
-func newClaimInfo(driverName string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string], cdiDevice []string) (*claimInfo, error) {
+func newClaimInfo(driverName string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string]) *claimInfo {
 	claimInfoState := state.ClaimInfoState{
 		DriverName: driverName,
 		ClaimUID:   claimUID,
 		ClaimName:  claimName,
 		Namespace:  namespace,
 		PodUIDs:    podUIDs,
-		CdiDevices: cdiDevice,
-	}
-	// NOTE: Passing CDI device names as annotations is a temporary solution
-	// It will be removed after all runtimes are updated
-	// to get CDI device names from the ContainerConfig.CDIDevices field
-	annotations, err := generateCDIAnnotations(claimUID, driverName, cdiDevice)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate container annotations, err: %+v", err)
 	}
 	claimInfo := claimInfo{
 		ClaimInfoState: claimInfoState,
-		annotations:    annotations,
 	}
-	return &claimInfo, nil
+	return &claimInfo
+}
+
+func (info *claimInfo) addCDIDevices(pluginName string, cdiDevices []string) error {
+	// NOTE: Passing CDI device names as annotations is a temporary solution
+	// It will be removed after all runtimes are updated
+	// to get CDI device names from the ContainerConfig.CDIDevices field
+	annotations, err := generateCDIAnnotations(info.ClaimUID, info.DriverName, cdiDevices)
+	if err != nil {
+		return fmt.Errorf("failed to generate container annotations, err: %+v", err)
+	}
+
+	if info.CDIDevices == nil {
+		info.CDIDevices = make(map[string][]string)
+	}
+
+	info.CDIDevices[pluginName] = cdiDevices
+	info.annotations = append(info.annotations, annotations...)
+
+	return nil
 }
 
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
@@ -98,16 +108,18 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 	}
 
 	for _, entry := range curState {
-		info, err := newClaimInfo(
+		info := newClaimInfo(
 			entry.DriverName,
 			entry.ClaimUID,
 			entry.ClaimName,
 			entry.Namespace,
 			entry.PodUIDs,
-			entry.CdiDevices,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create claimInfo %+v: %+v", info, err)
+		for pluginName, cdiDevices := range entry.CDIDevices {
+			err := info.addCDIDevices(pluginName, cdiDevices)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add CDIDevices to claimInfo %+v: %+v", info, err)
+			}
 		}
 		cache.add(info)
 	}
