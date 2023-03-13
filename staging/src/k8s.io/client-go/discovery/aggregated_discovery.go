@@ -23,6 +23,7 @@ import (
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 // StaleGroupVersionError encasulates failed GroupVersion marked "stale"
@@ -77,7 +78,7 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 	failedGVs := map[schema.GroupVersion]error{}
 	group.Name = g.ObjectMeta.Name
 	b, _ := json.Marshal(g)
-	fmt.Printf("resourceGVList: %s\n", b)
+	klog.Warningf("resourceGVList: %s\n", b)
 
 	for _, v := range g.Versions {
 		gv := schema.GroupVersion{Group: g.Name, Version: v.Version}
@@ -96,9 +97,9 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		a, _ := json.Marshal(v)
-		fmt.Printf("resourceList: %s\n", a)
+		klog.Warningf("resourceList: %s\n", a)
 		for _, r := range v.Resources {
-			fmt.Printf("resource: %s\n", r.Resource)
+			klog.Warningf("resource: %s\n", r.Resource)
 			resource := convertAPIResource(r)
 			resourceList.APIResources = append(resourceList.APIResources, resource)
 			// Subresources field in new format get transformed into full APIResources.
