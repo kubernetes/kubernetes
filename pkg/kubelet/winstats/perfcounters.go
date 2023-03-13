@@ -32,9 +32,9 @@ const (
 	cpuQuery                  = "\\Processor(_Total)\\% Processor Time"
 	memoryPrivWorkingSetQuery = "\\Process(_Total)\\Working Set - Private"
 	memoryCommittedBytesQuery = "\\Memory\\Committed Bytes"
-	// Perf counters are updated every second. This is the same as the default cadvisor collection period
-	// see https://github.com/google/cadvisor/blob/master/docs/runtime_options.md#housekeeping
-	perfCounterUpdatePeriod = 1 * time.Second
+	// Perf counters are updated 10 seconds. This is the same as the default cadvisor housekeeping interval
+	// set at https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cadvisor/cadvisor_linux.go
+	perfCounterUpdatePeriod = 10 * time.Second
 	// defaultCachePeriod is the default cache period for each cpuUsage.
 	// This matches with the cadvisor setting and the time interval we use for containers.
 	// see https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cadvisor/cadvisor_linux.go#L63
