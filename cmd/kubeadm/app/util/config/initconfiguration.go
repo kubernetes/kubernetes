@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -117,10 +118,8 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
 	} else {
 		if !strings.HasPrefix(cfg.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme) {
-			klog.Warningf("Usage of CRI endpoints without URL scheme is deprecated and can cause kubelet errors "+
-				"in the future. Automatically prepending scheme %q to the \"criSocket\" with value %q. "+
-				"Please update your configuration!", kubeadmapiv1.DefaultContainerRuntimeURLScheme, cfg.CRISocket)
-			cfg.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + cfg.CRISocket
+			return fmt.Errorf("the CRI endpoints %s has no prefix of URL scheme %q, and this is deprecated and can cause kubelet errors in the future",
+				cfg.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 		}
 	}
 
