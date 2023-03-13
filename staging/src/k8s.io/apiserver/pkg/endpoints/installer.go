@@ -17,6 +17,7 @@ limitations under the License.
 package endpoints
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -47,6 +48,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -70,6 +72,8 @@ type action struct {
 }
 
 func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscoveryv2beta1.APIResourceDiscovery, error) {
+	a, _ := json.Marshal(list)
+	klog.Infof("DiscoveryManager resourceList: %s", a)
 	var apiResourceList []apidiscoveryv2beta1.APIResourceDiscovery
 	parentResources := make(map[string]int)
 
@@ -123,6 +127,7 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 
 		parentidx, exists := parentResources[split[0]]
 		if !exists {
+			klog.Infof("DiscoveryManager no parent for subresource %s", split[1])
 			// If a subresource exists without a parent, create a parent
 			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
 				Resource: split[0],
