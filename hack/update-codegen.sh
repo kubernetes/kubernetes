@@ -898,8 +898,8 @@ function codegen::subprojects() {
         vendor/k8s.io/kube-aggregator
         vendor/k8s.io/sample-apiserver
         vendor/k8s.io/sample-controller
-        vendor/k8s.io/apiextensions-apiserver
         vendor/k8s.io/metrics
+        vendor/k8s.io/apiextensions-apiserver
         vendor/k8s.io/apiextensions-apiserver/examples/client-go
     )
 

@@ -28,6 +28,12 @@ kube::codegen::gen_helpers \
     --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 
+kube::codegen::gen_openapi \
+    --input-pkg-root k8s.io/kube-aggregator/pkg/apis \
+    --output-pkg-root k8s.io/kube-aggregator/pkg/generated \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
 kube::codegen::gen_client \
     --with-watch \
     --input-pkg-root k8s.io/kube-aggregator/pkg/apis \

@@ -28,6 +28,13 @@ kube::codegen::gen_helpers \
     --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 
+kube::codegen::gen_openapi \
+    --input-pkg-root k8s.io/apiextensions-apiserver/pkg \
+    --extra-pkgs k8s.io/api/autoscaling/v1 `# needed for Scale type` \
+    --output-pkg-root k8s.io/apiextensions-apiserver/pkg/generated \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
 kube::codegen::gen_client \
     --with-watch \
     --input-pkg-root k8s.io/apiextensions-apiserver/pkg/apis \
