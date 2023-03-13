@@ -71,6 +71,12 @@ const (
 	// TODO(vikasc): Instead of hard-coding number of devices, provide number of devices in the sample-device-plugin using configmap
 	// and then use the same here
 	expectedSampleDevsAmount int64 = 2
+
+	// This is the sleep interval specified in the command executed in the pod to ensure container is running "forever" in the test timescale
+	sleepIntervalForever string = "24h"
+
+	// This is the sleep interval specified in the command executed in the pod so that container is restarted within the expected test run time
+	sleepIntervalWithRestart string = "60s"
 )
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
@@ -137,7 +143,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		})
 
 		ginkgo.It("Can schedule a pod that requires a device", func() {
-			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalWithRestart)
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
@@ -196,7 +202,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		// entry point we sleep for a limited and short period of time. The device assignment should be kept and be stable across the container
 		// restarts. For the sake of brevity we however check just the fist restart.
 		ginkgo.It("Keeps device plugin assignments across pod restarts (no kubelet restart, device plugin re-registration)", func() {
-			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalWithRestart)
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
@@ -251,7 +257,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		// The device assignment should be kept and be stable across the kubelet/device plugin restart, as both the aforementioned components
 		// archestrate the device allocation: the actual consumer (container) is stable.
 		ginkgo.It("Keeps device plugin assignments after kubelet restart and device plugin has been re-registered (no pod restart)", func() {
-			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 24h" // the pod has to run "forever" in the timescale of this test
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever) // the pod has to run "forever" in the timescale of this test
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1, err := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
