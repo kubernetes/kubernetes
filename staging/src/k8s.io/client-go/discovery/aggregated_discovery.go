@@ -92,6 +92,9 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
+			if v.Resources.ResponseKind == nil {
+				continue
+			}
 			resource := convertAPIResource(r)
 			resourceList.APIResources = append(resourceList.APIResources, resource)
 			// Subresources field in new format get transformed into full APIResources.
