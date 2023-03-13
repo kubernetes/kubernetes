@@ -344,6 +344,10 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 
 	// Lookup last cached result for this apiservice's service.
 	cached, err := dm.fetchFreshDiscoveryForService(mgv, info)
+	if err != nil {
+		klog.Infof("DiscoveryManager: stale apiservice %s/%s err: %s", gv.Group, gv.Version, err)
+	}
+
 
 	var entry apidiscoveryv2beta1.APIVersionDiscovery
 
