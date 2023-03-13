@@ -11376,7 +11376,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareable
       type:
         scalar: boolean
-- name: io.k8s.api.resource.v1alpha2.PodScheduling
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingContext
   map:
     fields:
     - name: apiVersion
@@ -11391,13 +11391,13 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingContextSpec
       default: {}
     - name: status
       type:
-        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingContextStatus
       default: {}
-- name: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingContextSpec
   map:
     fields:
     - name: potentialNodes
@@ -11409,7 +11409,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: selectedNode
       type:
         scalar: string
-- name: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingContextStatus
   map:
     fields:
     - name: resourceClaims

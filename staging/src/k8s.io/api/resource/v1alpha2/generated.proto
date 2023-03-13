@@ -56,37 +56,37 @@ message AllocationResult {
   optional bool shareable = 3;
 }
 
-// PodScheduling objects hold information that is needed to schedule
+// PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
 // mode.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
-message PodScheduling {
+message PodSchedulingContext {
   // Standard object metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec describes where resources for the Pod are needed.
-  optional PodSchedulingSpec spec = 2;
+  optional PodSchedulingContextSpec spec = 2;
 
   // Status describes where resources for the Pod can be allocated.
   // +optional
-  optional PodSchedulingStatus status = 3;
+  optional PodSchedulingContextStatus status = 3;
 }
 
-// PodSchedulingList is a collection of Pod scheduling objects.
-message PodSchedulingList {
+// PodSchedulingContextList is a collection of Pod scheduling objects.
+message PodSchedulingContextList {
   // Standard list metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of PodScheduling objects.
-  repeated PodScheduling items = 2;
+  // Items is the list of PodSchedulingContext objects.
+  repeated PodSchedulingContext items = 2;
 }
 
-// PodSchedulingSpec describes where resources for the Pod are needed.
-message PodSchedulingSpec {
+// PodSchedulingContextSpec describes where resources for the Pod are needed.
+message PodSchedulingContextSpec {
   // SelectedNode is the node for which allocation of ResourceClaims that
   // are referenced by the Pod and that use "WaitForFirstConsumer"
   // allocation is to be attempted.
@@ -105,8 +105,8 @@ message PodSchedulingSpec {
   repeated string potentialNodes = 2;
 }
 
-// PodSchedulingStatus describes where resources for the Pod can be allocated.
-message PodSchedulingStatus {
+// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
+message PodSchedulingContextStatus {
   // ResourceClaims describes resource availability for each
   // pod.spec.resourceClaim entry where the corresponding ResourceClaim
   // uses "WaitForFirstConsumer" allocation mode.
