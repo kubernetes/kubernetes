@@ -76,6 +76,9 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 	gvResources := map[schema.GroupVersion]*metav1.APIResourceList{}
 	failedGVs := map[schema.GroupVersion]error{}
 	group.Name = g.ObjectMeta.Name
+	b, _ := json.Marshal(g)
+	fmt.Printf("resourceGVList: %s\n", b)
+
 	for _, v := range g.Versions {
 		gv := schema.GroupVersion{Group: g.Name, Version: v.Version}
 		if v.Freshness == apidiscovery.DiscoveryFreshnessStale {
