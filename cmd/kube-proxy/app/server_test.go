@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,52 +33,6 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
-
-func TestGetConntrackMax(t *testing.T) {
-	ncores := runtime.NumCPU()
-	testCases := []struct {
-		min        int32
-		maxPerCore int32
-		expected   int
-		err        string
-	}{
-		{
-			expected: 0,
-		},
-		{
-			maxPerCore: 67890, // use this if Max is 0
-			min:        1,     // avoid 0 default
-			expected:   67890 * ncores,
-		},
-		{
-			maxPerCore: 1, // ensure that Min is considered
-			min:        123456,
-			expected:   123456,
-		},
-		{
-			maxPerCore: 0, // leave system setting
-			min:        123456,
-			expected:   0,
-		},
-	}
-
-	for i, tc := range testCases {
-		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
-			Min:        pointer.Int32(tc.min),
-			MaxPerCore: pointer.Int32(tc.maxPerCore),
-		}
-		x, e := getConntrackMax(cfg)
-		if e != nil {
-			if tc.err == "" {
-				t.Errorf("[%d] unexpected error: %v", i, e)
-			} else if !strings.Contains(e.Error(), tc.err) {
-				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
-			}
-		} else if x != tc.expected {
-			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
-		}
-	}
-}
 
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {

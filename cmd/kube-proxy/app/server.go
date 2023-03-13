@@ -514,7 +514,6 @@ type ProxyServer struct {
 	Client        clientset.Interface
 	Broadcaster   events.EventBroadcaster
 	Recorder      events.EventRecorder
-	Conntracker   Conntracker // if nil, ignored
 	NodeRef       *v1.ObjectReference
 	HealthzServer healthcheck.ProxierHealthUpdater
 
@@ -652,45 +651,10 @@ func (s *ProxyServer) Run() error {
 	// Start up a metrics server if requested
 	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, errCh)
 
-	// Tune conntrack, if requested
-	// Conntracker is always nil for windows
-	if s.Conntracker != nil {
-		max, err := getConntrackMax(s.Config.Conntrack)
-		if err != nil {
-			return err
-		}
-		if max > 0 {
-			err := s.Conntracker.SetMax(max)
-			if err != nil {
-				if err != errReadOnlySysFS {
-					return err
-				}
-				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
-				// the only remediation we know is to restart the docker daemon.
-				// Here we'll send an node event with specific reason and message, the
-				// administrator should decide whether and how to handle this issue,
-				// whether to drain the node and restart docker.  Occurs in other container runtimes
-				// as well.
-				// TODO(random-liu): Remove this when the docker bug is fixed.
-				const message = "CRI error: /sys is read-only: " +
-					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
-				s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, err.Error(), "StartKubeProxy", message)
-			}
-		}
-
-		if s.Config.Conntrack.TCPEstablishedTimeout != nil && s.Config.Conntrack.TCPEstablishedTimeout.Duration > 0 {
-			timeout := int(s.Config.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
-			if err := s.Conntracker.SetTCPEstablishedTimeout(timeout); err != nil {
-				return err
-			}
-		}
-
-		if s.Config.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
-			timeout := int(s.Config.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
-			if err := s.Conntracker.SetTCPCloseWaitTimeout(timeout); err != nil {
-				return err
-			}
-		}
+	// Do platform-specific setup
+	err := s.platformSetup()
+	if err != nil {
+		return err
 	}
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
@@ -756,23 +720,6 @@ func (s *ProxyServer) Run() error {
 
 func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
-}
-
-func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
-	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
-		floor := 0
-		if config.Min != nil {
-			floor = int(*config.Min)
-		}
-		scaled := int(*config.MaxPerCore) * detectNumCPU()
-		if scaled > floor {
-			klog.V(3).InfoS("GetConntrackMax: using scaled conntrack-max-per-core")
-			return scaled, nil
-		}
-		klog.V(3).InfoS("GetConntrackMax: using conntrack-min")
-		return floor, nil
-	}
-	return 0, nil
 }
 
 // detectNodeIP returns the nodeIP used by the proxier

@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	goruntime "runtime"
 	"strconv"
 
 	// Enable pprof HTTP handlers.
@@ -105,6 +104,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}
 
 	var proxier proxy.Provider
+
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if dualStackMode {
 		klog.InfoS("Creating dualStackProxier for Windows kernel.")
@@ -136,7 +136,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	if err != nil {
 		return nil, fmt.Errorf("unable to create proxier: %v", err)
 	}
-	winkernel.RegisterMetrics()
 
 	return &ProxyServer{
 		Config:        config,
@@ -149,12 +148,13 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}, nil
 }
 
-func getDualStackMode(networkname string, compatTester winkernel.StackCompatTester) bool {
-	return compatTester.DualStackCompatible(networkname)
+func (s *ProxyServer) platformSetup() error {
+	winkernel.RegisterMetrics()
+	return nil
 }
 
-func detectNumCPU() int {
-	return goruntime.NumCPU()
+func getDualStackMode(networkname string, compatTester winkernel.StackCompatTester) bool {
+	return compatTester.DualStackCompatible(networkname)
 }
 
 // cleanupAndExit cleans up after a previous proxy run
