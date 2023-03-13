@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ limitations under the License.
 
 syntax = "proto3";
 
-package v1alpha1;
-option go_package = "k8s.io/kubelet/pkg/apis/dra/v1alpha1";
+package v1alpha2;
+option go_package = "k8s.io/kubelet/pkg/apis/dra/v1alpha2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -49,7 +49,7 @@ message NodePrepareResourceRequest {
     // The name of the Resource claim (ResourceClaim.meta.Name)
     // This field is REQUIRED.
     string claim_name = 3;
-    // Resource handle (AllocationResult.ResourceHandle)
+    // Resource handle (AllocationResult.ResourceHandles[*].Data)
     // This field is REQUIRED.
     string resource_handle = 4;
 }
@@ -71,9 +71,9 @@ message NodeUnprepareResourceRequest {
     // The name of the Resource claim (ResourceClaim.meta.Name)
     // This field is REQUIRED.
     string claim_name = 3;
-    // List of fully qualified CDI device names
-    // Kubelet plugin returns them in the NodePrepareResourceResponse
-    repeated string cdi_devices = 4;
+    // Resource handle (AllocationResult.ResourceHandles[*].Data)
+    // This field is REQUIRED.
+    string resource_handle = 4;
 }
 
 message NodeUnprepareResourceResponse {

@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 )
 
 type ExamplePlugin struct {
