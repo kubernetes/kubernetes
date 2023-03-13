@@ -558,7 +558,7 @@ func (a *HorizontalController) computeStatusForPodsMetric(currentReplicas int32,
 }
 
 func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context.Context, currentReplicas int32, target autoscalingv2.MetricTarget,
-	resourceName v1.ResourceName, namespace string, container string, selector labels.Selector) (replicaCountProposal int32,
+	resourceName v1.ResourceName, namespace string, container string, selector labels.Selector, sourceType autoscalingv2.MetricSourceType) (replicaCountProposal int32,
 	metricStatus *autoscalingv2.MetricValueStatus, timestampProposal time.Time, metricNameProposal string,
 	condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
 	if target.AverageValue != nil {
@@ -586,6 +586,9 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 	}
 
 	metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", resourceName)
+	if sourceType == autoscalingv2.ContainerResourceMetricSourceType {
+		metricNameProposal = fmt.Sprintf("%s container resource utilization (percentage of request)", resourceName)
+	}
 	status := autoscalingv2.MetricValueStatus{
 		AverageUtilization: &percentageProposal,
 		AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
@@ -597,7 +600,7 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 func (a *HorizontalController) computeStatusForResourceMetric(ctx context.Context, currentReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler,
 	selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, timestampProposal time.Time,
 	metricNameProposal string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	replicaCountProposal, metricValueStatus, timestampProposal, metricNameProposal, condition, err := a.computeStatusForResourceMetricGeneric(ctx, currentReplicas, metricSpec.Resource.Target, metricSpec.Resource.Name, hpa.Namespace, "", selector)
+	replicaCountProposal, metricValueStatus, timestampProposal, metricNameProposal, condition, err := a.computeStatusForResourceMetricGeneric(ctx, currentReplicas, metricSpec.Resource.Target, metricSpec.Resource.Name, hpa.Namespace, "", selector, autoscalingv2.ResourceMetricSourceType)
 	if err != nil {
 		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
 		return replicaCountProposal, timestampProposal, metricNameProposal, condition, err
@@ -616,7 +619,7 @@ func (a *HorizontalController) computeStatusForResourceMetric(ctx context.Contex
 func (a *HorizontalController) computeStatusForContainerResourceMetric(ctx context.Context, currentReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler,
 	selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, timestampProposal time.Time,
 	metricNameProposal string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	replicaCountProposal, metricValueStatus, timestampProposal, metricNameProposal, condition, err := a.computeStatusForResourceMetricGeneric(ctx, currentReplicas, metricSpec.ContainerResource.Target, metricSpec.ContainerResource.Name, hpa.Namespace, metricSpec.ContainerResource.Container, selector)
+	replicaCountProposal, metricValueStatus, timestampProposal, metricNameProposal, condition, err := a.computeStatusForResourceMetricGeneric(ctx, currentReplicas, metricSpec.ContainerResource.Target, metricSpec.ContainerResource.Name, hpa.Namespace, metricSpec.ContainerResource.Container, selector, autoscalingv2.ContainerResourceMetricSourceType)
 	if err != nil {
 		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetContainerResourceMetric", err)
 		return replicaCountProposal, timestampProposal, metricNameProposal, condition, err
