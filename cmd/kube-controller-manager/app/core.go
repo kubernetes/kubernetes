@@ -271,7 +271,8 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 		EnableDynamicProvisioning: controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 		FilteredDialOptions:       filteredDialOptions,
 	}
-	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "persistentvolume-binder-controller"))
+	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(ctx, params)
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
 	}
@@ -295,8 +296,11 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 		return nil, true, err
 	}
 
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "attachdetach-controller")
+	ctx = klog.NewContext(ctx, logger)
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
+			logger,
 			controllerContext.ClientBuilder.ClientOrDie("attachdetach-controller"),
 			controllerContext.InformerFactory.Core().V1().Pods(),
 			controllerContext.InformerFactory.Core().V1().Nodes(),
@@ -316,7 +320,7 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
-	go attachDetachController.Run(ctx.Done())
+	go attachDetachController.Run(ctx)
 	return nil, true, nil
 }
 
@@ -346,12 +350,14 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 	if expandControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 	}
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "persistentvolume-expander-controller"))
 	go expandController.Run(ctx)
 	return nil, true, nil
 
 }
 
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "ephemeral-volume-controller"))
 	ephemeralController, err := ephemeral.NewController(
 		controllerContext.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -548,7 +554,9 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 }
 
 func startPVCProtectionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "persistentvolumeclaim-protection-controller"))
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("pvc-protection-controller"),
@@ -561,7 +569,9 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 }
 
 func startPVProtectionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "persistentvolume-protection-controller"))
 	go pvprotection.NewPVProtectionController(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.ClientBuilder.ClientOrDie("pv-protection-controller"),
 	).Run(ctx, 1)

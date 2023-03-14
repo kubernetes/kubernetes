@@ -384,7 +384,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 }
 
 func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "claim", klog.KRef(namespace, name))
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "PVC", klog.KRef(namespace, name))
 	ctx = klog.NewContext(ctx, logger)
 	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
 	if err != nil {

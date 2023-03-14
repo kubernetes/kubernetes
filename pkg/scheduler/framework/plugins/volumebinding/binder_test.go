@@ -43,6 +43,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
@@ -150,7 +151,8 @@ type testEnv struct {
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	client := &fake.Clientset{}
-	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
+	_, ctx := ktesting.NewTestContext(t)
+	reactor := pvtesting.NewVolumeReactor(ctx, client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()

@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // Several tests in this file are configurable by environment variables:
@@ -1357,7 +1358,9 @@ func createClients(namespaceName string, t *testing.T, s *kubeapiservertesting.T
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.Cloud{}
 	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
+	_, ctx := ktesting.NewTestContext(t)
 	ctrl, err := persistentvolumecontroller.NewController(
+		ctx,
 		persistentvolumecontroller.ControllerParameters{
 			KubeClient:                binderClient,
 			SyncPeriod:                getSyncPeriod(syncPeriod),

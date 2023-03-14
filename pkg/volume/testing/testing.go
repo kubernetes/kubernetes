@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -441,11 +442,11 @@ func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *volume.Spec, eventR
 	return nil
 }
 
-func (plugin *FakeVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *FakeVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return &FakeDeleter{"/attributesTransferredFromSpec", volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *FakeVolumePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.LastProvisionerOptions = options

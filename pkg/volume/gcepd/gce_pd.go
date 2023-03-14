@@ -228,7 +228,7 @@ func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podU
 	}}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *gcePersistentDiskPlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &GCEDiskUtil{})
 }
 
@@ -245,7 +245,7 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 		}}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *gcePersistentDiskPlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	return plugin.newProvisionerInternal(options, &GCEDiskUtil{})
 }
 
