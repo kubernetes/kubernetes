@@ -312,6 +312,11 @@ func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime
 	return obj, nil
 }
 
+var kindToResource = map[string]string{
+	"nodemetricses": "nodes",
+	"podmetricses":  "pods",
+}
+
 func (t *tracker) Add(obj runtime.Object) error {
 	if meta.IsListType(obj) {
 		return t.addList(obj, false)
@@ -339,11 +344,14 @@ func (t *tracker) Add(obj runtime.Object) error {
 		// objects via Add(). Instead, it should trigger the Create() function
 		// of the tracker, where an arbitrary gvr can be specified.
 		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+
 		// Resource doesn't have the concept of "__internal" version, just set it to "".
 		if gvr.Version == runtime.APIVersionInternal {
 			gvr.Version = ""
 		}
-
+		if resource, exists := kindToResource[gvr.Resource]; exists {
+			gvr.Resource = resource
+		}
 		err := t.add(gvr, obj, objMeta.GetNamespace(), false)
 		if err != nil {
 			return err
