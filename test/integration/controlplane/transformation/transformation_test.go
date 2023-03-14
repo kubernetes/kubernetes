@@ -454,6 +454,15 @@ func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Int
 	return pod, nil
 }
 
+func (e *transformTest) deletePod(namespace string, dynamicInterface dynamic.Interface) error {
+	podGVR := gvr("", "v1", "pods")
+	stubObj, err := getStubObj(podGVR)
+	if err != nil {
+		return err
+	}
+	return dynamicInterface.Resource(podGVR).Namespace(namespace).Delete(context.TODO(), stubObj.GetName(), metav1.DeleteOptions{})
+}
+
 func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
 	podGVR := gvr("", "v1", "pods")
 	pod, err := inplaceUpdateResource(dynamicInterface, podGVR, namespace, obj)
@@ -519,7 +528,7 @@ func (e *transformTest) printMetrics() error {
 func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(2*time.Second, time.Minute, func() (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -540,7 +549,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(2*time.Second, time.Minute, func() (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {

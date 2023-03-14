@@ -95,7 +95,10 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := context.Background()
 	dataCtx := value.DefaultContext([]byte(secretETCDPath))
-	aesgcmTransformer := aestransformer.NewGCMTransformer(block)
+	aesgcmTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+	}
 	plainSecret, _, err := aesgcmTransformer.TransformFromStorage(ctx, r.cipherTextPayload(), dataCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform from storage via AESGCM, err: %w", err)
