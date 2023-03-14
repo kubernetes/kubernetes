@@ -492,22 +492,20 @@ func (proxier *Proxier) isInitialized() bool {
 
 // OnServiceAdd is called whenever creation of new service object
 // is observed.
-func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
-	proxier.OnServiceUpdate(nil, service)
+func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
+	return proxier.OnServiceUpdate(nil, service)
 }
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
-func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
-	if proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
+	return proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized()
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
-func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
-	proxier.OnServiceUpdate(service, nil)
+func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
+	return proxier.OnServiceUpdate(service, nil)
 
 }
 
@@ -525,26 +523,20 @@ func (proxier *Proxier) OnServiceSynced() {
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
-func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
-func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
-func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized()
 }
 
 // OnEndpointSlicesSynced is called once all the initial event handlers were
@@ -561,68 +553,68 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 
 // OnNodeAdd is called whenever creation of new node object
 // is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
+func (proxier *Proxier) OnNodeAdd(node *v1.Node) bool {
 	if node.Name != proxier.hostname {
 		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return
+		return false
 	}
 
 	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
+		return false
 	}
 
 	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	proxier.nodeLabels = map[string]string{}
 	for k, v := range node.Labels {
 		proxier.nodeLabels[k] = v
 	}
 	proxier.needFullSync = true
-	proxier.mu.Unlock()
 	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
-	proxier.Sync()
+	return true
 }
 
 // OnNodeUpdate is called whenever modification of an existing
 // node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
 	if node.Name != proxier.hostname {
 		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return
+		return false
 	}
 
 	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
+		return false
 	}
 
 	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	proxier.nodeLabels = map[string]string{}
 	for k, v := range node.Labels {
 		proxier.nodeLabels[k] = v
 	}
 	proxier.needFullSync = true
-	proxier.mu.Unlock()
 	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
-	proxier.Sync()
+	return true
 }
 
 // OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
+func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
 	if node.Name != proxier.hostname {
 		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return
+		return false
 	}
 	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	proxier.nodeLabels = nil
 	proxier.needFullSync = true
-	proxier.mu.Unlock()
 
-	proxier.Sync()
+	return true
 }
 
 // OnNodeSynced is called once all the initial event handlers were

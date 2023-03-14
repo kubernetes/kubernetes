@@ -262,24 +262,6 @@ type NodeHandler interface {
 	OnNodeSynced()
 }
 
-// NoopNodeHandler is a noop handler for proxiers that have not yet
-// implemented a full NodeHandler.
-type NoopNodeHandler struct{}
-
-// OnNodeAdd is a noop handler for Node creates.
-func (*NoopNodeHandler) OnNodeAdd(node *v1.Node) {}
-
-// OnNodeUpdate is a noop handler for Node updates.
-func (*NoopNodeHandler) OnNodeUpdate(oldNode, node *v1.Node) {}
-
-// OnNodeDelete is a noop handler for Node deletes.
-func (*NoopNodeHandler) OnNodeDelete(node *v1.Node) {}
-
-// OnNodeSynced is a noop handler for Node syncs.
-func (*NoopNodeHandler) OnNodeSynced() {}
-
-var _ NodeHandler = &NoopNodeHandler{}
-
 // NodeConfig tracks a set of node configurations.
 // It accepts "set", "add" and "remove" operations of node via channels, and invokes registered handlers on change.
 type NodeConfig struct {

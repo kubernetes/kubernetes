@@ -98,16 +98,6 @@ func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod 
 	return nil
 }
 
-// Sync immediately synchronizes the providers' current states to the proxy rules.
-func (r *Runner) Sync() {
-	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.Sync()
-	}
-	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.Sync()
-	}
-}
-
 // Run starts the main loop of the Runner (in other goroutines)
 func (r *Runner) Run() {
 	if r.ipv4Proxier != nil {
@@ -117,13 +107,27 @@ func (r *Runner) Run() {
 	}
 }
 
+// ipv4Sync immediately synchronizes the IPv4 provider
+func (r *Runner) ipv4Sync() {
+	r.ipv4Proxier.Sync()
+}
+
+// ipv6Sync immediately synchronizes the IPv6 provider
+func (r *Runner) ipv6Sync() {
+	r.ipv6Proxier.Sync()
+}
+
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (r *Runner) OnServiceAdd(service *v1.Service) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnServiceAdd(service)
+		if r.ipv4Proxier.OnServiceAdd(service) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnServiceAdd(service)
+		if r.ipv6Proxier.OnServiceAdd(service) {
+			r.ipv6Sync()
+		}
 	}
 }
 
@@ -131,10 +135,14 @@ func (r *Runner) OnServiceAdd(service *v1.Service) {
 // service object is observed.
 func (r *Runner) OnServiceUpdate(oldService, service *v1.Service) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnServiceUpdate(oldService, service)
+		if r.ipv4Proxier.OnServiceUpdate(oldService, service) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnServiceUpdate(oldService, service)
+		if r.ipv6Proxier.OnServiceUpdate(oldService, service) {
+			r.ipv6Sync()
+		}
 	}
 }
 
@@ -142,10 +150,14 @@ func (r *Runner) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (r *Runner) OnServiceDelete(service *v1.Service) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnServiceDelete(service)
+		if r.ipv4Proxier.OnServiceDelete(service) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnServiceDelete(service)
+		if r.ipv6Proxier.OnServiceDelete(service) {
+			r.ipv6Sync()
+		}
 	}
 }
 
@@ -166,11 +178,15 @@ func (r *Runner) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
 	switch endpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			r.ipv4Proxier.OnEndpointSliceAdd(endpointSlice)
+			if r.ipv4Proxier.OnEndpointSliceAdd(endpointSlice) {
+				r.ipv4Sync()
+			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			r.ipv6Proxier.OnEndpointSliceAdd(endpointSlice)
+			if r.ipv6Proxier.OnEndpointSliceAdd(endpointSlice) {
+				r.ipv6Sync()
+			}
 		}
 	default:
 		klog.ErrorS(nil, "EndpointSlice address type not supported", "addressType", endpointSlice.AddressType)
@@ -183,11 +199,15 @@ func (r *Runner) OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *disco
 	switch newEndpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			r.ipv4Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
+			if r.ipv4Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice) {
+				r.ipv4Sync()
+			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			r.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
+			if r.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice) {
+				r.ipv6Sync()
+			}
 		}
 	default:
 		klog.ErrorS(nil, "EndpointSlice address type not supported", "addressType", newEndpointSlice.AddressType)
@@ -200,11 +220,15 @@ func (r *Runner) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
 	switch endpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			r.ipv4Proxier.OnEndpointSliceDelete(endpointSlice)
+			if r.ipv4Proxier.OnEndpointSliceDelete(endpointSlice) {
+				r.ipv4Sync()
+			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			r.ipv6Proxier.OnEndpointSliceDelete(endpointSlice)
+			if r.ipv6Proxier.OnEndpointSliceDelete(endpointSlice) {
+				r.ipv6Sync()
+			}
 		}
 	default:
 		klog.ErrorS(nil, "EndpointSlice address type not supported", "addressType", endpointSlice.AddressType)
@@ -225,10 +249,14 @@ func (r *Runner) OnEndpointSlicesSynced() {
 // OnNodeAdd is called whenever creation of new node object is observed.
 func (r *Runner) OnNodeAdd(node *v1.Node) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnNodeAdd(node)
+		if r.ipv4Proxier.OnNodeAdd(node) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnNodeAdd(node)
+		if r.ipv6Proxier.OnNodeAdd(node) {
+			r.ipv6Sync()
+		}
 	}
 }
 
@@ -236,10 +264,14 @@ func (r *Runner) OnNodeAdd(node *v1.Node) {
 // node object is observed.
 func (r *Runner) OnNodeUpdate(oldNode, node *v1.Node) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnNodeUpdate(oldNode, node)
+		if r.ipv4Proxier.OnNodeUpdate(oldNode, node) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnNodeUpdate(oldNode, node)
+		if r.ipv6Proxier.OnNodeUpdate(oldNode, node) {
+			r.ipv6Sync()
+		}
 	}
 }
 
@@ -247,10 +279,14 @@ func (r *Runner) OnNodeUpdate(oldNode, node *v1.Node) {
 // object is observed.
 func (r *Runner) OnNodeDelete(node *v1.Node) {
 	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnNodeDelete(node)
+		if r.ipv4Proxier.OnNodeDelete(node) {
+			r.ipv4Sync()
+		}
 	}
 	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnNodeDelete(node)
+		if r.ipv6Proxier.OnNodeDelete(node) {
+			r.ipv6Sync()
+		}
 	}
 }
 

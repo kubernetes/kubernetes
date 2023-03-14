@@ -21,16 +21,31 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/proxy/config"
 )
 
 // Provider is the interface provided by proxier implementations.
 type Provider interface {
-	config.EndpointSliceHandler
-	config.ServiceHandler
-	config.NodeHandler
+	// The OnService*, OnEndpointSlice*, and OnNode* methods have the same semantics
+	// as in config.ServiceHandler, config.EndpointSliceHandler, and
+	// config.NodeHandler, but return a bool indicating whether or not a sync is
+	// needed
+	OnServiceAdd(service *v1.Service) bool
+	OnServiceUpdate(oldService, service *v1.Service) bool
+	OnServiceDelete(service *v1.Service) bool
+	OnServiceSynced()
+
+	OnEndpointSliceAdd(endpointSlice *discoveryv1.EndpointSlice) bool
+	OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discoveryv1.EndpointSlice) bool
+	OnEndpointSliceDelete(endpointSlice *discoveryv1.EndpointSlice) bool
+	OnEndpointSlicesSynced()
+
+	OnNodeAdd(node *v1.Node) bool
+	OnNodeUpdate(oldNode, node *v1.Node) bool
+	OnNodeDelete(node *v1.Node) bool
+	OnNodeSynced()
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
 	Sync()

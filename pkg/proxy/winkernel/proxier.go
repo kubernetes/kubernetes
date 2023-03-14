@@ -43,7 +43,6 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -589,9 +588,6 @@ type endPointsReferenceCountMap map[string]*uint16
 // Proxier is an hns based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	// TODO(imroc): implement node handler for winkernel proxier.
-	proxyconfig.NoopNodeHandler
-
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since policies were synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
@@ -950,22 +946,20 @@ func (proxier *Proxier) isInitialized() bool {
 
 // OnServiceAdd is called whenever creation of new service object
 // is observed.
-func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
-	proxier.OnServiceUpdate(nil, service)
+func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
+	return proxier.OnServiceUpdate(nil, service)
 }
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
-func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
-	if proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
+	return proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized()
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
-func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
-	proxier.OnServiceUpdate(service, nil)
+func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
+	return proxier.OnServiceUpdate(service, nil)
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -982,26 +976,20 @@ func (proxier *Proxier) OnServiceSynced() {
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
-func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
-func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
-func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
-	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized() {
-		proxier.Sync()
-	}
+func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized()
 }
 
 // OnEndpointSlicesSynced is called once all the initial event handlers were
@@ -1014,6 +1002,22 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
+}
+
+// Not yet implemented...
+func (proxier *Proxier) OnNodeAdd(node *v1.Node) bool {
+	return false
+}
+
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
+	return false
+}
+
+func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
+	return false
+}
+
+func (proxier *Proxier) OnNodeSynced() {
 }
 
 func (proxier *Proxier) cleanupAllPolicies() {
