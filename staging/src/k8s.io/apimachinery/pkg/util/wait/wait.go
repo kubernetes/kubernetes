@@ -137,13 +137,18 @@ func (c channelContext) Err() error {
 func (c channelContext) Deadline() (time.Time, bool) { return time.Time{}, false }
 func (c channelContext) Value(key any) any           { return nil }
 
-// runConditionWithCrashProtection runs a ConditionFunc with crash protection
+// runConditionWithCrashProtection runs a ConditionFunc with crash protection.
+//
+// Deprecated: Will be removed when the legacy polling methods are removed.
 func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
-	return runConditionWithCrashProtectionWithContext(context.TODO(), condition.WithContext())
+	defer runtime.HandleCrash()
+	return condition()
 }
 
-// runConditionWithCrashProtectionWithContext runs a
-// ConditionWithContextFunc with crash protection.
+// runConditionWithCrashProtectionWithContext runs a ConditionWithContextFunc
+// with crash protection.
+//
+// Deprecated: Will be removed when the legacy polling methods are removed.
 func runConditionWithCrashProtectionWithContext(ctx context.Context, condition ConditionWithContextFunc) (bool, error) {
 	defer runtime.HandleCrash()
 	return condition(ctx)
@@ -151,6 +156,9 @@ func runConditionWithCrashProtectionWithContext(ctx context.Context, condition C
 
 // waitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
+//
+// Deprecated: Will be removed in a future release in favor of
+// loopConditionUntilContext.
 type waitFunc func(done <-chan struct{}) <-chan struct{}
 
 // WithContext converts the WaitFunc to an equivalent WaitWithContextFunc
@@ -166,7 +174,8 @@ func (w waitFunc) WithContext() waitWithContextFunc {
 // When the specified context gets cancelled or expires the function
 // stops sending item and returns immediately.
 //
-// Deprecated: Will be removed when the legacy Poll methods are removed.
+// Deprecated: Will be removed in a future release in favor of
+// loopConditionUntilContext.
 type waitWithContextFunc func(ctx context.Context) <-chan struct{}
 
 // waitForWithContext continually checks 'fn' as driven by 'wait'.
@@ -186,7 +195,8 @@ type waitWithContextFunc func(ctx context.Context) <-chan struct{}
 // "uniform pseudo-random", the `fn` might still run one or multiple times,
 // though eventually `waitForWithContext` will return.
 //
-// Deprecated: Will be removed when the legacy Poll methods are removed.
+// Deprecated: Will be removed in a future release in favor of
+// loopConditionUntilContext.
 func waitForWithContext(ctx context.Context, wait waitWithContextFunc, fn ConditionWithContextFunc) error {
 	waitCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -205,7 +215,8 @@ func waitForWithContext(ctx context.Context, wait waitWithContextFunc, fn Condit
 				return ErrWaitTimeout
 			}
 		case <-ctx.Done():
-			// returning ctx.Err() will break backward compatibility
+			// returning ctx.Err() will break backward compatibility, use new PollUntilContext*
+			// methods instead
 			return ErrWaitTimeout
 		}
 	}
