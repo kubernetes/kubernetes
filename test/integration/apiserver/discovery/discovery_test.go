@@ -350,6 +350,7 @@ func TestCRD(t *testing.T) {
 					Name:                 "v1.stable.example.com",
 				},
 
+				waitForAbsentGroupVersionsV2([]metav1.GroupVersion{stableV1}),
 				// Update CRD to trigger a resync by adding a category and new groupversion
 				applyCRD(makeCRDSpec(stableGroup, "Bar", false, []string{"v1", "v2", "v1alpha1"}, "all")),
 

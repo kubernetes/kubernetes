@@ -383,7 +383,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
 	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.groupPriority, info.versionPriority)
-	return nil
+	return err
 }
 
 // Spwans a goroutune which waits for added/updated apiservices and updates
@@ -462,7 +462,11 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
 	if dm.setInfoForAPIService(apiServiceName, nil) != nil {
 		// mark dirty if there was actually something deleted
-		dm.dirtyAPIServiceQueue.Add(apiServiceName)
+		// Only add to queue if the apiService is not already about to
+		// be requeued.
+		if dm.dirtyAPIServiceQueue.NumRequeues(apiServiceName) == 0 {
+			dm.dirtyAPIServiceQueue.Add(apiServiceName)
+		}
 	}
 }
 
