@@ -176,7 +176,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		externalPolicyLocal:   externalPolicyLocal,
 		internalPolicyLocal:   internalPolicyLocal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
-		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
+	}
+
+	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
+	var ok bool
+	info.hintsAnnotation, ok = service.Annotations[v1.DeprecatedAnnotationTopologyAwareHints]
+	if !ok {
+		info.hintsAnnotation, _ = service.Annotations[v1.AnnotationTopologyMode]
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
