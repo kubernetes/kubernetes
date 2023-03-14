@@ -131,7 +131,7 @@ func invokeTestForInvalidFstype(ctx context.Context, f *framework.Framework, cli
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	// Create pod to attach Volume to Node
-	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, execCommand, false)
+	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, execCommand)
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
@@ -177,7 +177,7 @@ func createPodAndVerifyVolumeAccessible(ctx context.Context, client clientset.In
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, execCommand, false)
+	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, execCommand)
 	framework.ExpectNoError(err)
 
 	// Asserts: Right disk is attached to the pod

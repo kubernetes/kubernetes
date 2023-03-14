@@ -211,7 +211,7 @@ func VolumeCreateAndAttach(ctx context.Context, client clientset.Interface, time
 		ginkgo.By("Creating pod to attach PV to the node")
 		nodeSelector := nodeSelectorList[nodeSelectorIndex%len(nodeSelectorList)]
 		// Create pod to attach Volume to Node
-		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "", false)
+		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
 		framework.ExpectNoError(err)
 
 		for _, pv := range persistentvolumes {

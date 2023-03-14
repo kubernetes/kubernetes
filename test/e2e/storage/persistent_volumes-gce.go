@@ -52,7 +52,7 @@ func initializeGCETestSpec(ctx context.Context, c clientset.Interface, t *framew
 	framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, t, ns, pv, pvc))
 
 	ginkgo.By("Creating the Client Pod")
-	clientPod, err := e2epod.CreateClientPod(ctx, c, ns, pvc, false)
+	clientPod, err := e2epod.CreateClientPod(ctx, c, ns, pvc)
 	framework.ExpectNoError(err)
 	return clientPod, pv, pvc
 }

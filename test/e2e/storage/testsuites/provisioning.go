@@ -447,7 +447,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		actualPVSize := c.Status.Capacity.Storage().Value()
 
 		createdClaims := []*v1.PersistentVolumeClaim{c}
-		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "", false)
+		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -472,7 +472,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
 		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "", false)
+		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -565,7 +565,13 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		if pattern.VolMode != "Block" {
 			// Create pod to get mount path of fs
 			createdClaims := []*v1.PersistentVolumeClaim{originalClaim}
-			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "", true)
+			var podConfig *e2epod.Config = &e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          createdClaims,
+				NodeSelection: testConfig.ClientNodeSelection,
+				PVCsReadOnly: true,
+			}
+			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 			mountpath := findVolumeMountPath(pod, originalClaim)
 			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
@@ -759,7 +765,13 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			originalClaim, err = l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create pvc: %v", err)
 			createdClaims := []*v1.PersistentVolumeClaim{originalClaim}
-			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "", true)
+			var podConfig *e2epod.Config = &e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          createdClaims,
+				NodeSelection: testConfig.ClientNodeSelection,
+				PVCsReadOnly: true,
+			}
+			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 			mountpath := findVolumeMountPath(pod, originalClaim)
 			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
@@ -1180,7 +1192,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	if expectUnschedulable {
 		pod, err = e2epod.CreateUnschedulablePod(ctx, t.Client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
 	} else {
-		pod, err = e2epod.CreatePod(ctx, t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */, false /* readonlyPVCs */)
+		pod, err = e2epod.CreatePod(ctx, t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	}
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
