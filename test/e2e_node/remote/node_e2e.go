@@ -35,10 +35,9 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
-// InitNodeE2ERemote initializes the node e2e test suite.
-func InitNodeE2ERemote() TestSuite {
-	// TODO: Register flags.
-	return &NodeE2ERemote{}
+// init initializes the node e2e test suite.
+func init() {
+	RegisterTestSuite("default", &NodeE2ERemote{})
 }
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
