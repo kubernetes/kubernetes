@@ -132,12 +132,12 @@ func (p ApplySetParentRef) String() string {
 }
 
 type ApplySetTooling struct {
-	name    string
-	version string
+	Name    string
+	Version string
 }
 
 func (t ApplySetTooling) String() string {
-	return fmt.Sprintf("%s/%s", t.name, t.version)
+	return fmt.Sprintf("%s/%s", t.Name, t.Version)
 }
 
 // NewApplySet creates a new ApplySet object tracked by the given parent object.
@@ -226,7 +226,7 @@ func (a *ApplySet) LabelsForMember() map[string]string {
 }
 
 // addLabels sets our tracking labels on each object; this should be called as part of loading the objects.
-func (a *ApplySet) addLabels(objects []*resource.Info) error {
+func (a *ApplySet) AddLabels(objects ...*resource.Info) error {
 	applysetLabels := a.LabelsForMember()
 	for _, obj := range objects {
 		accessor, err := meta.Accessor(obj.Object)
@@ -249,7 +249,7 @@ func (a *ApplySet) addLabels(objects []*resource.Info) error {
 	return nil
 }
 
-func (a *ApplySet) FetchParent() error {
+func (a *ApplySet) fetchParent() error {
 	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping)
 	obj, err := helper.Get(a.parentRef.Namespace, a.parentRef.Name)
 	if errors.IsNotFound(err) {
@@ -272,8 +272,8 @@ func (a *ApplySet) FetchParent() error {
 	if !hasToolAnno {
 		return fmt.Errorf("ApplySet parent object %q already exists and is missing required annotation %q", a.parentRef, ApplySetToolingAnnotation)
 	}
-	if managedBy := toolingBaseName(toolAnnotation); managedBy != a.toolingID.name {
-		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %q instead of %q", a.parentRef, managedBy, a.toolingID.name)
+	if managedBy := toolingBaseName(toolAnnotation); managedBy != a.toolingID.Name {
+		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %q instead of %q", a.parentRef, managedBy, a.toolingID.Name)
 	}
 
 	idLabel, hasIDLabel := labels[ApplySetParentIDLabel]
@@ -375,9 +375,9 @@ func parseNamespacesAnnotation(annotations map[string]string) sets.Set[string] {
 	return sets.New(strings.Split(annotation, ",")...)
 }
 
-// AddResource registers the given resource and namespace as being part of the updated set of
+// addResource registers the given resource and namespace as being part of the updated set of
 // resources being applied by the current operation.
-func (a *ApplySet) AddResource(resource *meta.RESTMapping, namespace string) {
+func (a *ApplySet) addResource(resource *meta.RESTMapping, namespace string) {
 	a.updatedResources[resource.Resource] = resource
 	if resource.Scope == meta.RESTScopeNamespace && namespace != "" {
 		a.updatedNamespaces.Insert(namespace)
@@ -386,10 +386,10 @@ func (a *ApplySet) AddResource(resource *meta.RESTMapping, namespace string) {
 
 type ApplySetUpdateMode string
 
-var UpdateToLatestSet ApplySetUpdateMode = "latest"
-var UpdateToSuperset ApplySetUpdateMode = "superset"
+var updateToLatestSet ApplySetUpdateMode = "latest"
+var updateToSuperset ApplySetUpdateMode = "superset"
 
-func (a *ApplySet) UpdateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunStrategy, validation string) error {
+func (a *ApplySet) updateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunStrategy, validation string) error {
 	data, err := json.Marshal(a.buildParentPatch(mode))
 	if err != nil {
 		return fmt.Errorf("failed to encode patch for ApplySet parent: %w", err)
@@ -431,14 +431,14 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 func (a *ApplySet) buildParentPatch(mode ApplySetUpdateMode) *metav1.PartialObjectMetadata {
 	var newGRsAnnotation, newNsAnnotation string
 	switch mode {
-	case UpdateToSuperset:
+	case updateToSuperset:
 		// If the apply succeeded but pruning failed, the set of group resources that
 		// the ApplySet should track is the superset of the previous and current resources.
 		// This ensures that the resources that failed to be pruned are not orphaned from the set.
 		grSuperset := sets.KeySet(a.currentResources).Union(sets.KeySet(a.updatedResources))
 		newGRsAnnotation = generateResourcesAnnotation(grSuperset)
 		newNsAnnotation = generateNamespacesAnnotation(a.currentNamespaces.Union(a.updatedNamespaces), a.parentRef.Namespace)
-	case UpdateToLatestSet:
+	case updateToLatestSet:
 		newGRsAnnotation = generateResourcesAnnotation(sets.KeySet(a.updatedResources))
 		newNsAnnotation = generateNamespacesAnnotation(a.updatedNamespaces, a.parentRef.Namespace)
 	}
@@ -479,7 +479,7 @@ func generateResourcesAnnotation(resources sets.Set[schema.GroupVersionResource]
 }
 
 func (a ApplySet) FieldManager() string {
-	return fmt.Sprintf("%s-applyset", a.toolingID.name)
+	return fmt.Sprintf("%s-applyset", a.toolingID.Name)
 }
 
 // ParseApplySetParentRef creates a new ApplySetParentRef from a parent reference in the format [RESOURCE][.GROUP]/NAME
@@ -508,4 +508,53 @@ func ParseApplySetParentRef(parentRefStr string, mapper meta.RESTMapper) (*Apply
 		return nil, err
 	}
 	return &ApplySetParentRef{Name: name, RESTMapping: mapping}, nil
+}
+
+// Prune deletes any objects from the apiserver that are no longer in the applyset.
+func (a *ApplySet) Prune(ctx context.Context, o *ApplyOptions) error {
+	printer, err := o.ToPrinter("pruned")
+	if err != nil {
+		return err
+	}
+	opt := &ApplySetDeleteOptions{
+		CascadingStrategy: o.DeleteOptions.CascadingStrategy,
+		DryRunStrategy:    o.DryRunStrategy,
+		GracePeriod:       o.DeleteOptions.GracePeriod,
+
+		Printer: printer,
+
+		IOStreams: o.IOStreams,
+	}
+
+	if err := a.pruneAll(ctx, o.DynamicClient, o.VisitedUids, opt); err != nil {
+		return err
+	}
+
+	if err := a.updateParent(updateToLatestSet, o.DryRunStrategy, o.ValidationDirective); err != nil {
+		return fmt.Errorf("apply and prune succeeded, but ApplySet update failed: %w", err)
+	}
+
+	return nil
+}
+
+// BeforeApply should be called before applying the objects.
+// It pre-updates the parent object so that it covers the resources that will be applied.
+// In this way, even if we are interrupted, we will not leak objects.
+func (a *ApplySet) BeforeApply(objects []*resource.Info, dryRunStrategy cmdutil.DryRunStrategy, validationDirective string) error {
+	if err := a.fetchParent(); err != nil {
+		return err
+	}
+	// Update the live parent object to the superset of the current and previous resources.
+	// Doing this before the actual apply and prune operations improves behavior by ensuring
+	// the live object contains the superset on failure. This may cause the next pruning
+	// operation to make a larger number of GET requests than strictly necessary, but it prevents
+	// object leakage from the set. The superset will automatically be reduced to the correct
+	// set by the next successful operation.
+	for _, info := range objects {
+		a.addResource(info.ResourceMapping(), info.Namespace)
+	}
+	if err := a.updateParent(updateToSuperset, dryRunStrategy, validationDirective); err != nil {
+		return err
+	}
+	return nil
 }
