@@ -836,8 +836,8 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 
 		// if the secret is not nil, compare it
 		if expectedCall.expectedSecret != nil {
-			if !reflect.DeepEqual(expectedCall.expectedSecret, c.Request.Secret) {
-				return allCalls, i, fmt.Errorf("Unexpected secret: expected %v, got %v", expectedCall.expectedSecret, c.Request.Secret)
+			if !reflect.DeepEqual(expectedCall.expectedSecret, c.Request.Secrets) {
+				return allCalls, i, fmt.Errorf("Unexpected secret: expected %v, got %v", expectedCall.expectedSecret, c.Request.Secrets)
 			}
 		}
 

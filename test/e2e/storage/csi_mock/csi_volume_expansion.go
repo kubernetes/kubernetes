@@ -311,10 +311,9 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
-				var allCalls []drivers.MockCSICall
 				err = wait.Poll(time.Second, csiResizeWaitPeriod, func() (done bool, err error) {
 					var index int
-					allCalls, index, err = compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					_, index, err = compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
 					}
@@ -328,7 +327,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err, fmt.Sprintf("while waiting for all CSI calls: %s", allCalls))
+				framework.ExpectNoError(err, "while waiting for all CSI calls")
 
 				pvcConditions := pvc.Status.Conditions
 				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
