@@ -2435,7 +2435,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `, string(createdSecret))
@@ -2465,7 +2465,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `, string(updatedSecret))
@@ -2496,7 +2496,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `, string(updatedSecret))
@@ -2527,7 +2527,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `, string(updatedSecret))
@@ -2577,7 +2577,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			}),
 		}
 	}
-	validIDLabel := "placeholder-todo"
+	validIDLabel := "applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1"
 	validToolingAnnotation := "kubectl/v1.27.0"
 	validGrsAnnotation := "deployments.apps,namespaces,secrets"
 
@@ -2866,7 +2866,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `
@@ -3146,4 +3146,76 @@ func fatalNoExit(t *testing.T, ioStreams genericclioptions.IOStreams) func(msg s
 			fmt.Fprint(ioStreams.ErrOut, msg)
 		}
 	}
+}
+
+func TestApplySetDryRun(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	nameRC, rc := readReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+	nameParentSecret := "mySet"
+	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// Scenario: the rc 'exists' server side but the applyset secret does not
+	// In dry run mode, non-dry run patch requests should not be made, and the secret should not be created
+	serverSideData := map[string][]byte{
+		pathRC: rc,
+	}
+	fakeDryRunClient := func(t *testing.T, allowPatch bool) *fake.RESTClient {
+		return &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == "GET" {
+					data, ok := serverSideData[req.URL.Path]
+					if !ok {
+						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+				}
+				if req.Method == "PATCH" && allowPatch && req.URL.Query().Get("dryRun") == "All" {
+					data, err := io.ReadAll(req.Body)
+					require.NoError(t, err)
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
+				}
+
+				t.Fatalf("unexpected request: to %s\n%#v", req.URL.Path, req)
+				return nil, nil
+			}),
+		}
+	}
+
+	t.Run("server side dry run", func(t *testing.T) {
+		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
+		tf.Client = fakeDryRunClient(t, true)
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("server-side", "true")
+			cmd.Flags().Set("applyset", nameParentSecret)
+			cmd.Flags().Set("prune", "true")
+			cmd.Flags().Set("dry-run", "server")
+			cmd.Run(cmd, []string{})
+		})
+		assert.Equal(t, "replicationcontroller/test-rc serverside-applied (server dry run)\n", outbuff.String())
+		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		require.Nil(t, serverSideData[pathSecret], "secret was created")
+	})
+
+	t.Run("client side dry run", func(t *testing.T) {
+		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
+		tf.Client = fakeDryRunClient(t, false)
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("applyset", nameParentSecret)
+			cmd.Flags().Set("prune", "true")
+			cmd.Flags().Set("dry-run", "client")
+			cmd.Run(cmd, []string{})
+		})
+		assert.Equal(t, "replicationcontroller/test-rc configured (dry run)\n", outbuff.String())
+		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		require.Nil(t, serverSideData[pathSecret], "secret was created")
+	})
 }

@@ -313,7 +313,6 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		if enforceNamespace && parent.IsNamespaced() {
 			parent.Namespace = namespace
 		}
-		// TODO: is version.Get() the right thing? Does it work for non-kubectl package consumers?
 		tooling := ApplySetTooling{name: baseName, version: ApplySetToolVersion}
 		restClient, err := f.ClientForMapping(parent.RESTMapping)
 		if err != nil || restClient == nil {
@@ -419,8 +418,6 @@ func (o *ApplyOptions) Validate() error {
 				return fmt.Errorf("--selector is incompatible with --applyset")
 			} else if len(o.PruneResources) > 0 {
 				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
-			} else {
-				klog.Warning("WARNING: --prune --applyset is not fully implemented and does not yet prune any resources.")
 			}
 		} else {
 			if !o.All && o.Selector == "" {
