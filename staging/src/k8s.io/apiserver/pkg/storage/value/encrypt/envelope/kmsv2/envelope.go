@@ -21,9 +21,12 @@ import (
 	"context"
 	"crypto/aes"
 	"fmt"
+	"sort"
 	"time"
+	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
+	"golang.org/x/crypto/cryptobyte"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -87,6 +90,9 @@ type State struct {
 	UID string
 
 	ExpirationTimestamp time.Time
+
+	// CacheKey is the key used to cache the DEK in transformer.cache.
+	CacheKey []byte
 }
 
 func (s *State) ValidateEncryptCapability() error {
@@ -137,8 +143,13 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 		return nil, false, err
 	}
 
+	encryptedObjectCacheKey, err := generateCacheKey(encryptedObject.EncryptedDEK, encryptedObject.KeyID, encryptedObject.Annotations)
+	if err != nil {
+		return nil, false, err
+	}
+
 	// Look up the decrypted DEK from cache first
-	transformer := t.cache.get(encryptedObject.EncryptedDEK)
+	transformer := t.cache.get(encryptedObjectCacheKey)
 
 	// fallback to the envelope service if we do not have the transformer locally
 	if transformer == nil {
@@ -159,7 +170,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			return nil, false, fmt.Errorf("failed to decrypt DEK, error: %w", err)
 		}
 
-		transformer, err = t.addTransformerForDecryption(encryptedObject.EncryptedDEK, key)
+		transformer, err = t.addTransformerForDecryption(encryptedObjectCacheKey, key)
 		if err != nil {
 			return nil, false, err
 		}
@@ -190,7 +201,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	// this has the side benefit of causing the cache to perform a GC
 	// TODO see if we can do this inside the stateFunc control loop
 	// TODO(aramase): Add metrics for cache fill percentage with custom cache implementation.
-	t.cache.set(state.EncryptedDEK, state.Transformer)
+	t.cache.set(state.CacheKey, state.Transformer)
 
 	requestInfo := getRequestInfoFromContext(ctx)
 	klog.V(6).InfoS("encrypting content using DEK", "uid", state.UID, "key", string(dataCtx.AuthenticatedData()),
@@ -216,7 +227,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 }
 
 // addTransformerForDecryption inserts a new transformer to the Envelope cache of DEKs for future reads.
-func (t *envelopeTransformer) addTransformerForDecryption(encKey []byte, key []byte) (decryptTransformer, error) {
+func (t *envelopeTransformer) addTransformerForDecryption(cacheKey []byte, key []byte) (decryptTransformer, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -228,7 +239,7 @@ func (t *envelopeTransformer) addTransformerForDecryption(encKey []byte, key []b
 		return nil, err
 	}
 	// TODO(aramase): Add metrics for cache fill percentage with custom cache implementation.
-	t.cache.set(encKey, transformer)
+	t.cache.set(cacheKey, transformer)
 	return transformer, nil
 }
 
@@ -254,20 +265,25 @@ func (t *envelopeTransformer) doDecode(originalData []byte) (*kmstypes.Encrypted
 	return o, nil
 }
 
-func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsservice.Service) (value.Transformer, *kmsservice.EncryptResponse, error) {
+func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsservice.Service) (value.Transformer, *kmsservice.EncryptResponse, []byte, error) {
 	transformer, newKey, err := aestransformer.NewGCMTransformerWithUniqueKeyUnsafe()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid)
 
 	resp, err := envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
 	}
 
-	return transformer, resp, nil
+	cacheKey, err := generateCacheKey(resp.Ciphertext, resp.KeyID, resp.Annotations)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return transformer, resp, cacheKey, nil
 }
 
 func validateEncryptedObject(o *kmstypes.EncryptedObject) error {
@@ -338,4 +354,60 @@ func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestIn
 		return reqInfo
 	}
 	return &genericapirequest.RequestInfo{}
+}
+
+// generateCacheKey returns a key for the cache.
+// The key is a concatenation of:
+//  1. encryptedDEK
+//  2. keyID
+//  3. length of annotations
+//  4. annotations (sorted by key) - each annotation is a concatenation of:
+//     a. annotation key
+//     b. annotation value
+func generateCacheKey(encryptedDEK []byte, keyID string, annotations map[string][]byte) ([]byte, error) {
+	// TODO(aramase): use sync pool buffer to avoid allocations
+	b := cryptobyte.NewBuilder(nil)
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes(encryptedDEK)
+	})
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes(toBytes(keyID))
+	})
+	if len(annotations) == 0 {
+		return b.Bytes()
+	}
+
+	// add the length of annotations to the cache key
+	b.AddUint32(uint32(len(annotations)))
+
+	// Sort the annotations by key.
+	keys := make([]string, 0, len(annotations))
+	for k := range annotations {
+		k := k
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		// The maximum size of annotations is annotationsMaxSize (32 kB) so we can safely
+		// assume that the length of the key and value will fit in a uint16.
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes(toBytes(k))
+		})
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes(annotations[k])
+		})
+	}
+
+	return b.Bytes()
+}
+
+// toBytes performs unholy acts to avoid allocations
+func toBytes(s string) []byte {
+	// unsafe.StringData is unspecified for the empty string, so we provide a strict interpretation
+	if len(s) == 0 {
+		return nil
+	}
+	// Copied from go 1.20.1 os.File.WriteString
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/os/file.go#L246
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
