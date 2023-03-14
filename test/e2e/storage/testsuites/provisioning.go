@@ -19,6 +19,8 @@ package testsuites
 import (
 	"context"
 	"fmt"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -198,7 +200,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	ginkgo.It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
 		if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
-			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
 		}
 		if !dInfo.SupportedFsType.Has(pattern.FsType) {
 			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
@@ -402,6 +404,91 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 
 		l.testCase.TestDynamicProvisioning(ctx)
+	})
+
+	ginkgo.It("should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
+		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("Test is not valid Windows - skipping")
+		}
+
+		if pattern.VolMode == "Block" {
+			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
+		}
+
+		if dInfo.Capabilities[storageframework.CapFSResizeFromSourceNotSupported] {
+			e2eskipper.Skipf("Driver %q does not support filesystem resizing - skipping", dInfo.Name)
+		}
+
+		if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
+			e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
+		}
+
+		if !dInfo.SupportedFsType.Has(pattern.FsType) {
+			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
+		}
+
+		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
+		if !ok {
+			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+		}
+
+		init(ctx)
+		pvc2 := l.pvc.DeepCopy()
+		l.pvc.Name = "pvc-origin"
+		dc := l.config.Framework.DynamicClient
+		testConfig := storageframework.ConvertTestConfig(l.config)
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+
+		// Get the created PVC and record the actual size of the pv (from pvc status).
+		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
+		actualPVSize := c.Status.Capacity.Storage().Value()
+
+		createdClaims := []*v1.PersistentVolumeClaim{c}
+		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+
+		// Mount path should not be empty.
+		mountpath := findVolumeMountPath(pod, c)
+		gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
+
+		// Save filesystem size of the origin volume.
+		originFSSize, err := getFilesystemSizeBytes(pod, mountpath)
+		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+
+		// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
+		storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
+		storageRequest.Add(resource.MustParse("1Gi"))
+		pvc2.Spec.Resources.Requests = v1.ResourceList{
+			v1.ResourceStorage: *storageRequest,
+		}
+
+		// Set PVC snapshot data source.
+		pvc2.Spec.DataSourceRef = dataSourceRef
+
+		// Create a new claim and a pod that will use the new PVC.
+		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
+		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
+		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+
+		// Mount path should not be empty.
+		mountpath2 := findVolumeMountPath(pod2, c2)
+		gomega.Expect(mountpath2).ShouldNot(gomega.BeEmpty())
+
+		// Get actual size of the restored filesystem.
+		restoredFSSize, err := getFilesystemSizeBytes(pod2, mountpath2)
+		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+
+		// Filesystem of a restored volume should be larger than the origin.
+		msg := fmt.Sprintf("Filesystem resize failed when restoring from snapshot to PVC with larger size. "+
+			"Restored fs size: %v bytes is not larger than origin fs size: %v bytes.\n"+
+			"HINT: Your driver needs to check the volume in NodeStageVolume and resize fs if needed.\n"+
+			"HINT: For an example patch see: https://github.com/kubernetes/cloud-provider-openstack/pull/1563/files",
+			restoredFSSize, originFSSize)
+		gomega.Expect(restoredFSSize).Should(gomega.BeNumerically(">", originFSSize), msg)
 	})
 
 	ginkgo.It("should provision storage with pvc data source", func(ctx context.Context) {
@@ -1136,6 +1223,55 @@ func preparePVCDataSourceForProvisioning(
 	ginkgo.DeferCleanup(cleanupFunc)
 
 	return dataSourceRef
+}
+
+// findVolumeMountPath looks for a claim name inside a pod and returns an absolute path of its volume mount point.
+func findVolumeMountPath(pod *v1.Pod, claim *v1.PersistentVolumeClaim) string {
+	// Find volume name that the pod2 assigned to pvc.
+	volumeName = ""
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim.ClaimName == claim.Name {
+			volumeName = volume.Name
+			break
+		}
+	}
+
+	// Find where the pod mounted the volume inside a container.
+	containerMountPath := ""
+	for _, volumeMount := range pod.Spec.Containers[0].VolumeMounts {
+		if volumeMount.Name == volumeName {
+			containerMountPath = volumeMount.MountPath
+			break
+		}
+	}
+	return containerMountPath
+}
+
+// getFilesystemSizeBytes returns a total size of a filesystem on given mountPath inside a pod. You can use findVolumeMountPath for mountPath lookup.
+func getFilesystemSizeBytes(pod *v1.Pod, mountPath string) (int, error) {
+	cmd := fmt.Sprintf("stat -f -c %%s %v", mountPath)
+	blockSize, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--", "/bin/sh", "-c", cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	cmd = fmt.Sprintf("stat -f -c %%b %v", mountPath)
+	blockCount, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--", "/bin/sh", "-c", cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	bs, err := strconv.Atoi(strings.TrimSuffix(blockSize, "\n"))
+	if err != nil {
+		return 0, err
+	}
+
+	bc, err := strconv.Atoi(strings.TrimSuffix(blockCount, "\n"))
+	if err != nil {
+		return 0, err
+	}
+
+	return bs * bc, nil
 }
 
 // MultiplePVMountSingleNodeCheck checks that multiple PV pointing to the same underlying storage can be mounted simultaneously on a single node.
