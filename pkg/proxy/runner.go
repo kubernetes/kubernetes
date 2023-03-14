@@ -31,20 +31,48 @@ import (
 	"k8s.io/klog/v2"
 	proxyapis "k8s.io/kubernetes/pkg/proxy/apis"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/util/async"
 )
 
 type Runner struct {
 	ipv4Proxier Provider
+	ipv4Runner  *async.BoundedFrequencyRunner
+
 	ipv6Proxier Provider
+	ipv6Runner  *async.BoundedFrequencyRunner
+
+	syncPeriod    time.Duration
+	minSyncPeriod time.Duration
+	healthzServer healthcheck.ProxierHealthUpdater
 }
 
 // NewRunner returns a proxy runner that dispatches to the underlying IPv4
 // and/or IPv6 proxies.
-func NewRunner(ipv4Proxier, ipv6Proxier Provider) *Runner {
-	return &Runner{
-		ipv4Proxier: ipv4Proxier,
-		ipv6Proxier: ipv6Proxier,
+func NewRunner(
+	ipv4Proxier   Provider,
+	ipv6Proxier   Provider,
+	syncPeriod    time.Duration,
+	minSyncPeriod time.Duration,
+	healthzServer healthcheck.ProxierHealthUpdater,
+) *Runner {
+	r := &Runner{
+		ipv4Proxier:   ipv4Proxier,
+		ipv6Proxier:   ipv6Proxier,
+		syncPeriod:    syncPeriod,
+		minSyncPeriod: syncPeriod,
+		healthzServer: healthzServer,
 	}
+
+	if ipv4Proxier != nil {
+		r.ipv4Runner = async.NewBoundedFrequencyRunner("ipv4Runner", r.ipv4SyncNow, minSyncPeriod, time.Hour, 2)
+	}
+	if ipv6Proxier != nil {
+		r.ipv6Runner = async.NewBoundedFrequencyRunner("ipv6Runner", r.ipv6SyncNow, minSyncPeriod, time.Hour, 2)
+	}
+
+	return r
 }
 
 // StartInformers starts the runner's informers
@@ -100,21 +128,75 @@ func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod 
 
 // Run starts the main loop of the Runner (in other goroutines)
 func (r *Runner) Run() {
-	if r.ipv4Proxier != nil {
-		go r.ipv4Proxier.SyncLoop()
-	} else if r.ipv6Proxier != nil {
-		go r.ipv6Proxier.SyncLoop()
+	r.healthzServer.Updated()
+	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
+
+	if r.ipv4Runner != nil {
+		go r.ipv4Runner.Loop(wait.NeverStop)
+	}
+	if r.ipv6Runner != nil {
+		go r.ipv6Runner.Loop(wait.NeverStop)
 	}
 }
 
-// ipv4Sync immediately synchronizes the IPv4 provider
-func (r *Runner) ipv4Sync() {
-	r.ipv4Proxier.Sync()
+// ipv4SyncNow immediately synchronizes the IPv4 provider
+func (r *Runner) ipv4SyncNow() {
+	// Keep track of how long syncs take.
+	start := time.Now()
+	defer func() {
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		klog.V(2).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
+	}()
+
+	switch r.ipv4Proxier.Sync() {
+	case SyncSuccess:
+		r.healthzServer.Updated()
+		metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
+
+	case SyncFailure:
+
+	case SyncRetry:
+		klog.InfoS("Sync failed", "retryingTime", r.syncPeriod)
+		r.ipv4Runner.RetryAfter(r.syncPeriod)
+	}
 }
 
-// ipv6Sync immediately synchronizes the IPv6 provider
+// ipv4Sync queues a sync of the IPv4 provider
+func (r *Runner) ipv4Sync() {
+	r.healthzServer.QueuedUpdate()
+	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
+
+	r.ipv4Runner.Run()
+}
+
+// ipv6SyncNow immediately synchronizes the IPv6 provider
+func (r *Runner) ipv6SyncNow() {
+	// Keep track of how long syncs take.
+	start := time.Now()
+	defer func() {
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
+	}()
+
+	switch r.ipv6Proxier.Sync() {
+	case SyncSuccess:
+		r.healthzServer.Updated()
+		metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
+
+	case SyncFailure:
+
+	case SyncRetry:
+		klog.InfoS("Sync failed", "retryingTime", r.syncPeriod)
+		r.ipv6Runner.RetryAfter(r.syncPeriod)
+	}
+}
+
+// ipv6Sync queues a sync of the IPv4 provider
 func (r *Runner) ipv6Sync() {
-	r.ipv6Proxier.Sync()
+	r.healthzServer.QueuedUpdate()
+	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
+
+	r.ipv6Runner.Run()
 }
 
 // OnServiceAdd is called whenever creation of new service object is observed.

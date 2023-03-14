@@ -599,7 +599,12 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		}
 	}
 
-	s.ProxyRunner = proxy.NewRunner(ipv4Proxier, ipv6Proxier)
+	s.ProxyRunner = proxy.NewRunner(
+		ipv4Proxier, ipv6Proxier,
+		// FIXME: iptables-specific
+		config.IPTables.SyncPeriod.Duration,
+		config.IPTables.MinSyncPeriod.Duration,
+		s.HealthzServer)
 	return s, nil
 }
 

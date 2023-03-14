@@ -114,7 +114,7 @@ func NewHollowProxyOrDie(
 			},
 
 			Client:      client,
-			ProxyRunner: proxy.NewRunner(ipv4Proxier, ipv6Proxier),
+			ProxyRunner: proxy.NewRunner(ipv4Proxier, ipv6Proxier, 30 * time.Second, time.Second, FIXME_healthz),
 			Broadcaster: broadcaster,
 			Recorder:    recorder,
 			NodeRef:     nodeRef,

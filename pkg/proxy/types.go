@@ -48,12 +48,16 @@ type Provider interface {
 	OnNodeSynced()
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
-	Sync()
-	// SyncLoop runs periodic work.
-	// This is expected to run as a goroutine or as the main loop of the app.
-	// It does not return.
-	SyncLoop()
+	Sync() SyncResult
 }
+
+type SyncResult int
+
+const (
+	SyncFailure SyncResult = iota
+	SyncRetry
+	SyncSuccess
+)
 
 // ServicePortName carries a namespace + name + portname.  This is the unique
 // identifier for a load-balanced service.
