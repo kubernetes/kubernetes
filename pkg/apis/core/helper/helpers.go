@@ -156,6 +156,7 @@ var standardContainerResources = sets.NewString(
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),
 	string(core.ResourceEphemeralStorage),
+	string(core.ResourceSwap),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
@@ -256,6 +257,7 @@ var standardResources = sets.NewString(
 	string(core.ResourceRequestsStorage),
 	string(core.ResourceServicesNodePorts),
 	string(core.ResourceServicesLoadBalancers),
+	string(core.ResourceSwap),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
