@@ -1276,6 +1276,11 @@ EOF
 RUN_CONTROLLERS: $(yaml-quote "${RUN_CONTROLLERS}")
 EOF
   fi
+  if [ -n "${RUN_CCM_CONTROLLERS:-}" ]; then
+    cat >>"$file" <<EOF
+RUN_CCM_CONTROLLERS: $(yaml-quote "${RUN_CCM_CONTROLLERS}")
+EOF
+  fi
   if [ -n "${PROVIDER_VARS:-}" ]; then
     local var_name
     local var_value
