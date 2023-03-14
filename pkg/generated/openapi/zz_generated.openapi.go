@@ -58380,7 +58380,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"tracing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Tracing specifies the versioned configuration for OpenTelemetry tracing clients. See https://kep.k8s.io/2832 for more details.",
+							Description: "Tracing specifies the versioned configuration for OpenTelemetry tracing clients. See https://kep.k8s.io/2832 for more details. Default: nil",
 							Ref:         ref("k8s.io/component-base/tracing/api/v1.TracingConfiguration"),
 						},
 					},

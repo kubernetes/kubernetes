@@ -460,6 +460,7 @@ const (
 	// owner: @sallyom
 	// kep: https://kep.k8s.io/2832
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Add support for distributed tracing in the kubelet
 	KubeletTracing featuregate.Feature = "KubeletTracing"
@@ -1013,7 +1014,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.Beta},
 
-	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
+	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 

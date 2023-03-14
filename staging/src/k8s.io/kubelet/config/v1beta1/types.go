@@ -798,6 +798,7 @@ type KubeletConfiguration struct {
 	RegisterNode *bool `json:"registerNode,omitempty"`
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
+	// Default: nil
 	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`

@@ -1280,7 +1280,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	hostname, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine hostname for tracer provider: %v", err)
+		return nil, fmt.Errorf("could not determine hostname for tracer provider: %w", err)
 	}
 	resourceOpts := []otelsdkresource.Option{
 		otelsdkresource.WithAttributes(
@@ -1290,7 +1290,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlptracegrpc.Option{}, resourceOpts)
 	if err != nil {
-		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
+		return nil, fmt.Errorf("could not configure tracer provider: %w", err)
 	}
 	return tp, nil
 }

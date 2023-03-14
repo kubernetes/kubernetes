@@ -93,6 +93,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
+ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
@@ -753,7 +754,7 @@ staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
 
-    if [[ "$FEATURE_GATES" == *KubeletTracing=true* ]]; then
+  if [[ "$ENABLE_TRACING" = true ]]; then
         cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
 tracing:
   endpoint: localhost:4317 # the default value
