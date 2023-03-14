@@ -21,12 +21,13 @@ import (
 	"errors"
 	"fmt"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	"github.com/google/cel-go/cel"
 	celtypes "github.com/google/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	celplugin "k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -87,9 +88,9 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 			return MatchResult{
 				Error: err,
 			}
-		} else {
+		} else if m.failPolicy == v1.Ignore {
 			return MatchResult{
-				Matches: true,
+				Matches: false,
 			}
 		}
 	}
@@ -120,13 +121,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 		// If mix of true and eval errors then resort to fail policy
 		if m.failPolicy == v1.Fail {
 			// mix of true and errors with fail policy fail should fail request without calling webhook
-			if len(errorList) > 1 {
-				for i := 1; i < len(errorList); i++ {
-					// TODO: merge errors; until then, just return the first one.
-					utilruntime.HandleError(errorList[i])
-				}
-			}
-			err = errors.New(fmt.Sprintf("Error evaluating match conditions for %v: %v with failurePolicyType fail", m.objectName, errorList[0]))
+			err = utilerrors.NewAggregate(errorList)
 			return MatchResult{
 				Error: err,
 			}

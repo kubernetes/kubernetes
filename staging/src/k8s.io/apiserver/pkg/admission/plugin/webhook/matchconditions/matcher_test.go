@@ -191,7 +191,7 @@ func TestMatch(t *testing.T) {
 			returnedName: "test1",
 		},
 		{
-			name: "test error",
+			name: "test error, no fail policy",
 			evaluations: []cel.EvaluationResult{
 				{
 					EvalResult:         celtypes.True,
@@ -201,6 +201,31 @@ func TestMatch(t *testing.T) {
 			shouldMatch: true,
 			throwError:  true,
 			expectError: "test error",
+		},
+		{
+			name: "test error, fail policy fail",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &MatchCondition{},
+				},
+			},
+			failPolicy:  &fail,
+			shouldMatch: true,
+			throwError:  true,
+			expectError: "test error",
+		},
+		{
+			name: "test error, fail policy ignore",
+			evaluations: []cel.EvaluationResult{
+				{
+					EvalResult:         celtypes.True,
+					ExpressionAccessor: &MatchCondition{},
+				},
+			},
+			failPolicy:  &ignore,
+			shouldMatch: false,
+			throwError:  true,
 		},
 		{
 			name: "test mix of true, errors and false",
@@ -251,7 +276,7 @@ func TestMatch(t *testing.T) {
 			},
 			shouldMatch: false,
 			throwError:  false,
-			expectError: "Error evaluating match conditions for testhook: test error with failurePolicyType fail",
+			expectError: "test error",
 		},
 		{
 			name: "test mix of true, errors and fail policy fail",
@@ -276,7 +301,7 @@ func TestMatch(t *testing.T) {
 			failPolicy:  &fail,
 			shouldMatch: false,
 			throwError:  false,
-			expectError: "Error evaluating match conditions for testhook: test error with failurePolicyType fail",
+			expectError: "test error",
 		},
 		{
 			name: "test mix of true, errors and fail policy ignore",
@@ -324,7 +349,7 @@ func TestMatch(t *testing.T) {
 			} else if len(tc.expectError) > 0 {
 				t.Fatal("expected error but did not get one")
 			}
-			if tc.throwError && matchResult.Error == nil {
+			if len(tc.expectError) > 0 && matchResult.Error == nil {
 				t.Errorf("expected error thrown when filter errors")
 			}
 
