@@ -17,9 +17,20 @@ limitations under the License.
 package proxy
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	proxyapis "k8s.io/kubernetes/pkg/proxy/apis"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 )
 
 type Runner struct {
@@ -34,6 +45,57 @@ func NewRunner(ipv4Proxier, ipv6Proxier Provider) *Runner {
 		ipv4Proxier: ipv4Proxier,
 		ipv6Proxier: ipv6Proxier,
 	}
+}
+
+// StartInformers starts the runner's informers
+func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod time.Duration, nodeName string, useNodeCIDRInformer bool, podCIDRs []string) error {
+	// NewRequirement can't return an error if you're passing it known-valid data
+	noProxyName, _ := labels.NewRequirement(proxyapis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	noHeadlessEndpoints, _ := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	labelSelector := labels.NewSelector()
+	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+
+	// Make informers that filter out objects that want a non-default service proxy.
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, informerSyncPeriod,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
+		}))
+
+	// Create configs (i.e. Watches for Services and EndpointSlices)
+	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
+	// only notify on changes, and the initial update (on process start) may be lost if no handlers
+	// are registered yet.
+	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().V1().Services(), informerSyncPeriod)
+	serviceConfig.RegisterEventHandler(r)
+	go serviceConfig.Run(wait.NeverStop)
+
+	endpointSliceConfig := proxyconfig.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), informerSyncPeriod)
+	endpointSliceConfig.RegisterEventHandler(r)
+	go endpointSliceConfig.Run(wait.NeverStop)
+
+	// This has to start after the calls to NewServiceConfig because that
+	// function must configure its shared informer event handlers first.
+	informerFactory.Start(wait.NeverStop)
+
+	// Make an informer that selects for our nodename.
+	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, informerSyncPeriod,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", nodeName).String()
+		}))
+	nodeConfig := proxyconfig.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), informerSyncPeriod)
+
+	if useNodeCIDRInformer {
+		nodeConfig.RegisterEventHandler(NewNodePodCIDRHandler(podCIDRs))
+	}
+	nodeConfig.RegisterEventHandler(r)
+
+	go nodeConfig.Run(wait.NeverStop)
+
+	// This has to start after the calls to NewNodeConfig because that must
+	// configure the shared informer event handler first.
+	currentNodeInformerFactory.Start(wait.NeverStop)
+
+	return nil
 }
 
 // Sync immediately synchronizes the providers' current states to the proxy rules.

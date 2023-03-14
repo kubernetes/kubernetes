@@ -34,12 +34,8 @@ import (
 	"github.com/spf13/pflag"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -48,7 +44,6 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,12 +67,10 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
-	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
@@ -834,58 +827,11 @@ func (s *ProxyServer) Run() error {
 	// Start up a metrics server if requested
 	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, errCh)
 
-	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
-	if err != nil {
-		return err
-	}
-
-	noHeadlessEndpoints, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
-	if err != nil {
-		return err
-	}
-
-	labelSelector := labels.NewSelector()
-	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
-
-	// Make informers that filter out objects that want a non-default service proxy.
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelector.String()
-		}))
-
-	// Create configs (i.e. Watches for Services and EndpointSlices)
-	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
-	// only notify on changes, and the initial update (on process start) may be lost if no handlers
-	// are registered yet.
-	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
-	serviceConfig.RegisterEventHandler(s.ProxyRunner)
-	go serviceConfig.Run(wait.NeverStop)
-
-	endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
-	endpointSliceConfig.RegisterEventHandler(s.ProxyRunner)
-	go endpointSliceConfig.Run(wait.NeverStop)
-
-	// This has to start after the calls to NewServiceConfig because that
-	// function must configure its shared informer event handlers first.
-	informerFactory.Start(wait.NeverStop)
-
-	// Make an informer that selects for our nodename.
-	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
-		}))
-	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
-	// https://issues.k8s.io/111321
-	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
-	}
-	nodeConfig.RegisterEventHandler(s.ProxyRunner)
-
-	go nodeConfig.Run(wait.NeverStop)
-
-	// This has to start after the calls to NewNodeConfig because that must
-	// configure the shared informer event handler first.
-	currentNodeInformerFactory.Start(wait.NeverStop)
+	// Start watching Service/EndpointSlice/Node changes
+	s.ProxyRunner.StartInformers(
+		s.Client, s.Config.ConfigSyncPeriod.Duration,
+		s.NodeRef.Name,
+		s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR, s.podCIDRs)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
