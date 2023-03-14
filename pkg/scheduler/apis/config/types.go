@@ -247,13 +247,13 @@ func (p *Plugins) Names() []string {
 		p.Permit,
 		p.QueueSort,
 	}
-	n := sets.NewString()
+	n := sets.New[string]()
 	for _, e := range extensions {
 		for _, pg := range e.Enabled {
 			n.Insert(pg.Name)
 		}
 	}
-	return n.List()
+	return sets.List(n)
 }
 
 // Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
