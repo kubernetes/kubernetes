@@ -1637,7 +1637,8 @@ func TestSyncKnownPods(t *testing.T) {
 	// verify workers that are not terminated stay open even if config no longer
 	// sees them
 	podWorkers.SyncKnownPods(nil)
-	if len(podWorkers.podUpdates) != 2 {
+	drainAllWorkers(podWorkers)
+	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 	if len(podWorkers.podSyncStatuses) != 2 {
