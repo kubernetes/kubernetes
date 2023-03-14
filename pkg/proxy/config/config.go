@@ -41,9 +41,6 @@ type ServiceHandler interface {
 	// OnServiceDelete is called whenever deletion of an existing service
 	// object is observed.
 	OnServiceDelete(service *v1.Service)
-	// OnServiceSynced is called once all the initial event handlers were
-	// called and the state is fully propagated to local cache.
-	OnServiceSynced()
 }
 
 // EndpointSliceHandler is an abstract interface of objects which receive
@@ -58,22 +55,16 @@ type EndpointSliceHandler interface {
 	// OnEndpointSliceDelete is called whenever deletion of an existing
 	// endpoint slice object is observed.
 	OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice)
-	// OnEndpointSlicesSynced is called once all the initial event handlers were
-	// called and the state is fully propagated to local cache.
-	OnEndpointSlicesSynced()
 }
 
 // EndpointSliceConfig tracks a set of endpoints configurations.
 type EndpointSliceConfig struct {
-	listerSynced  cache.InformerSynced
 	eventHandlers []EndpointSliceHandler
 }
 
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
 func NewEndpointSliceConfig(endpointSliceInformer discoveryinformers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
-	result := &EndpointSliceConfig{
-		listerSynced: endpointSliceInformer.Informer().HasSynced,
-	}
+	result := &EndpointSliceConfig{}
 
 	endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -90,20 +81,6 @@ func NewEndpointSliceConfig(endpointSliceInformer discoveryinformers.EndpointSli
 // RegisterEventHandler registers a handler which is called on every endpoint slice change.
 func (c *EndpointSliceConfig) RegisterEventHandler(handler EndpointSliceHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
-}
-
-// Run waits for cache synced and invokes handlers after syncing.
-func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting endpoint slice config controller")
-
-	if !cache.WaitForNamedCacheSync("endpoint slice config", stopCh, c.listerSynced) {
-		return
-	}
-
-	for _, h := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnEndpointSlicesSynced()")
-		h.OnEndpointSlicesSynced()
-	}
 }
 
 func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
@@ -156,15 +133,12 @@ func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
 
 // ServiceConfig tracks a set of service configurations.
 type ServiceConfig struct {
-	listerSynced  cache.InformerSynced
 	eventHandlers []ServiceHandler
 }
 
 // NewServiceConfig creates a new ServiceConfig.
 func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
-	result := &ServiceConfig{
-		listerSynced: serviceInformer.Informer().HasSynced,
-	}
+	result := &ServiceConfig{}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -181,20 +155,6 @@ func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPerio
 // RegisterEventHandler registers a handler which is called on every service change.
 func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
-}
-
-// Run waits for cache synced and invokes handlers after syncing.
-func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting service config controller")
-
-	if !cache.WaitForNamedCacheSync("service config", stopCh, c.listerSynced) {
-		return
-	}
-
-	for i := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnServiceSynced()")
-		c.eventHandlers[i].OnServiceSynced()
-	}
 }
 
 func (c *ServiceConfig) handleAddService(obj interface{}) {
@@ -257,23 +217,17 @@ type NodeHandler interface {
 	// OnNodeDelete is called whenever deletion of an existing node
 	// object is observed.
 	OnNodeDelete(node *v1.Node)
-	// OnNodeSynced is called once all the initial event handlers were
-	// called and the state is fully propagated to local cache.
-	OnNodeSynced()
 }
 
 // NodeConfig tracks a set of node configurations.
 // It accepts "set", "add" and "remove" operations of node via channels, and invokes registered handlers on change.
 type NodeConfig struct {
-	listerSynced  cache.InformerSynced
 	eventHandlers []NodeHandler
 }
 
 // NewNodeConfig creates a new NodeConfig.
 func NewNodeConfig(nodeInformer coreinformers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
-	result := &NodeConfig{
-		listerSynced: nodeInformer.Informer().HasSynced,
-	}
+	result := &NodeConfig{}
 
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -290,20 +244,6 @@ func NewNodeConfig(nodeInformer coreinformers.NodeInformer, resyncPeriod time.Du
 // RegisterEventHandler registers a handler which is called on every node change.
 func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
-}
-
-// Run starts the goroutine responsible for calling registered handlers.
-func (c *NodeConfig) Run(stopCh <-chan struct{}) {
-	klog.InfoS("Starting node config controller")
-
-	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
-		return
-	}
-
-	for i := range c.eventHandlers {
-		klog.V(3).InfoS("Calling handler.OnNodeSynced()")
-		c.eventHandlers[i].OnNodeSynced()
-	}
 }
 
 func (c *NodeConfig) handleAddNode(obj interface{}) {

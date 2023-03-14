@@ -35,17 +35,14 @@ type Provider interface {
 	OnServiceAdd(service *v1.Service) bool
 	OnServiceUpdate(oldService, service *v1.Service) bool
 	OnServiceDelete(service *v1.Service) bool
-	OnServiceSynced()
 
 	OnEndpointSliceAdd(endpointSlice *discoveryv1.EndpointSlice) bool
 	OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discoveryv1.EndpointSlice) bool
 	OnEndpointSliceDelete(endpointSlice *discoveryv1.EndpointSlice) bool
-	OnEndpointSlicesSynced()
 
 	OnNodeAdd(node *v1.Node) bool
 	OnNodeUpdate(oldNode, node *v1.Node) bool
 	OnNodeDelete(node *v1.Node) bool
-	OnNodeSynced()
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
 	Sync() SyncResult

@@ -27,7 +27,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -231,12 +230,6 @@ type Proxier struct {
 	// For eg: it enables us to update weights of existing destinations only on startup
 	// saving us the cost of querying and updating real servers during every sync.
 	initialSync bool
-	// endpointSlicesSynced, and servicesSynced are set to true when
-	// corresponding objects are synced after startup. This is used to avoid updating
-	// ipvs rules with some partial data after kube-proxy restart.
-	endpointSlicesSynced bool
-	servicesSynced       bool
-	initialized          int32
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod    time.Duration
@@ -692,18 +685,6 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	return encounteredError
 }
 
-func (proxier *Proxier) setInitialized(value bool) {
-	var initialized int32
-	if value {
-		initialized = 1
-	}
-	atomic.StoreInt32(&proxier.initialized, initialized)
-}
-
-func (proxier *Proxier) isInitialized() bool {
-	return atomic.LoadInt32(&proxier.initialized) > 0
-}
-
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
 	return proxier.OnServiceUpdate(nil, service)
@@ -711,7 +692,7 @@ func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
 
 // OnServiceUpdate is called whenever modification of an existing service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
-	return proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized()
+	return proxier.serviceChanges.Update(oldService, service)
 }
 
 // OnServiceDelete is called whenever deletion of an existing service object is observed.
@@ -719,45 +700,22 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
 	return proxier.OnServiceUpdate(service, nil)
 }
 
-// OnServiceSynced is called once all the initial event handlers were called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnServiceSynced() {
-	proxier.mu.Lock()
-	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.endpointSlicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.Sync()
-}
-
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
 func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
 func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized()
-}
-
-// OnEndpointSlicesSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointSlicesSynced() {
-	proxier.mu.Lock()
-	proxier.endpointSlicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.Sync()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true)
 }
 
 // OnNodeAdd is called whenever creation of new node object
@@ -820,21 +778,10 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
 	return true
 }
 
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnNodeSynced() {
-}
-
 // This is where all of the ipvs calls happen.
 func (proxier *Proxier) Sync() proxy.SyncResult {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-
-	// don't sync rules till we've received services and endpoints
-	if !proxier.isInitialized() {
-		klog.V(2).InfoS("Not syncing ipvs rules until Services and Endpoints have been received from master")
-		return proxy.SyncSuccess
-	}
 
 	// its safe to set initialSync to false as it acts as a flag for startup actions
 	// and the mutex is held.

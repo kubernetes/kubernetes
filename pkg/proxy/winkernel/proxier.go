@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -595,14 +594,9 @@ type Proxier struct {
 	mu                sync.Mutex // protects the following fields
 	svcPortMap        proxy.ServicePortMap
 	endpointsMap      proxy.EndpointsMap
-	// endpointSlicesSynced and servicesSynced are set to true when corresponding
-	// objects are synced after startup. This is used to avoid updating hns policies
-	// with some partial data after kube-proxy restart.
-	endpointSlicesSynced bool
-	servicesSynced       bool
-	isIPv6Mode           bool
-	initialized          int32
+
 	// These are effectively const and do not need the mutex to be held.
+	isIPv6Mode  bool
 	clusterCIDR string
 	hostname    string
 	nodeIP      net.IP
@@ -903,18 +897,6 @@ func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-func (proxier *Proxier) setInitialized(value bool) {
-	var initialized int32
-	if value {
-		initialized = 1
-	}
-	atomic.StoreInt32(&proxier.initialized, initialized)
-}
-
-func (proxier *Proxier) isInitialized() bool {
-	return atomic.LoadInt32(&proxier.initialized) > 0
-}
-
 // OnServiceAdd is called whenever creation of new service object
 // is observed.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
@@ -924,7 +906,7 @@ func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
-	return proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized()
+	return proxier.serviceChanges.Update(oldService, service)
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
@@ -933,46 +915,22 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
 	return proxier.OnServiceUpdate(service, nil)
 }
 
-// OnServiceSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnServiceSynced() {
-	proxier.mu.Lock()
-	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.endpointSlicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.Sync()
-}
-
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
 func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
 func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized()
-}
-
-// OnEndpointSlicesSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointSlicesSynced() {
-	proxier.mu.Lock()
-	proxier.endpointSlicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.Sync()
+	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true)
 }
 
 // Not yet implemented...
@@ -986,9 +944,6 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
 
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
 	return false
-}
-
-func (proxier *Proxier) OnNodeSynced() {
 }
 
 func (proxier *Proxier) cleanupAllPolicies() {
@@ -1070,12 +1025,6 @@ func updateQueriedEndpoints(newHnsEndpoint *endpointsInfo, queriedEndpoints map[
 func (proxier *Proxier) Sync() proxy.SyncResult {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-
-	// don't sync rules till we've received services and endpoints
-	if !proxier.isInitialized() {
-		klog.V(2).InfoS("Not syncing hns until Services and Endpoints have been received from master")
-		return proxy.SyncSuccess
-	}
 
 	hnsNetworkName := proxier.network.name
 	hns := proxier.hns

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -46,6 +47,8 @@ type Runner struct {
 	syncPeriod    time.Duration
 	minSyncPeriod time.Duration
 	healthzServer healthcheck.ProxierHealthUpdater
+
+	informerWaiters []cache.InformerSynced
 }
 
 // NewRunner returns a proxy runner that dispatches to the underlying IPv4
@@ -67,9 +70,13 @@ func NewRunner(
 
 	if ipv4Proxier != nil {
 		r.ipv4Runner = async.NewBoundedFrequencyRunner("ipv4Runner", r.ipv4SyncNow, minSyncPeriod, time.Hour, 2)
+		// Queue a sync to occur as soon as the runner's loop is started
+		r.ipv4Runner.Run()
 	}
 	if ipv6Proxier != nil {
 		r.ipv6Runner = async.NewBoundedFrequencyRunner("ipv6Runner", r.ipv6SyncNow, minSyncPeriod, time.Hour, 2)
+		// Queue a sync to occur as soon as the runner's loop is started
+		r.ipv6Runner.Run()
 	}
 
 	return r
@@ -93,13 +100,15 @@ func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod 
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().V1().Services(), informerSyncPeriod)
+	serviceInformer := informerFactory.Core().V1().Services()
+	serviceConfig := proxyconfig.NewServiceConfig(serviceInformer, informerSyncPeriod)
 	serviceConfig.RegisterEventHandler(r)
-	go serviceConfig.Run(wait.NeverStop)
+	r.informerWaiters = append(r.informerWaiters, serviceInformer.Informer().HasSynced)
 
-	endpointSliceConfig := proxyconfig.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), informerSyncPeriod)
+	endpointSliceInformer := informerFactory.Discovery().V1().EndpointSlices()
+	endpointSliceConfig := proxyconfig.NewEndpointSliceConfig(endpointSliceInformer, informerSyncPeriod)
 	endpointSliceConfig.RegisterEventHandler(r)
-	go endpointSliceConfig.Run(wait.NeverStop)
+	r.informerWaiters = append(r.informerWaiters, endpointSliceInformer.Informer().HasSynced)
 
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
@@ -110,14 +119,14 @@ func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod 
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", nodeName).String()
 		}))
-	nodeConfig := proxyconfig.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), informerSyncPeriod)
+	nodeInformer := currentNodeInformerFactory.Core().V1().Nodes()
+	nodeConfig := proxyconfig.NewNodeConfig(nodeInformer, informerSyncPeriod)
+	r.informerWaiters = append(r.informerWaiters, nodeInformer.Informer().HasSynced)
 
 	if useNodeCIDRInformer {
 		nodeConfig.RegisterEventHandler(NewNodePodCIDRHandler(podCIDRs))
 	}
 	nodeConfig.RegisterEventHandler(r)
-
-	go nodeConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewNodeConfig because that must
 	// configure the shared informer event handler first.
@@ -128,6 +137,14 @@ func (r *Runner) StartInformers(client kubernetes.Interface, informerSyncPeriod 
 
 // Run starts the main loop of the Runner (in other goroutines)
 func (r *Runner) Run() {
+	go r.waitAndRun()
+}
+
+func (r *Runner) waitAndRun() {
+	klog.InfoS("Waiting for proxy informers to sync")
+	cache.WaitForNamedCacheSync("proxy.Runner", wait.NeverStop, r.informerWaiters...)
+	klog.InfoS("Proxy informers are synced")
+
 	r.healthzServer.Updated()
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 
@@ -243,17 +260,6 @@ func (r *Runner) OnServiceDelete(service *v1.Service) {
 	}
 }
 
-// OnServiceSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (r *Runner) OnServiceSynced() {
-	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnServiceSynced()
-	}
-	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnServiceSynced()
-	}
-}
-
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (r *Runner) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
@@ -317,17 +323,6 @@ func (r *Runner) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
 	}
 }
 
-// OnEndpointSlicesSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (r *Runner) OnEndpointSlicesSynced() {
-	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnEndpointSlicesSynced()
-	}
-	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnEndpointSlicesSynced()
-	}
-}
-
 // OnNodeAdd is called whenever creation of new node object is observed.
 func (r *Runner) OnNodeAdd(node *v1.Node) {
 	if r.ipv4Proxier != nil {
@@ -369,16 +364,5 @@ func (r *Runner) OnNodeDelete(node *v1.Node) {
 		if r.ipv6Proxier.OnNodeDelete(node) {
 			r.ipv6Sync()
 		}
-	}
-}
-
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (r *Runner) OnNodeSynced() {
-	if r.ipv4Proxier != nil {
-		r.ipv4Proxier.OnNodeSynced()
-	}
-	if r.ipv6Proxier != nil {
-		r.ipv6Proxier.OnNodeSynced()
 	}
 }
