@@ -839,7 +839,7 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
-				if !test.runPreScore {
+				if test.runPreScore {
 					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
