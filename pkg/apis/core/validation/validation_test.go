@@ -23693,34 +23693,42 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	goodClaimSource := core.ClaimSource{
 		ResourceClaimName: &externalClaimName,
 	}
+	shortPodName := &metav1.ObjectMeta{
+		Name: "some-pod",
+	}
+	brokenPodName := &metav1.ObjectMeta{
+		Name: ".dot.com",
+	}
+	goodClaimTemplate := core.PodSpec{
+		Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}}},
+		RestartPolicy: core.RestartPolicyAlways,
+		DNSPolicy:     core.DNSClusterFirst,
+		ResourceClaims: []core.PodResourceClaim{
+			{
+				Name: "my-claim-template",
+				Source: core.ClaimSource{
+					ResourceClaimTemplateName: &externalClaimTemplateName,
+				},
+			},
+		},
+	}
+	goodClaimReference := core.PodSpec{
+		Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}}},
+		RestartPolicy: core.RestartPolicyAlways,
+		DNSPolicy:     core.DNSClusterFirst,
+		ResourceClaims: []core.PodResourceClaim{
+			{
+				Name: "my-claim-reference",
+				Source: core.ClaimSource{
+					ResourceClaimName: &externalClaimName,
+				},
+			},
+		},
+	}
 
 	successCases := map[string]core.PodSpec{
-		"resource claim reference": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-			},
-		},
-		"resource claim template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimTemplateName: &externalClaimTemplateName,
-					},
-				},
-			},
-		},
+		"resource claim reference": goodClaimTemplate,
+		"resource claim template":  goodClaimTemplate,
 		"multiple claims": {
 			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
@@ -23751,7 +23759,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -23896,10 +23904,43 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 				},
 			},
 		},
+		"invalid claim template name": func() core.PodSpec {
+			spec := goodClaimTemplate.DeepCopy()
+			notLabel := ".foo_bar"
+			spec.ResourceClaims[0].Source.ResourceClaimTemplateName = &notLabel
+			return *spec
+		}(),
+		"invalid claim reference name": func() core.PodSpec {
+			spec := goodClaimReference.DeepCopy()
+			notLabel := ".foo_bar"
+			spec.ResourceClaims[0].Source.ResourceClaimName = &notLabel
+			return *spec
+		}(),
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
+
+	t.Run("generated-claim-name", func(t *testing.T) {
+		for _, spec := range []*core.PodSpec{&goodClaimTemplate, &goodClaimReference} {
+			claimName := spec.ResourceClaims[0].Name
+			t.Run(claimName, func(t *testing.T) {
+				for _, podMeta := range []*metav1.ObjectMeta{shortPodName, brokenPodName} {
+					t.Run(podMeta.Name, func(t *testing.T) {
+						errs := ValidatePodSpec(spec, podMeta, field.NewPath("field"), PodValidationOptions{})
+						// Only one out of the four combinations fails.
+						expectError := spec == &goodClaimTemplate && podMeta == brokenPodName
+						if expectError && len(errs) == 0 {
+							t.Error("did not get the expected failure")
+						}
+						if !expectError && len(errs) > 0 {
+							t.Errorf("unexpected failures: %+v", errs)
+						}
+					})
+				}
+			})
+		}
+	})
 }
