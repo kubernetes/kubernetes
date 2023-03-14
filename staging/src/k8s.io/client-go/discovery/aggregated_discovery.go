@@ -17,7 +17,6 @@ limitations under the License.
 package discovery
 
 import (
-	"encoding/json"
 	"fmt"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
