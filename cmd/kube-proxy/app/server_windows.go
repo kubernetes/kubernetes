@@ -23,13 +23,13 @@ package app
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strconv"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -71,47 +71,25 @@ func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, du
 	return
 }
 
-// createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode bool) (proxy.Provider, error) {
+// createProxier creates a proxy.Provider of the given IP family
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, family v1.IPFamily, nodeIP net.IP) (proxy.Provider, error) {
 	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
 		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
 		healthzPort, _ = strconv.Atoi(port)
 	}
 
-	var proxier proxy.Provider
-	var err error
-
-	if dualStackMode {
-		proxier, err = winkernel.NewDualStackProxier(
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
-			s.Hostname,
-			s.NodeIPs,
-			s.Recorder,
-			s.HealthzServer,
-			config.Winkernel,
-			healthzPort,
-		)
-	} else {
-		proxier, err = winkernel.NewProxier(
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
-			s.Hostname,
-			s.NodeIPs[s.PrimaryIPFamily],
-			s.Recorder,
-			s.HealthzServer,
-			config.Winkernel,
-			healthzPort,
-		)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("unable to create proxier: %v", err)
-	}
-
-	return proxier, nil
+	return winkernel.NewProxier(
+		config.IPTables.SyncPeriod.Duration,
+		config.IPTables.MinSyncPeriod.Duration,
+		config.ClusterCIDR,
+		s.Hostname,
+		nodeIP,
+		s.Recorder,
+		s.HealthzServer,
+		config.Winkernel,
+		healthzPort,
+	)
 }
 
 // cleanupAndExit cleans up after a previous proxy run

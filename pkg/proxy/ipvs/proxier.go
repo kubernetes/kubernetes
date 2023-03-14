@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
-	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -460,58 +459,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
-}
-
-// NewDualStackProxier returns a new Proxier for dual-stack operation
-func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
-	ipvs utilipvs.Interface,
-	ipset utilipset.Interface,
-	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	excludeCIDRs []string,
-	strictARP bool,
-	tcpTimeout time.Duration,
-	tcpFinTimeout time.Duration,
-	udpTimeout time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
-	scheduler string,
-	nodePortAddresses []string,
-	kernelHandler KernelHandler,
-) (proxy.Provider, error) {
-
-	safeIpset := newSafeIpset(ipset)
-
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
-
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
-	}
-
-	// Return a meta-proxier that dispatch calls between the two
-	// single-stack proxier instances
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 func filterCIDRs(wantIPv6 bool, cidrs []string) []string {

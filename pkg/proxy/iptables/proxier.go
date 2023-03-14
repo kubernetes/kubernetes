@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -314,40 +313,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 
 	return proxier, nil
-}
-
-// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
-func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
-	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	localhostNodePorts bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
-	nodePortAddresses []string,
-) (proxy.Provider, error) {
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
-
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
-	}
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 type iptablesJumpChain struct {

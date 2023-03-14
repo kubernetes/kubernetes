@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -676,11 +675,6 @@ func NewProxier(
 	config config.KubeProxyWinkernelConfiguration,
 	healthzPort int,
 ) (*Proxier, error) {
-	if nodeIP == nil {
-		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
-	}
-
 	if len(clusterCIDR) == 0 {
 		klog.InfoS("ClusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
@@ -802,39 +796,6 @@ func NewProxier(
 	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	return proxier, nil
-}
-
-func NewDualStackProxier(
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	clusterCIDR string,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
-	config config.KubeProxyWinkernelConfiguration,
-	healthzPort int,
-) (proxy.Provider, error) {
-
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
-		config, healthzPort)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv4Protocol])
-	}
-
-	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
-		config, healthzPort)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv6Protocol])
-	}
-
-	// Return a meta-proxier that dispatch calls between the two
-	// single-stack proxier instances
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // CleanupLeftovers removes all hns rules created by the Proxier

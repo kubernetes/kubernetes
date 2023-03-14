@@ -79,6 +79,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -521,7 +522,6 @@ type ProxyServer struct {
 	HealthzServer   healthcheck.ProxierHealthUpdater
 	Hostname        string
 	PrimaryIPFamily v1.IPFamily
-	NodeIPs         map[v1.IPFamily]net.IP
 
 	podCIDRs []string // only used for LocalModeNodeCIDR
 
@@ -552,7 +552,8 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		return nil, err
 	}
 
-	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(s.Client, s.Hostname, config.BindAddress)
+	var nodeIPs map[v1.IPFamily]net.IP	
+	s.PrimaryIPFamily, nodeIPs = detectNodeIPs(s.Client, s.Hostname, config.BindAddress)
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
@@ -592,9 +593,26 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		klog.ErrorS(err, "Kube-proxy configuration may be incomplete or incorrect")
 	}
 
-	s.Proxier, err = s.createProxier(config, dualStackSupported)
-	if err != nil {
-		return nil, err
+	var ipv4Proxier, ipv6Proxier proxy.Provider
+	if ipv4Supported {
+		ipv4Proxier, err = s.createProxier(config, v1.IPv4Protocol, nodeIPs[v1.IPv4Protocol])
+		if err != nil {
+			return nil, fmt.Errorf("unable to create proxier: %v", err)
+		}
+	}
+	if ipv6Supported {
+		ipv6Proxier, err = s.createProxier(config, v1.IPv4Protocol, nodeIPs[v1.IPv4Protocol])
+		if err != nil {
+			return nil, fmt.Errorf("unable to create proxier: %v", err)
+		}
+	}
+
+	if ipv4Proxier != nil && ipv6Proxier != nil {
+		s.Proxier = metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier)
+	} else if ipv4Proxier != nil {
+		s.Proxier = ipv4Proxier
+	} else {
+		s.Proxier = ipv6Proxier
 	}
 
 	return s, nil
