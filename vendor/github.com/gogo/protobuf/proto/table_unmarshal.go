@@ -70,7 +70,7 @@ type unmarshalInfo struct {
 	// 0 = only typ field is initialized
 	// 1 = completely initialized
 	initialized     int32
-	lock            sync.Mutex                    // prevents double initialization
+	lock            sync.RWMutex                  // prevents double initialization
 	dense           []unmarshalFieldInfo          // fields indexed by tag #
 	sparse          map[uint64]unmarshalFieldInfo // fields indexed by tag #
 	reqFields       []string                      // names of required fields
@@ -134,6 +134,8 @@ func getUnmarshalInfo(t reflect.Type) *unmarshalInfo {
 // b is a byte stream to unmarshal into m.
 // This is top routine used when recursively unmarshaling submessages.
 func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
+	u.lock.RLock()
+	defer u.lock.RUnlock()
 	if atomic.LoadInt32(&u.initialized) == 0 {
 		u.computeUnmarshalInfo()
 	}
@@ -2004,12 +2006,14 @@ func makeUnmarshalMap(f *reflect.StructField) unmarshaler {
 
 // makeUnmarshalOneof makes an unmarshaler for oneof fields.
 // for:
-// message Msg {
-//   oneof F {
-//     int64 X = 1;
-//     float64 Y = 2;
-//   }
-// }
+//
+//	message Msg {
+//	  oneof F {
+//	    int64 X = 1;
+//	    float64 Y = 2;
+//	  }
+//	}
+//
 // typ is the type of the concrete entry for a oneof case (e.g. Msg_X).
 // ityp is the interface type of the oneof field (e.g. isMsg_F).
 // unmarshal is the unmarshaler for the base type of the oneof case (e.g. int64).
