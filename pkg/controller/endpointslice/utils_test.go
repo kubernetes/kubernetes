@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"k8s.io/client-go/tools/cache"
 	"reflect"
 	"testing"
 	"time"
@@ -1174,6 +1175,55 @@ func Test_hintsEnabled(t *testing.T) {
 			actualEnabled := hintsEnabled(tc.annotations)
 			if actualEnabled != tc.expectEnabled {
 				t.Errorf("Expected %t, got %t", tc.expectEnabled, actualEnabled)
+			}
+		})
+	}
+}
+
+func Test_getEndpointSliceFromDeleteAction(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  interface{}
+		want *discovery.EndpointSlice
+	}{
+		{
+			name: "obj type is EndpointSlice",
+			obj:  &discovery.EndpointSlice{},
+			want: &discovery.EndpointSlice{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and content is nil",
+			obj:  cache.DeletedFinalStateUnknown{},
+			want: nil,
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is EndpointSlice",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &discovery.EndpointSlice{},
+			},
+			want: &discovery.EndpointSlice{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is not EndpointSlice",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &discovery.Endpoint{},
+			},
+			want: nil,
+		},
+		{
+			name: "obj is not EndpointSlice or DeletedFinalStateUnknown",
+			obj: &discovery.Endpoint{
+				Addresses: []string{"127.0.0.1:80", "127.0.0.2:80"},
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getEndpointSliceFromDeleteAction(tt.obj); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getEndpointSliceFromDeleteAction() = %v, want %v", got, tt.want)
 			}
 		})
 	}
