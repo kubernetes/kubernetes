@@ -18,10 +18,11 @@ package endpointslicemirroring
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,36 +30,37 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
 	portName := "foo"
-	protocol := v1.ProtocolTCP
+	protocol := corev1.ProtocolTCP
 
 	ports := []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}}
 	addrType := discovery.AddressTypeIPv4
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Endpoints"}
 
-	endpoints := v1.Endpoints{
+	endpoints := corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test",
 		},
-		Subsets: []v1.EndpointSubset{{
-			Ports: []v1.EndpointPort{{Port: 80}},
+		Subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{Port: 80}},
 		}},
 	}
 	ownerRef := metav1.NewControllerRef(&endpoints, gvk)
 
 	testCases := []struct {
 		name          string
-		tweakEndpoint func(ep *v1.Endpoints)
+		tweakEndpoint func(ep *corev1.Endpoints)
 		expectedSlice discovery.EndpointSlice
 	}{
 		{
 			name: "create slice from endpoints",
-			tweakEndpoint: func(ep *v1.Endpoints) {
+			tweakEndpoint: func(ep *corev1.Endpoints) {
 			},
 			expectedSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -78,7 +80,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with annotations",
-			tweakEndpoint: func(ep *v1.Endpoints) {
+			tweakEndpoint: func(ep *corev1.Endpoints) {
 				annotations := map[string]string{"foo": "bar"}
 				ep.Annotations = annotations
 			},
@@ -100,7 +102,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels",
-			tweakEndpoint: func(ep *v1.Endpoints) {
+			tweakEndpoint: func(ep *corev1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 			},
@@ -123,7 +125,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations",
-			tweakEndpoint: func(ep *v1.Endpoints) {
+			tweakEndpoint: func(ep *corev1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{"foo2": "bar2"}
@@ -148,12 +150,12 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations triggertime",
-			tweakEndpoint: func(ep *v1.Endpoints) {
+			tweakEndpoint: func(ep *corev1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{
-					"foo2":                            "bar2",
-					v1.EndpointsLastChangeTriggerTime: "date",
+					"foo2":                                "bar2",
+					corev1.EndpointsLastChangeTriggerTime: "date",
 				}
 				ep.Annotations = annotations
 			},
@@ -190,11 +192,11 @@ func TestNewEndpointSlice(t *testing.T) {
 
 func TestAddressToEndpoint(t *testing.T) {
 	//name: "simple + gate enabled",
-	epAddress := v1.EndpointAddress{
+	epAddress := corev1.EndpointAddress{
 		IP:       "10.1.2.3",
 		Hostname: "foo",
 		NodeName: pointer.String("node-abc"),
-		TargetRef: &v1.ObjectReference{
+		TargetRef: &corev1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
 			Namespace:  "default",
@@ -208,7 +210,7 @@ func TestAddressToEndpoint(t *testing.T) {
 		Conditions: discovery.EndpointConditions{
 			Ready: pointer.BoolPtr(true),
 		},
-		TargetRef: &v1.ObjectReference{
+		TargetRef: &corev1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
 			Namespace:  "default",
@@ -244,4 +246,205 @@ func newClientset() *fake.Clientset {
 	}))
 
 	return client
+}
+
+func Test_getServiceFromDeleteAction(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  interface{}
+		want *corev1.Service
+	}{
+		{
+			name: "obj type is Service",
+			obj:  &corev1.Service{},
+			want: &corev1.Service{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and content is empty",
+			obj:  cache.DeletedFinalStateUnknown{},
+			want: nil,
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is Service",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &corev1.Service{},
+			},
+			want: &corev1.Service{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is not Service",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &discovery.Endpoint{},
+			},
+			want: nil,
+		},
+		{
+			name: "obj is not EndpointSlice or DeletedFinalStateUnknown",
+			obj: &discovery.Endpoint{
+				Addresses: []string{"127.0.0.1:80", "127.0.0.2:80"},
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getServiceFromDeleteAction(tt.obj); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getServiceFromDeleteAction() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getEndpointsFromDeleteAction(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  interface{}
+		want *corev1.Endpoints
+	}{
+		{
+			name: "obj type is Service",
+			obj:  &corev1.Endpoints{},
+			want: &corev1.Endpoints{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and content is empty",
+			obj:  cache.DeletedFinalStateUnknown{},
+			want: nil,
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is Endpoints",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &corev1.Endpoints{},
+			},
+			want: &corev1.Endpoints{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is not Endpoints",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &corev1.Service{},
+			},
+			want: nil,
+		},
+		{
+			name: "obj is not EndpointSlice or DeletedFinalStateUnknown",
+			obj:  &corev1.Service{},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getEndpointsFromDeleteAction(tt.obj); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getEndpointsFromDeleteAction() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getEndpointSliceFromDeleteAction(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  interface{}
+		want *discovery.EndpointSlice
+	}{
+		{
+			name: "obj type is EndpointSlice",
+			obj:  &discovery.EndpointSlice{},
+			want: &discovery.EndpointSlice{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and content is nil",
+			obj:  cache.DeletedFinalStateUnknown{},
+			want: nil,
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is EndpointSlice",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &discovery.EndpointSlice{},
+			},
+			want: &discovery.EndpointSlice{},
+		},
+		{
+			name: "obj type is DeletedFinalStateUnknown and the Obj's type is not EndpointSlice",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test",
+				Obj: &discovery.Endpoint{},
+			},
+			want: nil,
+		},
+		{
+			name: "obj is not EndpointSlice or DeletedFinalStateUnknown",
+			obj: &discovery.Endpoint{
+				Addresses: []string{"127.0.0.1:80", "127.0.0.2:80"},
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getEndpointSliceFromDeleteAction(tt.obj); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getEndpointSliceFromDeleteAction() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_endpointsControllerKey(t *testing.T) {
+	tests := []struct {
+		name          string
+		endpointSlice *discovery.EndpointSlice
+		want          string
+		wantErr       bool
+	}{
+		{
+			name:          "endpointSlice is nil",
+			endpointSlice: nil,
+			want:          "",
+			wantErr:       true,
+		},
+		{
+			name: "have service name",
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "foo",
+					},
+				},
+			},
+			want:    "bar/foo",
+			wantErr: false,
+		},
+		{
+			name: "have no service name",
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+					Labels: map[string]string{
+						"app": "foo",
+					},
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := endpointsControllerKey(tt.endpointSlice)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("endpointsControllerKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("endpointsControllerKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
