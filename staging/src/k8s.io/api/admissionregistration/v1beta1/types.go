@@ -294,7 +294,7 @@ type ValidatingWebhook struct {
 	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
 	//   3. If any matchCondition evaluates to an error (but none are FALSE):
 	//      - If failurePolicy=Fail, reject the request
-	//      - If failurePolicy=Ignore, the webhook is called
+	//      - If failurePolicy=Ignore, the webhook is skipped
 	//
 	// This is an alpha feature and managed by the AdmissionWebhookMatchConditions feature gate.
 	//
@@ -466,7 +466,7 @@ type MutatingWebhook struct {
 	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
 	//   3. If any matchCondition evaluates to an error (but none are FALSE):
 	//      - If failurePolicy=Fail, reject the request
-	//      - If failurePolicy=Ignore, the webhook is called
+	//      - If failurePolicy=Ignore, the webhook is skipped
 	//
 	// This is an alpha feature and managed by the AdmissionWebhookMatchConditions feature gate.
 	//

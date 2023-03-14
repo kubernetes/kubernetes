@@ -54,29 +54,28 @@ var _ Matcher = &matcher{}
 type matcher struct {
 	filter      celplugin.Filter
 	authorizer  authorizer.Authorizer
-	failPolicy  *v1.FailurePolicyType
+	failPolicy  v1.FailurePolicyType
 	matcherType string
 	objectName  string
 }
 
 func NewMatcher(filter celplugin.Filter, authorizer authorizer.Authorizer, failPolicy *v1.FailurePolicyType, matcherType, objectName string) Matcher {
+	var f v1.FailurePolicyType
+	if failPolicy == nil {
+		f = v1.Fail
+	} else {
+		f = *failPolicy
+	}
 	return &matcher{
 		filter:      filter,
 		authorizer:  authorizer,
-		failPolicy:  failPolicy,
+		failPolicy:  f,
 		matcherType: matcherType,
 		objectName:  objectName,
 	}
 }
 
 func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) MatchResult {
-	var f v1.FailurePolicyType
-	if m.failPolicy == nil {
-		f = v1.Fail
-	} else {
-		f = *m.failPolicy
-	}
-
 	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
 		Authorizer:      m.authorizer,
@@ -84,7 +83,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 
 	if err != nil {
 		// filter returning error is unexpected and not an evaluation error so not incrementing metric here
-		if f == v1.Fail {
+		if m.failPolicy == v1.Fail {
 			return MatchResult{
 				Error: err,
 			}
@@ -119,7 +118,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 	}
 	if len(errorList) > 0 {
 		// If mix of true and eval errors then resort to fail policy
-		if f == v1.Fail {
+		if m.failPolicy == v1.Fail {
 			// mix of true and errors with fail policy fail should fail request without calling webhook
 			if len(errorList) > 1 {
 				for i := 1; i < len(errorList); i++ {
@@ -131,7 +130,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 			return MatchResult{
 				Error: err,
 			}
-		} else if f == v1.Ignore {
+		} else if m.failPolicy == v1.Ignore {
 			// if fail policy ignore then skip call to webhook
 			return MatchResult{
 				Matches: false,

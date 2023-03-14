@@ -306,14 +306,10 @@ func TestMatch(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := matcher{
-				filter: &fakeCelFilter{
-					evaluations: tc.evaluations,
-					throwError:  tc.throwError,
-				},
-				failPolicy: tc.failPolicy,
-				objectName: "testhook",
-			}
+			m := NewMatcher(&fakeCelFilter{
+				evaluations: tc.evaluations,
+				throwError:  tc.throwError,
+			}, nil, tc.failPolicy, "test", "testhook")
 			ctx := context.TODO()
 			matchResult := m.Match(ctx, fakeVersionedAttr, nil)
 
