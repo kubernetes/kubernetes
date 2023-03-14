@@ -379,7 +379,7 @@ type MockCSICall struct {
 	Method  string
 	Request struct {
 		VolumeContext map[string]string `json:"volume_context"`
-		Secret        map[string]string `json:"secret"`
+		Secrets       map[string]string `json:"secrets"`
 	}
 	FullError struct {
 		Code    codes.Code `json:"code"`
