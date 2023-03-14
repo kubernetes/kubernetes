@@ -94,8 +94,8 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
-			if v.Resources.ResponseKind == nil {
-				a, _ := json.Marshal(v.Resources)
+			if r.ResponseKind == nil {
+				a, _ := json.Marshal(r)
 				klog.Infof("ResourceManager no ResponseKind: %s\n", a)
 				continue
 			}
