@@ -46,16 +46,19 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/admissionregistration/v1.ValidatingWebhookConfigurationList":                          schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfigurationList(ref),
 		"k8s.io/api/admissionregistration/v1.WebhookClientConfig":                                         schema_k8sio_api_admissionregistration_v1_WebhookClientConfig(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation":                                       schema_k8sio_api_admissionregistration_v1alpha1_AuditAnnotation(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.ExpressionWarning":                                     schema_k8sio_api_admissionregistration_v1alpha1_ExpressionWarning(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.MatchResources":                                        schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.NamedRuleWithOperations":                               schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ParamKind":                                             schema_k8sio_api_admissionregistration_v1alpha1_ParamKind(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ParamRef":                                              schema_k8sio_api_admissionregistration_v1alpha1_ParamRef(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.TypeChecking":                                          schema_k8sio_api_admissionregistration_v1alpha1_TypeChecking(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicy":                             schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicy(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyBinding":                      schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBinding(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyBindingList":                  schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBindingList(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyBindingSpec":                  schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBindingSpec(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyList":                         schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyList(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicySpec":                         schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySpec(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyStatus":                       schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyStatus(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.Validation":                                            schema_k8sio_api_admissionregistration_v1alpha1_Validation(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhook":                                        schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhook(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfiguration":                           schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref),
@@ -1889,6 +1892,36 @@ func schema_k8sio_api_admissionregistration_v1alpha1_AuditAnnotation(ref common.
 	}
 }
 
+func schema_k8sio_api_admissionregistration_v1alpha1_ExpressionWarning(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExpressionWarning is a warning information that targets a specific expression.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"fieldRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The path to the field that refers the expression. For example, the reference to the expression of the first item of validations is \"spec.validations[0].expression\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"warning": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The content of type checking information in a human-readable form. Each line of the warning contains the type that the expression is checked against, followed by the type check error from the compiler.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"fieldRef", "warning"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2156,6 +2189,40 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ParamRef(ref common.Referen
 	}
 }
 
+func schema_k8sio_api_admissionregistration_v1alpha1_TypeChecking(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TypeChecking contains results of type checking the expressions in the ValidatingAdmissionPolicy",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"expressionWarnings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "The type checking warnings for each expression.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1alpha1.ExpressionWarning"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1alpha1.ExpressionWarning"},
+	}
+}
+
 func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2191,11 +2258,18 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicy(r
 							Ref:         ref("k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicySpec"),
 						},
 					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy behaves in the expected way. Populated by the system. Read-only.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyStatus"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicySpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicySpec", "k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -2466,6 +2540,56 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 		},
 		Dependencies: []string{
 			"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Validation"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation observed by the controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"typeChecking": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The results of type checking for each expression. Presence of this field indicates the completion of the type checking.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1alpha1.TypeChecking"),
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "The conditions represent the latest available observations of a policy's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1alpha1.TypeChecking", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 

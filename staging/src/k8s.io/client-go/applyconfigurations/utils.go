@@ -141,6 +141,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=admissionregistration.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("AuditAnnotation"):
 		return &admissionregistrationv1alpha1.AuditAnnotationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ExpressionWarning"):
+		return &admissionregistrationv1alpha1.ExpressionWarningApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MatchResources"):
 		return &admissionregistrationv1alpha1.MatchResourcesApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
@@ -149,6 +151,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ParamKindApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParamRef"):
 		return &admissionregistrationv1alpha1.ParamRefApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TypeChecking"):
+		return &admissionregistrationv1alpha1.TypeCheckingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy"):
 		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBinding"):
@@ -157,6 +161,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicySpec"):
 		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyStatus"):
+		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Validation"):
 		return &admissionregistrationv1alpha1.ValidationApplyConfiguration{}
 

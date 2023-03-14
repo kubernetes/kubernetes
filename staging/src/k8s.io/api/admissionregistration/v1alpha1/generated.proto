@@ -66,6 +66,19 @@ message AuditAnnotation {
   optional string valueExpression = 2;
 }
 
+// ExpressionWarning is a warning information that targets a specific expression.
+message ExpressionWarning {
+  // The path to the field that refers the expression.
+  // For example, the reference to the expression of the first item of
+  // validations is "spec.validations[0].expression"
+  optional string fieldRef = 2;
+
+  // The content of type checking information in a human-readable form.
+  // Each line of the warning contains the type that the expression is checked
+  // against, followed by the type check error from the compiler.
+  optional string warning = 3;
+}
+
 // MatchResources decides whether to run the admission control policy on an object based
 // on whether it meets the match criteria.
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
@@ -198,6 +211,15 @@ message ParamRef {
   optional string namespace = 2;
 }
 
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
+message TypeChecking {
+  // The type checking warnings for each expression.
+  // +optional
+  // +listType=atomic
+  repeated ExpressionWarning expressionWarnings = 1;
+}
+
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 message ValidatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -206,6 +228,13 @@ message ValidatingAdmissionPolicy {
 
   // Specification of the desired behavior of the ValidatingAdmissionPolicy.
   optional ValidatingAdmissionPolicySpec spec = 2;
+
+  // The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+  // behaves in the expected way.
+  // Populated by the system.
+  // Read-only.
+  // +optional
+  optional ValidatingAdmissionPolicyStatus status = 3;
 }
 
 // ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
@@ -351,6 +380,24 @@ message ValidatingAdmissionPolicySpec {
   // +listType=atomic
   // +optional
   repeated AuditAnnotation auditAnnotations = 5;
+}
+
+// ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
+message ValidatingAdmissionPolicyStatus {
+  // The generation observed by the controller.
+  // +optional
+  optional int64 observedGeneration = 1;
+
+  // The results of type checking for each expression.
+  // Presence of this field indicates the completion of the type checking.
+  // +optional
+  optional TypeChecking typeChecking = 2;
+
+  // The conditions represent the latest available observations of a policy's current state.
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
 }
 
 // Validation specifies the CEL expression which is used to apply the validation.

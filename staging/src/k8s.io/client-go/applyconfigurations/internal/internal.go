@@ -236,6 +236,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.admissionregistration.v1alpha1.ExpressionWarning
+  map:
+    fields:
+    - name: fieldRef
+      type:
+        scalar: string
+      default: ""
+    - name: warning
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1alpha1.MatchResources
   map:
     fields:
@@ -318,6 +329,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
     elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.TypeChecking
+  map:
+    fields:
+    - name: expressionWarnings
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.ExpressionWarning
+          elementRelationship: atomic
 - name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy
   map:
     fields:
@@ -334,6 +354,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: spec
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyStatus
       default: {}
 - name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding
   map:
@@ -394,6 +418,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.admissionregistration.v1alpha1.Validation
           elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: typeChecking
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.TypeChecking
 - name: io.k8s.api.admissionregistration.v1alpha1.Validation
   map:
     fields:
