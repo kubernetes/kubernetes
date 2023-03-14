@@ -205,10 +205,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		original                   *appsv1beta2.StatefulSet
-		expected                   *appsv1beta2.StatefulSet
-		enableMaxUnavailablePolicy bool
+		name                        string
+		original                    *appsv1beta2.StatefulSet
+		expected                    *appsv1beta2.StatefulSet
+		enableMaxUnavailablePolicy  bool
+		enableStatefulSetAutoDelete bool
 	}{
 		{
 			name: "labels and default update strategy",
@@ -441,12 +442,43 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 			enableMaxUnavailablePolicy: true,
 		},
+		{
+			name: "StatefulSetAutoDeletePVC enabled",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			enableStatefulSetAutoDelete: true,
+		},
 	}
 
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enableStatefulSetAutoDelete)()
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1beta2.StatefulSet)
 			if !ok {
