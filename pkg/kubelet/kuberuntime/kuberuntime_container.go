@@ -847,78 +847,84 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// findNextInitContainerToRun returns the status of the first failed container, the
-// index of next init container to start, or done if there are no further init
-// containers to start right now. Note that, sidecar containers can re-run even
-// after done once.
-// Status is only returned if an init container is failed, in which case next will
-// point to the current container.
-func (m *kubeGenericRuntimeManager) findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
+// findInitContainersToRun returns the indexes of init containers to run and
+// the flag whether the pod has been initialized.
+func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) ([]int, bool) {
 	if len(pod.Spec.InitContainers) == 0 {
-		return nil, nil, true
+		return nil, true
 	}
 
+	podHasInitialized := false
 	// If any of the main containers have status and are Running, then all init containers must
 	// have been executed at some point in the past.  However, they could have been removed
 	// from the container runtime now, and if we proceed, it would appear as if they
 	// never ran and will re-execute improperly except for the sidecar containers.
-	hasInitialized := false
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status != nil && status.State == kubecontainer.ContainerStateRunning {
-			hasInitialized = true
+			podHasInitialized = true
 			break
 		}
 	}
 
-	// If there are failed containers, return the status of the first failed one.
+	containersToRun := make([]int, 0, len(pod.Spec.InitContainers))
+	lastContainerInitialized := true
 	for i := range pod.Spec.InitContainers {
 		container := &pod.Spec.InitContainers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status != nil && isInitContainerFailed(status) {
-			return status, container, false
-		}
-	}
-
-	// There are no failed containers now.
-	for _, container := range pod.Spec.InitContainers {
-		if hasInitialized && !types.IsSidecarContainer(&container) {
+		if podHasInitialized && !types.IsSidecarContainer(container) {
 			// after initialization, only sidecar containers need to be kept running
 			continue
 		}
 
 		status := podStatus.FindContainerStatusByName(container.Name)
+		// If the container is not found, it means it has not been started yet.
 		if status == nil {
-			return nil, &container, false
+			if podHasInitialized || lastContainerInitialized {
+				containersToRun = append(containersToRun, i)
+			}
+			// There is an init container that has not been started yet.
+			// We should not start any other containers.
+			return containersToRun, podHasInitialized
 		}
 
+		lastContainerInitialized = false
 		switch status.State {
 		case kubecontainer.ContainerStateCreated:
-			return nil, nil, false
+			continue
 
 		case kubecontainer.ContainerStateRunning:
-			if !types.IsSidecarContainer(&container) {
-				return nil, nil, false
+			switch {
+			case types.IsSidecarContainer(container):
+				if startup, found := m.startupManager.Get(status.ID); !found || startup == proberesults.Success {
+					lastContainerInitialized = true
+				}
+			default:
+				return containersToRun, podHasInitialized
 			}
-
-			if startup, found := m.startupManager.Get(status.ID); found && startup == proberesults.Failure {
-				return nil, nil, false
-			}
-			// sidecar container has started, continue
 
 		case kubecontainer.ContainerStateExited:
-			if types.IsSidecarContainer(&container) {
-				return nil, &container, false
+			switch {
+			case types.IsSidecarContainer(container):
+				containersToRun = append(containersToRun, i)
+			default:
+				if status.ExitCode != 0 {
+					containersToRun = append(containersToRun, i)
+					return containersToRun, podHasInitialized
+				}
+				lastContainerInitialized = true
 			}
-			// init container has finished, continue
 
 		default:
-			return nil, &container, false
+			containersToRun = append(containersToRun, i)
 		}
 	}
 
-	return nil, nil, true
+	if lastContainerInitialized {
+		podHasInitialized = true
+	}
+
+	return containersToRun, podHasInitialized
 }
 
 // GetContainerLogs returns logs of a specific container.
