@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,8 +66,16 @@ func (p *PruneObject) String() string {
 // FindAllObjectsToPrune returns the list of objects that will be pruned.
 // Calling this instead of Prune can be useful for dry-run / diff behaviour.
 func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dynamic.Interface, visitedUids sets.Set[types.UID]) ([]PruneObject, error) {
-	var allObjects []PruneObject
-	// TODO: Run discovery in parallel (and maybe in consistent order?)
+	type task struct {
+		namespace   string
+		restMapping *meta.RESTMapping
+
+		results []PruneObject
+	}
+	var tasks []*task
+
+	// We run discovery in parallel, in as many goroutines as priority and fairness will allow
+	// (We don't expect many requests in real-world scenarios - maybe tens, unlikely to be hundreds)
 	for _, restMapping := range a.AllPrunableResources() {
 		switch restMapping.Scope.Name() {
 		case meta.RESTScopeNameNamespace:
@@ -75,25 +84,46 @@ func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dyna
 					// Just double-check because otherwise we get cryptic error messages
 					return nil, fmt.Errorf("unexpectedly encountered empty namespace during prune of namespace-scoped resource %v", restMapping.GroupVersionKind)
 				}
-				pruneObjects, err := a.findObjectsToPrune(ctx, dynamicClient, visitedUids, namespace, restMapping)
-				if err != nil {
-					return nil, fmt.Errorf("listing %v objects for prune: %w", restMapping.GroupVersionKind.String(), err)
-				}
-				allObjects = append(allObjects, pruneObjects...)
+				tasks = append(tasks, &task{
+					namespace:   namespace,
+					restMapping: restMapping,
+				})
 			}
 
 		case meta.RESTScopeNameRoot:
-			pruneObjects, err := a.findObjectsToPrune(ctx, dynamicClient, visitedUids, metav1.NamespaceNone, restMapping)
-			if err != nil {
-				return nil, fmt.Errorf("listing %v objects for prune: %w", restMapping.GroupVersionKind.String(), err)
-			}
-			allObjects = append(allObjects, pruneObjects...)
+			tasks = append(tasks, &task{
+				restMapping: restMapping,
+			})
 
 		default:
 			return nil, fmt.Errorf("unhandled scope %q", restMapping.Scope.Name())
 		}
 	}
 
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i := range tasks {
+		task := tasks[i]
+
+		g.Go(func() error {
+			results, err := a.findObjectsToPrune(ctx, dynamicClient, visitedUids, task.namespace, task.restMapping)
+			if err != nil {
+				return fmt.Errorf("listing %v objects for pruning: %w", task.restMapping.GroupVersionKind.String(), err)
+			}
+			task.results = results
+			return nil
+		})
+	}
+
+	// Wait for all the tasks to finish
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	var allObjects []PruneObject
+	for _, task := range tasks {
+		allObjects = append(allObjects, task.results...)
+	}
 	return allObjects, nil
 }
 
