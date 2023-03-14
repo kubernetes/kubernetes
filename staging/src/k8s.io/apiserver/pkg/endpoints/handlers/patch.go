@@ -177,9 +177,8 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			userInfo,
 		)
 
-		if scope.FieldManager != nil {
-			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
-		}
+		admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
@@ -345,9 +344,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(requestContext context.Context, 
 		}
 	}
 
-	if p.fieldManager != nil {
-		objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
-	}
+	objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
 	return objToUpdate, nil
 }
 
@@ -441,9 +438,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(requestContext context.Context, c
 		return nil, err
 	}
 
-	if p.fieldManager != nil {
-		newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent))
-	}
+	newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent))
 	return newObj, nil
 }
 
