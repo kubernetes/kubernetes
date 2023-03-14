@@ -17,7 +17,6 @@ limitations under the License.
 package workqueue
 
 import (
-	"sync"
 	"time"
 
 	"k8s.io/utils/clock"
@@ -216,14 +215,10 @@ var globalMetricsFactory = queueMetricsFactory{
 
 type queueMetricsFactory struct {
 	metricsProvider MetricsProvider
-
-	onlyOnce sync.Once
 }
 
 func (f *queueMetricsFactory) setProvider(mp MetricsProvider) {
-	f.onlyOnce.Do(func() {
-		f.metricsProvider = mp
-	})
+	f.metricsProvider = mp
 }
 
 func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) queueMetrics {
