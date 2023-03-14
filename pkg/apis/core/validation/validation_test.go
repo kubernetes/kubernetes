@@ -22091,11 +22091,12 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{
 					MaxSkew:           1,
 					TopologyKey:       "k8s.io/zone",
+					LabelSelector:     &metav1.LabelSelector{},
 					WhenUnsatisfiable: core.DoNotSchedule,
 					MatchLabelKeys:    []string{"/simple"},
 				},
 			},
-			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMatchLabelKeys.Index(0), "/simple", "prefix part must be non-empty")},
+			wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "/simple", "prefix part must be non-empty")},
 		},
 		{
 			name: "key exists in both matchLabelKeys and labelSelector",
@@ -22116,7 +22117,19 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 					},
 				},
 			},
-			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
+			wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
+		},
+		{
+			name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MatchLabelKeys:    []string{"foo"},
+				},
+			},
+			wantFieldErrors: field.ErrorList{field.Forbidden(fieldPathMatchLabelKeys, "must not be specified when labelSelector is not set")},
 		},
 		{
 			name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
