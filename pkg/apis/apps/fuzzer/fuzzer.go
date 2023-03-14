@@ -51,6 +51,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					WhenScaled:  policies[(choice>>1)&1],
 				}
 			}
+			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
+			}
+			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
+			}
 			if s.Spec.RevisionHistoryLimit == nil {
 				s.Spec.RevisionHistoryLimit = new(int32)
 				*s.Spec.RevisionHistoryLimit = 10
