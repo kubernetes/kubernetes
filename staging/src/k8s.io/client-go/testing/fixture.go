@@ -344,7 +344,6 @@ func (t *tracker) Add(obj runtime.Object) error {
 		// objects via Add(). Instead, it should trigger the Create() function
 		// of the tracker, where an arbitrary gvr can be specified.
 		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
-
 		// Resource doesn't have the concept of "__internal" version, just set it to "".
 		if gvr.Version == runtime.APIVersionInternal {
 			gvr.Version = ""
