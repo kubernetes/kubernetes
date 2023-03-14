@@ -1972,6 +1972,27 @@ metadata:
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")
 		})
 	})
+
+	ginkgo.Describe("kubectl subresource flag", func() {
+		ginkgo.It("should not be used in a bulk GET", func() {
+			ginkgo.By("calling kubectl get nodes --subresource=status")
+			out, err := e2ekubectl.RunKubectl("", "get", "nodes", "--subresource=status")
+			gomega.Expect(err).To(gomega.HaveOccurred(), fmt.Sprintf("Expected kubectl to fail, but it succeeded: %s", out))
+			gomega.Expect(err).To(gomega.ContainSubstring("subresource cannot be used when bulk resources are specified"))
+		})
+		ginkgo.It("GET on status subresource of built-in type (node) returns identical info as GET on the built-in type", func(ctx context.Context) {
+			ginkgo.By("first listing nodes in the cluster, and using first node of the list")
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
+			node := nodes.Items[0]
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s", node.Name))
+			outBuiltIn := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name)
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s --subresource=status", node.Name))
+			outStatusSubresource := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name, "--subresource=status")
+			gomega.Expect(outBuiltIn).To(gomega.Equal(outStatusSubresource))
+		})
+	})
 })
 
 // Checks whether the output split by line contains the required elements.
