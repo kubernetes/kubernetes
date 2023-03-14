@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package userns
 
 import (
 	"fmt"
@@ -25,18 +25,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 )
 
 type testUserNsPodsManager struct {
 }
 
-func (m *testUserNsPodsManager) getPodDir(podUID types.UID) string {
+func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
 	return "/tmp/non-existant-dir.This-is-not-used-in-tests"
 }
 
-func (m *testUserNsPodsManager) listPodsFromDisk() ([]types.UID, error) {
+func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 	return nil, nil
 }
 
@@ -47,8 +46,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	m, err := MakeUserNsManager(testUserNsPodsManager)
 	require.NoError(t, err)
 
-	assert.Equal(t, true, m.isSet(0), "m.isSet(0) should be true")
-	assert.Equal(t, true, m.isSet(1), "m.isSet(1) should be true")
+	assert.Equal(t, true, m.isSet(0*65536), "m.isSet(0) should be true")
 
 	allocated, length, err := m.allocateOne("one")
 	assert.NoError(t, err)
@@ -170,136 +168,6 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 			}
 
 			t.Errorf("expected success: %v but got error: %v", tc.success, err)
-		})
-	}
-}
-
-func TestUserNsManagerHostIDFromMapping(t *testing.T) {
-	// mapping []*runtimeapi.IDMapping, containerId *int64
-
-	cases := []struct {
-		name        string
-		success     bool
-		containerId int64 // -1 means a nil ptr will be used.
-		expHostId   int64
-		m           []*runtimeapi.IDMapping
-	}{
-		{
-			name:        "one basic mapping",
-			success:     true,
-			containerId: -1,
-			expHostId:   0,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      0,
-					ContainerId: 0,
-					Length:      userNsLength,
-				},
-			},
-		},
-		{
-			name:        "one unprivileged mapping",
-			success:     true,
-			containerId: -1,
-			expHostId:   userNsLength * 2,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      userNsLength * 2,
-					ContainerId: 0,
-					Length:      userNsLength,
-				},
-			},
-		},
-		{
-			name:        "one unprivileged mapping random id",
-			success:     true,
-			containerId: 3,
-			expHostId:   userNsLength*2 + 3,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      userNsLength * 2,
-					ContainerId: 0,
-					Length:      userNsLength,
-				},
-			},
-		},
-		{
-			name:        "two unprivileged mapping",
-			success:     true,
-			containerId: 0,
-			expHostId:   userNsLength*2 + 0,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      userNsLength * 2,
-					ContainerId: 0,
-					Length:      1,
-				},
-				{
-					HostId:      userNsLength*2 + 10,
-					ContainerId: 1,
-					Length:      1,
-				},
-			},
-		},
-		{
-			name:        "two unprivileged mapping - random id",
-			success:     true,
-			containerId: 1,
-			expHostId:   userNsLength*2 + 10,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      userNsLength * 2,
-					ContainerId: 0,
-					Length:      1,
-				},
-				{
-					HostId:      userNsLength*2 + 10,
-					ContainerId: 1,
-					Length:      1,
-				},
-			},
-		},
-		{
-			name:        "two unprivileged mapping - not mapped user",
-			success:     false,
-			containerId: 3,
-			m: []*runtimeapi.IDMapping{
-				{
-					HostId:      userNsLength * 2,
-					ContainerId: 0,
-					Length:      1,
-				},
-				{
-					HostId:      userNsLength*2 + 1,
-					ContainerId: 1,
-					Length:      1,
-				},
-			},
-		},
-		{
-			name:    "no mappings",
-			success: false,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var containerId *int64
-			if tc.containerId != -1 {
-				containerId = &tc.containerId
-			}
-
-			id, err := hostIDFromMapping(tc.m, containerId)
-			if (tc.success && err != nil) || (!tc.success && err == nil) {
-				t.Fatalf("%v: expected success: %v - got error: %v", tc.name, tc.success, err)
-			}
-			if !tc.success && err != nil {
-				return
-			}
-
-			if id != tc.expHostId {
-				t.Errorf("expected: %v - got: %v", tc.expHostId, id)
-			}
 		})
 	}
 }

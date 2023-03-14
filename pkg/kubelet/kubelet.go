@@ -110,6 +110,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -908,7 +909,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	klet.usernsManager, err = MakeUserNsManager(klet)
+	klet.usernsManager, err = userns.MakeUserNsManager(klet)
 	if err != nil {
 		return nil, err
 	}
@@ -1256,7 +1257,7 @@ type Kubelet struct {
 	shutdownManager nodeshutdown.Manager
 
 	// Manage user namespaces
-	usernsManager *usernsManager
+	usernsManager *userns.UsernsManager
 
 	// Mutex to serialize new pod admission and existing pod resizing
 	podResizeMutex sync.Mutex

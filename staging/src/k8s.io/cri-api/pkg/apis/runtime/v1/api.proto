@@ -222,6 +222,10 @@ message Mount {
     bool selinux_relabel = 4;
     // Requested propagation mode.
     MountPropagation propagation = 5;
+    // UidMappings specifies the runtime UID mappings for the mount.
+    repeated IDMapping uidMappings = 6;
+    // GidMappings specifies the runtime GID mappings for the mount.
+    repeated IDMapping gidMappings = 7;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
