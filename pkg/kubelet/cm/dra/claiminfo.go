@@ -36,18 +36,40 @@ type ClaimInfo struct {
 	annotations []kubecontainer.Annotation
 }
 
-func (res *ClaimInfo) addPodReference(podUID types.UID) {
-	res.Lock()
-	defer res.Unlock()
+func (info *ClaimInfo) addPodReference(podUID types.UID) {
+	info.Lock()
+	defer info.Unlock()
 
-	res.PodUIDs.Insert(string(podUID))
+	info.PodUIDs.Insert(string(podUID))
 }
 
-func (res *ClaimInfo) deletePodReference(podUID types.UID) {
-	res.Lock()
-	defer res.Unlock()
+func (info *ClaimInfo) deletePodReference(podUID types.UID) {
+	info.Lock()
+	defer info.Unlock()
 
-	res.PodUIDs.Delete(string(podUID))
+	info.PodUIDs.Delete(string(podUID))
+}
+
+func (info *ClaimInfo) addCDIDevices(pluginName string, cdiDevices []string) error {
+	info.Lock()
+	defer info.Unlock()
+
+	// NOTE: Passing CDI device names as annotations is a temporary solution
+	// It will be removed after all runtimes are updated
+	// to get CDI device names from the ContainerConfig.CDIDevices field
+	annotations, err := generateCDIAnnotations(info.ClaimUID, info.DriverName, cdiDevices)
+	if err != nil {
+		return fmt.Errorf("failed to generate container annotations, err: %+v", err)
+	}
+
+	if info.CDIDevices == nil {
+		info.CDIDevices = make(map[string][]string)
+	}
+
+	info.CDIDevices[pluginName] = cdiDevices
+	info.annotations = append(info.annotations, annotations...)
+
+	return nil
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
@@ -70,25 +92,6 @@ func newClaimInfo(driverName, className string, claimUID types.UID, claimName, n
 		ClaimInfoState: claimInfoState,
 	}
 	return &claimInfo
-}
-
-func (info *ClaimInfo) addCDIDevices(pluginName string, cdiDevices []string) error {
-	// NOTE: Passing CDI device names as annotations is a temporary solution
-	// It will be removed after all runtimes are updated
-	// to get CDI device names from the ContainerConfig.CDIDevices field
-	annotations, err := generateCDIAnnotations(info.ClaimUID, info.DriverName, cdiDevices)
-	if err != nil {
-		return fmt.Errorf("failed to generate container annotations, err: %+v", err)
-	}
-
-	if info.CDIDevices == nil {
-		info.CDIDevices = make(map[string][]string)
-	}
-
-	info.CDIDevices[pluginName] = cdiDevices
-	info.annotations = append(info.annotations, annotations...)
-
-	return nil
 }
 
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
