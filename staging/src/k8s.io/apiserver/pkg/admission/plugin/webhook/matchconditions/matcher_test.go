@@ -299,7 +299,7 @@ func TestMatch(t *testing.T) {
 				},
 			},
 			failPolicy:  &ignore,
-			shouldMatch: true,
+			shouldMatch: false,
 			throwError:  false,
 		},
 	}

@@ -132,9 +132,9 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 				Error: err,
 			}
 		} else if f == v1.Ignore {
-			// if fail policy ignore then call webhook
+			// if fail policy ignore then skip call to webhook
 			return MatchResult{
-				Matches: true,
+				Matches: false,
 			}
 		}
 	}

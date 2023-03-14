@@ -273,10 +273,7 @@ func Test_MatchConditions(t *testing.T) {
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods: []*corev1.Pod{
-				matchConditionsTestPod("test1", "kube-system"),
-				matchConditionsTestPod("test2", "default"),
-			},
+			matchedPods:   []*corev1.Pod{},
 			failPolicy:    &ignore,
 			expectErrorWH: false,
 		},
