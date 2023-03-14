@@ -1234,7 +1234,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).InfoS("Syncing Policies")
+	klog.V(3).InfoS("Syncing Policies. PR for test pass.")
 
 	// Program HNS by adding corresponding policies for each service.
 	for svcName, svc := range proxier.serviceMap {
