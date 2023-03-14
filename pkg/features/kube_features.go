@@ -878,6 +878,7 @@ const (
 	// owner: @jsafrane
 	// kep: https://kep.k8s.io/1710
 	// alpha: v1.25
+	// beta: v1.27
 	// Speed up container startup by mounting volumes with the correct SELinux label
 	// instead of changing each file on the volumes recursively.
 	// Initial implementation focused on ReadWriteOncePod volumes.
@@ -1124,7 +1125,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeInclusionPolicyInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
-	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Alpha},
+	SELinuxMountReadWriteOncePod: {Default: true, PreRelease: featuregate.Beta},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
