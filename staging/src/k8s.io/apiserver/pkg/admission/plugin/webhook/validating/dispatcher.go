@@ -129,11 +129,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		go func(invocation *generic.WebhookInvocation, idx int) {
 			ignoreClientCallFailures := false
 			hookName := "unknown"
-			versionedAttr, err := versionedAttrAccessor.VersionedAttribute(invocation.Kind)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch was not able to fetch expected versionedAttributes for %v", invocation.Webhook.GetName()))
-				return
-			}
+			versionedAttr := versionedAttrAccessor.versionedAttrs[invocation.Kind]
 			// The ordering of these two defers is critical. The wg.Done will release the parent go func to close the errCh
 			// that is used by the second defer to report errors. The recovery and error reporting must be done first.
 			defer wg.Done()
@@ -172,7 +168,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			hookName = hook.Name
 			ignoreClientCallFailures = hook.FailurePolicy != nil && *hook.FailurePolicy == v1.Ignore
 			t := time.Now()
-			err = d.callHook(ctx, hook, invocation, versionedAttr)
+			err := d.callHook(ctx, hook, invocation, versionedAttr)
 			rejected := false
 			if err != nil {
 				switch err := err.(type) {

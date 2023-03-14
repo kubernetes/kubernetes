@@ -119,17 +119,16 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	defer func() {
 		webhookReinvokeCtx.SetLastWebhookInvocationOutput(attr.GetObject())
 	}()
-	var versionedAttr *admission.VersionedAttributes
+	v := &versionedAttributeAccessor{
+		attr:             attr,
+		objectInterfaces: o,
+	}
 	for i, hook := range hooks {
 		attrForCheck := attr
-		if versionedAttr != nil {
-			attrForCheck = versionedAttr
+		if v.versionedAttr != nil {
+			attrForCheck = v.versionedAttr
 		}
-		v := &versionedAttributeAccessor{
-			attr:             attr,
-			objectInterfaces: o,
-			versionedAttr:    versionedAttr,
-		}
+
 		invocation, statusErr := a.plugin.ShouldCallHook(ctx, hook, attrForCheck, o, v)
 		if statusErr != nil {
 			return statusErr
@@ -151,9 +150,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
-		// Subsequent webhook, convert existing versioned attributes to this webhook's version
 		var err error
-		versionedAttr, err = v.VersionedAttribute(invocation.Kind)
+		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
@@ -227,8 +225,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	}
 
 	// convert versionedAttr.VersionedObject to the internal version in the underlying admission.Attributes
-	if versionedAttr != nil && versionedAttr.VersionedObject != nil && versionedAttr.Dirty {
-		return o.GetObjectConvertor().Convert(versionedAttr.VersionedObject, versionedAttr.Attributes.GetObject(), nil)
+	if v.versionedAttr != nil && v.versionedAttr.VersionedObject != nil && v.versionedAttr.Dirty {
+		return o.GetObjectConvertor().Convert(v.versionedAttr.VersionedObject, v.versionedAttr.Attributes.GetObject(), nil)
 	}
 
 	return nil

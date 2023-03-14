@@ -214,18 +214,15 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 					URL:      &v2Endpoint,
 					CABundle: localhostCert,
 				},
-				// ignore pods in the marker namespace
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      corev1.LabelMetadataName,
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"marker"},
-						},
-					}},
 				FailurePolicy:           &ignore,
 				SideEffects:             &noSideEffects,
 				AdmissionReviewVersions: []string{"v1"},
+				MatchConditions: []admissionregistrationv1.MatchCondition{
+					{
+						Name:       "test-v2",
+						Expression: "object.metadata.version == 'v2'",
+					},
+				},
 			},
 			{
 				Name: "admission.integration.test",
@@ -242,17 +239,14 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 					URL:      &v1Endpoint,
 					CABundle: localhostCert,
 				},
-				// ignore pods in the marker namespace
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      corev1.LabelMetadataName,
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"marker"},
-						},
-					}},
 				SideEffects:             &noSideEffects,
 				AdmissionReviewVersions: []string{"v1"},
+				MatchConditions: []admissionregistrationv1.MatchCondition{
+					{
+						Name:       "test-v1",
+						Expression: "object.metadata.version == 'v1'",
+					},
+				},
 			},
 			{
 				Name: "admission.integration.test.marker",
