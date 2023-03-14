@@ -19,10 +19,10 @@
     {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive) -}}
         {{- . -}}
     {{- else -}}
-        error: GVK {{$gvk}} not found in OpenAPI schema
+        {{- throw "error: GVK %v not found in OpenAPI schema" $gvk -}}
     {{- end -}}
 {{- else -}}
-    error: GVR ({{$.GVR.String}}) not found in OpenAPI schema
+    {{- throw "error: GVR (%v) not found in OpenAPI schema" $.GVR.String -}}
 {{- end -}}
 {{- "\n" -}}
 
@@ -43,7 +43,8 @@ Takes dictionary as argument with keys:
             {{- with include "output" (set $ "schema" .) -}}
                 {{- . -}}
             {{- else -}}
-                error: field "{{index $.FieldPath (sub (len $.FieldPath) 1)}}" does not exist
+                {{- $fieldName := (index $.FieldPath (sub (len $.FieldPath) 1)) -}}
+                {{- throw "error: field \"%v\" does not exist" $fieldName}}
             {{- end -}}
             {{- break -}}
         {{- end -}}
