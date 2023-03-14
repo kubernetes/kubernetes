@@ -193,9 +193,9 @@ type EndpointPort struct {
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
 	// * Kubernetes-defined prefixed names:
-	//   * 'kubernetes.io/h2c' - http2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
-	//   * 'kubernetes.io/grpc' - grpc traffic - see https://github.com/grpc/grpc/blob/v1.51.1/doc/PROTOCOL-HTTP2.md
-	//   * 'kubernetes.io/tcp' - plain tcp traffic
+	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/grpc' - gRPC traffic - see https://github.com/grpc/grpc/blob/v1.51.1/doc/PROTOCOL-HTTP2.md
+	//   * 'kubernetes.io/tcp' - plain TCP traffic
 	//
 	// * Other protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
