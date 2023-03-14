@@ -22,13 +22,19 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e_node/remote"
+	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
 var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
+var _ = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+var _ = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var _ = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var _ = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 func main() {
 	klog.InitFlags(nil)
