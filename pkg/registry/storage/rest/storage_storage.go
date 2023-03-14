@@ -79,7 +79,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	storage := map[string]rest.Storage{}
 
 	// register csistoragecapacities
-	if resource := "csistoragecapacities"; apiResourceConfigSource.ResourceEnabled(storageapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "csistoragecapacities"; apiResourceConfigSource.ResourceEnabled(storageapiv1.SchemeGroupVersion.WithResource(resource)) {
 		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
 		if err != nil {
 			return storage, err

@@ -36,6 +36,7 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -436,6 +437,7 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
 		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
 		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
+		storageapiv1.SchemeGroupVersion.WithResource("csinodes"):
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
 	}
 
