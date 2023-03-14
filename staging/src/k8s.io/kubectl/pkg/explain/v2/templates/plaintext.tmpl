@@ -242,7 +242,9 @@ Takes dictionary as argument with keys:
             {{- $name := split $ref "/" | last -}}
             {{- or (split $name "." | last) "Object" -}}
         {{- else -}}
-            {{- or .type "Object" -}}
+            {{/* Old explain used capitalized "Object". Just follow suit */}}
+            {{- if eq .type "object" -}}Object
+            {{- else -}}{{- or .type "Object" -}}{{- end -}}
         {{- end -}}
     {{- else -}}
         {{- fail "expected schema argument to subtemplate 'typeguess'" -}}

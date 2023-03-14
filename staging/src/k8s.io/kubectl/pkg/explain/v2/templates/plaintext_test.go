@@ -311,6 +311,20 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
+			// Shows that the typeguess puts Object tpye in title case
+			Name:        "ArrayUnknown",
+			Subtemplate: "typeGuess",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"description": "a cool field",
+					"type":        "object",
+				},
+			},
+			Checks: []check{
+				checkEquals("Object"),
+			},
+		},
+		{
 			// Shows that the typeguess template works with scalars
 			Name:        "ArrayOfScalar",
 			Subtemplate: "typeGuess",
