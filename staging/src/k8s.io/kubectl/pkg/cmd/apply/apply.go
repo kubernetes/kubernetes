@@ -38,6 +38,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -103,6 +104,7 @@ type ApplyOptions struct {
 	Validator           validation.Schema
 	Builder             *resource.Builder
 	Mapper              meta.RESTMapper
+	MetadataClient      metadata.Interface
 	DynamicClient       dynamic.Interface
 	OpenAPISchema       openapi.Resources
 
@@ -256,6 +258,11 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, err
 	}
 
+	metadataClient, err := f.MetadataClient()
+	if err != nil {
+		return nil, err
+	}
+
 	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
 
 	// allow for a success message operation to be specified at print time
@@ -359,6 +366,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		Builder:             builder,
 		Mapper:              mapper,
 		DynamicClient:       dynamicClient,
+		MetadataClient:      metadataClient,
 		OpenAPISchema:       openAPISchema,
 
 		IOStreams: flags.IOStreams,

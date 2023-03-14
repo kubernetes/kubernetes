@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
 	restclient "k8s.io/client-go/rest"
@@ -413,6 +414,7 @@ type TestFactory struct {
 	Client             RESTClient
 	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient RESTClient
+	FakeMetadataClient metadata.Interface
 	ClientConfigVal    *restclient.Config
 	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
@@ -599,6 +601,14 @@ func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 		return f.FakeDynamicClient, nil
 	}
 	return f.Factory.DynamicClient()
+}
+
+// MetadataClient returns a metadata client from TestFactory
+func (f *TestFactory) MetadataClient() (metadata.Interface, error) {
+	if f.FakeMetadataClient != nil {
+		return f.FakeMetadataClient, nil
+	}
+	return f.Factory.MetadataClient()
 }
 
 // RESTClient returns a REST client from TestFactory

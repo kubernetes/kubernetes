@@ -526,7 +526,7 @@ func (a *ApplySet) Prune(ctx context.Context, o *ApplyOptions) error {
 		IOStreams: o.IOStreams,
 	}
 
-	if err := a.pruneAll(ctx, o.DynamicClient, o.VisitedUids, opt); err != nil {
+	if err := a.pruneAll(ctx, o.MetadataClient, o.DynamicClient, o.VisitedUids, opt); err != nil {
 		return err
 	}
 

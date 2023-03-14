@@ -22,12 +22,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/metadata"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -64,7 +66,7 @@ func (p *PruneObject) String() string {
 
 // FindAllObjectsToPrune returns the list of objects that will be pruned.
 // Calling this instead of Prune can be useful for dry-run / diff behaviour.
-func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dynamic.Interface, visitedUids sets.Set[types.UID]) ([]PruneObject, error) {
+func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, metadataClient metadata.Interface, visitedUids sets.Set[types.UID]) ([]PruneObject, error) {
 	var allObjects []PruneObject
 	// TODO: Run discovery in parallel (and maybe in consistent order?)
 	for _, restMapping := range a.AllPrunableResources() {
@@ -75,7 +77,7 @@ func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dyna
 					// Just double-check because otherwise we get cryptic error messages
 					return nil, fmt.Errorf("unexpectedly encountered empty namespace during prune of namespace-scoped resource %v", restMapping.GroupVersionKind)
 				}
-				pruneObjects, err := a.findObjectsToPrune(ctx, dynamicClient, visitedUids, namespace, restMapping)
+				pruneObjects, err := a.findObjectsToPrune(ctx, metadataClient, visitedUids, namespace, restMapping)
 				if err != nil {
 					return nil, fmt.Errorf("listing %v objects for prune: %w", restMapping.GroupVersionKind.String(), err)
 				}
@@ -83,7 +85,7 @@ func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dyna
 			}
 
 		case meta.RESTScopeNameRoot:
-			pruneObjects, err := a.findObjectsToPrune(ctx, dynamicClient, visitedUids, metav1.NamespaceNone, restMapping)
+			pruneObjects, err := a.findObjectsToPrune(ctx, metadataClient, visitedUids, metav1.NamespaceNone, restMapping)
 			if err != nil {
 				return nil, fmt.Errorf("listing %v objects for prune: %w", restMapping.GroupVersionKind.String(), err)
 			}
@@ -97,8 +99,8 @@ func (a *ApplySet) FindAllObjectsToPrune(ctx context.Context, dynamicClient dyna
 	return allObjects, nil
 }
 
-func (a *ApplySet) pruneAll(ctx context.Context, dynamicClient dynamic.Interface, visitedUids sets.Set[types.UID], deleteOptions *ApplySetDeleteOptions) error {
-	allObjects, err := a.FindAllObjectsToPrune(ctx, dynamicClient, visitedUids)
+func (a *ApplySet) pruneAll(ctx context.Context, metadataClient metadata.Interface, dynamicClient dynamic.Interface, visitedUids sets.Set[types.UID], deleteOptions *ApplySetDeleteOptions) error {
+	allObjects, err := a.FindAllObjectsToPrune(ctx, metadataClient, visitedUids)
 	if err != nil {
 		return err
 	}
@@ -106,7 +108,7 @@ func (a *ApplySet) pruneAll(ctx context.Context, dynamicClient dynamic.Interface
 	return a.deleteObjects(ctx, dynamicClient, allObjects, deleteOptions)
 }
 
-func (a *ApplySet) findObjectsToPrune(ctx context.Context, dynamicClient dynamic.Interface, visitedUids sets.Set[types.UID], namespace string, mapping *meta.RESTMapping) ([]PruneObject, error) {
+func (a *ApplySet) findObjectsToPrune(ctx context.Context, metadataClient metadata.Interface, visitedUids sets.Set[types.UID], namespace string, mapping *meta.RESTMapping) ([]PruneObject, error) {
 	applysetLabelSelector := a.LabelSelectorForMembers()
 
 	opt := metav1.ListOptions{
@@ -114,7 +116,7 @@ func (a *ApplySet) findObjectsToPrune(ctx context.Context, dynamicClient dynamic
 	}
 
 	klog.V(2).Infof("listing objects for pruning; namespace=%q, resource=%v", namespace, mapping.Resource)
-	objects, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, opt)
+	objects, err := metadataClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, opt)
 	if err != nil {
 		return nil, err
 	}
