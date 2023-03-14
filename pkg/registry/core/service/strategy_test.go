@@ -86,7 +86,7 @@ func makeValidServicePort(name string, proto api.Protocol, port int32) api.Servi
 		Name:       name,
 		Protocol:   proto,
 		Port:       port,
-		TargetPort: intstr.FromInt(int(port)),
+		TargetPort: intstr.FromInt32(port),
 	}
 }
 
