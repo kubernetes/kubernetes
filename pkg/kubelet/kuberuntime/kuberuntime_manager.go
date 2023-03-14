@@ -946,7 +946,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		restart := shouldRestartOnFailure(pod)
 		// Do not restart if only the Resources field has changed with InPlacePodVerticalScaling enabled
 		if _, _, changed := containerChanged(&container, containerStatus); changed &&
-			(!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) ||
+			(!isInPlacePodVerticalScalingAllowed(pod) ||
 				kubecontainer.HashContainerWithoutResources(&container) != containerStatus.HashWithoutResources) {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
