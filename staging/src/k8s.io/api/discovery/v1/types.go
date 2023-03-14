@@ -184,19 +184,18 @@ type EndpointPort struct {
 	// interpreted in the context of the specific consumer.
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
 
-	// Used as a hint for implementations to
-	// configure the protocol used between the
-	// implementation and the application it exposes.
+	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
 	// Valid values are either:
 	//
 	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
-	// * Kubernetes standard names:
-	//   * 'k8s.io/h2c' - http2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
-	//   * 'k8s.io/grpc' - grpc traffic - see https://github.com/grpc/grpc/blob/v1.51.1/doc/PROTOCOL-HTTP2.md
-	//   * 'k8s.io/tcp' - plain tcp traffic
+	// * Kubernetes-defined prefixed names:
+	//   * 'kubernetes.io/h2c' - http2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/grpc' - grpc traffic - see https://github.com/grpc/grpc/blob/v1.51.1/doc/PROTOCOL-HTTP2.md
+	//   * 'kubernetes.io/tcp' - plain tcp traffic
 	//
 	// * Other protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
