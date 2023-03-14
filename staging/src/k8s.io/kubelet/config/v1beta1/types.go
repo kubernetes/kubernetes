@@ -692,6 +692,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// enableSystemLogQuery enables the node log query feature on the /logs endpoint.
+	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
+	// Default: false
+	// +featureGate=NodeLogQuery
+	// +optional
+	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the
 	// shutdown and total grace period for pod termination during a node shutdown.
 	// Default: "0s"

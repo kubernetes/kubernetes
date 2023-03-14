@@ -31,14 +31,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opencontainers/selinux/go-selinux"
-
-	"k8s.io/client-go/informers"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
+	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"k8s.io/client-go/informers"
 
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
@@ -1510,7 +1508,39 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	ctx := context.Background()
 	if kl.logServer == nil {
-		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
+		file := http.FileServer(http.Dir(nodeLogDir))
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLogQuery) && kl.kubeletConfiguration.EnableSystemLogQuery {
+			kl.logServer = http.StripPrefix("/logs/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if nlq, errs := newNodeLogQuery(req.URL.Query()); len(errs) > 0 {
+					http.Error(w, errs.ToAggregate().Error(), http.StatusBadRequest)
+					return
+				} else if nlq != nil {
+					if req.URL.Path != "/" && req.URL.Path != "" {
+						http.Error(w, "path not allowed in query mode", http.StatusNotAcceptable)
+						return
+					}
+					if errs := nlq.validate(); len(errs) > 0 {
+						http.Error(w, errs.ToAggregate().Error(), http.StatusNotAcceptable)
+						return
+					}
+					// Validation ensures that the request does not query services and files at the same time
+					if len(nlq.Services) > 0 {
+						journal.ServeHTTP(w, req)
+						return
+					}
+					// Validation ensures that the request does not explicitly query multiple files at the same time
+					if len(nlq.Files) == 1 {
+						// Account for the \ being used on Windows clients
+						req.URL.Path = filepath.ToSlash(nlq.Files[0])
+					}
+				}
+				// Fall back in case the caller is directly trying to query a file
+				// Example: kubectl get --raw /api/v1/nodes/$name/proxy/logs/foo.log
+				file.ServeHTTP(w, req)
+			}))
+		} else {
+			kl.logServer = http.StripPrefix("/logs/", file)
+		}
 	}
 	if kl.kubeClient == nil {
 		klog.InfoS("No API server defined - no node status update will be sent")

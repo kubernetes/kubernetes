@@ -563,6 +563,24 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority",
 		},
+		{
+			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler",
+		},
+		{
+			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": true}
+				conf.EnableSystemLogHandler = false
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
+		},
 	}
 
 	for _, tc := range cases {
