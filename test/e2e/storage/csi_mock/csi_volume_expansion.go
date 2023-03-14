@@ -286,6 +286,9 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				if pv.Spec.CSI == nil || pv.Spec.CSI.NodeExpandSecretRef == nil {
 					framework.Fail("creating pv without 'NodeExpandSecretRef'")
 				}
+				if pv.Spec.CSI.NodeExpandSecretRef.Namespace != f.Namespace.Name || pv.Spec.CSI.NodeExpandSecretRef.Name != secretName {
+					framework.Failf("failed to set node expand secret ref, namespace: %s name: %s", pv.Spec.CSI.NodeExpandSecretRef.Namespace, pv.Spec.CSI.NodeExpandSecretRef.Name)
+				}
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
@@ -302,6 +305,10 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				ginkgo.By("Waiting for persistent volume resize to finish")
 				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for PV resize to finish")
+
+				ginkgo.By("Waiting for PVC resize to finish")
+				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
+				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiResizeWaitPeriod, func() (done bool, err error) {
@@ -320,10 +327,6 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					return false, nil
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
-
-				ginkgo.By("Waiting for PVC resize to finish")
-				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
-				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
 				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
