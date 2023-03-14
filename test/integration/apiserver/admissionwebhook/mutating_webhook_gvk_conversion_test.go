@@ -28,6 +28,10 @@ import (
 	"testing"
 	"time"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -155,6 +159,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 	defer webhookServer.Close()
 
 	upCh := typeChecker.Reset()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--disable-admission-plugins=ServiceAccount",
 	}, framework.SharedEtcd())
@@ -220,7 +225,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				MatchConditions: []admissionregistrationv1.MatchCondition{
 					{
 						Name:       "test-v2",
-						Expression: "object.metadata.version == 'v2'",
+						Expression: "object.apiVersion == 'awesome.bears.com/v2'",
 					},
 				},
 			},
@@ -244,7 +249,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				MatchConditions: []admissionregistrationv1.MatchCondition{
 					{
 						Name:       "test-v1",
-						Expression: "object.metadata.version == 'v1'",
+						Expression: "object.apiVersion == 'awesome.bears.com/v1'",
 					},
 				},
 			},
