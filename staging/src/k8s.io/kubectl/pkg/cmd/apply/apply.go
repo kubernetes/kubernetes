@@ -418,8 +418,6 @@ func (o *ApplyOptions) Validate() error {
 				return fmt.Errorf("--selector is incompatible with --applyset")
 			} else if len(o.PruneResources) > 0 {
 				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
-			} else {
-				klog.Warning("WARNING: --prune --applyset is not fully implemented and does not yet prune any resources.")
 			}
 		} else {
 			if !o.All && o.Selector == "" {

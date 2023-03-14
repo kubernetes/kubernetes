@@ -2527,7 +2527,7 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: placeholder-todo
+    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
   name: mySet
   namespace: test
 `, string(updatedSecret))
@@ -3148,16 +3148,8 @@ func fatalNoExit(t *testing.T, ioStreams genericclioptions.IOStreams) func(msg s
 	}
 }
 
-
 func TestApplySetDryRun(t *testing.T) {
-	// TODO: replace with cmdtesting.InitTestErrorHandler() when the feature is fully implemented
-	cmdutil.BehaviorOnFatal(func(s string, i int) {
-		if s != "error: ApplySet-based pruning is not yet implemented" {
-			t.Fatalf("unexpected exit %d: %s", i, s)
-		}
-	})
-	defer cmdutil.DefaultBehaviorOnFatal()
-
+	cmdtesting.InitTestErrorHandler(t)
 	nameRC, rc := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	nameParentSecret := "mySet"
