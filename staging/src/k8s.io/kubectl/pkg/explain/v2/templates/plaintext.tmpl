@@ -43,7 +43,7 @@ Takes dictionary as argument with keys:
             {{- with include "output" (set $ "schema" .) -}}
                 {{- . -}}
             {{- else -}}
-                error: field "{{$.FieldPath}}" does not exist
+                error: field "{{index $.FieldPath (sub (len $.FieldPath) 1)}}" does not exist
             {{- end -}}
             {{- break -}}
         {{- end -}}

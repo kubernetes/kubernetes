@@ -336,7 +336,7 @@ func TestPlaintext(t *testing.T) {
 		},
 		{
 			// Shows that the typeguess puts Object tpye in title case
-			Name:        "ArrayUnknown",
+			Name:        "ObjectTitle",
 			Subtemplate: "typeGuess",
 			Context: map[string]any{
 				"schema": map[string]any{
