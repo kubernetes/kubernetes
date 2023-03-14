@@ -79,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -525,7 +524,7 @@ type ProxyServer struct {
 
 	podCIDRs []string // only used for LocalModeNodeCIDR
 
-	Proxier proxy.Provider
+	ProxyRunner *proxy.Runner
 }
 
 // newProxyServer creates a ProxyServer based on the given config
@@ -607,14 +606,7 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		}
 	}
 
-	if ipv4Proxier != nil && ipv6Proxier != nil {
-		s.Proxier = metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier)
-	} else if ipv4Proxier != nil {
-		s.Proxier = ipv4Proxier
-	} else {
-		s.Proxier = ipv6Proxier
-	}
-
+	s.ProxyRunner = proxy.NewRunner(ipv4Proxier, ipv6Proxier)
 	return s, nil
 }
 
@@ -866,11 +858,11 @@ func (s *ProxyServer) Run() error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
-	serviceConfig.RegisterEventHandler(s.Proxier)
+	serviceConfig.RegisterEventHandler(s.ProxyRunner)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
-	endpointSliceConfig.RegisterEventHandler(s.Proxier)
+	endpointSliceConfig.RegisterEventHandler(s.ProxyRunner)
 	go endpointSliceConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig because that
@@ -887,7 +879,7 @@ func (s *ProxyServer) Run() error {
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
 	}
-	nodeConfig.RegisterEventHandler(s.Proxier)
+	nodeConfig.RegisterEventHandler(s.ProxyRunner)
 
 	go nodeConfig.Run(wait.NeverStop)
 
@@ -898,7 +890,7 @@ func (s *ProxyServer) Run() error {
 	// Birth Cry after the birth is successful
 	s.birthCry()
 
-	go s.Proxier.SyncLoop()
+	s.ProxyRunner.Run()
 
 	return <-errCh
 }

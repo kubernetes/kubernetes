@@ -21,7 +21,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,7 +30,6 @@ import (
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -47,23 +45,6 @@ type HollowProxy struct {
 	ProxyServer *proxyapp.ProxyServer
 }
 
-type FakeProxier struct {
-	proxyconfig.NoopNodeHandler
-}
-
-func (*FakeProxier) Sync() {}
-func (*FakeProxier) SyncLoop() {
-	select {}
-}
-func (*FakeProxier) OnServiceAdd(service *v1.Service)                                 {}
-func (*FakeProxier) OnServiceUpdate(oldService, service *v1.Service)                  {}
-func (*FakeProxier) OnServiceDelete(service *v1.Service)                              {}
-func (*FakeProxier) OnServiceSynced()                                                 {}
-func (*FakeProxier) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice)              {}
-func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {}
-func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
-func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
-
 func NewHollowProxyOrDie(
 	nodeName string,
 	client clientset.Interface,
@@ -78,7 +59,7 @@ func NewHollowProxyOrDie(
 	proxierMinSyncPeriod time.Duration,
 ) (*HollowProxy, error) {
 	// Create proxier and service/endpoint handlers.
-	var proxier proxy.Provider
+	var ipv4Proxier, ipv6Proxier proxy.Provider
 	var err error
 
 	if useRealProxier {
@@ -88,12 +69,14 @@ func NewHollowProxyOrDie(
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		family := v1.IPv4Protocol
+		proxier := &ipv4Proxier
 		if iptInterface.IsIPv6() {
 			family = v1.IPv6Protocol
+			proxier = &ipv6Proxier
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
-		proxier, err = iptables.NewProxier(
+		*proxier, err = iptables.NewProxier(
 			family,
 			iptInterface,
 			sysctl,
@@ -113,8 +96,6 @@ func NewHollowProxyOrDie(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-	} else {
-		proxier = &FakeProxier{}
 	}
 
 	// Create a Hollow Proxy instance.
@@ -133,7 +114,7 @@ func NewHollowProxyOrDie(
 			},
 
 			Client:      client,
-			Proxier:     proxier,
+			ProxyRunner: proxy.NewRunner(ipv4Proxier, ipv6Proxier),
 			Broadcaster: broadcaster,
 			Recorder:    recorder,
 			NodeRef:     nodeRef,
