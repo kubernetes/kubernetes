@@ -476,7 +476,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		register("storage-version-gc", startStorageVersionGCController)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		controllers["resource-claim-controller"] = startResourceClaimController
+		register("resource-claim-controller", startResourceClaimController)
 	}
 
 	return controllers
