@@ -149,6 +149,9 @@ func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels
 }
 
 func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {
+	if selector.Empty() {
+		return 0
+	}
 	count := 0
 	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).
