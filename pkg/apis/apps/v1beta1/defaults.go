@@ -78,7 +78,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-				maxUnavailable := intstr.FromInt(1)
+				maxUnavailable := intstr.FromInt32(1)
 				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 			}
 		}

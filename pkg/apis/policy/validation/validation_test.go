@@ -52,9 +52,9 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 		intstr.FromString("0%"),
 		intstr.FromString("1%"),
 		intstr.FromString("100%"),
-		intstr.FromInt(0),
-		intstr.FromInt(1),
-		intstr.FromInt(100),
+		intstr.FromInt32(0),
+		intstr.FromInt32(1),
+		intstr.FromInt32(100),
 	}
 	for _, c := range successCases {
 		spec := policy.PodDisruptionBudgetSpec{
@@ -71,7 +71,7 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 		intstr.FromString("nope"),
 		intstr.FromString("-1%"),
 		intstr.FromString("101%"),
-		intstr.FromInt(-1),
+		intstr.FromInt32(-1),
 	}
 	for _, c := range failureCases {
 		spec := policy.PodDisruptionBudgetSpec{
@@ -86,7 +86,7 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 
 func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing.T) {
 	c1 := intstr.FromString("10%")
-	c2 := intstr.FromInt(1)
+	c2 := intstr.FromInt32(1)
 
 	spec := policy.PodDisruptionBudgetSpec{
 		MinAvailable:   &c1,

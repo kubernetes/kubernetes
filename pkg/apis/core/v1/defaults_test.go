@@ -1365,14 +1365,14 @@ func TestSetDefaultServiceTargetPort(t *testing.T) {
 	in := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*v1.Service)
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(1234) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(1234) {
 		t.Errorf("Expected TargetPort to be defaulted, got %v", out.Spec.Ports[0].TargetPort)
 	}
 
-	in = &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234, TargetPort: intstr.FromInt(5678)}}}}
+	in = &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234, TargetPort: intstr.FromInt32(5678)}}}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(5678) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(5678) {
 		t.Errorf("Expected TargetPort to be unchanged, got %v", out.Spec.Ports[0].TargetPort)
 	}
 }
@@ -1382,7 +1382,7 @@ func TestSetDefaultServicePort(t *testing.T) {
 	in := &v1.Service{Spec: v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{Protocol: "UDP", Port: 9376, TargetPort: intstr.FromString("p")},
-			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt(309)},
+			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt32(309)},
 		},
 	}}
 	out := roundTrip(t, runtime.Object(in)).(*v1.Service)
@@ -1395,7 +1395,7 @@ func TestSetDefaultServicePort(t *testing.T) {
 	if out.Spec.Ports[1].Protocol != v1.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolUDP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(309) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt32(309) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 
@@ -1403,20 +1403,20 @@ func TestSetDefaultServicePort(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{Protocol: "", Port: 9376, TargetPort: intstr.FromString("")},
-			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt(0)},
+			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt32(0)},
 		},
 	}}
 	out = roundTrip(t, runtime.Object(in)).(*v1.Service)
 	if out.Spec.Ports[0].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(int(in.Spec.Ports[0].Port)) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(in.Spec.Ports[0].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt32(in.Spec.Ports[1].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }

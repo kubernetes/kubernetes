@@ -288,7 +288,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				tweakReplicas(3),
 				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
 				tweakRollingUpdatePartition(2),
-				tweakMaxUnavailable(intstr.FromInt(2)),
+				tweakMaxUnavailable(intstr.FromInt32(2)),
 			),
 		},
 		{
@@ -495,7 +495,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			set: mkStatefulSet(&validPodTemplate,
 				tweakReplicas(3),
 				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakMaxUnavailable(intstr.FromInt(0)),
+				tweakMaxUnavailable(intstr.FromInt32(0)),
 			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
@@ -1742,7 +1742,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &apps.RollingUpdateDaemonSet{
-							MaxUnavailable: intstr.FromInt(1),
+							MaxUnavailable: intstr.FromInt32(1),
 						},
 					},
 				},
@@ -1769,7 +1769,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &apps.RollingUpdateDaemonSet{
-							MaxUnavailable: intstr.FromInt(1),
+							MaxUnavailable: intstr.FromInt32(1),
 						},
 					},
 				},
@@ -2275,8 +2275,8 @@ func validDeployment() *apps.Deployment {
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt(1),
-					MaxUnavailable: intstr.FromInt(1),
+					MaxSurge:       intstr.FromInt32(1),
+					MaxUnavailable: intstr.FromInt32(1),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -2366,7 +2366,7 @@ func TestValidateDeployment(t *testing.T) {
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
 			MaxSurge:       intstr.FromString("0%"),
-			MaxUnavailable: intstr.FromInt(0),
+			MaxUnavailable: intstr.FromInt32(0),
 		},
 	}
 	errorCases["may not be 0 when `maxSurge` is 0"] = invalidRollingUpdateDeployment
@@ -3497,13 +3497,13 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 		},
 		"invalid: zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(0),
+				MaxUnavailable: intstr.FromInt32(0),
 			},
 			expectError: true,
 		},
 		"valid: one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(1),
+				MaxUnavailable: intstr.FromInt32(1),
 			},
 		},
 		"valid: one percent": {
@@ -3539,13 +3539,13 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 		},
 		"invalid: surge enabled, unavailable zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(0),
+				MaxUnavailable: intstr.FromInt32(0),
 			},
 			expectError: true,
 		},
 		"valid: surge enabled, unavailable one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(1),
+				MaxUnavailable: intstr.FromInt32(1),
 			},
 		},
 		"valid: surge enabled, unavailable one percent": {
@@ -3573,13 +3573,13 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 		},
 		"invalid: surge enabled, surge zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromInt(0),
+				MaxSurge: intstr.FromInt32(0),
 			},
 			expectError: true,
 		},
 		"valid: surge enabled, surge one": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxSurge: intstr.FromInt(1),
+				MaxSurge: intstr.FromInt32(1),
 			},
 		},
 		"valid: surge enabled, surge one percent": {
@@ -3616,14 +3616,14 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 		},
 		"invalid: surge enabled, surge and unavailable zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(0),
-				MaxSurge:       intstr.FromInt(0),
+				MaxUnavailable: intstr.FromInt32(0),
+				MaxSurge:       intstr.FromInt32(0),
 			},
 			expectError: true,
 		},
 		"invalid: surge enabled, surge and unavailable mixed zero": {
 			ds: &apps.RollingUpdateDaemonSet{
-				MaxUnavailable: intstr.FromInt(0),
+				MaxUnavailable: intstr.FromInt32(0),
 				MaxSurge:       intstr.FromString("0%"),
 			},
 			expectError: true,
