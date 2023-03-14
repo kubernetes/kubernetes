@@ -3546,8 +3546,8 @@ func TestPrintServiceList(t *testing.T) {
 }
 
 func TestPrintPodDisruptionBudget(t *testing.T) {
-	minAvailable := intstr.FromInt(22)
-	maxUnavailable := intstr.FromInt(11)
+	minAvailable := intstr.FromInt32(22)
+	maxUnavailable := intstr.FromInt32(11)
 	tests := []struct {
 		pdb      policy.PodDisruptionBudget
 		expected []metav1.TableRow
@@ -3604,8 +3604,8 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 }
 
 func TestPrintPodDisruptionBudgetList(t *testing.T) {
-	minAvailable := intstr.FromInt(22)
-	maxUnavailable := intstr.FromInt(11)
+	minAvailable := intstr.FromInt32(22)
+	maxUnavailable := intstr.FromInt32(11)
 
 	pdbList := policy.PodDisruptionBudgetList{
 		Items: []policy.PodDisruptionBudget{
