@@ -21604,7 +21604,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolumeClaimCondition contails details about state of pvc",
+				Description: "PersistentVolumeClaimCondition contains details about state of pvc",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {

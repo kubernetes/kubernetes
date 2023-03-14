@@ -577,7 +577,7 @@ const (
 	PersistentVolumeClaimNodeExpansionFailed PersistentVolumeClaimResizeStatus = "NodeExpansionFailed"
 )
 
-// PersistentVolumeClaimCondition contails details about state of pvc
+// PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimCondition struct {
 	Type   PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
 	Status ConditionStatus                    `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`

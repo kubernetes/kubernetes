@@ -2973,7 +2973,7 @@
         ]
       },
       "io.k8s.api.core.v1.PersistentVolumeClaimCondition": {
-        "description": "PersistentVolumeClaimCondition contails details about state of pvc",
+        "description": "PersistentVolumeClaimCondition contains details about state of pvc",
         "properties": {
           "lastProbeTime": {
             "allOf": [
