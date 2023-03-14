@@ -157,6 +157,7 @@ var standardContainerResources = sets.NewString(
 	string(corev1.ResourceCPU),
 	string(corev1.ResourceMemory),
 	string(corev1.ResourceEphemeralStorage),
+	string(corev1.ResourceSwap),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
