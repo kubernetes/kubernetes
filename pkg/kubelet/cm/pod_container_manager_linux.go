@@ -70,7 +70,6 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesn't already exist it is created.
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
-	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
@@ -80,6 +79,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 			enforceMemoryQoS = true
 		}
 		// Create the pod container
+		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
