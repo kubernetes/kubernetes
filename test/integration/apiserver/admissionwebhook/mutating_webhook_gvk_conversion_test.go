@@ -206,7 +206,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				Rules: []admissionregistrationv1.RuleWithOperations{{
 					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
 					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{"awesome.bears.com"},
+						APIGroups:   []string{"awesome.example.com"},
 						APIVersions: []string{"v2"},
 						Resources:   []string{"*/*"},
 					},
@@ -222,7 +222,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				MatchConditions: []admissionregistrationv1.MatchCondition{
 					{
 						Name:       "test-v2",
-						Expression: "object.apiVersion == 'awesome.bears.com/v2'",
+						Expression: "object.apiVersion == 'awesome.example.com/v2'",
 					},
 				},
 			},
@@ -231,7 +231,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				Rules: []admissionregistrationv1.RuleWithOperations{{
 					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
 					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{"awesome.bears.com"},
+						APIGroups:   []string{"awesome.example.com"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"*/*"},
 					},
@@ -246,7 +246,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				MatchConditions: []admissionregistrationv1.MatchCondition{
 					{
 						Name:       "test-v1",
-						Expression: "object.apiVersion == 'awesome.bears.com/v1'",
+						Expression: "object.apiVersion == 'awesome.example.com/v1'",
 					},
 				},
 			},
@@ -301,7 +301,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 
 	v1Resource := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "awesome.bears.com" + "/" + "v1",
+			"apiVersion": "awesome.example.com" + "/" + "v1",
 			"kind":       "Panda",
 			"metadata": map[string]interface{}{
 				"name": "v1-bears",
@@ -311,7 +311,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 
 	v2Resource := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "awesome.bears.com" + "/" + "v2",
+			"apiVersion": "awesome.example.com" + "/" + "v2",
 			"kind":       "Panda",
 			"metadata": map[string]interface{}{
 				"name": "v2-bears",
@@ -319,12 +319,12 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 		},
 	}
 
-	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.example.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("error1 %v", err.Error())
 	}
 
-	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.example.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("error2 %v", err.Error())
 	}
@@ -356,10 +356,10 @@ func newMarkerPodGVKConversion(namespace string) *corev1.Pod {
 func versionedCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
 	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pandas.awesome.bears.com",
+			Name: "pandas.awesome.example.com",
 		},
 		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "awesome.bears.com",
+			Group: "awesome.example.com",
 			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
 					Name:    "v1",
