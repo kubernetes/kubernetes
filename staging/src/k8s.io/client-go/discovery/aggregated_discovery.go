@@ -99,6 +99,9 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		a, _ := json.Marshal(v)
 		klog.Warningf("resourceList: %s\n", a)
 		for _, r := range v.Resources {
+			if r.ResponseKind == nil {
+				panic(fmt.Errorf("AggregatedDiscovery: fail %s", a))
+			}
 			klog.Warningf("resource: %s\n", r.Resource)
 			resource := convertAPIResource(r)
 			resourceList.APIResources = append(resourceList.APIResources, resource)
