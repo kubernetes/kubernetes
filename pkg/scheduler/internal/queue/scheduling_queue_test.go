@@ -1100,14 +1100,13 @@ func TestSchedulingQueue_Close(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort())
-	wantErr := fmt.Errorf(queueClosed)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		pod, err := q.Pop()
-		if err.Error() != wantErr.Error() {
-			t.Errorf("Expected err %q from Pop() if queue is closed, but got %q", wantErr.Error(), err.Error())
+		if err != nil {
+			t.Errorf("Expected nil err from Pop() if queue is closed, but got %q", err.Error())
 		}
 		if pod != nil {
 			t.Errorf("Expected pod nil from Pop() if queue is closed, but got: %v", pod)
