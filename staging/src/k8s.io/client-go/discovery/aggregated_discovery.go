@@ -23,7 +23,6 @@ import (
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 )
 
 // StaleGroupVersionError encasulates failed GroupVersion marked "stale"
