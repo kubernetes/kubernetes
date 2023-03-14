@@ -2783,11 +2783,12 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		return
 	}
 
-	providers := server.PodResourcesProviders{
-		Pods:    kl.podManager,
-		Devices: kl.containerManager,
-		Cpus:    kl.containerManager,
-		Memory:  kl.containerManager,
+	providers := podresources.PodResourcesProviders{
+		Pods:             kl.podManager,
+		Devices:          kl.containerManager,
+		Cpus:             kl.containerManager,
+		Memory:           kl.containerManager,
+		DynamicResources: kl.containerManager,
 	}
 
 	server.ListenAndServePodResources(socket, providers)

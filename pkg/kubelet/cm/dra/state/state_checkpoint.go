@@ -39,6 +39,9 @@ type ClaimInfoState struct {
 	// Name of the DRA driver
 	DriverName string
 
+	// ClassName is a resource class of the claim
+	ClassName string
+
 	// ClaimUID is an UID of the resource claim
 	ClaimUID types.UID
 

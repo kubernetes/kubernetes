@@ -127,10 +127,11 @@ type ContainerManager interface {
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
-	// Implements the podresources Provider API for CPUs, Memory and Devices
+	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
 	podresources.MemoryProvider
+	podresources.DynamicResourcesProvider
 }
 
 type NodeConfig struct {

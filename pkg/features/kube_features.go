@@ -439,6 +439,18 @@ const (
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources featuregate.Feature = "KubeletPodResources"
 
+	// owner: @moshe010
+	// alpha: v1.27
+	//
+	// Enable POD resources API to return resources allocated by Dynamic Resource Allocation
+	KubeletPodResourcesDynamicResources featuregate.Feature = "KubeletPodResourcesDynamicResources"
+
+	// owner: @moshe010
+	// alpha: v1.27
+	//
+	// Enable POD resources API with Get method
+	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
+
 	// owner: @fromanirh
 	// alpha: v1.21
 	// beta: v1.23
@@ -994,6 +1006,10 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletPodResources: {Default: true, PreRelease: featuregate.Beta},
+
+	KubeletPodResourcesDynamicResources: {Default: false, PreRelease: featuregate.Alpha},
+
+	KubeletPodResourcesGet: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.Beta},
 

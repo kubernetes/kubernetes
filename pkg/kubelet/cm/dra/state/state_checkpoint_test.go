@@ -50,11 +50,12 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		},
 		{
 			"Restore checkpoint - single claim",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120167}`,
+			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":153446146}`,
 			"",
 			[]ClaimInfoState{
 				{
 					DriverName: "test-driver.cdi.k8s.io",
+					ClassName:  "class-name",
 					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
 					ClaimName:  "example",
 					Namespace:  "default",
@@ -67,11 +68,12 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		},
 		{
 			"Restore checkpoint - single claim - multiple devices",
-			`{"version":"v1","entries":[{"DriverName":"meta-test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver-1.cdi.k8s.io":["example-1.com/example-1=cdi-example-1"],"test-driver-2.cdi.k8s.io":["example-2.com/example-2=cdi-example-2"]}}],"checksum":2113538068}`,
+			`{"version":"v1","entries":[{"DriverName":"meta-test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver-1.cdi.k8s.io":["example-1.com/example-1=cdi-example-1"],"test-driver-2.cdi.k8s.io":["example-2.com/example-2=cdi-example-2"]}}],"checksum":1363630443}`,
 			"",
 			[]ClaimInfoState{
 				{
 					DriverName: "meta-test-driver.cdi.k8s.io",
+					ClassName:  "class-name",
 					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
 					ClaimName:  "example",
 					Namespace:  "default",
@@ -85,11 +87,12 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		},
 		{
 			"Restore checkpoint - multiple claims",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example-1","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-1"]}},{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c","ClaimName":"example-2","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-2"]}}],"checksum":666680545}`,
+			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name-1","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example-1","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-1"]}},{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c","ClassName":"class-name-2","ClaimName":"example-2","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-2"]}}],"checksum":1978566460}`,
 			"",
 			[]ClaimInfoState{
 				{
 					DriverName: "test-driver.cdi.k8s.io",
+					ClassName:  "class-name-1",
 					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
 					ClaimName:  "example-1",
 					Namespace:  "default",
@@ -100,6 +103,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 				},
 				{
 					DriverName: "test-driver.cdi.k8s.io",
+					ClassName:  "class-name-2",
 					ClaimUID:   "4cf8db2d-06c0-7d70-1a51-e59b25b2c16c",
 					ClaimName:  "example-2",
 					Namespace:  "default",
@@ -112,7 +116,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		},
 		{
 			"Restore checkpoint - invalid checksum",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120168}`,
+			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120168}`,
 			"checkpoint is corrupted",
 			[]ClaimInfoState{},
 		},
@@ -167,6 +171,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 func TestCheckpointStateStore(t *testing.T) {
 	claimInfoState := ClaimInfoState{
 		DriverName: "test-driver.cdi.k8s.io",
+		ClassName:  "class-name",
 		ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
 		ClaimName:  "example",
 		Namespace:  "default",
@@ -176,7 +181,7 @@ func TestCheckpointStateStore(t *testing.T) {
 		},
 	}
 
-	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120167}`
+	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":153446146}`
 
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "dramanager_state_test")
