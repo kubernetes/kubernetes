@@ -296,6 +296,30 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
+			// Show that a ref to a primitive type uses the referred type's type
+			Name:        "PrimitiveRef",
+			Subtemplate: "typeGuess",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"description": "a cool field",
+					"$ref":        "#/components/schemas/v1.Time",
+				},
+				"Document": map[string]any{
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"v1.Time": map[string]any{
+								"type":   "string",
+								"format": "date-time",
+							},
+						},
+					},
+				},
+			},
+			Checks: []check{
+				checkEquals("string"),
+			},
+		},
+		{
 			// Shows that the typeguess template behaves correctly given an
 			// array with unknown items
 			Name:        "ArrayUnknown",
