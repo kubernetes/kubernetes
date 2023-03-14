@@ -253,33 +253,33 @@ func validateResourceClaimConsumers(consumers []resource.ResourceClaimConsumerRe
 	return allErrs
 }
 
-// ValidatePodScheduling validates a PodScheduling.
-func ValidatePodScheduling(resourceClaim *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidatePodName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+// ValidatePodSchedulingContext validates a PodSchedulingContext.
+func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&schedulingCtx.ObjectMeta, true, corevalidation.ValidatePodName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingSpec(&schedulingCtx.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validatePodSchedulingSpec(spec *resource.PodSchedulingSpec, fldPath *field.Path) field.ErrorList {
+func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
-// ValidatePodSchedulingUpdate tests if an update to PodScheduling is valid.
-func ValidatePodSchedulingUpdate(resourceClaim, oldPodScheduling *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodScheduling(resourceClaim)...)
+// ValidatePodSchedulingContextUpdate tests if an update to PodSchedulingContext is valid.
+func ValidatePodSchedulingContextUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodSchedulingContexts(schedulingCtx)...)
 	return allErrs
 }
 
-// ValidatePodSchedulingStatusUpdate tests if an update to the status of a PodScheduling is valid.
-func ValidatePodSchedulingStatusUpdate(resourceClaim, oldPodScheduling *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingStatus(&resourceClaim.Status, field.NewPath("status"))...)
+// ValidatePodSchedulingContextStatusUpdate tests if an update to the status of a PodSchedulingContext is valid.
+func ValidatePodSchedulingContextStatusUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingStatus(&schedulingCtx.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-func validatePodSchedulingStatus(status *resource.PodSchedulingStatus, fldPath *field.Path) field.ErrorList {
+func validatePodSchedulingStatus(status *resource.PodSchedulingContextStatus, fldPath *field.Path) field.ErrorList {
 	return validatePodSchedulingClaims(status.ResourceClaims, fldPath.Child("claims"))
 }
 

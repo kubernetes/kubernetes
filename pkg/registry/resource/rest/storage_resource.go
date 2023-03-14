@@ -24,7 +24,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	podschedulingstore "k8s.io/kubernetes/pkg/registry/resource/podscheduling/storage"
+	podschedulingcontextsstore "k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceclassstore "k8s.io/kubernetes/pkg/registry/resource/resourceclass/storage"
@@ -74,8 +74,8 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClaimTemplateStorage
 	}
 
-	if resource := "podschedulings"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
-		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingstore.NewREST(restOptionsGetter)
+	if resource := "podschedulingcontexts"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingcontextsstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
 		}

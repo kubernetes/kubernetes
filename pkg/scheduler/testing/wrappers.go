@@ -925,22 +925,24 @@ func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha2.R
 	return wrapper
 }
 
-// PodSchedulingWrapper wraps a PodScheduling inside.
-type PodSchedulingWrapper struct{ resourcev1alpha2.PodScheduling }
-
-// MakePodScheduling creates a PodScheduling wrapper.
-func MakePodScheduling() *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{resourcev1alpha2.PodScheduling{}}
+// PodSchedulingWrapper wraps a PodSchedulingContext inside.
+type PodSchedulingWrapper struct {
+	resourcev1alpha2.PodSchedulingContext
 }
 
-// FromPodScheduling creates a PodScheduling wrapper from some existing object.
-func FromPodScheduling(other *resourcev1alpha2.PodScheduling) *PodSchedulingWrapper {
+// MakePodSchedulingContext creates a PodSchedulingContext wrapper.
+func MakePodSchedulingContexts() *PodSchedulingWrapper {
+	return &PodSchedulingWrapper{resourcev1alpha2.PodSchedulingContext{}}
+}
+
+// FromPodSchedulingContext creates a PodSchedulingContext wrapper from some existing object.
+func FromPodSchedulingContexts(other *resourcev1alpha2.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner object.
-func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha2.PodScheduling {
-	return &wrapper.PodScheduling
+func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha2.PodSchedulingContext {
+	return &wrapper.PodSchedulingContext
 }
 
 // Name sets `s` as the name of the inner object.

@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// PodSchedulingListerExpansion allows custom methods to be added to
-// PodSchedulingLister.
-type PodSchedulingListerExpansion interface{}
+// PodSchedulingContextListerExpansion allows custom methods to be added to
+// PodSchedulingContextLister.
+type PodSchedulingContextListerExpansion interface{}
 
-// PodSchedulingNamespaceListerExpansion allows custom methods to be added to
-// PodSchedulingNamespaceLister.
-type PodSchedulingNamespaceListerExpansion interface{}
+// PodSchedulingContextNamespaceListerExpansion allows custom methods to be added to
+// PodSchedulingContextNamespaceLister.
+type PodSchedulingContextNamespaceListerExpansion interface{}
 
 // ResourceClaimListerExpansion allows custom methods to be added to
 // ResourceClaimLister.

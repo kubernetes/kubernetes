@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// PodSchedulings returns a PodSchedulingInformer.
-	PodSchedulings() PodSchedulingInformer
+	// PodSchedulingContexts returns a PodSchedulingContextInformer.
+	PodSchedulingContexts() PodSchedulingContextInformer
 	// ResourceClaims returns a ResourceClaimInformer.
 	ResourceClaims() ResourceClaimInformer
 	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
@@ -45,9 +45,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// PodSchedulings returns a PodSchedulingInformer.
-func (v *version) PodSchedulings() PodSchedulingInformer {
-	return &podSchedulingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// PodSchedulingContexts returns a PodSchedulingContextInformer.
+func (v *version) PodSchedulingContexts() PodSchedulingContextInformer {
+	return &podSchedulingContextInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceClaims returns a ResourceClaimInformer.
