@@ -404,6 +404,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: messageExpression
+      type:
+        scalar: string
     - name: reason
       type:
         scalar: string

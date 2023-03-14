@@ -85,4 +85,5 @@ spec:
   validations:
   - expression: expressionValue
     message: messageValue
+    messageExpression: messageExpressionValue
     reason: reasonValue

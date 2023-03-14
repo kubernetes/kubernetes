@@ -548,6 +548,7 @@ func autoConvert_v1alpha1_Validation_To_admissionregistration_Validation(in *v1a
 	out.Expression = in.Expression
 	out.Message = in.Message
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
+	out.MessageExpression = in.MessageExpression
 	return nil
 }
 
@@ -560,6 +561,7 @@ func autoConvert_admissionregistration_Validation_To_v1alpha1_Validation(in *adm
 	out.Expression = in.Expression
 	out.Message = in.Message
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
+	out.MessageExpression = in.MessageExpression
 	return nil
 }
 
