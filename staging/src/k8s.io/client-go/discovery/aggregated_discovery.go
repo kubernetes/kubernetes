@@ -93,8 +93,8 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
-			if r.ResponseKind != nil {
-				resource := convertAPIResource(r)
+			resource := convertAPIResource(r)
+			if resource.Kind != "" {
 				resourceList.APIResources = append(resourceList.APIResources, resource)
 			}
 			// Subresources field in new format get transformed into full APIResources.
@@ -110,17 +110,20 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 
 // convertAPIResource tranforms a APIResourceDiscovery to an APIResource.
 func convertAPIResource(in apidiscovery.APIResourceDiscovery) metav1.APIResource {
-	return metav1.APIResource{
+	r := metav1.APIResource{
 		Name:         in.Resource,
 		SingularName: in.SingularResource,
 		Namespaced:   in.Scope == apidiscovery.ScopeNamespace,
-		Group:        in.ResponseKind.Group,
-		Version:      in.ResponseKind.Version,
-		Kind:         in.ResponseKind.Kind,
 		Verbs:        in.Verbs,
 		ShortNames:   in.ShortNames,
 		Categories:   in.Categories,
 	}
+	if in.ResponseKind != nil {
+		r.Group = in.ResponseKind.Group
+		r.Version = in.ResponseKind.Version
+		r.Kind = in.ResponseKind.Kind
+	}
+	return r
 }
 
 // convertAPISubresource tranforms a APISubresourceDiscovery to an APIResource.
@@ -129,9 +132,6 @@ func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubreso
 		Name:         fmt.Sprintf("%s/%s", parent.Name, in.Subresource),
 		SingularName: parent.SingularName,
 		Namespaced:   parent.Namespaced,
-		Group:        in.ResponseKind.Group,
-		Version:      in.ResponseKind.Version,
-		Kind:         in.ResponseKind.Kind,
 		Verbs:        in.Verbs,
 	}
 	if in.ResponseKind != nil {
