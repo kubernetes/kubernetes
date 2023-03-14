@@ -93,13 +93,10 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
-			if r.ResponseKind == nil {
-				a, _ := json.Marshal(r)
-				panic(fmt.Sprintf("ResourceManager no ResponseKind: %s\n", a))
-				continue
+			if r.ResponseKind != nil {
+				resource := convertAPIResource(r)
+				resourceList.APIResources = append(resourceList.APIResources, resource)
 			}
-			resource := convertAPIResource(r)
-			resourceList.APIResources = append(resourceList.APIResources, resource)
 			// Subresources field in new format get transformed into full APIResources.
 			for _, subresource := range r.Subresources {
 				sr := convertAPISubresource(resource, subresource)
@@ -128,7 +125,7 @@ func convertAPIResource(in apidiscovery.APIResourceDiscovery) metav1.APIResource
 
 // convertAPISubresource tranforms a APISubresourceDiscovery to an APIResource.
 func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubresourceDiscovery) metav1.APIResource {
-	return metav1.APIResource{
+	r := metav1.APIResource{
 		Name:         fmt.Sprintf("%s/%s", parent.Name, in.Subresource),
 		SingularName: parent.SingularName,
 		Namespaced:   parent.Namespaced,
@@ -137,4 +134,10 @@ func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubreso
 		Kind:         in.ResponseKind.Kind,
 		Verbs:        in.Verbs,
 	}
+	if in.ResponseKind != nil {
+		r.Group = in.ResponseKind.Group
+		r.Version = in.ResponseKind.Version
+		r.Kind = in.ResponseKind.Kind
+	}
+	return r
 }
