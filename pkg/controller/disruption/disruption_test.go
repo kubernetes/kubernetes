@@ -426,7 +426,7 @@ func add(t *testing.T, store cache.Store, obj interface{}) {
 func TestNoSelector(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 	pdb.Spec.Selector = &metav1.LabelSelector{}
 	pod, _ := newPod(t, "yo-yo-yo")
 
@@ -445,7 +445,7 @@ func TestNoSelector(t *testing.T) {
 func TestUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 	ctx := context.TODO()
 	add(t, dc.pdbStore, pdb)
 	dc.sync(ctx, pdbName)
@@ -475,7 +475,7 @@ func TestUnavailable(t *testing.T) {
 func TestIntegerMaxUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	add(t, dc.pdbStore, pdb)
 	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
@@ -496,7 +496,7 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(2))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(2))
 	add(t, dc.pdbStore, pdb)
 
 	rs, _ := newReplicaSet(t, 7)
@@ -672,7 +672,7 @@ func TestScaleResource(t *testing.T) {
 		return true, obj, nil
 	})
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(int(maxUnavailable)))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(maxUnavailable))
 	add(t, dc.pdbStore, pdb)
 
 	trueVal := true
@@ -1030,7 +1030,7 @@ func TestPDBNotExist(t *testing.T) {
 func TestUpdateDisruptedPods(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	currentTime := dc.clock.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
 		"p1":       {Time: currentTime},                       // Should be removed, pod deletion started.
@@ -1272,7 +1272,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 	ctx := context.TODO()
 	// Create a PDB and 3 pods that match it.
-	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	pdb, err := dc.coreClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create PDB: %v", err)
@@ -1409,7 +1409,7 @@ func TestInvalidSelectors(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			dc, ps := newFakeDisruptionController()
 
-			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 			pdb.Spec.Selector = tc.labelSelector
 
 			add(t, dc.pdbStore, pdb)

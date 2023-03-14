@@ -608,7 +608,7 @@ func (ao ascendingOrdinal) Less(i, j int) bool {
 // Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
 // or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
 func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
-	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt(1)), replicaCount, false)
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), replicaCount, false)
 	if err != nil {
 		return 0, err
 	}

@@ -93,8 +93,8 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
-					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt32(0); return &i }(),
+					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt32(0); return &i }(),
 				},
 			},
 			Replicas: pointer.Int32(int32(replicas)),
