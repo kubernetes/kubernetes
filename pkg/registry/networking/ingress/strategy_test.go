@@ -17,6 +17,7 @@ limitations under the License.
 package ingress
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -175,17 +176,11 @@ func TestWarningsOnCreate(t *testing.T) {
 		tweakIngress     func(ingress *networking.Ingress)
 		expectedWarnings []string
 	}{
-		"ingressClass annotation and IngressClassName set": {
-			tweakIngress: func(ingress *networking.Ingress) {
-				ingress.Spec.IngressClassName = utilpointer.String("foo")
-				ingress.Annotations = map[string]string{annotationIngressClass: "foo"}
-			},
-			expectedWarnings: []string{"ingressClass annotation and IngressClassName should not be set at the same time"},
-		},
-		"ingressClass annotation set": {
+		"ingressClass annotation set, IngressClassName not set": {
 			tweakIngress: func(ingress *networking.Ingress) {
 				ingress.Annotations = map[string]string{annotationIngressClass: "foo"}
 			},
+			expectedWarnings: []string{fmt.Sprintf("annotation %q is deprecated, please use 'spec.ingressClassName' instead", annotationIngressClass)},
 		},
 		"IngressClassName set": {
 			tweakIngress: func(ingress *networking.Ingress) {

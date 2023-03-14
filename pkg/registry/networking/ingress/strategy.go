@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"context"
+	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,8 +102,8 @@ func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 	var warnings []string
 	ingress := obj.(*networking.Ingress)
 	_, annotationIsSet := ingress.Annotations[annotationIngressClass]
-	if annotationIsSet && ingress.Spec.IngressClassName != nil {
-		warnings = append(warnings, "ingressClass annotation and IngressClassName should not be set at the same time")
+	if annotationIsSet && ingress.Spec.IngressClassName == nil {
+		warnings = append(warnings, fmt.Sprintf("annotation %q is deprecated, please use 'spec.ingressClassName' instead", annotationIngressClass))
 	}
 	return warnings
 }

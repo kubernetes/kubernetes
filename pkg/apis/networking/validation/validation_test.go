@@ -1005,7 +1005,7 @@ func TestValidateIngressCreate(t *testing.T) {
 				ingress.Spec.IngressClassName = utilpointer.String("bar")
 				ingress.Annotations = map[string]string{annotationIngressClass: "foo"}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("annotations").Child(annotationIngressClass), "foo", "ingressClass annotation and IngressClassName should have the same value")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("annotations").Child(annotationIngressClass), "foo", "must match `ingressClassName` when both are specified")},
 		},
 		"valid regex path": {
 			tweakIngress: func(ingress *networking.Ingress) {

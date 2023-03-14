@@ -278,7 +278,7 @@ func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
 	if annotationIsSet && ingress.Spec.IngressClassName != nil && annotationVal != *ingress.Spec.IngressClassName {
 		annotationPath := field.NewPath("annotations").Child(annotationIngressClass)
-		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "ingressClass annotation and IngressClassName should have the same value"))
+		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "must match `ingressClassName` when both are specified"))
 	}
 	return allErrs
 }
