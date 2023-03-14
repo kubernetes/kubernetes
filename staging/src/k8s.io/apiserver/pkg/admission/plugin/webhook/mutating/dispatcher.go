@@ -150,7 +150,6 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
-		var err error
 		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
 		if err != nil {
 			return apierrors.NewInternalError(err)

@@ -21,13 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-
 	"github.com/google/cel-go/cel"
 	celtypes "github.com/google/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	celplugin "k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -93,6 +92,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 				Matches: false,
 			}
 		}
+		//TODO: add default so that if in future we add different failure types it doesn't fall through
 	}
 
 	errorList := []error{}
