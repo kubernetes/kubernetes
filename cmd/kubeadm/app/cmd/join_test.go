@@ -48,12 +48,12 @@ discovery:
 controlPlane:
   certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
-  criSocket: unix:///var/run/containerd/containerd.sock
+  criSocket: %s
   name: someName
   ignorePreflightErrors:
     - c
     - d
-`, kubeadmapiv1.SchemeGroupVersion.String())
+`, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
@@ -218,7 +218,7 @@ func TestNewJoinData(t *testing.T) {
 						TypeMeta: metav1.TypeMeta{Kind: "", APIVersion: ""},
 						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 							Name:                  "somename",
-							CRISocket:             "unix:///var/run/containerd/containerd.sock",
+							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
 							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},

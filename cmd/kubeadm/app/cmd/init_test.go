@@ -42,7 +42,7 @@ localAPIEndpoint:
 bootstrapTokens:
 - token: "abcdef.0123456789abcdef"
 nodeRegistration:
-  criSocket: unix:///var/run/containerd/containerd.sock
+  criSocket: %s
   name: someName
   ignorePreflightErrors:
     - c
@@ -51,7 +51,7 @@ nodeRegistration:
 apiVersion: %[1]s
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
-`, kubeadmapiv1.SchemeGroupVersion.String())
+`, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
@@ -113,7 +113,7 @@ func TestNewInitData(t *testing.T) {
 					cfg: &kubeadmapi.InitConfiguration{
 						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 							Name:                  "somename",
-							CRISocket:             "unix:///var/run/containerd/containerd.sock",
+							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
 						},
