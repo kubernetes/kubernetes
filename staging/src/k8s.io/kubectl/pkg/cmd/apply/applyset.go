@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -33,6 +34,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -73,6 +75,10 @@ const (
 	// ApplysetPartOfLabel is the key of the label which indicates that the object is a member of an ApplySet.
 	// The value of the label MUST match the value of ApplySetParentIDLabel on the parent object.
 	ApplysetPartOfLabel = "applyset.k8s.io/part-of"
+
+	// ApplysetParentCRDLabel is the key of the label that can be set on a CRD to identify
+	// the custom resource type it defines (not the CRD itself) as an allowed parent for an ApplySet.
+	ApplysetParentCRDLabel = "applyset.k8s.io/is-parent-type"
 )
 
 var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
@@ -103,10 +109,10 @@ type ApplySet struct {
 	client resource.RESTClient
 }
 
-var builtinApplySetParentGVRs = map[schema.GroupVersionResource]bool{
-	defaultApplySetParentGVR:                true,
-	{Version: "v1", Resource: "configmaps"}: true,
-}
+var builtinApplySetParentGVRs = sets.New[schema.GroupVersionResource](
+	defaultApplySetParentGVR,
+	schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+)
 
 // ApplySetParentRef stores object and type meta for the parent object that is used to track the applyset.
 type ApplySetParentRef struct {
@@ -162,16 +168,55 @@ func (a ApplySet) ID() string {
 }
 
 // Validate imposes restrictions on the parent object that is used to track the applyset.
-func (a ApplySet) Validate() error {
+func (a ApplySet) Validate(ctx context.Context, client dynamic.Interface) error {
 	var errors []error
-	// TODO: permit CRDs that have the annotation required by the ApplySet specification
-	if !builtinApplySetParentGVRs[a.parentRef.Resource] {
-		errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.parentRef.Resource))
-	}
 	if a.parentRef.IsNamespaced() && a.parentRef.Namespace == "" {
 		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet"))
 	}
+	if !builtinApplySetParentGVRs.Has(a.parentRef.Resource) {
+		// Determine which custom resource types are allowed as ApplySet parents.
+		// Optimization: Since this makes requests, we only do this if they aren't using a default type.
+		permittedCRParents, err := a.getAllowedCustomResourceParents(ctx, client)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("identifying allowed custom resource parent types: %w", err))
+		}
+		parentRefResourceIgnoreVersion := a.parentRef.Resource.GroupResource().WithVersion("")
+		if !permittedCRParents.Has(parentRefResourceIgnoreVersion) {
+			errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.parentRef.Resource))
+		}
+	}
 	return utilerrors.NewAggregate(errors)
+}
+
+func (a *ApplySet) labelForCustomParentCRDs() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{{
+			Key:      ApplysetParentCRDLabel,
+			Operator: metav1.LabelSelectorOpExists,
+		}},
+	}
+}
+
+func (a *ApplySet) getAllowedCustomResourceParents(ctx context.Context, client dynamic.Interface) (sets.Set[schema.GroupVersionResource], error) {
+	opts := metav1.ListOptions{
+		LabelSelector: metav1.FormatLabelSelector(a.labelForCustomParentCRDs()),
+	}
+	list, err := client.Resource(schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}).List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	set := sets.New[schema.GroupVersionResource]()
+	for i := range list.Items {
+		// Custom resources must be named `<names.plural>.<group>`
+		// and are served under `/apis/<group>/<version>/.../<plural>`
+		gr := schema.ParseGroupResource(list.Items[i].GetName())
+		set.Insert(gr.WithVersion(""))
+	}
+	return set, nil
 }
 
 func (a *ApplySet) LabelsForMember() map[string]string {
@@ -208,11 +253,14 @@ func (a *ApplySet) FetchParent() error {
 	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping)
 	obj, err := helper.Get(a.parentRef.Namespace, a.parentRef.Name)
 	if errors.IsNotFound(err) {
+		if !builtinApplySetParentGVRs.Has(a.parentRef.Resource) {
+			return fmt.Errorf("custom resource ApplySet parents cannot be created automatically")
+		}
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to fetch ApplySet parent object %q from server: %w", a.parentRef, err)
+		return fmt.Errorf("failed to fetch ApplySet parent object %q: %w", a.parentRef, err)
 	} else if obj == nil {
-		return fmt.Errorf("failed to fetch ApplySet parent object %q from server", a.parentRef)
+		return fmt.Errorf("failed to fetch ApplySet parent object %q", a.parentRef)
 	}
 
 	labels, annotations, err := getLabelsAndAnnotations(obj)
@@ -291,11 +339,15 @@ func toolingBaseName(toolAnnotation string) string {
 func parseResourcesAnnotation(annotations map[string]string, mapper meta.RESTMapper) (map[schema.GroupVersionResource]*meta.RESTMapping, error) {
 	annotation, ok := annotations[ApplySetGRsAnnotation]
 	if !ok {
-		// The spec does not require this annotation. However, 'missing' means 'perform discovery' (as opposed to 'present but empty', which means ' this is an empty set').
+		// The spec does not require this annotation. However, 'missing' means 'perform discovery'.
 		// We return an error because we do not currently support dynamic discovery in kubectl apply.
 		return nil, fmt.Errorf("kubectl requires the %q annotation to be set on all ApplySet parent objects", ApplySetGRsAnnotation)
 	}
 	mappings := make(map[schema.GroupVersionResource]*meta.RESTMapping)
+	// Annotation present but empty means that this is currently an empty set.
+	if annotation == "" {
+		return mappings, nil
+	}
 	for _, grString := range strings.Split(annotation, ",") {
 		gr := schema.ParseGroupResource(grString)
 		gvk, err := mapper.KindFor(gr.WithVersion(""))

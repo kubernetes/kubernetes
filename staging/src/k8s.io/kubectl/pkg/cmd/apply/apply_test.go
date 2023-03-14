@@ -37,7 +37,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -237,6 +236,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
 			f.Client = &fake.RESTClient{}
+			f.UnstructuredClient = f.Client
 			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
@@ -285,6 +285,8 @@ const (
 	filenameWidgetServerside    = "../../../testdata/apply/widget-serverside.yaml"
 	filenameDeployObjServerside = "../../../testdata/apply/deploy-serverside.yaml"
 	filenameDeployObjClientside = "../../../testdata/apply/deploy-clientside.yaml"
+	filenameApplySetCR          = "../../../testdata/apply/applyset-cr.yaml"
+	filenameApplySetCRD         = "../../../testdata/apply/applysets-crd.yaml"
 )
 
 func readConfigMapList(t *testing.T, filename string) [][]byte {
@@ -2112,7 +2114,7 @@ func TestApplySetParentValidation(t *testing.T) {
 		"other namespaced builtin parents types are correctly parsed but invalid": {
 			applysetFlag:     "deployments.apps/thename",
 			expectParentKind: "Deployment",
-			expectErr:        "[resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent, namespace is required to use namespace-scoped ApplySet]",
+			expectErr:        "[namespace is required to use namespace-scoped ApplySet, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent]",
 		},
 		"namespaced builtin parents with multi-segment groups are correctly parsed but invalid": {
 			applysetFlag:     "priorityclasses.scheduling.k8s.io/thename",
@@ -2170,7 +2172,7 @@ func TestApplySetParentValidation(t *testing.T) {
 				cmd.Flags().Set("prune", "true")
 				f := cmdtesting.NewTestFactory()
 				defer f.Cleanup()
-				f.Client = &fake.RESTClient{}
+				setUpClientsForApplySetWithSSA(t, f)
 
 				var expectedParentNs string
 				if test.namespaceFlag != "" {
@@ -2206,10 +2208,102 @@ func TestApplySetParentValidation(t *testing.T) {
 	}
 }
 
+func setUpClientsForApplySetWithSSA(t *testing.T, tf *cmdtesting.TestFactory, objects ...runtime.Object) {
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "", Version: "v1", Resource: "services"}:                                      "ServiceList",
+		{Group: "", Version: "v1", Resource: "replicationcontrollers"}:                        "ReplicationControllerList",
+		{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}: "CustomResourceDefinitionList",
+	}
+	fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listMapping, objects...)
+	tf.FakeDynamicClient = fakeDynamicClient
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			tokens := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
+			var gvr schema.GroupVersionResource
+			var name, namespace string
+
+			if len(tokens) == 4 && tokens[0] == "namespaces" { // e.g. namespaces/my-ns/secrets/my-secret
+				namespace = tokens[1]
+				name = tokens[3]
+				gvr = schema.GroupVersionResource{Version: "v1", Resource: tokens[2]}
+			} else if len(tokens) == 2 && tokens[0] == "applysets" {
+				gvr = schema.GroupVersionResource{Group: "company.com", Version: "v1", Resource: tokens[0]}
+				name = tokens[1]
+			} else {
+				t.Fatalf("unexpected request: path segments %v: request: \n%#v", tokens, req)
+				return nil, nil
+			}
+
+			switch req.Method {
+			case "GET":
+				obj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
+				if err == nil {
+					objJson, err := json.Marshal(obj)
+					require.NoError(t, err)
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.BytesBody(objJson)}, nil
+				} else if apierrors.IsNotFound(err) {
+					return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
+				} else {
+					t.Fatalf("error getting object: %v", err)
+				}
+			case "PATCH":
+				require.Equal(t, string(types.ApplyPatchType), req.Header.Get("Content-Type"), "received patch request with unexpected patch type")
+
+				var existing *unstructured.Unstructured
+				existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						t.Fatalf("error getting object: %v", err)
+					}
+				} else {
+					existing = existingObj.(*unstructured.Unstructured)
+				}
+
+				data, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+
+				patch := &unstructured.Unstructured{}
+				err = runtime.DecodeInto(codec, data, patch)
+				require.NoError(t, err)
+
+				var returnData []byte
+				if existing == nil {
+					patch.SetUID("a-static-fake-uid")
+					err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace)
+					require.NoError(t, err, "error creating object")
+
+					returnData, err = json.Marshal(patch)
+					require.NoError(t, err, "error marshalling response: %v", err)
+				} else {
+					uid := existing.GetUID()
+					patch.DeepCopyInto(existing)
+					existing.SetUID(uid)
+
+					err = fakeDynamicClient.Tracker().Update(gvr, existing, namespace)
+					require.NoError(t, err, "error updating object")
+
+					returnData, err = json.Marshal(existing)
+					require.NoError(t, err, "error marshalling response")
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
+
+			default:
+				t.Fatalf("unexpected request: %s\n%#v", req.URL.Path, req)
+				return nil, nil
+			}
+			return nil, nil
+		}),
+	}
+	tf.Client = tf.UnstructuredClient
+}
+
 func TestLoadObjects(t *testing.T) {
 	f := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer f.Cleanup()
 	f.Client = &fake.RESTClient{}
+	f.UnstructuredClient = f.Client
 
 	testFiles := []string{"testdata/prune/simple/manifest1", "testdata/prune/simple/manifest2"}
 	for _, testFile := range testFiles {
@@ -2263,153 +2357,27 @@ func TestLoadObjects(t *testing.T) {
 }
 
 func TestApplySetParentManagement(t *testing.T) {
-	cmdutil.BehaviorOnFatal(func(s string, i int) {
-		switch s {
-		case `error: pruning /v1, Kind=ReplicationController objects: deleting test/test-rc: an error on the server ("") has prevented the request from succeeding`:
-			t.Logf("got expected error %q", s)
-		default:
-			t.Fatalf("unexpected exit %d: %s", i, s)
-		}
-	})
-	defer cmdutil.DefaultBehaviorOnFatal()
-
-	nameRC, rc := readReplicationController(t, filenameRC)
-	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
-	nameParentSecret := "mySet"
-	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
-
+	nameParentSecret := "my-set"
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	serverSideData := map[string][]byte{
-		pathRC: rc,
-	}
-
-	scheme := runtime.NewScheme()
-
-	listMapping := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "services"}:               "ServiceList",
-		{Group: "", Version: "v1", Resource: "replicationcontrollers"}: "ReplicationControllerList",
-	}
-
-	fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
-	tf.FakeDynamicClient = fakeDynamicClient
-
+	replicationController := readUnstructuredFromFile(t, filenameRC)
+	setUpClientsForApplySetWithSSA(t, tf, replicationController)
 	failDeletes := false
-	fakeDynamicClient.PrependReactor("delete", "*", func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
+	tf.FakeDynamicClient.PrependReactor("delete", "*", func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
 		if failDeletes {
 			return true, nil, fmt.Errorf("an error on the server (\"\") has prevented the request from succeeding")
 		}
 		return false, nil, nil
 	})
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-
-			if req.URL.Path == "/namespaces/test/secrets/mySet" {
-				switch req.Method {
-				case "GET":
-					data, ok := serverSideData[req.URL.Path]
-					if !ok {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
-					}
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
-				case "PATCH":
-					if got := req.Header.Get("Content-Type"); got == string(types.ApplyPatchType) {
-						// crudely save the patch data as the new object and return it
-						serverSideData[req.URL.Path], _ = io.ReadAll(req.Body)
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(serverSideData[req.URL.Path]))}, nil
-					} else {
-						t.Fatalf("unexpected content-type: %s\n", got)
-						return nil, nil
-					}
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}
-
-			method := req.Method
-
-			tokens := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && method == "GET" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: tokens[2]}
-				obj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader()}, nil
-					}
-					t.Fatalf("error getting object: %v", err)
-				}
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
-			}
-
-			if len(tokens) == 4 && tokens[0] == "namespaces" && method == "PATCH" {
-				namespace := tokens[1]
-				name := tokens[3]
-				gvr := schema.GroupVersionResource{Version: "v1", Resource: tokens[2]}
-				var existing *unstructured.Unstructured
-				existingObj, err := fakeDynamicClient.Tracker().Get(gvr, namespace, name)
-				if err != nil {
-					if !apierrors.IsNotFound(err) {
-						t.Fatalf("error getting object: %v", err)
-					}
-				} else {
-					existing = existingObj.(*unstructured.Unstructured)
-				}
-
-				data, err := io.ReadAll(req.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				patch := &unstructured.Unstructured{}
-				if err := runtime.DecodeInto(codec, data, patch); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				var returnData []byte
-				if existing == nil {
-					uid := types.UID(fmt.Sprintf("%v", time.Now().UnixNano()))
-					patch.SetUID(uid)
-
-					if err := fakeDynamicClient.Tracker().Create(gvr, patch, namespace); err != nil {
-						t.Fatalf("error creating object: %v", err)
-					}
-
-					b, err := json.Marshal(patch)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				} else {
-					uid := existing.GetUID()
-
-					patch.DeepCopyInto(existing)
-					existing.SetUID(uid)
-
-					if err := fakeDynamicClient.Tracker().Update(gvr, existing, namespace); err != nil {
-						t.Fatalf("error updating object: %v", err)
-					}
-
-					b, err := json.Marshal(existing)
-					if err != nil {
-						t.Fatalf("error marshalling response: %v", err)
-					}
-					returnData = b
-				}
-
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(returnData))}, nil
-			}
-
-			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-			return nil, nil
-		}),
-	}
+	cmdutil.BehaviorOnFatal(func(s string, i int) {
+		if failDeletes && s == `error: pruning /v1, Kind=ReplicationController objects: deleting test/test-rc: an error on the server ("") has prevented the request from succeeding` {
+			t.Logf("got expected error %q", s)
+		} else {
+			t.Fatalf("unexpected exit %d: %s", i, s)
+		}
+	})
+	defer cmdutil.DefaultBehaviorOnFatal()
 
 	// Initially, the rc 'exists' server side but the svc and applyset secret do not
 	// This should 'update' the rc and create the secret
@@ -2424,7 +2392,10 @@ func TestApplySetParentManagement(t *testing.T) {
 	})
 	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	createdSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+
+	createdSecret, err := tf.FakeDynamicClient.Tracker().Get(schema.GroupVersionResource{Resource: "secrets", Version: "v1"}, "test", nameParentSecret)
+	require.NoError(t, err)
+	createSecretYaml, err := yaml.Marshal(createdSecret)
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2435,10 +2406,11 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
-  name: mySet
+    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+  name: my-set
   namespace: test
-`, string(createdSecret))
+  uid: a-static-fake-uid
+`, string(createSecretYaml))
 
 	// Next, do an apply that creates a second resource, the svc, and updates the applyset secret
 	outbuff.Reset()
@@ -2454,7 +2426,10 @@ metadata:
 	})
 	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\nservice/test-service serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err := yaml.JSONToYAML(serverSideData[pathSecret])
+
+	updatedSecret, err := tf.FakeDynamicClient.Tracker().Get(schema.GroupVersionResource{Resource: "secrets", Version: "v1"}, "test", nameParentSecret)
+	require.NoError(t, err)
+	updatedSecretYaml, err := yaml.Marshal(updatedSecret)
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2465,10 +2440,11 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
-  name: mySet
+    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+  name: my-set
   namespace: test
-`, string(updatedSecret))
+  uid: a-static-fake-uid
+`, string(updatedSecretYaml))
 
 	// Next, do an apply that attempts to remove the rc from the set, but pruning fails
 	// Both types remain in the ApplySet
@@ -2485,7 +2461,10 @@ metadata:
 	})
 	assert.Equal(t, "service/test-service serverside-applied\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err = yaml.JSONToYAML(serverSideData[pathSecret])
+
+	updatedSecret, err = tf.FakeDynamicClient.Tracker().Get(schema.GroupVersionResource{Resource: "secrets", Version: "v1"}, "test", nameParentSecret)
+	require.NoError(t, err)
+	updatedSecretYaml, err = yaml.Marshal(updatedSecret)
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2496,10 +2475,11 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
-  name: mySet
+    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+  name: my-set
   namespace: test
-`, string(updatedSecret))
+  uid: a-static-fake-uid
+`, string(updatedSecretYaml))
 
 	// Finally, do an apply that successfully removes the rc and updates the set
 	failDeletes = false
@@ -2516,7 +2496,10 @@ metadata:
 	})
 	assert.Equal(t, "service/test-service serverside-applied\nreplicationcontroller/test-rc pruned\n", outbuff.String())
 	assert.Equal(t, "", errbuff.String())
-	updatedSecret, err = yaml.JSONToYAML(serverSideData[pathSecret])
+
+	updatedSecret, err = tf.FakeDynamicClient.Tracker().Get(schema.GroupVersionResource{Resource: "secrets", Version: "v1"}, "test", nameParentSecret)
+	require.NoError(t, err)
+	updatedSecretYaml, err = yaml.Marshal(updatedSecret)
 	require.NoError(t, err)
 	require.Equal(t, `apiVersion: v1
 kind: Secret
@@ -2527,15 +2510,15 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
-  name: mySet
+    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+  name: my-set
   namespace: test
-`, string(updatedSecret))
+  uid: a-static-fake-uid
+`, string(updatedSecretYaml))
 }
 
 func TestApplySetInvalidLiveParent(t *testing.T) {
-	nameParentSecret := "mySet"
-	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
+	nameParentSecret := "my-set"
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
@@ -2545,39 +2528,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 		idLabel           string
 		expectErr         string
 	}
-	fakeParentGetterForTest := func(t *testing.T, test testCase) *fake.RESTClient {
-		return &fake.RESTClient{
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method == "GET" && req.URL.Path == pathSecret {
-					obj := &metav1.PartialObjectMetadata{
-						TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-						ObjectMeta: metav1.ObjectMeta{
-							Name:        nameParentSecret,
-							Namespace:   "test",
-							Annotations: make(map[string]string),
-							Labels:      make(map[string]string),
-						},
-					}
-					if test.grsAnnotation != "" {
-						obj.ObjectMeta.Annotations[ApplySetGRsAnnotation] = test.grsAnnotation
-					}
-					if test.toolingAnnotation != "" {
-						obj.ObjectMeta.Annotations[ApplySetToolingAnnotation] = test.toolingAnnotation
-					}
-					if test.idLabel != "" {
-						obj.ObjectMeta.Labels[ApplySetParentIDLabel] = test.idLabel
-					}
-					data, err := json.Marshal(obj)
-					require.NoError(t, err)
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))}, nil
-				}
-				t.Fatalf("unexpected request to %s:\n%#v", req.URL.Path, req)
-				return nil, nil
-			}),
-		}
-	}
-	validIDLabel := "applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1"
+	validIDLabel := "applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1"
 	validToolingAnnotation := "kubectl/v1.27.0"
 	validGrsAnnotation := "deployments.apps,namespaces,secrets"
 
@@ -2586,49 +2537,49 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     "",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./mySet\": kubectl requires the \"applyset.k8s.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.k8s.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
 		},
 		"group-resources annotation should not contain invalid resources": {
 			grsAnnotation:     "does-not-exist",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./mySet\": invalid group resource in \"applyset.k8s.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.k8s.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
 		},
 		"tooling annotation is required": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is missing required annotation \"applyset.k8s.io/tooling\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.k8s.io/tooling\"",
 		},
 		"tooling annotation must have kubectl prefix": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "helm/v3",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with one segment can be parsed": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "helm",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with many segments can be parsed": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "example.com/tool/why/v1",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" already exists and is managed by tooling \"example.com/tool/why\" instead of \"kubectl\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"example.com/tool/why\" instead of \"kubectl\"",
 		},
 		"ID label is required": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "",
-			expectErr:         "error: ApplySet parent object \"secrets./mySet\" exists and does not have required label applyset.k8s.io/id",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.k8s.io/id",
 		},
 		"ID label must match the ApplySet's real ID": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "somethingelse",
-			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./mySet\" exists and has incorrect value for label \"applyset.k8s.io/id\" (got: somethingelse, want: %s)", validIDLabel),
+			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.k8s.io/id\" (got: somethingelse, want: %s)", validIDLabel),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2636,7 +2587,26 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			cmdutil.BehaviorOnFatal(func(s string, i int) {
 				assert.Equal(t, test.expectErr, s)
 			})
-			tf.Client = fakeParentGetterForTest(t, test)
+			defer cmdutil.DefaultBehaviorOnFatal()
+			secret := &unstructured.Unstructured{}
+			secret.SetKind("Secret")
+			secret.SetAPIVersion("v1")
+			secret.SetName(nameParentSecret)
+			secret.SetNamespace("test")
+			annotations := make(map[string]string)
+			labels := make(map[string]string)
+			if test.grsAnnotation != "" {
+				annotations[ApplySetGRsAnnotation] = test.grsAnnotation
+			}
+			if test.toolingAnnotation != "" {
+				annotations[ApplySetToolingAnnotation] = test.toolingAnnotation
+			}
+			if test.idLabel != "" {
+				labels[ApplySetParentIDLabel] = test.idLabel
+			}
+			secret.SetAnnotations(annotations)
+			secret.SetLabels(labels)
+			setUpClientsForApplySetWithSSA(t, tf, secret)
 
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
@@ -2649,6 +2619,63 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	replicationController := readUnstructuredFromFile(t, filenameRC)
+	crd := readUnstructuredFromFile(t, filenameApplySetCRD)
+	cr := readUnstructuredFromFile(t, filenameApplySetCR)
+	setUpClientsForApplySetWithSSA(t, tf, replicationController, crd)
+
+	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	cmdutil.BehaviorOnFatal(func(s string, i int) {
+		require.Equal(t, "error: custom resource ApplySet parents cannot be created automatically", s)
+	})
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	// Initially, the rc 'exists' server side the parent CR does not. This should fail.
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameRC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", fmt.Sprintf("applysets.company.com/my-set"))
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	cmdtesting.InitTestErrorHandler(t)
+
+	// Simulate creating the CR parent out of band
+	require.NoError(t, tf.FakeDynamicClient.Tracker().Add(cr))
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmd := NewCmdApply("kubectl", tf, ioStreams)
+		cmd.Flags().Set("filename", filenameRC)
+		cmd.Flags().Set("server-side", "true")
+		cmd.Flags().Set("applyset", fmt.Sprintf("applysets.company.com/my-set"))
+		cmd.Flags().Set("prune", "true")
+		cmd.Run(cmd, []string{})
+	})
+	assert.Equal(t, "replicationcontroller/test-rc serverside-applied\n", outbuff.String())
+	assert.Equal(t, "", errbuff.String())
+
+	updatedCR, err := tf.FakeDynamicClient.Tracker().Get(schema.GroupVersionResource{Resource: "applysets", Version: "v1", Group: "company.com"}, "", "my-set")
+	require.NoError(t, err)
+	updatedCRYaml, err := yaml.Marshal(updatedCR)
+	require.NoError(t, err)
+	require.Equal(t, `apiVersion: company.com/v1
+kind: ApplySet
+metadata:
+  annotations:
+    applyset.k8s.io/additional-namespaces: test
+    applyset.k8s.io/contains-group-resources: replicationcontrollers
+    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+  creationTimestamp: null
+  labels:
+    applyset.k8s.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
+  name: my-set
+`, string(updatedCRYaml))
 }
 
 func TestApplyWithPruneV2(t *testing.T) {
@@ -2852,10 +2879,7 @@ func TestApplyWithPruneV2(t *testing.T) {
 }
 
 func TestApplySetUpdateConflictsAreRetried(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	defer cmdutil.DefaultBehaviorOnFatal()
-
-	nameParentSecret := "mySet"
+	nameParentSecret := "my-set"
 	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
 	secretYaml := `apiVersion: v1
 kind: Secret
@@ -2866,12 +2890,13 @@ metadata:
     applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-nqNkDlL072a9O3FBtGMDroXnF18TNtgUetAA6vsaglI-v1
-  name: mySet
+    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+  name: my-set
   namespace: test
 `
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
+
 	applyReturnedConflict := false
 	appliedWithConflictsForced := false
 	tf.Client = &fake.RESTClient{
@@ -2902,8 +2927,12 @@ metadata:
 			return nil, nil
 		}),
 	}
+	tf.UnstructuredClient = tf.Client
 
 	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	cmdutil.BehaviorOnFatal(fatalNoExit(t, ioStreams))
+	defer cmdutil.DefaultBehaviorOnFatal()
+
 	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
@@ -3152,7 +3181,7 @@ func TestApplySetDryRun(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 	nameRC, rc := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
-	nameParentSecret := "mySet"
+	nameParentSecret := "my-set"
 	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -3189,6 +3218,7 @@ func TestApplySetDryRun(t *testing.T) {
 	t.Run("server side dry run", func(t *testing.T) {
 		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, true)
+		tf.UnstructuredClient = tf.Client
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
@@ -3206,6 +3236,7 @@ func TestApplySetDryRun(t *testing.T) {
 	t.Run("client side dry run", func(t *testing.T) {
 		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, false)
+		tf.UnstructuredClient = tf.Client
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)

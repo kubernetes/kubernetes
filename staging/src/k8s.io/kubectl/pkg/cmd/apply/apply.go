@@ -314,9 +314,12 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 			parent.Namespace = namespace
 		}
 		tooling := ApplySetTooling{name: baseName, version: ApplySetToolVersion}
-		restClient, err := f.ClientForMapping(parent.RESTMapping)
-		if err != nil || restClient == nil {
+		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+		if err != nil {
 			return nil, fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+		}
+		if restClient == nil {
+			return nil, fmt.Errorf("could not build RESTClient for ApplySet")
 		}
 		applySet = NewApplySet(parent, tooling, mapper, restClient)
 	}
@@ -400,7 +403,7 @@ func (o *ApplyOptions) Validate() error {
 		if !o.Prune {
 			return fmt.Errorf("--applyset requires --prune")
 		}
-		if err := o.ApplySet.Validate(); err != nil {
+		if err := o.ApplySet.Validate(context.TODO(), o.DynamicClient); err != nil {
 			return err
 		}
 	}
