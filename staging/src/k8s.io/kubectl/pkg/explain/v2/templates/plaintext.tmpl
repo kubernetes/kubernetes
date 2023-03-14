@@ -19,10 +19,10 @@
     {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive) -}}
         {{- . -}}
     {{- else -}}
-        error: GVK {{$gvk}} not found in OpenAPI schema
+        {{- throw "error: GVK %v not found in OpenAPI schema" $gvk -}}
     {{- end -}}
 {{- else -}}
-    error: GVR ({{$.GVR.String}}) not found in OpenAPI schema
+    {{- throw "error: GVR (%v) not found in OpenAPI schema" $.GVR.String -}}
 {{- end -}}
 {{- "\n" -}}
 
@@ -43,7 +43,8 @@ Takes dictionary as argument with keys:
             {{- with include "output" (set $ "schema" .) -}}
                 {{- . -}}
             {{- else -}}
-                error: field "{{$.FieldPath}}" does not exist
+                {{- $fieldName := (index $.FieldPath (sub (len $.FieldPath) 1)) -}}
+                {{- throw "error: field \"%v\" does not exist" $fieldName}}
             {{- end -}}
             {{- break -}}
         {{- end -}}
@@ -88,7 +89,7 @@ Takes dictionary as argument with keys:
         {{- $subschema := index $resolved.properties (first $.FieldPath) -}}
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
-            FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema) }}>{{"\n"}}
+            FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
         {{- template "output" (set $nextContext "history" (dict) "FieldPath" (slice $.FieldPath 1) "schema" $subschema ) -}}
@@ -149,7 +150,7 @@ Takes dictionary as argument with keys:
         {{- $nextContext := set $ "history" (set $.history $refString 1) -}}
         {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
         {{- range $k, $v := $resolved.properties -}}
-            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "short" $.Recursive "level" $.level) -}}
+            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "short" $.Recursive "level" $.level "Document" $.Document) -}}
             {{- if $.Recursive -}}
                 {{- /* Check if we already know about this element */}}
                 {{- template "fieldList" (set $nextContext "schema" $v "level" (add $.level 1)) -}}
@@ -174,12 +175,13 @@ Takes dictionary as argument with keys:
     name: name of field
     short: limit printing to a single-line summary
     level: indentation amount
+    Document: openapi document
 */ -}}
 {{- define "fieldDetail" -}}
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema) }}>
+    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- "\n" -}}
     {{- if not $.short -}}
@@ -225,24 +227,35 @@ Takes dictionary as argument with keys:
 
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema
+    Document: openapi document
 */ -}}
 {{- define "typeGuess" -}}
     {{- with $.schema -}}
         {{- if .items -}}
-            []{{template "typeGuess" (dict "schema" .items)}}
+            []{{template "typeGuess" (set $ "schema" .items)}}
         {{- else if .additionalProperties -}}
-            map[string]{{template "typeGuess" (dict "schema" .additionalProperties)}}
+            map[string]{{template "typeGuess" (set $ "schema" .additionalProperties)}}
         {{- else if and .allOf (not .properties) (eq (len .allOf) 1) -}}
             {{- /* If allOf has a single element and there are no direct
                 properties on the schema, defer to the allOf */ -}}
-            {{- template "typeGuess" (dict "schema" (first .allOf)) -}}
+            {{- template "typeGuess" (set $ "schema" (first .allOf)) -}}
         {{- else if index . "$ref"}}
             {{- /* Parse the #!/components/schemas/io.k8s.Kind string into just the Kind name */ -}}
             {{- $ref := index . "$ref" -}}
-            {{- $name := split $ref "/" | last -}}
-            {{- or (split $name "." | last) "Object" -}}
+            {{- /* Look up ref schema to see primitive type. Only put the ref type name if it is an object. */ -}}
+            {{- $refSchema := resolveRef $ref $.Document -}}
+            {{- if (or (not $refSchema) (or (not $refSchema.type) (eq $refSchema.type "object"))) -}}
+                {{- $name := split $ref "/" | last -}}
+                {{- or (split $name "." | last) "Object" -}}
+            {{- else if $refSchema.type -}}
+                {{- or $refSchema.type "Object" -}}
+            {{- else -}}
+                {{- or .type "Object" -}}
+            {{- end -}}
         {{- else -}}
-            {{- or .type "Object" -}}
+            {{/* Old explain used capitalized "Object". Just follow suit */}}
+            {{- if eq .type "object" -}}Object
+            {{- else -}}{{- or .type "Object" -}}{{- end -}}
         {{- end -}}
     {{- else -}}
         {{- fail "expected schema argument to subtemplate 'typeguess'" -}}
