@@ -201,7 +201,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			})
 		}
 	})
-	ginkgo.Context("CSI online volume expansion with secret[Feature:CSINodeExpandSecret]", func() {
+	ginkgo.Context("CSI online volume expansion with secret", func() {
 		var stringSecret = map[string]string{
 			"username": "admin",
 			"password": "t0p-Secret",
@@ -274,6 +274,11 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
+				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				if err != nil {
+					framework.Failf("failed to get pvc %s, %v", pvc.Name, err)
+				}
+				gomega.Expect(pvc.Spec.VolumeName).ShouldNot(gomega.BeEquivalentTo(""), "while provisioning a volume for resizing")
 				pv, err := m.cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 				if err != nil {
 					framework.Failf("failed to get pv %s, %v", pvc.Spec.VolumeName, err)
