@@ -525,7 +525,7 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 		}
 		// TODO: re-evaluate whether there are any labels that need to be
 		// reconcile in 1.19. Remove this function if it's no longer necessary.
-		if err := nc.reconcileNodeLabels(nodeName); err != nil {
+		if err := nc.reconcileNodeLabels(ctx, nodeName); err != nil {
 			logger.Error(err, "Failed to reconcile labels for node, requeue it", "node", klog.KRef("", nodeName))
 			// TODO(yujuhong): Add nodeName back to the queue
 		}
@@ -675,7 +675,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	}
 	for i := range added {
 		logger.V(1).Info("Controller observed a new Node", "node", klog.KRef("", added[i].Name))
-		controllerutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
+		controllerutil.RecordNodeEvent(ctx, nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(logger, added[i])
 		nc.markNodeAsReachable(ctx, added[i])
@@ -683,7 +683,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 
 	for i := range deleted {
 		logger.V(1).Info("Controller observed a Node deletion", "node", klog.KRef("", deleted[i].Name))
-		controllerutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
+		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
@@ -1287,7 +1287,7 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 }
 
 // reconcileNodeLabels reconciles node labels.
-func (nc *Controller) reconcileNodeLabels(nodeName string) error {
+func (nc *Controller) reconcileNodeLabels(ctx context.Context, nodeName string) error {
 	node, err := nc.nodeLister.Get(nodeName)
 	if err != nil {
 		// If node not found, just ignore it.
@@ -1327,7 +1327,7 @@ func (nc *Controller) reconcileNodeLabels(nodeName string) error {
 	if len(labelsToUpdate) == 0 {
 		return nil
 	}
-	if !controllerutil.AddOrUpdateLabelsOnNode(nc.kubeClient, labelsToUpdate, node) {
+	if !controllerutil.AddOrUpdateLabelsOnNode(ctx, nc.kubeClient, labelsToUpdate, node) {
 		return fmt.Errorf("failed update labels for node %+v", node)
 	}
 	return nil
