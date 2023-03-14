@@ -437,7 +437,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				diff.NewCmdDiff(f, o.IOStreams),
+				diff.NewCmdDiff("kubectl", f, o.IOStreams),
 				apply.NewCmdApply("kubectl", f, o.IOStreams),
 				patch.NewCmdPatch(f, o.IOStreams),
 				replace.NewCmdReplace(f, o.IOStreams),

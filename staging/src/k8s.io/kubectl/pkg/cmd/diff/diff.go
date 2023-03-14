@@ -17,6 +17,7 @@ limitations under the License.
 package diff
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -115,6 +116,11 @@ type DiffOptions struct {
 	Builder          *resource.Builder
 	Diff             *DiffProgram
 
+	Prune          bool
+	ApplySetRef    string
+	PruneAllowlist []string
+	applySet       *apply.ApplySet
+
 	pruner  *pruner
 	tracker *tracker
 }
@@ -128,7 +134,7 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 	}
 }
 
-func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDiff(baseName string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	options := NewDiffOptions(streams)
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
@@ -137,8 +143,13 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckDiffErr(options.Complete(f, cmd, args))
-			cmdutil.CheckDiffErr(options.Validate())
+			ctx := cmd.Context()
+
+			dynamicClient, err := f.DynamicClient()
+			cmdutil.CheckDiffErr(err)
+
+			cmdutil.CheckDiffErr(options.Complete(f, cmd, baseName, args))
+			cmdutil.CheckDiffErr(options.Validate(ctx, dynamicClient))
 			// `kubectl diff` propagates the error code from
 			// diff or `KUBECTL_EXTERNAL_DIFF`. Also, we
 			// don't want to print an error if diff returns
@@ -163,13 +174,12 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	})
 
 	usage := "contains the configuration to diff"
-	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmd.Flags().BoolVar(&options.ShowManagedFields, "show-managed-fields", options.ShowManagedFields, "If true, include managed fields in the diff.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &options.Selector)
+	cmdutil.AddPruningFlags(cmd, &options.Prune, &options.PruneAllowlist, nil, nil, &options.ApplySetRef)
 
 	return cmd
 }
@@ -615,7 +625,7 @@ func isConflict(err error) bool {
 	return err != nil && errors.IsConflict(err)
 }
 
-func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, baseName string, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
@@ -651,13 +661,40 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	if cmdutil.GetFlagBool(cmd, "prune") {
+	if o.ApplySetRef != "" {
 		mapper, err := f.ToRESTMapper()
 		if err != nil {
 			return err
 		}
 
-		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
+		o.tracker = newTracker()
+
+		parent, err := apply.ParseApplySetParentRef(o.ApplySetRef, mapper)
+		if err != nil {
+			return fmt.Errorf("invalid parent reference %q: %w", o.ApplySetRef, err)
+		}
+		// ApplySet uses the namespace value from the flag, but not from the kubeconfig or defaults
+		// This means the namespace flag is required when using a namespaced parent.
+		if o.EnforceNamespace && parent.IsNamespaced() {
+			parent.Namespace = o.CmdNamespace
+		}
+		tooling := apply.ApplySetTooling{Name: baseName, Version: apply.ApplySetToolVersion}
+		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+		if err != nil {
+			return fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+		}
+		if restClient == nil {
+			return fmt.Errorf("could not build RESTClient for ApplySet")
+		}
+
+		o.applySet = apply.NewApplySet(parent, tooling, mapper, restClient)
+	} else if o.Prune {
+		mapper, err := f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
+
+		resources, err := prune.ParseResources(mapper, o.PruneAllowlist)
 		if err != nil {
 			return err
 		}
@@ -673,6 +710,8 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 // diff, and find each Info object for each files, and runs against the
 // differ.
 func (o *DiffOptions) Run() error {
+	ctx := context.TODO()
+
 	differ, err := NewDiffer("LIVE", "MERGED")
 	if err != nil {
 		return err
@@ -692,10 +731,21 @@ func (o *DiffOptions) Run() error {
 		return err
 	}
 
+	// Collect for use with the applyset
+	var infos []*resource.Info
+
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
+
+		if o.applySet != nil {
+			if err := o.applySet.AddLabels(info); err != nil {
+				return err
+			}
+		}
+
+		infos = append(infos, info)
 
 		local := info.Object.DeepCopyObject()
 		for i := 1; i <= maxRetries; i++ {
@@ -741,6 +791,39 @@ func (o *DiffOptions) Run() error {
 		return err
 	})
 
+	if o.applySet != nil {
+		validationDirective := "ignore"
+		if err := o.applySet.BeforeApply(infos, cmdutil.DryRunServer, validationDirective); err != nil {
+			return err
+		}
+	}
+
+	if o.applySet != nil {
+		prunedObjects, err := o.applySet.FindAllObjectsToPrune(ctx, o.DynamicClient, o.tracker.visitedUids)
+		if err != nil {
+			return fmt.Errorf("unable to find objects for pruning: %w", err)
+		}
+
+		// Print pruned objects into old file and thus, diff
+		// command will show them as pruned.
+		for _, prunedObject := range prunedObjects {
+			obj := prunedObject.Object
+
+			name, err := getObjectName(obj)
+			if err != nil {
+				return fmt.Errorf("error getting object name: %w", err)
+			}
+
+			if !o.ShowManagedFields {
+				obj = omitManagedFields(obj)
+			}
+
+			if err := differ.From.Print(name, obj, printer); err != nil {
+				return err
+			}
+		}
+	}
+
 	if o.pruner != nil {
 		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
 		if err != nil {
@@ -769,7 +852,16 @@ func (o *DiffOptions) Run() error {
 }
 
 // Validate makes sure provided values for DiffOptions are valid
-func (o *DiffOptions) Validate() error {
+func (o *DiffOptions) Validate(ctx context.Context, client dynamic.Interface) error {
+	if o.applySet != nil {
+		if !o.Prune {
+			return fmt.Errorf("--applyset requires --prune")
+		}
+		if err := o.applySet.Validate(ctx, client); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -513,10 +513,17 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 
 func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, pruneWhitelist *[]string, all *bool, applySetRef *string) {
 	// Flags associated with the original allowlist-based alpha
-	cmd.Flags().StringArrayVar(pruneAllowlist, "prune-allowlist", *pruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
-	cmd.Flags().StringArrayVar(pruneWhitelist, "prune-whitelist", *pruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
-	_ = cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
-	cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
+	if pruneAllowlist != nil {
+		cmd.Flags().StringArrayVar(pruneAllowlist, "prune-allowlist", *pruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
+	}
+	if pruneWhitelist != nil {
+		cmd.Flags().StringArrayVar(pruneWhitelist, "prune-whitelist", *pruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
+		_ = cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
+	}
+
+	if all != nil {
+		cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
+	}
 
 	// Flags associated with the new ApplySet-based alpha
 	if ApplySet.IsEnabled() {
