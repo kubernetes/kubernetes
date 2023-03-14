@@ -847,8 +847,9 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// findInitContainersToRun returns the indexes of init containers to run and
-// the flag whether the pod has been initialized.
+// findInitContainersToRun returns the indexes of sidecar containers to run and
+// next init container to run, and the flag whether the pod has been
+// initialized.
 func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) ([]int, bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, true

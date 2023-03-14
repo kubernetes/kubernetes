@@ -851,8 +851,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	// Check initialization progress or find any sidecar container that needs to
-	// run after initialization is hasInitialized.
+	// Check initialization progress and find init containers including sidecar
+	// containers that need to run even after initialization is finished.
 	initContainersToRun, hasInitialized := m.findInitContainersToRun(pod, podStatus)
 	for _, idx := range initContainersToRun {
 		container := &pod.Spec.InitContainers[idx]
