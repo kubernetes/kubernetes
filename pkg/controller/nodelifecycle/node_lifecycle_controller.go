@@ -307,7 +307,7 @@ func NewNodeLifecycleController(
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
 ) (*Controller, error) {
-	logger := klog.LoggerWithName(klog.FromContext(ctx), "NodeLifecycleController")
+	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
 		logger.Error(nil, "kubeClient is nil when starting nodelifecycle Controller")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)

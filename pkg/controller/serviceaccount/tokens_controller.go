@@ -166,13 +166,14 @@ func (e *TokensController) Run(ctx context.Context, workers int) {
 		return
 	}
 
-	klog.FromContext(ctx).V(5).Info("Starting workers")
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Starting workers")
 	for i := 0; i < workers; i++ {
-		go wait.Until(e.syncServiceAccount, 0, ctx.Done())
-		go wait.Until(e.syncSecret, 0, ctx.Done())
+		go wait.UntilWithContext(ctx, e.syncServiceAccount, 0)
+		go wait.UntilWithContext(ctx, e.syncSecret, 0)
 	}
 	<-ctx.Done()
-	klog.FromContext(ctx).V(1).Info("Shutting down")
+	logger.V(1).Info("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
@@ -188,7 +189,7 @@ func (e *TokensController) queueServiceAccountUpdateSync(oldObj interface{}, new
 }
 
 // complete optionally requeues key, then calls queue.Done(key)
-func (e *TokensController) retryOrForget(queue workqueue.RateLimitingInterface, key interface{}, requeue bool) {
+func (e *TokensController) retryOrForget(logger klog.Logger, queue workqueue.RateLimitingInterface, key interface{}, requeue bool) {
 	if !requeue {
 		queue.Forget(key)
 		return
@@ -200,7 +201,7 @@ func (e *TokensController) retryOrForget(queue workqueue.RateLimitingInterface, 
 		return
 	}
 
-	klog.V(4).Infof("retried %d times: %#v", requeueCount, key)
+	logger.V(4).Info("retried several times", "key", key, "count", requeueCount)
 	queue.Forget(key)
 }
 
@@ -216,8 +217,8 @@ func (e *TokensController) queueSecretUpdateSync(oldObj interface{}, newObj inte
 	}
 }
 
-func (e *TokensController) syncServiceAccount() {
-	logger := klog.FromContext(context.TODO())
+func (e *TokensController) syncServiceAccount(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	key, quit := e.syncServiceAccountQueue.Get()
 	if quit {
 		return
@@ -226,7 +227,7 @@ func (e *TokensController) syncServiceAccount() {
 
 	retry := false
 	defer func() {
-		e.retryOrForget(e.syncServiceAccountQueue, key, retry)
+		e.retryOrForget(logger, e.syncServiceAccountQueue, key, retry)
 	}()
 
 	saInfo, err := parseServiceAccountKey(key)
@@ -251,20 +252,20 @@ func (e *TokensController) syncServiceAccount() {
 	}
 }
 
-func (e *TokensController) syncSecret() {
+func (e *TokensController) syncSecret(ctx context.Context) {
 	key, quit := e.syncSecretQueue.Get()
 	if quit {
 		return
 	}
 	defer e.syncSecretQueue.Done(key)
 
+	logger := klog.FromContext(ctx)
 	// Track whether or not we should retry this sync
 	retry := false
 	defer func() {
-		e.retryOrForget(e.syncSecretQueue, key, retry)
+		e.retryOrForget(logger, e.syncSecretQueue, key, retry)
 	}()
 
-	logger := klog.FromContext(context.TODO())
 	secretInfo, err := parseSecretQueueKey(key)
 	if err != nil {
 		logger.Error(err, "Parsing secret queue key")

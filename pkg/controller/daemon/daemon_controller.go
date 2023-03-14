@@ -1274,7 +1274,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	case err != nil && statusErr != nil:
 		// If there was an error, and we failed to update status,
 		// log it and return the original error.
-		klog.Error(statusErr, "Failed to update status", "daemonSet", klog.KObj(ds))
+		logger.Error(statusErr, "Failed to update status", "daemonSet", klog.KObj(ds))
 		return err
 	case err != nil:
 		return err

@@ -33,9 +33,10 @@ import (
 )
 
 func startCSRSigningController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
 	if missingSingleSigningFile && !anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
-		klog.V(2).Info("skipping CSR signer controller because no csr cert/key was specified")
+		logger.Info("Skipping CSR signer controller because no csr cert/key was specified")
 		return nil, false, nil
 	}
 	if !missingSingleSigningFile && anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
@@ -53,7 +54,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		}
 		go kubeletServingSigner.Run(ctx, 5)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kubelet-serving")
+		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kubelet-serving")
 	}
 
 	if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
@@ -63,7 +64,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		}
 		go kubeletClientSigner.Run(ctx, 5)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client-kubelet")
+		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client-kubelet")
 	}
 
 	if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
@@ -73,7 +74,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		}
 		go kubeAPIServerClientSigner.Run(ctx, 5)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client")
+		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client")
 	}
 
 	if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
@@ -83,7 +84,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		}
 		go legacyUnknownSigner.Run(ctx, 5)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/legacy-unknown")
+		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/legacy-unknown")
 	}
 
 	return nil, true, nil

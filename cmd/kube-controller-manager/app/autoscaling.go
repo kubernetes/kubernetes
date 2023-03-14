@@ -27,7 +27,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -38,9 +37,6 @@ import (
 )
 
 func startHPAController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-
-	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "hpa-controller"))
-
 	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
 		return nil, false, nil
 	}
