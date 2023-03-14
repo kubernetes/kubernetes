@@ -24,12 +24,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	. "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -196,6 +200,313 @@ func TestDefaultDeploymentAvailability(t *testing.T) {
 	}
 }
 
+func TestSetDefaultStatefulSet(t *testing.T) {
+	defaultLabels := map[string]string{"foo": "bar"}
+	var defaultPartition int32 = 0
+	var notTheDefaultPartition int32 = 42
+	var defaultReplicas int32 = 1
+
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 v1.DefaultSchedulerName,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: defaultLabels,
+		},
+	}
+
+	tests := []struct {
+		name                        string
+		original                    *appsv1beta1.StatefulSet
+		expected                    *appsv1beta1.StatefulSet
+		enableMaxUnavailablePolicy  bool
+		enableStatefulSetAutoDelete bool
+	}{
+		{
+			name: "labels and default update strategy",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+		},
+		{
+			name: "Alternate update strategy",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: appsv1beta1.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+		},
+		{
+			name: "Parallel pod management policy.",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.ParallelPodManagement,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.ParallelPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+		},
+		{
+			name: "MaxUnavailable disabled, with maxUnavailable not specified",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with default maxUnavailable specified",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      &defaultPartition,
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(0),
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with non default maxUnavailable specified",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable enabled, with no maxUnavailable specified",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableMaxUnavailablePolicy: true,
+		},
+		{
+			name: "MaxUnavailable enabled, with non default maxUnavailable specified",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableMaxUnavailablePolicy: true,
+		},
+		{
+			name: "StatefulSetAutoDeletePVC enabled",
+			original: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: nil,
+					},
+					RevisionHistoryLimit: utilpointer.Int32(10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"foo": "bar"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			enableStatefulSetAutoDelete: true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enableStatefulSetAutoDelete)()
+			obj2 := roundTrip(t, runtime.Object(test.original))
+			got, ok := obj2.(*appsv1beta1.StatefulSet)
+			if !ok {
+				t.Errorf("unexpected object: %v", got)
+				t.FailNow()
+			}
+			if !apiequality.Semantic.DeepEqual(got.Spec, test.expected.Spec) {
+				t.Errorf("got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", got.Spec, test.expected.Spec)
+			}
+		})
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
@@ -214,4 +525,13 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
+}
+
+func getPartition(partition int32) *int32 {
+	return &partition
+}
+
+func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
+	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
+	return &maxUnavailableIntOrStr
 }
