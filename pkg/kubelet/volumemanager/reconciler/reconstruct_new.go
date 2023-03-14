@@ -180,6 +180,14 @@ func (rc *reconciler) cleanOrphanVolumes() {
 func (rc *reconciler) updateReconstructedDevicePaths() {
 	klog.V(4).InfoS("Updating reconstructed devicePaths")
 
+	if rc.kubeClient == nil {
+		// Skip reconstructing devicePath from node objects if kubelet is in standalone mode.
+		// Such kubelet is not expected to mount any attachable volume or Secrets / ConfigMap.
+		klog.V(2).InfoS("Skipped reconstruction of DevicePaths from node.status in standalone mode")
+		rc.volumesNeedDevicePath = nil
+		return
+	}
+
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		// This may repeat few times per second until kubelet is able to read its own status for the first time.
