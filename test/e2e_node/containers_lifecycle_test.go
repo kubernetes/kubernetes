@@ -913,7 +913,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 		// TODO: add a test case similar to one above, but with startup probe never succeeding
 
-		ginkgo.When("a sidecar starts and exists with exit code 0 continuously", ginkgo.Ordered, func() {
+		ginkgo.When("a sidecar starts and exits with exit code 0 continuously", ginkgo.Ordered, func() {
 
 			sidecar1 := "sidecar-1"
 			init1 := "init-1"
@@ -983,7 +983,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			})
 		})
 
-		ginkgo.When("a sidecar starts and exists with exit code 1 continuously", ginkgo.Ordered, func() {
+		ginkgo.When("a sidecar starts and exits with exit code 1 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 
 			sidecar1 := "sidecar-1"
