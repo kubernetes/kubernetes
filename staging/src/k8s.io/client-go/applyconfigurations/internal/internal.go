@@ -11364,7 +11364,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
-- name: io.k8s.api.resource.v1alpha1.AllocationResult
+- name: io.k8s.api.resource.v1alpha2.AllocationResult
   map:
     fields:
     - name: availableOnNodes
@@ -11376,7 +11376,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareable
       type:
         scalar: boolean
-- name: io.k8s.api.resource.v1alpha1.PodScheduling
+- name: io.k8s.api.resource.v1alpha2.PodScheduling
   map:
     fields:
     - name: apiVersion
@@ -11391,13 +11391,13 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.resource.v1alpha1.PodSchedulingSpec
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
       default: {}
     - name: status
       type:
-        namedType: io.k8s.api.resource.v1alpha1.PodSchedulingStatus
+        namedType: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
       default: {}
-- name: io.k8s.api.resource.v1alpha1.PodSchedulingSpec
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingSpec
   map:
     fields:
     - name: potentialNodes
@@ -11409,18 +11409,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: selectedNode
       type:
         scalar: string
-- name: io.k8s.api.resource.v1alpha1.PodSchedulingStatus
+- name: io.k8s.api.resource.v1alpha2.PodSchedulingStatus
   map:
     fields:
     - name: resourceClaims
       type:
         list:
           elementType:
-            namedType: io.k8s.api.resource.v1alpha1.ResourceClaimSchedulingStatus
+            namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus
           elementRelationship: associative
           keys:
           - name
-- name: io.k8s.api.resource.v1alpha1.ResourceClaim
+- name: io.k8s.api.resource.v1alpha2.ResourceClaim
   map:
     fields:
     - name: apiVersion
@@ -11435,13 +11435,13 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClaimSpec
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
       default: {}
     - name: status
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClaimStatus
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimStatus
       default: {}
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimConsumerReference
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference
   map:
     fields:
     - name: apiGroup
@@ -11459,7 +11459,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimParametersReference
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
   map:
     fields:
     - name: apiGroup
@@ -11473,7 +11473,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimSchedulingStatus
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus
   map:
     fields:
     - name: name
@@ -11485,7 +11485,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: associative
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimSpec
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
   map:
     fields:
     - name: allocationMode
@@ -11493,17 +11493,17 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
     - name: parametersRef
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClaimParametersReference
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
     - name: resourceClassName
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimStatus
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimStatus
   map:
     fields:
     - name: allocation
       type:
-        namedType: io.k8s.api.resource.v1alpha1.AllocationResult
+        namedType: io.k8s.api.resource.v1alpha2.AllocationResult
     - name: deallocationRequested
       type:
         scalar: boolean
@@ -11514,11 +11514,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: io.k8s.api.resource.v1alpha1.ResourceClaimConsumerReference
+            namedType: io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference
           elementRelationship: associative
           keys:
           - uid
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimTemplate
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimTemplate
   map:
     fields:
     - name: apiVersion
@@ -11533,9 +11533,9 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClaimTemplateSpec
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec
       default: {}
-- name: io.k8s.api.resource.v1alpha1.ResourceClaimTemplateSpec
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec
   map:
     fields:
     - name: metadata
@@ -11544,9 +11544,9 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClaimSpec
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
       default: {}
-- name: io.k8s.api.resource.v1alpha1.ResourceClass
+- name: io.k8s.api.resource.v1alpha2.ResourceClass
   map:
     fields:
     - name: apiVersion
@@ -11565,11 +11565,11 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: parametersRef
       type:
-        namedType: io.k8s.api.resource.v1alpha1.ResourceClassParametersReference
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
     - name: suitableNodes
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-- name: io.k8s.api.resource.v1alpha1.ResourceClassParametersReference
+- name: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
   map:
     fields:
     - name: apiGroup

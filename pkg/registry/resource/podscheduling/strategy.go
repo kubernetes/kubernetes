@@ -52,7 +52,7 @@ func (podSchedulingStrategy) NamespaceScoped() bool {
 // status.
 func (podSchedulingStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -113,7 +113,7 @@ var StatusStrategy = podSchedulingStatusStrategy{Strategy}
 // should not be modified by the user. For a status update that is the spec.
 func (podSchedulingStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

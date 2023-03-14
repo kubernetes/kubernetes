@@ -27,7 +27,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -53,7 +53,7 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) string {
 // was created for the Pod. It returns an error that is informative
 // enough to be returned by the caller without adding further details
 // about the Pod or ResourceClaim.
-func IsForPod(pod *v1.Pod, claim *resourcev1alpha1.ResourceClaim) error {
+func IsForPod(pod *v1.Pod, claim *resourcev1alpha2.ResourceClaim) error {
 	// Checking the namespaces is just a precaution. The caller should
 	// never pass in a ResourceClaim that isn't from the same namespace as the
 	// Pod.
@@ -65,7 +65,7 @@ func IsForPod(pod *v1.Pod, claim *resourcev1alpha1.ResourceClaim) error {
 
 // IsReservedForPod checks whether a claim lists the pod as one of the objects
 // that the claim was reserved for.
-func IsReservedForPod(pod *v1.Pod, claim *resourcev1alpha1.ResourceClaim) bool {
+func IsReservedForPod(pod *v1.Pod, claim *resourcev1alpha2.ResourceClaim) bool {
 	for _, reserved := range claim.Status.ReservedFor {
 		if reserved.UID == pod.UID {
 			return true
@@ -75,7 +75,7 @@ func IsReservedForPod(pod *v1.Pod, claim *resourcev1alpha1.ResourceClaim) bool {
 }
 
 // CanBeReserved checks whether the claim could be reserved for another object.
-func CanBeReserved(claim *resourcev1alpha1.ResourceClaim) bool {
+func CanBeReserved(claim *resourcev1alpha2.ResourceClaim) bool {
 	return claim.Status.Allocation.Shareable ||
 		len(claim.Status.ReservedFor) == 0
 }

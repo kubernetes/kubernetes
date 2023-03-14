@@ -52,7 +52,7 @@ func (resourceclaimStrategy) NamespaceScoped() bool {
 // status.
 func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -113,7 +113,7 @@ var StatusStrategy = resourceclaimStatusStrategy{Strategy}
 // should not be modified by the user. For a status update that is the spec.
 func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"resource.k8s.io/v1alpha1": fieldpath.NewSet(
+		"resource.k8s.io/v1alpha2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
