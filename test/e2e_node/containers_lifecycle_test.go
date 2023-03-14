@@ -638,7 +638,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						Name:  sidecar1,
 						Image: busyboxImage,
 						Command: ExecCommand(sidecar1, execCommand{
-							Delay:    600, // replacing to 1 will make test fail
+							Delay:    600,
 							ExitCode: 0,
 						}),
 						RestartPolicy: &containerRestartPolicyAlways,
