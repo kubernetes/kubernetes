@@ -437,7 +437,7 @@ func TestLifeCycleHook(t *testing.T) {
 		t.Run("consistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()
-			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt32(80)
 			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 

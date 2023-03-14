@@ -41,7 +41,7 @@ func TestContainerLabels(t *testing.T) {
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "path",
 				Host:   "host",
-				Port:   intstr.FromInt(8080),
+				Port:   intstr.FromInt32(8080),
 				Scheme: "scheme",
 			},
 			TCPSocket: &v1.TCPSocketAction{
@@ -110,7 +110,7 @@ func TestContainerAnnotations(t *testing.T) {
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "path",
 				Host:   "host",
-				Port:   intstr.FromInt(8080),
+				Port:   intstr.FromInt32(8080),
 				Scheme: "scheme",
 			},
 			TCPSocket: &v1.TCPSocketAction{
