@@ -69,6 +69,9 @@ var (
 	e2es *services.E2EServices
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	featureGates map[string]bool
+	// serviceFeatureGates is a map of feature names to bools that enable or
+	// disable alpha/experimental features for API service.
+	serviceFeatureGates map[string]bool
 
 	// TODO(random-liu): Change the following modes to sub-command.
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -100,6 +103,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flags.Var(cliflag.NewMapStringBool(&serviceFeatureGates), "service-feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features for API service.")
 }
 
 func init() {
@@ -131,8 +135,8 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	if err := services.SetFeatureGatesForInProcessComponents(featureGates); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates: %v", err)
+	if err := services.SetFeatureGatesForInProcessComponents(serviceFeatureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates for API service: %v", err)
 		os.Exit(1)
 	}
 
