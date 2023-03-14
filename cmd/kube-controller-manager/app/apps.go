@@ -34,7 +34,9 @@ import (
 )
 
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "daemonset-controller"))
 	dsc, err := daemon.NewDaemonSetsController(
+		ctx,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),

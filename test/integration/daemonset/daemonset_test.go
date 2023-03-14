@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -75,8 +76,11 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	clientSet, config, closeFn := framework.StartTestServer(t, serverSetup)
 
 	resyncPeriod := 12 * time.Hour
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
 	dc, err := daemon.NewDaemonSetsController(
+		ctx,
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
@@ -87,8 +91,6 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1(),
