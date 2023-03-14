@@ -24,6 +24,7 @@ import (
 	"sort"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,14 +39,16 @@ type containerGC struct {
 	client           internalapi.RuntimeService
 	manager          *kubeGenericRuntimeManager
 	podStateProvider podStateProvider
+	tracer           trace.Tracer
 }
 
 // NewContainerGC creates a new containerGC.
-func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
+func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager, tracer trace.Tracer) *containerGC {
 	return &containerGC{
 		client:           client,
 		manager:          manager,
 		podStateProvider: podStateProvider,
+		tracer:           tracer,
 	}
 }
 
@@ -407,6 +410,8 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	ctx, otelSpan := cgc.tracer.Start(ctx, "Containers/GarbageCollect")
+	defer otelSpan.End()
 	errors := []error{}
 	// Remove evictable containers
 	if err := cgc.evictContainers(ctx, gcPolicy, allSourcesReady, evictNonDeletedPods); err != nil {

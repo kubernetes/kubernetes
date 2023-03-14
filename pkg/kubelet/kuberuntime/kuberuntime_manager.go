@@ -26,6 +26,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"go.opentelemetry.io/otel/trace"
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 
@@ -77,6 +78,8 @@ const (
 	versionCacheTTL = 60 * time.Second
 	// How frequently to report identical errors
 	identicalErrorDelay = 1 * time.Minute
+	// OpenTelemetry instrumentation scope name
+	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 )
 
 var (
@@ -205,10 +208,12 @@ func NewKubeGenericRuntimeManager(
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
+	tracerProvider trace.TracerProvider,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
+	tracer := tracerProvider.Tracer(instrumentationScope)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
@@ -281,7 +286,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullBurst,
 		podPullingTimeRecorder)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
-	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
