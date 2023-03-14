@@ -251,7 +251,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Port:   intstr.FromInt(443),
+						Port:   intstr.FromInt32(443),
 						Path:   "/readyz",
 					},
 				},
@@ -300,7 +300,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       aggregatorServicePort,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},

@@ -56,7 +56,7 @@ func testingPod(name, value string) v1.Pod {
 						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/index.html",
-								Port: intstr.FromInt(8080),
+								Port: intstr.FromInt32(8080),
 							},
 						},
 						InitialDelaySeconds: 30,

@@ -170,7 +170,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 			Selector: labels,
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

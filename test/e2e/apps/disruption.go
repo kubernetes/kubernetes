@@ -87,9 +87,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ConformanceIt("should list and delete a collection of PodDisruptionBudgets", func(ctx context.Context) {
 			specialLabels := map[string]string{"foo_pdb": "bar_pdb"}
 			labelSelector := labels.SelectorFromSet(specialLabels).String()
-			createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt(2), specialLabels)
+			createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt32(2), specialLabels)
 			createPDBMinAvailableOrDie(ctx, cs, ns, "foo2", intstr.FromString("1%"), specialLabels)
-			createPDBMinAvailableOrDie(ctx, anotherFramework.ClientSet, anotherFramework.Namespace.Name, "foo3", intstr.FromInt(2), specialLabels)
+			createPDBMinAvailableOrDie(ctx, anotherFramework.ClientSet, anotherFramework.Namespace.Name, "foo3", intstr.FromInt32(2), specialLabels)
 
 			ginkgo.By("listing a collection of PDBs across all namespaces")
 			listPDBs(ctx, cs, metav1.NamespaceAll, labelSelector, 3, []string{defaultName, "foo2", "foo3"})
@@ -139,7 +139,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 	   how many disruptions are allowed.
 	*/
 	framework.ConformanceIt("should observe PodDisruptionBudget status updated", func(ctx context.Context) {
-		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt32(1), defaultLabels)
 
 		createPodsOrDie(ctx, cs, ns, 3)
 		waitForPodsOrDie(ctx, cs, ns, 3)
@@ -162,7 +162,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		Description: PodDisruptionBudget API must support update and patch operations on status subresource.
 	*/
 	framework.ConformanceIt("should update/patch PodDisruptionBudget status", func(ctx context.Context) {
-		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt32(1), defaultLabels)
 
 		ginkgo.By("Updating PodDisruptionBudget status")
 		// PDB status can be updated by both PDB controller and the status API. The test selects `DisruptedPods` field to show immediate update via API.
@@ -194,7 +194,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 	// PDB shouldn't error out when there are unmanaged pods
 	ginkgo.It("should observe that the PodDisruptionBudget status is not updated for unmanaged pods",
 		func(ctx context.Context) {
-			createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+			createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt32(1), defaultLabels)
 
 			createPodsOrDie(ctx, cs, ns, 3)
 			waitForPodsOrDie(ctx, cs, ns, 3)
@@ -228,13 +228,13 @@ var _ = SIGDescribe("DisruptionController", func() {
 			shouldDeny:     false,
 		}, {
 			description:    "too few pods, absolute",
-			minAvailable:   intstr.FromInt(2),
+			minAvailable:   intstr.FromInt32(2),
 			maxUnavailable: intstr.FromString(""),
 			podCount:       2,
 			shouldDeny:     true,
 		}, {
 			description:    "enough pods, absolute",
-			minAvailable:   intstr.FromInt(2),
+			minAvailable:   intstr.FromInt32(2),
 			maxUnavailable: intstr.FromString(""),
 			podCount:       3,
 			shouldDeny:     false,
@@ -266,7 +266,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		{
 			description:    "maxUnavailable deny evictions, integer",
 			minAvailable:   intstr.FromString(""),
-			maxUnavailable: intstr.FromInt(1),
+			maxUnavailable: intstr.FromInt32(1),
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
@@ -348,7 +348,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 	*/
 	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func(ctx context.Context) {
 		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
-		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt(3), defaultLabels)
+		createPDBMinAvailableOrDie(ctx, cs, ns, defaultName, intstr.FromInt32(3), defaultLabels)
 		createReplicaSetOrDie(ctx, cs, ns, 3, false)
 
 		ginkgo.By("First trying to evict a pod which shouldn't be evictable")
@@ -370,7 +370,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBOrDie(ctx, cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
-			newMinAvailable := intstr.FromInt(2)
+			newMinAvailable := intstr.FromInt32(2)
 			pdb.Spec.MinAvailable = &newMinAvailable
 			return pdb
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
@@ -386,7 +386,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			oldData, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for old data")
 			old.Spec.MinAvailable = nil
-			maxUnavailable := intstr.FromInt(0)
+			maxUnavailable := intstr.FromInt32(0)
 			old.Spec.MaxUnavailable = &maxUnavailable
 			newData, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")

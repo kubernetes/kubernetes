@@ -108,7 +108,7 @@ var (
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       int32(defaultServeHostnameServicePort),
-				TargetPort: intstr.FromInt(9376),
+				TargetPort: intstr.FromInt32(9376),
 				Protocol:   v1.ProtocolTCP,
 			}},
 			Selector: map[string]string{
@@ -1287,7 +1287,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodePortService, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1319,7 +1319,7 @@ var _ = common.SIGDescribe("Services", func() {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ExternalIPs = []string{externalIP}
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
 			}
 		})
 		if err != nil && strings.Contains(err.Error(), "Use of external IPs is denied by admission control") {
@@ -1364,7 +1364,7 @@ var _ = common.SIGDescribe("Services", func() {
 					Name:       "tcp-port",
 					Port:       80,
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				},
 			}
 		})
@@ -1384,13 +1384,13 @@ var _ = common.SIGDescribe("Services", func() {
 					Name:       "tcp-port",
 					Port:       80,
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				},
 				{
 					Name:       "udp-port",
 					Port:       80,
 					Protocol:   v1.ProtocolUDP,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				},
 			}
 		})
@@ -1432,7 +1432,7 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1471,7 +1471,7 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1764,7 +1764,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		t.Name = "slow-terminating-unready-pod"
 		t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
-		port := 80
+		port := int32(80)
 		terminateSeconds := int64(100)
 
 		service := &v1.Service{
@@ -1776,8 +1776,8 @@ var _ = common.SIGDescribe("Services", func() {
 				Selector: t.Labels,
 				Ports: []v1.ServicePort{{
 					Name:       "http",
-					Port:       int32(port),
-					TargetPort: intstr.FromInt(port),
+					Port:       port,
+					TargetPort: intstr.FromInt32(port),
 				}},
 				PublishNotReadyAddresses: true,
 			},
@@ -1913,7 +1913,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.PublishNotReadyAddresses = true
@@ -2032,7 +2032,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.PublishNotReadyAddresses = false
@@ -2488,7 +2488,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
@@ -2556,7 +2556,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(8000)},
+				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(8000)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
@@ -2725,7 +2725,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
@@ -2819,7 +2819,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -2893,7 +2893,7 @@ var _ = common.SIGDescribe("Services", func() {
 		local := v1.ServiceInternalTrafficPolicyLocal
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
@@ -2970,7 +2970,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
@@ -3045,7 +3045,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
@@ -3355,7 +3355,7 @@ var _ = common.SIGDescribe("Services", func() {
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
 					Port:       int32(80),
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 				}},
 			},
 		}

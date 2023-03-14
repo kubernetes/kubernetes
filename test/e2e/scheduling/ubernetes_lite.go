@@ -93,7 +93,7 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 			},
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

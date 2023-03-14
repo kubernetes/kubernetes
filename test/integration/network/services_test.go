@@ -79,7 +79,7 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 			Ports: []v1.ServicePort{{
 				Port:       8443,
 				NodePort:   30443,
-				TargetPort: intstr.FromInt(8443),
+				TargetPort: intstr.FromInt32(8443),
 				Protocol:   v1.ProtocolTCP,
 			}},
 			Type: v1.ServiceTypeNodePort,

@@ -158,7 +158,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 						"foo": "bar",
 					},
 					Ports: []corev1.ServicePort{
-						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt(443)},
+						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
 					},
 				},
 			}

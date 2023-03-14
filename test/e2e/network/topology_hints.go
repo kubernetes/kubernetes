@@ -53,7 +53,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 	})
 
 	ginkgo.It("should distribute endpoints evenly", func(ctx context.Context) {
-		portNum := 9376
+		portNum := int32(9376)
 		thLabels := map[string]string{labelKey: clientLabelValue}
 		img := imageutils.GetE2EImage(imageutils.Agnhost)
 		ports := []v1.ContainerPort{{ContainerPort: int32(portNum)}}
@@ -74,7 +74,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(portNum),
+					TargetPort: intstr.FromInt32(portNum),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},

@@ -137,7 +137,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -213,7 +213,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -300,7 +300,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)

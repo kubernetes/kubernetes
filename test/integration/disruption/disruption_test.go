@@ -251,7 +251,7 @@ func TestEmptySelector(t *testing.T) {
 			go pdbc.Run(ctx)
 
 			replicas := 4
-			minAvailable := intstr.FromInt(2)
+			minAvailable := intstr.FromInt32(2)
 
 			for j := 0; j < replicas; j++ {
 				createPod(ctx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
@@ -366,7 +366,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			informers.Start(ctx.Done())
 			go pdbc.Run(ctx)
 
-			minAvailable := intstr.FromInt(1)
+			minAvailable := intstr.FromInt32(1)
 
 			// Create the PDB first and wait for it to settle.
 			pdbName := "test-pdb"
