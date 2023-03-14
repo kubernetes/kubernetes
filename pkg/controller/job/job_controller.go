@@ -1116,7 +1116,7 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 			// this error might undercount the backoff.
 			// re-syncing from the current state might not help to recover
 			// the backoff information
-			klog.V(2).ErrorS(err, "Backoff update failed")
+			klog.ErrorS(err, "Backoff update failed")
 		}
 
 		recordJobPodFinished(job, *oldCounters)

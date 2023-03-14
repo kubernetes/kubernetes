@@ -416,10 +416,14 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches: 1,
 		},
 		"no new pod; possible finalizer update of failed pod": {
-			parallelism:        1,
-			completions:        1,
-			backoffLimit:       6,
-			initialStatus:      &jobInitialStatus{1, 0, 1, nil},
+			parallelism:  1,
+			completions:  1,
+			backoffLimit: 6,
+			initialStatus: &jobInitialStatus{
+				active:  1,
+				succeed: 0,
+				failed:  1,
+			},
 			activePods:         1,
 			failedPods:         0,
 			expectedCreations:  0,
