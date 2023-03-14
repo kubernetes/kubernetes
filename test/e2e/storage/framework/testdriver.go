@@ -204,6 +204,9 @@ const (
 	// talk to Kubernetes API server in any way should keep this capability enabled, because
 	// they will see the same NodeStage / NodePublish requests as if only one PV existed.
 	CapMultiplePVsSameID Capability = "multiplePVsSameID"
+
+	// The driver supports ReadOnlyMany (ROX) access mode
+	CapReadOnlyMany Capability = "capReadOnlyMany"
 )
 
 // DriverInfo represents static information about a TestDriver.
