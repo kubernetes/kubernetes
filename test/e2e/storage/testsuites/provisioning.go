@@ -533,6 +533,10 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
 
+		if !dInfo.Capabilities[storageframework.CapReadOnlyMany] {
+			e2eskipper.Skipf("Driver %q does not support ROX access mode - skipping", dInfo.Name)
+		}
+
 		init(ctx)
 
 		if l.config.ClientNodeSelection.Name == "" {
@@ -621,7 +625,14 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			createdClaims := []*v1.PersistentVolumeClaim{claim}
-			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "", true)
+			var podConfig *e2epod.Config = &e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          createdClaims,
+				NodeSelection: testConfig.ClientNodeSelection,
+				PVCsReadOnly: true,
+			}
+			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
+
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 			mountpath := findVolumeMountPath(pod, claim)
 			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
@@ -655,6 +666,10 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
 		}
 
+		if !dInfo.Capabilities[storageframework.CapReadOnlyMany] {
+			e2eskipper.Skipf("Driver %q does not support ROX access mode - skipping", dInfo.Name)
+		}
+
 		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
 		if !ok {
 			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
@@ -678,7 +693,15 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		if pattern.VolMode != "Block" {
 			// Create pod to get mount path of fs
 			createdClaims := []*v1.PersistentVolumeClaim{originalClaim}
-			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "", true)
+			var podConfig *e2epod.Config = &e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          createdClaims,
+				NodeSelection: testConfig.ClientNodeSelection,
+				PVCsReadOnly: true,
+			}
+
+			var pod *v1.Pod
+			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 			mountpath := findVolumeMountPath(pod, originalClaim)
 			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
