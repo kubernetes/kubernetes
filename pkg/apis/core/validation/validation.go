@@ -299,6 +299,14 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidateResourceClaimName can be used to check whether the given
+// name for a ResourceClaim is valid.
+var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateResourceClaimTemplateName can be used to check whether the given
+// name for a ResourceClaimTemplate is valid.
+var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -2747,11 +2755,11 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	return allErrs
 }
 
-func validatePodResourceClaims(claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.NewString()
 	for i, claim := range claims {
-		allErrs = append(allErrs, validatePodResourceClaim(claim, &podClaimNames, fldPath.Index(i))...)
+		allErrs = append(allErrs, validatePodResourceClaim(podMeta, claim, &podClaimNames, fldPath.Index(i))...)
 	}
 	return allErrs
 }
@@ -2769,14 +2777,22 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.String {
 	return podClaimNames
 }
 
-func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if claim.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
+		nameErrs := ValidateDNS1123Label(claim.Name, fldPath.Child("name"))
+		if len(nameErrs) > 0 {
+			allErrs = append(allErrs, nameErrs...)
+		} else if podMeta != nil && claim.Source.ResourceClaimTemplateName != nil {
+			claimName := podMeta.Name + "-" + claim.Name
+			for _, detail := range ValidateResourceClaimName(claimName, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claimName, "final ResourceClaim name: "+detail))
+			}
+		}
 		podClaimNames.Insert(claim.Name)
 	}
 	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Source, fldPath.Child("source"))...)
@@ -2791,6 +2807,16 @@ func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field
 	}
 	if claimSource.ResourceClaimName == nil && claimSource.ResourceClaimTemplateName == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
+	}
+	if claimSource.ResourceClaimName != nil {
+		for _, detail := range ValidateResourceClaimName(*claimSource.ResourceClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), *claimSource.ResourceClaimName, detail))
+		}
+	}
+	if claimSource.ResourceClaimTemplateName != nil {
+		for _, detail := range ValidateResourceClaimTemplateName(*claimSource.ResourceClaimTemplateName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimTemplateName"), *claimSource.ResourceClaimTemplateName, detail))
+		}
 	}
 	return allErrs
 }
@@ -3759,7 +3785,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
-	allErrs = append(allErrs, validatePodResourceClaims(spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
+	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, fldPath.Child("containers"), opts)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, fldPath.Child("initContainers"), opts)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts)...)

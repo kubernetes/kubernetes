@@ -25,21 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-// validateResourceClaimName can be used to check whether the given
-// name for a ResourceClaim is valid.
-var validateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
-
-// validateResourceClaimTemplateName can be used to check whether the given
-// name for a ResourceClaimTemplate is valid.
-var validateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
-
 // validateResourceDriverName reuses the validation of a CSI driver because
 // the allowed values are exactly the same.
 var validateResourceDriverName = corevalidation.ValidateCSIDriverName
 
 // ValidateClaim validates a ResourceClaim.
 func ValidateClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, validateResourceClaimName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -304,7 +296,7 @@ func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, f
 
 // ValidateClaimTemplace validates a ResourceClaimTemplate.
 func ValidateClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, validateResourceClaimTemplateName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, corevalidation.ValidateResourceClaimTemplateName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
