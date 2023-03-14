@@ -6964,7 +6964,9 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 		return nil
 	}
 
+	var allErrs field.ErrorList
 	labelSelectorKeys := sets.String{}
+
 	if labelSelector != nil {
 		for key := range labelSelector.MatchLabels {
 			labelSelectorKeys.Insert(key)
@@ -6972,9 +6974,10 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 		for _, matchExpression := range labelSelector.MatchExpressions {
 			labelSelectorKeys.Insert(matchExpression.Key)
 		}
+	} else {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must not be specified when labelSelector is not set"))
 	}
 
-	allErrs := field.ErrorList{}
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {

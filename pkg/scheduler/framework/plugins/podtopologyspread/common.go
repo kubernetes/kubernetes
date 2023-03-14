@@ -135,10 +135,14 @@ func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.To
 
 func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels.Selector {
 	mergedSelector := labels.SelectorFromSet(matchLabels)
-	if requirements, ok := s.Requirements(); ok {
-		for _, r := range requirements {
-			mergedSelector = mergedSelector.Add(r)
-		}
+
+	requirements, ok := s.Requirements()
+	if !ok {
+		return s
+	}
+
+	for _, r := range requirements {
+		mergedSelector = mergedSelector.Add(r)
 	}
 
 	return mergedSelector
