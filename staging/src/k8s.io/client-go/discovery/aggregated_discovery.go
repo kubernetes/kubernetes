@@ -96,7 +96,7 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		for _, r := range v.Resources {
 			if r.ResponseKind == nil {
 				a, _ := json.Marshal(r)
-				klog.Infof("ResourceManager no ResponseKind: %s\n", a)
+				panic(fmt.Sprintf("ResourceManager no ResponseKind: %s\n", a))
 				continue
 			}
 			resource := convertAPIResource(r)
