@@ -87,3 +87,16 @@ spec:
     message: messageValue
     messageExpression: messageExpressionValue
     reason: reasonValue
+status:
+  conditions:
+  - lastTransitionTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    observedGeneration: 3
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
+  observedGeneration: 1
+  typeChecking:
+    expressionWarnings:
+    - fieldRef: fieldRefValue
+      warning: warningValue

@@ -43,6 +43,7 @@ type ValidatingAdmissionPoliciesGetter interface {
 type ValidatingAdmissionPolicyInterface interface {
 	Create(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.CreateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
 	Update(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
+	UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
@@ -50,6 +51,7 @@ type ValidatingAdmissionPolicyInterface interface {
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
 	Apply(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
+	ApplyStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
 	ValidatingAdmissionPolicyExpansion
 }
 
@@ -132,6 +134,21 @@ func (c *validatingAdmissionPolicies) Update(ctx context.Context, validatingAdmi
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *validatingAdmissionPolicies) UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
+	result = &v1alpha1.ValidatingAdmissionPolicy{}
+	err = c.client.Put().
+		Resource("validatingadmissionpolicies").
+		Name(validatingAdmissionPolicy.Name).
+		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(validatingAdmissionPolicy).
+		Do(ctx).
+		Into(result)
+	return
+}
+
 // Delete takes name of the validatingAdmissionPolicy and deletes it. Returns an error if one occurs.
 func (c *validatingAdmissionPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
@@ -189,6 +206,35 @@ func (c *validatingAdmissionPolicies) Apply(ctx context.Context, validatingAdmis
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("validatingadmissionpolicies").
 		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *validatingAdmissionPolicies) ApplyStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
+	if validatingAdmissionPolicy == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(validatingAdmissionPolicy)
+	if err != nil {
+		return nil, err
+	}
+
+	name := validatingAdmissionPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy.Name must be provided to Apply")
+	}
+
+	result = &v1alpha1.ValidatingAdmissionPolicy{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("validatingadmissionpolicies").
+		Name(*name).
+		SubResource("status").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).

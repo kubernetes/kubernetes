@@ -37,6 +37,16 @@ func (AuditAnnotation) SwaggerDoc() map[string]string {
 	return map_AuditAnnotation
 }
 
+var map_ExpressionWarning = map[string]string{
+	"":         "ExpressionWarning is a warning information that targets a specific expression.",
+	"fieldRef": "The path to the field that refers the expression. For example, the reference to the expression of the first item of validations is \"spec.validations[0].expression\"",
+	"warning":  "The content of type checking information in a human-readable form. Each line of the warning contains the type that the expression is checked against, followed by the type check error from the compiler.",
+}
+
+func (ExpressionWarning) SwaggerDoc() map[string]string {
+	return map_ExpressionWarning
+}
+
 var map_MatchResources = map[string]string{
 	"":                     "MatchResources decides whether to run the admission control policy on an object based on whether it meets the match criteria. The exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
 	"namespaceSelector":    "NamespaceSelector decides whether to run the admission control policy on an object based on whether the namespace for that object matches the selector. If the object itself is a namespace, the matching is performed on object.metadata.labels. If the object is another cluster scoped resource, it never skips the policy.\n\nFor example, to run the webhook on any objects whose namespace is not associated with \"runlevel\" of \"0\" or \"1\";  you will set the selector as follows: \"namespaceSelector\": {\n  \"matchExpressions\": [\n    {\n      \"key\": \"runlevel\",\n      \"operator\": \"NotIn\",\n      \"values\": [\n        \"0\",\n        \"1\"\n      ]\n    }\n  ]\n}\n\nIf instead you want to only run the policy on any objects whose namespace is associated with the \"environment\" of \"prod\" or \"staging\"; you will set the selector as follows: \"namespaceSelector\": {\n  \"matchExpressions\": [\n    {\n      \"key\": \"environment\",\n      \"operator\": \"In\",\n      \"values\": [\n        \"prod\",\n        \"staging\"\n      ]\n    }\n  ]\n}\n\nSee https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/ for more examples of label selectors.\n\nDefault to the empty LabelSelector, which matches everything.",
@@ -79,10 +89,20 @@ func (ParamRef) SwaggerDoc() map[string]string {
 	return map_ParamRef
 }
 
+var map_TypeChecking = map[string]string{
+	"":                   "TypeChecking contains results of type checking the expressions in the ValidatingAdmissionPolicy",
+	"expressionWarnings": "The type checking warnings for each expression.",
+}
+
+func (TypeChecking) SwaggerDoc() map[string]string {
+	return map_TypeChecking
+}
+
 var map_ValidatingAdmissionPolicy = map[string]string{
 	"":         "ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 	"spec":     "Specification of the desired behavior of the ValidatingAdmissionPolicy.",
+	"status":   "The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy behaves in the expected way. Populated by the system. Read-only.",
 }
 
 func (ValidatingAdmissionPolicy) SwaggerDoc() map[string]string {
@@ -142,6 +162,17 @@ var map_ValidatingAdmissionPolicySpec = map[string]string{
 
 func (ValidatingAdmissionPolicySpec) SwaggerDoc() map[string]string {
 	return map_ValidatingAdmissionPolicySpec
+}
+
+var map_ValidatingAdmissionPolicyStatus = map[string]string{
+	"":                   "ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.",
+	"observedGeneration": "The generation observed by the controller.",
+	"typeChecking":       "The results of type checking for each expression. Presence of this field indicates the completion of the type checking.",
+	"conditions":         "The conditions represent the latest available observations of a policy's current state.",
+}
+
+func (ValidatingAdmissionPolicyStatus) SwaggerDoc() map[string]string {
+	return map_ValidatingAdmissionPolicyStatus
 }
 
 var map_Validation = map[string]string{

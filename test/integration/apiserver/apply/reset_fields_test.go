@@ -67,6 +67,8 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1alpha1", "podschedulings"):            `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulings.
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
+	// standard for []metav1.Condition
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -151,6 +153,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 }
 
 // TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.
