@@ -2751,7 +2751,15 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		klog.V(2).InfoS("Failed to get local endpoint for PodResources endpoint", "err", err)
 		return
 	}
-	server.ListenAndServePodResources(socket, kl.podManager, kl.containerManager, kl.containerManager, kl.containerManager)
+
+	providers := server.PodResourcesProviders{
+		Pods:    kl.podManager,
+		Devices: kl.containerManager,
+		Cpus:    kl.containerManager,
+		Memory:  kl.containerManager,
+	}
+
+	server.ListenAndServePodResources(socket, providers)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
