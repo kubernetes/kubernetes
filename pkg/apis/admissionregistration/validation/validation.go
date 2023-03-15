@@ -213,6 +213,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedAdmissi
 func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(e, validationOptions{
 		ignoreMatchConditions:                   false,
+		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
@@ -241,7 +242,7 @@ func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
 	return validateMutatingWebhookConfiguration(e, validationOptions{
 		ignoreMatchConditions:                   false,
-		matchConditionsHasParameters:            false,
+		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
@@ -251,7 +252,7 @@ func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 
 type validationOptions struct {
 	ignoreMatchConditions                   bool
-	matchConditionsHasParameters            bool
+	allowParamsInMatchConditions            bool
 	requireNoSideEffects                    bool
 	requireRecognizedAdmissionReviewVersion bool
 	requireUniqueWebhookNames               bool
@@ -623,7 +624,7 @@ func mutatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistrat
 func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(newC, validationOptions{
 		ignoreMatchConditions:                   ignoreValidatingWebhookMatchConditions(newC.Webhooks, oldC.Webhooks),
-		matchConditionsHasParameters:            false,
+		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    validatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: validatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
 		requireUniqueWebhookNames:               validatingHasUniqueWebhookNames(oldC.Webhooks),
@@ -635,7 +636,7 @@ func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistrat
 func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
 	return validateMutatingWebhookConfiguration(newC, validationOptions{
 		ignoreMatchConditions:                   ignoreMutatingWebhookMatchConditions(newC.Webhooks, oldC.Webhooks),
-		matchConditionsHasParameters:            false,
+		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    mutatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: mutatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
 		requireUniqueWebhookNames:               mutatingHasUniqueWebhookNames(oldC.Webhooks),
@@ -670,7 +671,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, supportedFailurePolicies.List()))
 	}
 	if spec.ParamKind != nil {
-		opts.matchConditionsHasParameters = true
+		opts.allowParamsInMatchConditions = true
 		allErrors = append(allErrors, validateParamKind(*spec.ParamKind, fldPath.Child("paramKind"))...)
 	}
 	if spec.MatchConstraints == nil {
@@ -867,7 +868,7 @@ func validateMatchCondition(v *admissionregistration.MatchCondition, opts valida
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), ""))
 	} else {
 		allErrors = append(allErrors, validateCELExpression(trimmedExpression, plugincel.OptionalVariableDeclarations{
-			HasParams:     opts.matchConditionsHasParameters,
+			HasParams:     opts.allowParamsInMatchConditions,
 			HasAuthorizer: true,
 		}, fldPath.Child("expression"))...)
 	}
