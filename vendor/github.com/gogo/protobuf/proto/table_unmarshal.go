@@ -257,6 +257,8 @@ func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
 	}
 	if reqMask != u.reqMask && errLater == nil {
 		// A required field of this message is missing.
+		u.lock.Lock()
+		defer u.lock.Unlock()
 		for _, n := range u.reqFields {
 			if reqMask&1 == 0 {
 				errLater = &RequiredNotSetError{n}
