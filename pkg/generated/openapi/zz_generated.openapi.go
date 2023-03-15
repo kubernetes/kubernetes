@@ -17535,27 +17535,27 @@ func schema_k8sio_api_core_v1_ContainerResizePolicy(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ContainerResizePolicy represents resource resize policy for a single container.",
+				Description: "ContainerResizePolicy represents resource resize policy for the container.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"resourceName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the resource type to which this resource resize policy applies. Supported values: cpu, memory.",
+							Description: "Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"policy": {
+					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resource resize policy applicable to the specified resource name. If not specified, it defaults to RestartNotRequired.",
+							Description: "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"resourceName", "policy"},
+				Required: []string{"resourceName", "restartPolicy"},
 			},
 		},
 	}

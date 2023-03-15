@@ -585,15 +585,15 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		cpuRequest:    currentCPURequest,
 	}
 
-	resizePolicy := make(map[v1.ResourceName]v1.ResourceResizePolicy)
+	resizePolicy := make(map[v1.ResourceName]v1.ResourceResizeRestartPolicy)
 	for _, pol := range container.ResizePolicy {
-		resizePolicy[pol.ResourceName] = pol.Policy
+		resizePolicy[pol.ResourceName] = pol.RestartPolicy
 	}
 	determineContainerResize := func(rName v1.ResourceName, specValue, statusValue int64) (resize, restart bool) {
 		if specValue == statusValue {
 			return false, false
 		}
-		if resizePolicy[rName] == v1.RestartRequired {
+		if resizePolicy[rName] == v1.RestartContainer {
 			return true, true
 		}
 		return true, false

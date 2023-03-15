@@ -2264,31 +2264,31 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// ResourceResizePolicy specifies how Kubernetes should handle resource resize.
-type ResourceResizePolicy string
+// ResourceResizeRestartPolicy specifies how to handle container resource resize.
+type ResourceResizeRestartPolicy string
 
-// These are the valid resource resize policy values:
+// These are the valid resource resize restart policy values:
 const (
-	// RestartNotRequired tells Kubernetes to resize the container in-place
+	// 'NotRequired' means Kubernetes will try to resize the container
 	// without restarting it, if possible. Kubernetes may however choose to
 	// restart the container if it is unable to actuate resize without a
 	// restart. For e.g. the runtime doesn't support restart-free resizing.
-	RestartNotRequired ResourceResizePolicy = "RestartNotRequired"
-	// 'RestartRequired' tells Kubernetes to resize the container in-place
+	NotRequired ResourceResizeRestartPolicy = "NotRequired"
+	// 'RestartContainer' means Kubernetes will resize the container in-place
 	// by stopping and starting the container when new resources are applied.
 	// This is needed for legacy applications. For e.g. java apps using the
 	// -xmxN flag which are unable to use resized memory without restarting.
-	RestartRequired ResourceResizePolicy = "RestartRequired"
+	RestartContainer ResourceResizeRestartPolicy = "RestartContainer"
 )
 
-// ContainerResizePolicy represents resource resize policy for a single container.
+// ContainerResizePolicy represents resource resize policy for the container.
 type ContainerResizePolicy struct {
-	// Name of the resource type to which this resource resize policy applies.
+	// Name of the resource to which this resource resize policy applies.
 	// Supported values: cpu, memory.
 	ResourceName ResourceName `json:"resourceName" protobuf:"bytes,1,opt,name=resourceName,casttype=ResourceName"`
-	// Resource resize policy applicable to the specified resource name.
-	// If not specified, it defaults to RestartNotRequired.
-	Policy ResourceResizePolicy `json:"policy" protobuf:"bytes,2,opt,name=policy,casttype=ResourceResizePolicy"`
+	// Restart policy to apply when specified resource is resized.
+	// If not specified, it defaults to NotRequired.
+	RestartPolicy ResourceResizeRestartPolicy `json:"restartPolicy" protobuf:"bytes,2,opt,name=restartPolicy,casttype=ResourceResizeRestartPolicy"`
 }
 
 // PreemptionPolicy describes a policy for if/when to preempt a pod.

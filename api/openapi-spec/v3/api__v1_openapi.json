@@ -1306,22 +1306,22 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.ContainerResizePolicy": {
-        "description": "ContainerResizePolicy represents resource resize policy for a single container.",
+        "description": "ContainerResizePolicy represents resource resize policy for the container.",
         "properties": {
-          "policy": {
-            "default": "",
-            "description": "Resource resize policy applicable to the specified resource name. If not specified, it defaults to RestartNotRequired.",
-            "type": "string"
-          },
           "resourceName": {
             "default": "",
-            "description": "Name of the resource type to which this resource resize policy applies. Supported values: cpu, memory.",
+            "description": "Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.",
+            "type": "string"
+          },
+          "restartPolicy": {
+            "default": "",
+            "description": "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
             "type": "string"
           }
         },
         "required": [
           "resourceName",
-          "policy"
+          "restartPolicy"
         ],
         "type": "object"
       },

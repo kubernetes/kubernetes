@@ -869,15 +869,15 @@ message ContainerPort {
   optional string hostIP = 5;
 }
 
-// ContainerResizePolicy represents resource resize policy for a single container.
+// ContainerResizePolicy represents resource resize policy for the container.
 message ContainerResizePolicy {
-  // Name of the resource type to which this resource resize policy applies.
+  // Name of the resource to which this resource resize policy applies.
   // Supported values: cpu, memory.
   optional string resourceName = 1;
 
-  // Resource resize policy applicable to the specified resource name.
-  // If not specified, it defaults to RestartNotRequired.
-  optional string policy = 2;
+  // Restart policy to apply when specified resource is resized.
+  // If not specified, it defaults to NotRequired.
+  optional string restartPolicy = 2;
 }
 
 // ContainerState holds a possible state of container.

@@ -2290,8 +2290,8 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
 						},
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, Policy: api.RestartNotRequired},
-							{ResourceName: api.ResourceMemory, Policy: api.RestartRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+							{ResourceName: api.ResourceMemory, RestartPolicy: api.RestartContainer},
 						},
 					},
 				},

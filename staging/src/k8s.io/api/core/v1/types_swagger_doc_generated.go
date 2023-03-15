@@ -390,9 +390,9 @@ func (ContainerPort) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerResizePolicy = map[string]string{
-	"":             "ContainerResizePolicy represents resource resize policy for a single container.",
-	"resourceName": "Name of the resource type to which this resource resize policy applies. Supported values: cpu, memory.",
-	"policy":       "Resource resize policy applicable to the specified resource name. If not specified, it defaults to RestartNotRequired.",
+	"":              "ContainerResizePolicy represents resource resize policy for the container.",
+	"resourceName":  "Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.",
+	"restartPolicy": "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
 }
 
 func (ContainerResizePolicy) SwaggerDoc() map[string]string {
