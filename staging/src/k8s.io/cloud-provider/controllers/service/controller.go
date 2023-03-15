@@ -582,7 +582,7 @@ func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service)
 		return true
 	}
 
-	// User can upgrade (add another clusterIP or ipFamily) or can downgrade (remove secondary clusterIP or ipFamily), 
+	// User can upgrade (add another clusterIP or ipFamily) or can downgrade (remove secondary clusterIP or ipFamily),
 	// but CAN NOT change primary/secondary clusterIP || ipFamily UNLESS they are changing from/to/ON ExternalName
 	// so not care about order, only need check the length.
 	if len(oldService.Spec.IPFamilies) != len(newService.Spec.IPFamilies) {
