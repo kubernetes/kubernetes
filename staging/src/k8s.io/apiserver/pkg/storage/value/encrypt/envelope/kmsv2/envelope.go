@@ -35,7 +35,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
+	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/pkg/service"
@@ -49,7 +49,7 @@ func init() {
 
 const (
 	// KMSAPIVersion is the version of the KMS API.
-	KMSAPIVersion = "v2alpha1"
+	KMSAPIVersion = "v2beta1"
 	// annotationsMaxSize is the maximum size of the annotations.
 	annotationsMaxSize = 32 * 1024 // 32 kB
 	// KeyIDMaxSize is the maximum size of the keyID.

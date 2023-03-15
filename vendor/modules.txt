@@ -1517,10 +1517,10 @@ k8s.io/apiserver/pkg/storage/value
 k8s.io/apiserver/pkg/storage/value/encrypt/aes
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2
-k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1
+k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1
-k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1
+k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2
 k8s.io/apiserver/pkg/storage/value/encrypt/identity
 k8s.io/apiserver/pkg/storage/value/encrypt/secretbox
 k8s.io/apiserver/pkg/storageversion
@@ -2052,7 +2052,7 @@ k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
 ## explicit; go 1.20
 k8s.io/kms/apis/v1beta1
-k8s.io/kms/apis/v2alpha1
+k8s.io/kms/apis/v2
 k8s.io/kms/pkg/service
 k8s.io/kms/pkg/util
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator

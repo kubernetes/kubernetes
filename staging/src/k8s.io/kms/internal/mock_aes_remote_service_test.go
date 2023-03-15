@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	version       = "v2alpha1"
+	version       = "v2beta1"
 	testAESKey    = "abcdefghijklmnop"
 	testKeyID     = "test-key-id"
 	testPlaintext = "lorem ipsum dolor sit amet"

@@ -72,7 +72,7 @@ func (s *mockAESRemoteService) Decrypt(ctx context.Context, uid string, req *ser
 
 func (s *mockAESRemoteService) Status(ctx context.Context) (*service.StatusResponse, error) {
 	resp := &service.StatusResponse{
-		Version: "v2alpha1",
+		Version: "v2beta1",
 		Healthz: "ok",
 		KeyID:   s.keyID,
 	}
