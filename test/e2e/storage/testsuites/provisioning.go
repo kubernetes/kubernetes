@@ -569,7 +569,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NS:            f.Namespace.Name,
 				PVCs:          createdClaims,
 				NodeSelection: testConfig.ClientNodeSelection,
-				PVCsReadOnly: true,
+				PVCsReadOnly:  true,
 			}
 			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
@@ -635,7 +635,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NS:            f.Namespace.Name,
 				PVCs:          createdClaims,
 				NodeSelection: testConfig.ClientNodeSelection,
-				PVCsReadOnly: true,
+				PVCsReadOnly:  true,
 			}
 			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 
@@ -703,7 +703,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NS:            f.Namespace.Name,
 				PVCs:          createdClaims,
 				NodeSelection: testConfig.ClientNodeSelection,
-				PVCsReadOnly: true,
+				PVCsReadOnly:  true,
 			}
 
 			var pod *v1.Pod
@@ -769,7 +769,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NS:            f.Namespace.Name,
 				PVCs:          createdClaims,
 				NodeSelection: testConfig.ClientNodeSelection,
-				PVCsReadOnly: true,
+				PVCsReadOnly:  true,
 			}
 			pod, err := e2epod.CreateSecPod(ctx, l.testCase.Client, podConfig, l.testCase.Timeouts.DataSourceProvision)
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
