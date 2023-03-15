@@ -11411,9 +11411,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: availableOnNodes
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-    - name: resourceHandle
+    - name: resourceHandles
       type:
-        scalar: string
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.ResourceHandle
+          elementRelationship: atomic
     - name: shareable
       type:
         scalar: boolean
@@ -11625,6 +11628,15 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
       default: ""
     - name: namespace
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha2.ResourceHandle
+  map:
+    fields:
+    - name: data
+      type:
+        scalar: string
+    - name: driverName
       type:
         scalar: string
 - name: io.k8s.api.scheduling.v1.PriorityClass

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -101,22 +102,13 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 						pod.Name, pod.UID, podResourceClaim.Name, resourceClaim.UID)
 				}
 
-				// Build a slice of "resourceHandles" to group the name of the
-				// kubelet plugin to call NodePrepareResources() on and the
-				// ResourceHandle data to be processed by that plugin. For now
-				// this slice will only have a single entry, where the name of
-				// the kubelet plugin matches the DriverName. In the future we
-				// plan to allow each claim to be processed by multiple plugins
-				// (each with their own ResourceHandle) so this code is being
-				// written in a way to accommodate this.
-				resourceHandles := []struct {
-					KubeletPluginName string
-					Data              string
-				}{
-					{
-						KubeletPluginName: resourceClaim.Status.DriverName,
-						Data:              resourceClaim.Status.Allocation.ResourceHandle,
-					},
+				// Grab the allocation.resourceHandles. If there are no
+				// allocation.resourceHandles, create a single resourceHandle with no
+				// content. This will trigger processing of this claim by a single
+				// kubelet plugin whose name matches resourceClaim.Status.DriverName.
+				resourceHandles := resourceClaim.Status.Allocation.ResourceHandles
+				if len(resourceHandles) == 0 {
+					resourceHandles = make([]resourcev1alpha2.ResourceHandle, 1)
 				}
 
 				// Create a claimInfo object to store the relevant claim info.
@@ -131,10 +123,17 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 				// Walk through each resourceHandle
 				for _, resourceHandle := range resourceHandles {
+					// If no DriverName is provided in the resourceHandle, we
+					// use the DriverName from the status
+					pluginName := resourceHandle.DriverName
+					if pluginName == "" {
+						pluginName = resourceClaim.Status.DriverName
+					}
+
 					// Call NodePrepareResource RPC for each resourceHandle
-					client, err := dra.NewDRAPluginClient(resourceHandle.KubeletPluginName)
+					client, err := dra.NewDRAPluginClient(pluginName)
 					if err != nil {
-						return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resourceHandle.KubeletPluginName, err)
+						return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", pluginName, err)
 					}
 					response, err := client.NodePrepareResource(
 						context.Background(),
@@ -146,11 +145,11 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 						return fmt.Errorf("NodePrepareResource failed, claim UID: %s, claim name: %s, resource handle: %s, err: %+v",
 							resourceClaim.UID, resourceClaim.Name, resourceHandle.Data, err)
 					}
-					klog.V(3).InfoS("NodePrepareResource succeeded", "pluginName", resourceHandle.KubeletPluginName, "response", response)
+					klog.V(3).InfoS("NodePrepareResource succeeded", "pluginName", pluginName, "response", response)
 
 					// Add the CDI Devices returned by NodePrepareResource to
 					// the claimInfo object.
-					err = claimInfo.addCDIDevices(resourceHandle.KubeletPluginName, response.CdiDevices)
+					err = claimInfo.addCDIDevices(pluginName, response.CdiDevices)
 					if err != nil {
 						return fmt.Errorf("failed to add CDIDevices to claimInfo %+v: %+v", claimInfo, err)
 					}

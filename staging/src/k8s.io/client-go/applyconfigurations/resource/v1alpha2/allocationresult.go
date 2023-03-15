@@ -25,7 +25,7 @@ import (
 // AllocationResultApplyConfiguration represents an declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
-	ResourceHandle   *string                            `json:"resourceHandle,omitempty"`
+	ResourceHandles  []ResourceHandleApplyConfiguration `json:"resourceHandles,omitempty"`
 	AvailableOnNodes *v1.NodeSelectorApplyConfiguration `json:"availableOnNodes,omitempty"`
 	Shareable        *bool                              `json:"shareable,omitempty"`
 }
@@ -36,11 +36,16 @@ func AllocationResult() *AllocationResultApplyConfiguration {
 	return &AllocationResultApplyConfiguration{}
 }
 
-// WithResourceHandle sets the ResourceHandle field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourceHandle field is set to the value of the last call.
-func (b *AllocationResultApplyConfiguration) WithResourceHandle(value string) *AllocationResultApplyConfiguration {
-	b.ResourceHandle = &value
+// WithResourceHandles adds the given value to the ResourceHandles field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceHandles field.
+func (b *AllocationResultApplyConfiguration) WithResourceHandles(values ...*ResourceHandleApplyConfiguration) *AllocationResultApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceHandles")
+		}
+		b.ResourceHandles = append(b.ResourceHandles, *values[i])
+	}
 	return b
 }
 

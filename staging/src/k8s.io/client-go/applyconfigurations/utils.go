@@ -1483,6 +1483,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceClassApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
 		return &resourcev1alpha2.ResourceClassParametersReferenceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceHandle"):
+		return &resourcev1alpha2.ResourceHandleApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):

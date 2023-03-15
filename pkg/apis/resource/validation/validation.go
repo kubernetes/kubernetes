@@ -147,6 +147,11 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 		}
 	}
 
+	// Updates to a populated resourceClaim.Status.Allocation are not allowed
+	if oldClaim.Status.Allocation != nil && resourceClaim.Status.Allocation != nil {
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Status.Allocation, oldClaim.Status.Allocation, fldPath.Child("allocation"))...)
+	}
+
 	if !oldClaim.Status.DeallocationRequested &&
 		resourceClaim.Status.DeallocationRequested &&
 		len(resourceClaim.Status.ReservedFor) > 0 {
@@ -177,12 +182,30 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if allocation != nil {
-		if len(allocation.ResourceHandle) > resource.ResourceHandleMaxSize {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("resourceHandle"), len(allocation.ResourceHandle), resource.ResourceHandleMaxSize))
+		if len(allocation.ResourceHandles) > 0 {
+			allErrs = append(allErrs, validateResourceHandles(allocation.ResourceHandles, resource.AllocationResultResourceHandlesMaxSize, fldPath.Child("resourceHandles"))...)
 		}
 		if allocation.AvailableOnNodes != nil {
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.AvailableOnNodes, fldPath.Child("availableOnNodes"))...)
 		}
+	}
+	return allErrs
+}
+
+func validateResourceHandles(resourceHandles []resource.ResourceHandle, maxSize int, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, resourceHandle := range resourceHandles {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validateResourceDriverName(resourceHandle.DriverName, idxPath.Child("driverName"))...)
+		if len(resourceHandle.Data) > resource.ResourceHandleDataMaxSize {
+			allErrs = append(allErrs, field.TooLongMaxLength(idxPath.Child("data"), len(resourceHandle.Data), resource.ResourceHandleDataMaxSize))
+		}
+	}
+	if len(resourceHandles) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(resourceHandles), maxSize))
 	}
 	return allErrs
 }
