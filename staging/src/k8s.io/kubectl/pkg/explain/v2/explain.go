@@ -18,7 +18,6 @@ package v2
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
@@ -86,12 +85,5 @@ func printModelDescriptionWithGenerator(
 		return fmt.Errorf("failed to parse openapi schema for %s: %w", resourcePath, err)
 	}
 
-	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, w)
-
-	explainErr := explainError("")
-	if errors.As(err, &explainErr) {
-		return explainErr
-	}
-
-	return err
+	return generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, w)
 }

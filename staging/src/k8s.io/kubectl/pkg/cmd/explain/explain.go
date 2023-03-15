@@ -68,6 +68,10 @@ type ExplainOptions struct {
 	Mapper meta.RESTMapper
 	Schema openapi.Resources
 
+	// Toggles whether the OpenAPI v3 template-based renderer should be used to show
+	// output.
+	EnableOpenAPIV3 bool
+
 	// Name of the template to use with the openapiv3 template renderer. If
 	// `EnableOpenAPIV3` is disabled, this does nothing
 	OutputFormat string
@@ -78,9 +82,10 @@ type ExplainOptions struct {
 
 func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
 	return &ExplainOptions{
-		IOStreams:    streams,
-		CmdParent:    parent,
-		OutputFormat: plaintextTemplateName,
+		IOStreams:       streams,
+		CmdParent:       parent,
+		EnableOpenAPIV3: cmdutil.ExplainOpenapiV3.IsEnabled(),
+		OutputFormat:    plaintextTemplateName,
 	}
 }
 
@@ -104,7 +109,9 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
 
 	// Only enable --output as a valid flag if the feature is enabled
-	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	if o.EnableOpenAPIV3 {
+		cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	}
 
 	return cmd
 }
@@ -121,10 +128,12 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	// Only openapi v3 needs the discovery client.
-	o.OpenAPIV3Client, err = f.OpenAPIV3Client()
-	if err != nil {
-		return err
+	// Only openapi v3 needs the openapiv3client
+	if o.EnableOpenAPIV3 {
+		o.OpenAPIV3Client, err = f.OpenAPIV3Client()
+		if err != nil {
+			return err
+		}
 	}
 
 	o.args = args
@@ -163,36 +172,39 @@ func (o *ExplainOptions) Run() error {
 	}
 
 	// Fallback to openapiv2 implementation using special template name
-	switch o.OutputFormat {
-	case plaintextOpenAPIV2TemplateName:
-		return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
-	case plaintextTemplateName:
-		// Check whether the server reponds to OpenAPIV3.
-		if _, err := o.OpenAPIV3Client.Paths(); err != nil {
-			// Use v2 renderer if server does not support v3
+	if o.EnableOpenAPIV3 {
+		switch o.OutputFormat {
+		case plaintextOpenAPIV2TemplateName:
 			return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
-		}
-
-		fallthrough
-	default:
-		if len(o.APIVersion) > 0 {
-			apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
-			if err != nil {
-				return err
+		case plaintextTemplateName:
+			// Check whether the server reponds to OpenAPIV3.
+			if _, err := o.OpenAPIV3Client.Paths(); err != nil {
+				// Use v2 renderer if server does not support v3
+				return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
 			}
-			fullySpecifiedGVR.Group = apiVersion.Group
-			fullySpecifiedGVR.Version = apiVersion.Version
-		}
 
-		return openapiv3explain.PrintModelDescription(
-			fieldsPath,
-			o.Out,
-			o.OpenAPIV3Client,
-			fullySpecifiedGVR,
-			o.Recursive,
-			o.OutputFormat,
-		)
+			fallthrough
+		default:
+			if len(o.APIVersion) > 0 {
+				apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
+				if err != nil {
+					return err
+				}
+				fullySpecifiedGVR.Group = apiVersion.Group
+				fullySpecifiedGVR.Version = apiVersion.Version
+			}
+
+			return openapiv3explain.PrintModelDescription(
+				fieldsPath,
+				o.Out,
+				o.OpenAPIV3Client,
+				fullySpecifiedGVR,
+				o.Recursive,
+				o.OutputFormat,
+			)
+		}
 	}
+	return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
 }
 
 func (o *ExplainOptions) renderOpenAPIV2(
