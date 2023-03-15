@@ -851,7 +851,11 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
-					Action:             ActionDeny,
+				},
+			},
+			policyDecision: []PolicyDecision{
+				{
+					Action: ActionDeny,
 				},
 			},
 			failPolicy: &fail,
