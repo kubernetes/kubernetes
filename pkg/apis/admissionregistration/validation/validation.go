@@ -523,7 +523,7 @@ func ignoreValidatingWebhookMatchConditions(new, old []admissionregistration.Val
 	return true
 }
 
-// ignoreMatchConditions returns true if any new expressions are added
+// ignoreValidatingAdmissionPolicyMatchConditions returns true if there have been no updates that could invalidate previously-valid match conditions
 func ignoreValidatingAdmissionPolicyMatchConditions(new, old *admissionregistration.ValidatingAdmissionPolicy) bool {
 	if !reflect.DeepEqual(new.Spec.ParamKind, old.Spec.ParamKind) {
 		return false
