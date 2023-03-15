@@ -23,7 +23,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +33,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -212,12 +210,6 @@ const (
 type Proxier struct {
 	// the ipfamily on which this proxy is operating on.
 	ipFamily v1.IPFamily
-	// endpointsChanges and serviceChanges contains all changes to endpoints and
-	// services that happened since last syncProxyRules call. For a single object,
-	// changes are accumulated, i.e. previous is state from before all of them,
-	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointChangeTracker
-	serviceChanges   *proxy.ServiceChangeTracker
 
 	mu           sync.Mutex // protects the following fields
 	svcPortMap   proxy.ServicePortMap
@@ -407,9 +399,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		svcPortMap:            make(proxy.ServicePortMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, nil),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
@@ -444,6 +434,14 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
+}
+
+func (proxier *Proxier) MakeServiceChangeTracker() *proxy.ServiceChangeTracker {
+	return proxy.NewServiceChangeTracker(newServiceInfo, proxier.ipFamily, proxier.recorder, nil)
+}
+
+func (proxier *Proxier) MakeEndpointChangeTracker() *proxy.EndpointChangeTracker {
+	return proxy.NewEndpointChangeTracker(proxier.hostname, nil, proxier.ipFamily, proxier.recorder, nil)
 }
 
 func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
@@ -685,101 +683,8 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	return encounteredError
 }
 
-// OnServiceAdd is called whenever creation of new service object is observed.
-func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(nil, service)
-}
-
-// OnServiceUpdate is called whenever modification of an existing service object is observed.
-func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
-	return proxier.serviceChanges.Update(oldService, service)
-}
-
-// OnServiceDelete is called whenever deletion of an existing service object is observed.
-func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(service, nil)
-}
-
-// OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
-// is observed.
-func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceUpdate is called whenever modification of an existing endpoint
-// slice object is observed.
-func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
-// object is observed.
-func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true)
-}
-
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return false
-	}
-
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
-
-	return true
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return false
-	}
-
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
-
-	return true
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = nil
-
-	return true
-}
-
 // This is where all of the ipvs calls happen.
-func (proxier *Proxier) Sync() proxy.SyncResult {
+func (proxier *Proxier) Sync(serviceChanges *proxy.ServiceChangeTracker, endpointChanges *proxy.EndpointChangeTracker, nodeLabels map[string]string) proxy.SyncResult {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -789,11 +694,17 @@ func (proxier *Proxier) Sync() proxy.SyncResult {
 		proxier.initialSync = false
 	}()
 
-	// We assume that if this was called, we really want to sync them,
-	// even if nothing changed in the meantime. In other words, callers are
-	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
-	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
+	var serviceUpdateResult proxy.UpdateServiceMapResult
+	if serviceChanges != nil {
+		serviceUpdateResult = proxier.svcPortMap.Update(serviceChanges)
+	}
+	var endpointUpdateResult proxy.UpdateEndpointMapResult
+	if endpointChanges != nil {
+		endpointUpdateResult = proxier.endpointsMap.Update(endpointChanges)
+	}
+	if nodeLabels != nil {
+		proxier.nodeLabels = nodeLabels
+	}
 
 	klog.V(3).InfoS("Syncing ipvs proxier rules")
 

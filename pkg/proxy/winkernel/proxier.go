@@ -31,7 +31,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -584,12 +583,6 @@ type endPointsReferenceCountMap map[string]*uint16
 // Proxier is an hns based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	// endpointsChanges and serviceChanges contains all changes to endpoints and
-	// services that happened since policies were synced. For a single object,
-	// changes are accumulated, i.e. previous is state from before all of them,
-	// current is state after applying all of those.
-	endpointsChanges  *proxy.EndpointChangeTracker
-	serviceChanges    *proxy.ServiceChangeTracker
 	endPointsRefCount endPointsReferenceCountMap
 	mu                sync.Mutex // protects the following fields
 	svcPortMap        proxy.ServicePortMap
@@ -597,6 +590,7 @@ type Proxier struct {
 
 	// These are effectively const and do not need the mutex to be held.
 	isIPv6Mode  bool
+	ipFamily    v1.IPFamily
 	clusterCIDR string
 	hostname    string
 	nodeIP      net.IP
@@ -765,18 +759,22 @@ func NewProxier(
 		isDSR:                 isDSR,
 		supportedFeatures:     supportedFeatures,
 		isIPv6Mode:            isIPv6,
+		ipFamily:              ipFamily,
 		healthzPort:           healthzPort,
 		rootHnsEndpointName:   config.RootHnsEndpointName,
 		forwardHealthCheckVip: config.ForwardHealthCheckVip,
 		mapStaleLoadbalancers: make(map[string]bool),
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, proxier.endpointsMapChange)
-	proxier.endpointsChanges = endPointChangeTracker
-	proxier.serviceChanges = serviceChanges
-
 	return proxier, nil
+}
+
+func (proxier *Proxier) MakeServiceChangeTracker() *proxy.ServiceChangeTracker {
+	return proxy.NewServiceChangeTracker(proxier.newServiceInfo, proxier.ipFamily, proxier.recorder, proxier.serviceMapChange)
+}
+
+func (proxier *Proxier) MakeEndpointChangeTracker() *proxy.EndpointChangeTracker {
+	return proxy.NewEndpointChangeTracker(proxier.hostname, proxier.newEndpointInfo, proxier.ipFamily, proxier.recorder, proxier.endpointsMapChange)
 }
 
 // CleanupLeftovers removes all hns rules created by the Proxier
@@ -897,55 +895,6 @@ func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-// OnServiceAdd is called whenever creation of new service object
-// is observed.
-func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(nil, service)
-}
-
-// OnServiceUpdate is called whenever modification of an existing
-// service object is observed.
-func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
-	return proxier.serviceChanges.Update(oldService, service)
-}
-
-// OnServiceDelete is called whenever deletion of an existing service
-// object is observed.
-func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(service, nil)
-}
-
-// OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
-// is observed.
-func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceUpdate is called whenever modification of an existing endpoint
-// slice object is observed.
-func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
-// object is observed.
-func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true)
-}
-
-// Not yet implemented...
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) bool {
-	return false
-}
-
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
-	return false
-}
-
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
-	return false
-}
-
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*serviceInfo)
@@ -1022,7 +971,7 @@ func updateQueriedEndpoints(newHnsEndpoint *endpointsInfo, queriedEndpoints map[
 
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
-func (proxier *Proxier) Sync() proxy.SyncResult {
+func (proxier *Proxier) Sync(serviceChanges *proxy.ServiceChangeTracker, endpointChanges *proxy.EndpointChangeTracker, nodeLabels map[string]string) proxy.SyncResult {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1045,11 +994,14 @@ func (proxier *Proxier) Sync() proxy.SyncResult {
 		return proxy.SyncFailure
 	}
 
-	// We assume that if this was called, we really want to sync them,
-	// even if nothing changed in the meantime. In other words, callers are
-	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
-	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
+	var serviceUpdateResult proxy.UpdateServiceMapResult
+	if serviceChanges != nil {
+		serviceUpdateResult = proxier.svcPortMap.Update(serviceChanges)
+	}
+	var endpointUpdateResult proxy.UpdateEndpointMapResult
+	if endpointChanges != nil {
+		endpointUpdateResult = proxier.endpointsMap.Update(endpointChanges)
+	}
 
 	deletedUDPClusterIPs := serviceUpdateResult.DeletedUDPClusterIPs
 	// merge stale services gathered from updateEndpointsMap

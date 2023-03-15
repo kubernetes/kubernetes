@@ -26,14 +26,12 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -149,13 +147,6 @@ func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	// endpointsChanges and serviceChanges contains all changes to endpoints and
-	// services that happened since iptables was synced. For a single object,
-	// changes are accumulated, i.e. previous is state from before all of them,
-	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointChangeTracker
-	serviceChanges   *proxy.ServiceChangeTracker
-
 	mu           sync.Mutex // protects the following fields
 	svcPortMap   proxy.ServicePortMap
 	endpointsMap proxy.EndpointsMap
@@ -172,6 +163,7 @@ type Proxier struct {
 	exec           utilexec.Interface
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
+	ipFamily       v1.IPFamily
 	nodeIP         net.IP
 	recorder       events.EventRecorder
 
@@ -260,9 +252,7 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	proxier := &Proxier{
 		svcPortMap:               make(proxy.ServicePortMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		needFullSync:             true,
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
@@ -271,6 +261,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		exec:                     exec,
 		localDetector:            localDetector,
 		hostname:                 hostname,
+		ipFamily:                 ipFamily,
 		nodeIP:                   nodeIP,
 		recorder:                 recorder,
 		serviceHealthServer:      serviceHealthServer,
@@ -296,6 +287,14 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 
 	return proxier, nil
+}
+
+func (proxier *Proxier) MakeServiceChangeTracker() *proxy.ServiceChangeTracker {
+	return proxy.NewServiceChangeTracker(newServiceInfo, proxier.ipFamily, proxier.recorder, nil)
+}
+
+func (proxier *Proxier) MakeEndpointChangeTracker() *proxy.EndpointChangeTracker {
+	return proxy.NewEndpointChangeTracker(proxier.hostname, newEndpointInfo, proxier.ipFamily, proxier.recorder, nil)
 }
 
 type iptablesJumpChain struct {
@@ -440,109 +439,6 @@ func (proxier *Proxier) probability(n int) string {
 	return proxier.precomputedProbabilities[n]
 }
 
-// OnServiceAdd is called whenever creation of new service object
-// is observed.
-func (proxier *Proxier) OnServiceAdd(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(nil, service)
-}
-
-// OnServiceUpdate is called whenever modification of an existing
-// service object is observed.
-func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) bool {
-	return proxier.serviceChanges.Update(oldService, service)
-}
-
-// OnServiceDelete is called whenever deletion of an existing service
-// object is observed.
-func (proxier *Proxier) OnServiceDelete(service *v1.Service) bool {
-	return proxier.OnServiceUpdate(service, nil)
-
-}
-
-// OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
-// is observed.
-func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceUpdate is called whenever modification of an existing endpoint
-// slice object is observed.
-func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false)
-}
-
-// OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
-// object is observed.
-func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) bool {
-	return proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true)
-}
-
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return false
-	}
-
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	proxier.needFullSync = true
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
-
-	return true
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return false
-	}
-
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	proxier.needFullSync = true
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
-
-	return true
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) bool {
-	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
-		return false
-	}
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.nodeLabels = nil
-	proxier.needFullSync = true
-
-	return true
-}
-
 // portProtoHash takes the ServicePortName and protocol for a service
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables
@@ -633,19 +529,19 @@ func (proxier *Proxier) forceSyncProxyRules() {
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
 
-	proxier.Sync()
+	proxier.Sync(nil, nil, nil)
 }
 
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // This assumes proxier.mu is NOT held
-func (proxier *Proxier) Sync() proxy.SyncResult {
+func (proxier *Proxier) Sync(serviceChanges *proxy.ServiceChangeTracker, endpointChanges *proxy.EndpointChangeTracker, nodeLabels map[string]string) proxy.SyncResult {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
 	// The value of proxier.needFullSync may change before the defer funcs run, so
 	// we need to keep track of whether it was set at the *start* of the sync.
-	tryPartialSync := !proxier.needFullSync
+	tryPartialSync := !proxier.needFullSync && serviceChanges != nil && endpointChanges != nil
 
 	start := time.Now()
 	defer func() {
@@ -657,12 +553,24 @@ func (proxier *Proxier) Sync() proxy.SyncResult {
 	}()
 
 	var serviceChanged, endpointsChanged sets.Set[string]
-	if tryPartialSync {
-		serviceChanged = proxier.serviceChanges.PendingChanges()
-		endpointsChanged = proxier.endpointsChanges.PendingChanges()
+
+	var serviceUpdateResult proxy.UpdateServiceMapResult
+	if serviceChanges != nil {
+		serviceUpdateResult = proxier.svcPortMap.Update(serviceChanges)
+		if tryPartialSync {
+			serviceChanged = serviceChanges.PendingChanges()
+		}
 	}
-	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
-	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
+	var endpointUpdateResult proxy.UpdateEndpointMapResult
+	if endpointChanges != nil {
+		endpointUpdateResult = proxier.endpointsMap.Update(endpointChanges)
+		if tryPartialSync {
+			endpointsChanged = endpointChanges.PendingChanges()
+		}
+	}
+	if nodeLabels != nil {
+		proxier.nodeLabels = nodeLabels
+	}
 
 	klog.V(2).InfoS("Syncing iptables rules")
 

@@ -17,6 +17,8 @@ limitations under the License.
 package proxy
 
 import (
+	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,17 +40,24 @@ import (
 )
 
 type Runner struct {
-	ipv4Proxier Provider
-	ipv4Runner  *async.BoundedFrequencyRunner
+	sync.Mutex
 
-	ipv6Proxier Provider
-	ipv6Runner  *async.BoundedFrequencyRunner
+	ipv4Proxier         Provider
+	ipv4Runner          *async.BoundedFrequencyRunner
+	ipv4ServiceTracker  *ServiceChangeTracker
+	ipv4EndpointTracker *EndpointChangeTracker
+
+	ipv6Proxier         Provider
+	ipv6Runner          *async.BoundedFrequencyRunner
+	ipv6ServiceTracker  *ServiceChangeTracker
+	ipv6EndpointTracker *EndpointChangeTracker
 
 	syncPeriod    time.Duration
 	minSyncPeriod time.Duration
 	healthzServer healthcheck.ProxierHealthUpdater
 
 	informerWaiters []cache.InformerSynced
+	nodeLabels      map[string]string
 }
 
 // NewRunner returns a proxy runner that dispatches to the underlying IPv4
@@ -69,11 +78,17 @@ func NewRunner(
 	}
 
 	if ipv4Proxier != nil {
+		r.ipv4ServiceTracker = ipv4Proxier.MakeServiceChangeTracker()
+		r.ipv4EndpointTracker = ipv4Proxier.MakeEndpointChangeTracker()
+
 		r.ipv4Runner = async.NewBoundedFrequencyRunner("ipv4Runner", r.ipv4SyncNow, minSyncPeriod, time.Hour, 2)
 		// Queue a sync to occur as soon as the runner's loop is started
 		r.ipv4Runner.Run()
 	}
 	if ipv6Proxier != nil {
+		r.ipv6ServiceTracker = ipv6Proxier.MakeServiceChangeTracker()
+		r.ipv6EndpointTracker = ipv6Proxier.MakeEndpointChangeTracker()
+
 		r.ipv6Runner = async.NewBoundedFrequencyRunner("ipv6Runner", r.ipv6SyncNow, minSyncPeriod, time.Hour, 2)
 		// Queue a sync to occur as soon as the runner's loop is started
 		r.ipv6Runner.Run()
@@ -158,6 +173,9 @@ func (r *Runner) waitAndRun() {
 
 // ipv4SyncNow immediately synchronizes the IPv4 provider
 func (r *Runner) ipv4SyncNow() {
+	r.Lock()
+	defer r.Unlock()
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
@@ -165,7 +183,7 @@ func (r *Runner) ipv4SyncNow() {
 		klog.V(2).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 
-	switch r.ipv4Proxier.Sync() {
+	switch r.ipv4Proxier.Sync(r.ipv4ServiceTracker, r.ipv4EndpointTracker, r.nodeLabels) {
 	case SyncSuccess:
 		r.healthzServer.Updated()
 		metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
@@ -188,6 +206,9 @@ func (r *Runner) ipv4Sync() {
 
 // ipv6SyncNow immediately synchronizes the IPv6 provider
 func (r *Runner) ipv6SyncNow() {
+	r.Lock()
+	defer r.Unlock()
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
@@ -195,7 +216,7 @@ func (r *Runner) ipv6SyncNow() {
 		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 
-	switch r.ipv6Proxier.Sync() {
+	switch r.ipv6Proxier.Sync(r.ipv4ServiceTracker, r.ipv4EndpointTracker, r.nodeLabels) {
 	case SyncSuccess:
 		r.healthzServer.Updated()
 		metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
@@ -218,28 +239,19 @@ func (r *Runner) ipv6Sync() {
 
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (r *Runner) OnServiceAdd(service *v1.Service) {
-	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnServiceAdd(service) {
-			r.ipv4Sync()
-		}
-	}
-	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnServiceAdd(service) {
-			r.ipv6Sync()
-		}
-	}
+	r.OnServiceUpdate(nil, service)
 }
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
 func (r *Runner) OnServiceUpdate(oldService, service *v1.Service) {
 	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnServiceUpdate(oldService, service) {
+		if r.ipv4ServiceTracker.Update(oldService, service) {
 			r.ipv4Sync()
 		}
 	}
 	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnServiceUpdate(oldService, service) {
+		if r.ipv6ServiceTracker.Update(oldService, service) {
 			r.ipv6Sync()
 		}
 	}
@@ -248,16 +260,7 @@ func (r *Runner) OnServiceUpdate(oldService, service *v1.Service) {
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
 func (r *Runner) OnServiceDelete(service *v1.Service) {
-	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnServiceDelete(service) {
-			r.ipv4Sync()
-		}
-	}
-	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnServiceDelete(service) {
-			r.ipv6Sync()
-		}
-	}
+	r.OnServiceUpdate(service, nil)
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -266,13 +269,13 @@ func (r *Runner) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
 	switch endpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			if r.ipv4Proxier.OnEndpointSliceAdd(endpointSlice) {
+			if r.ipv4EndpointTracker.EndpointSliceUpdate(endpointSlice, false) {
 				r.ipv4Sync()
 			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			if r.ipv6Proxier.OnEndpointSliceAdd(endpointSlice) {
+			if r.ipv6EndpointTracker.EndpointSliceUpdate(endpointSlice, false) {
 				r.ipv6Sync()
 			}
 		}
@@ -287,13 +290,13 @@ func (r *Runner) OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *disco
 	switch newEndpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			if r.ipv4Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice) {
+			if r.ipv4EndpointTracker.EndpointSliceUpdate(newEndpointSlice, false) {
 				r.ipv4Sync()
 			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			if r.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice) {
+			if r.ipv6EndpointTracker.EndpointSliceUpdate(newEndpointSlice, false) {
 				r.ipv6Sync()
 			}
 		}
@@ -308,13 +311,13 @@ func (r *Runner) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
 	switch endpointSlice.AddressType {
 	case discovery.AddressTypeIPv4:
 		if r.ipv4Proxier != nil {
-			if r.ipv4Proxier.OnEndpointSliceDelete(endpointSlice) {
+			if r.ipv4EndpointTracker.EndpointSliceUpdate(endpointSlice, true) {
 				r.ipv4Sync()
 			}
 		}
 	case discovery.AddressTypeIPv6:
 		if r.ipv6Proxier != nil {
-			if r.ipv6Proxier.OnEndpointSliceDelete(endpointSlice) {
+			if r.ipv6EndpointTracker.EndpointSliceUpdate(endpointSlice, true) {
 				r.ipv6Sync()
 			}
 		}
@@ -325,44 +328,45 @@ func (r *Runner) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
 
 // OnNodeAdd is called whenever creation of new node object is observed.
 func (r *Runner) OnNodeAdd(node *v1.Node) {
-	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnNodeAdd(node) {
-			r.ipv4Sync()
-		}
-	}
-	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnNodeAdd(node) {
-			r.ipv6Sync()
-		}
-	}
+	r.OnNodeUpdate(nil, node)
 }
 
 // OnNodeUpdate is called whenever modification of an existing
 // node object is observed.
-func (r *Runner) OnNodeUpdate(oldNode, node *v1.Node) {
+func (r *Runner) OnNodeUpdate(_, node *v1.Node) {
+	if reflect.DeepEqual(r.nodeLabels, node.Labels) {
+		return
+	}
+
+	r.Lock()
+	defer r.Unlock()
+	r.nodeLabels = map[string]string{}
+	for k, v := range node.Labels {
+		r.nodeLabels[k] = v
+	}
+	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
+
+	// FIXME proxier.needFullSync = true
 	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnNodeUpdate(oldNode, node) {
-			r.ipv4Sync()
-		}
+		r.ipv4Sync()
 	}
 	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnNodeUpdate(oldNode, node) {
-			r.ipv6Sync()
-		}
+		r.ipv6Sync()
 	}
 }
 
 // OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (r *Runner) OnNodeDelete(node *v1.Node) {
+	r.Lock()
+	defer r.Unlock()
+	r.nodeLabels = map[string]string{}
+
+	// FIXME proxier.needFullSync = true
 	if r.ipv4Proxier != nil {
-		if r.ipv4Proxier.OnNodeDelete(node) {
-			r.ipv4Sync()
-		}
+		r.ipv4Sync()
 	}
 	if r.ipv6Proxier != nil {
-		if r.ipv6Proxier.OnNodeDelete(node) {
-			r.ipv6Sync()
-		}
+		r.ipv6Sync()
 	}
 }

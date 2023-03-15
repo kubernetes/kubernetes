@@ -21,31 +21,21 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Provider is the interface provided by proxier implementations.
 type Provider interface {
-	// The OnService*, OnEndpointSlice*, and OnNode* methods have the same semantics
-	// as in config.ServiceHandler, config.EndpointSliceHandler, and
-	// config.NodeHandler, but return a bool indicating whether or not a sync is
-	// needed
-	OnServiceAdd(service *v1.Service) bool
-	OnServiceUpdate(oldService, service *v1.Service) bool
-	OnServiceDelete(service *v1.Service) bool
-
-	OnEndpointSliceAdd(endpointSlice *discoveryv1.EndpointSlice) bool
-	OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discoveryv1.EndpointSlice) bool
-	OnEndpointSliceDelete(endpointSlice *discoveryv1.EndpointSlice) bool
-
-	OnNodeAdd(node *v1.Node) bool
-	OnNodeUpdate(oldNode, node *v1.Node) bool
-	OnNodeDelete(node *v1.Node) bool
+	// MakeServiceChangeTracker is called by the Runner at startup to create an
+	// appropriate ServiceChangeTracker for the Provider
+	MakeServiceChangeTracker() *ServiceChangeTracker
+	// MakeEndpointChangeTracker is called by the Runner at startup to create an
+	// appropriate EndpointChangeTracker for the Provider
+	MakeEndpointChangeTracker() *EndpointChangeTracker
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
-	Sync() SyncResult
+	Sync(*ServiceChangeTracker, *EndpointChangeTracker, map[string]string) SyncResult
 }
 
 type SyncResult int

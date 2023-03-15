@@ -91,13 +91,6 @@ func (h *ServiceHandlerMock) OnServiceDelete(service *v1.Service) {
 	h.sendServices()
 }
 
-func (h *ServiceHandlerMock) OnServiceSynced() {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	h.synced = true
-	h.sendServices()
-}
-
 func (h *ServiceHandlerMock) sendServices() {
 	if !h.synced {
 		return
@@ -183,13 +176,6 @@ func (h *EndpointSliceHandlerMock) OnEndpointSliceDelete(slice *discoveryv1.Endp
 	defer h.lock.Unlock()
 	namespacedName := types.NamespacedName{Namespace: slice.Namespace, Name: slice.Name}
 	delete(h.state, namespacedName)
-	h.sendEndpointSlices()
-}
-
-func (h *EndpointSliceHandlerMock) OnEndpointSlicesSynced() {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	h.synced = true
 	h.sendEndpointSlices()
 }
 
