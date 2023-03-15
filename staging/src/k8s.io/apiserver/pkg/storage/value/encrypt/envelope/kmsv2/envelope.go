@@ -137,7 +137,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	}
 
 	// TODO: consider marking state.EncryptedDEK != encryptedObject.EncryptedDEK as a stale read to support DEK defragmentation
-	//  at a minimum we should have a metric that helps the user understand if DEK fragmentation is high
+	// at a minimum we should have a metric that helps the user understand if DEK fragmentation is high
 	state, err := t.stateFunc() // no need to call state.ValidateEncryptCapability on reads
 	if err != nil {
 		return nil, false, err

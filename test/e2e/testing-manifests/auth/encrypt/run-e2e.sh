@@ -127,22 +127,22 @@ main(){
     mkdir -p "${ARTIFACTS}"
 
     export GO111MODULE=on;
-    go install sigs.k8s.io/kind@v0.17.0;
-    go install sigs.k8s.io/kubetest2@latest;
-    go install sigs.k8s.io/kubetest2/kubetest2-kind@latest;
-    go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest;
+    # go install sigs.k8s.io/kind@v0.17.0;
+    # go install sigs.k8s.io/kubetest2@latest;
+    # go install sigs.k8s.io/kubetest2/kubetest2-kind@latest;
+    # go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest;
 
     # The build e2e.test, ginkgo and kubectl binaries + copy to dockerized dir is
     # because of https://github.com/kubernetes-sigs/kubetest2/issues/184
-    make all WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl";
-    mkdir -p _output/dockerized/bin/linux/amd64;
-    for binary in kubectl e2e.test ginkgo; do
-        cp -f _output/local/go/bin/${binary} _output/dockerized/bin/linux/amd64/${binary};
-    done;
+    # make all WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl";
+    # mkdir -p _output/dockerized/bin/linux/amd64;
+    # for binary in kubectl e2e.test ginkgo; do
+    #     cp -f _output/local/go/bin/${binary} _output/dockerized/bin/linux/amd64/${binary};
+    # done;
 
     create_registry
     build_and_push_mock_plugin
-    connect_registry &
+    # connect_registry &
     create_cluster_and_run_test
     cleanup
 }
