@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,6 +38,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
@@ -60,9 +60,16 @@ var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 		file := staticPodPath(podPath, staticPodName, ns)
 		defer os.Remove(file)
 
-		pod := pullPods(ctx, 1*time.Minute, 5*time.Second, staticPodName)
-
-		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+		gomega.Eventually(ctx, func() error {
+			pod, err := getPodStatus(ctx, staticPodName)
+			if err != nil {
+				return err
+			}
+			if pod.Status.Phase != v1.PodRunning {
+				return fmt.Errorf("pod %s is not running. Status: %v", staticPodName, pod.Status.Phase)
+			}
+			return nil
+		}, 1*time.Minute, 5*time.Second).Should(gomega.Succeed())
 	})
 })
 
@@ -123,8 +130,9 @@ func createBasicStaticPod(dir, name, namespace, image string, restart v1.Restart
 }
 
 // returns a status 200 response from the /configz endpoint or nil if fails
-func pullPods(ctx context.Context, timeout time.Duration, pollInterval time.Duration, name string) *v1.Pod {
+func getPodStatus(ctx context.Context, name string) (*v1.Pod, error) {
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d/pods", ports.KubeletReadOnlyPort)
+	// TODO: we do not need TLS and bearer token for this test
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -135,46 +143,39 @@ func pullPods(ctx context.Context, timeout time.Duration, pollInterval time.Dura
 	req.Header.Add("Accept", "application/json")
 
 	var pod *v1.Pod
-	err = wait.PollImmediateWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
-		resp, err := client.Do(req)
-		if err != nil {
-			framework.Logf("Failed to get /pods, retrying. Error: %v", err)
-			return false, nil
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("/pods response status not 200. Response was: %+v", resp)
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read body from /pods response %w", err)
+	}
+
+	pods, err := decodePods(respBody)
+	framework.ExpectNoError(err)
+
+	found := false
+	for _, p := range pods.Items {
+		// Static pods has a node name suffix so comparing as substring
+		if strings.Contains(p.Name, name) {
+			found = true
+			pod = &p
 		}
-		defer resp.Body.Close()
+	}
 
-		if resp.StatusCode != 200 {
-			framework.Logf("/pods response status not 200, retrying. Response was: %+v", resp)
-			return false, nil
-		}
+	if !found {
+		return nil, fmt.Errorf("pod %s not found in /pods response. Pods were: %v", name, string(respBody))
+	}
 
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			framework.Logf("failed to read body from /pods response, retrying. Error: %v", err)
-			return false, nil
-		}
-
-		pods, err := decodePods(respBody)
-		framework.ExpectNoError(err)
-
-		found := false
-		for _, p := range pods.Items {
-			if strings.Contains(p.Name, name) {
-				found = true
-				pod = &p
-			}
-		}
-
-		if !found {
-			framework.Logf("Pod %s not found in /pods response, retrying. Pods were: %v", name, string(respBody))
-			return false, nil
-		}
-
-		return true, nil
-	})
-	framework.ExpectNoError(err, "Failed to get pod %s from /pods", name)
-
-	return pod
+	return pod, nil
 }
 
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
