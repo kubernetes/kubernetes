@@ -1,4 +1,4 @@
-## Support for deploying and using Kubernetes
+## Support for deploying and using Kubernetes  ## CI test
 
 Welcome to Kubernetes! We use GitHub for tracking bugs and feature requests.
 This isn't the right place to get support for using Kubernetes, but the following
