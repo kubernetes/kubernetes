@@ -1024,6 +1024,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/cloud-provider/config/v1alpha1.CloudControllerManagerConfiguration":                       schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfiguration(ref),
 		"k8s.io/cloud-provider/config/v1alpha1.CloudProviderConfiguration":                                schema_k8sio_cloud_provider_config_v1alpha1_CloudProviderConfiguration(ref),
 		"k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration":                              schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(ref),
+		"k8s.io/cloud-provider/config/v1alpha1.WebhookConfiguration":                                      schema_k8sio_cloud_provider_config_v1alpha1_WebhookConfiguration(ref),
 		"k8s.io/controller-manager/config/v1alpha1.ControllerLeaderConfiguration":                         schema_k8sio_controller_manager_config_v1alpha1_ControllerLeaderConfiguration(ref),
 		"k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration":                 schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerConfiguration(ref),
 		"k8s.io/controller-manager/config/v1alpha1.LeaderMigrationConfiguration":                          schema_k8sio_controller_manager_config_v1alpha1_LeaderMigrationConfiguration(ref),
@@ -50999,7 +51000,8 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "CloudControllerManagerConfiguration contains elements describing cloud-controller manager.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -51050,12 +51052,19 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"Webhook": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Webhook is the configuration for cloud-controller-manager hosted webhooks",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/cloud-provider/config/v1alpha1.WebhookConfiguration"),
+						},
+					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "NodeController", "ServiceController", "NodeStatusUpdateFrequency"},
+				Required: []string{"Generic", "KubeCloudShared", "NodeController", "ServiceController", "NodeStatusUpdateFrequency", "Webhook"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/node/config/v1alpha1.NodeControllerConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/config/v1alpha1.WebhookConfiguration", "k8s.io/cloud-provider/controllers/node/config/v1alpha1.NodeControllerConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration"},
 	}
 }
 
@@ -51193,6 +51202,35 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/cloud-provider/config/v1alpha1.CloudProviderConfiguration"},
+	}
+}
+
+func schema_k8sio_cloud_provider_config_v1alpha1_WebhookConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WebhookConfiguration contains configuration related to cloud-controller-manager hosted webhooks",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Webhooks": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Webhooks is the list of webhooks to enable or disable '*' means \"all enabled by default webhooks\" 'foo' means \"enable 'foo'\" '-foo' means \"disable 'foo'\" first item for a particular name wins",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Webhooks"},
+			},
+		},
 	}
 }
 

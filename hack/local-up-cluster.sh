@@ -656,8 +656,9 @@ function start_cloud_controller_manager {
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
+    # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
-      "${CLOUD_CTLRMGR_FLAGS}" \
+      ${CLOUD_CTLRMGR_FLAGS} \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --feature-gates="${FEATURE_GATES}" \

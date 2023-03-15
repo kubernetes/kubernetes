@@ -165,6 +165,12 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
+	// owner: @nckturner
+	// kep:  http://kep.k8s.io/2699
+	// alpha: v1.27
+	// Enable webhooks in cloud controller manager
+	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
+
 	// owner: @adrianreber
 	// kep: https://kep.k8s.io/2008
 	// alpha: v1.25
@@ -943,6 +949,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
+
+	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
