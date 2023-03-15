@@ -24,7 +24,10 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	netutils "k8s.io/utils/net"
 )
@@ -61,6 +64,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 		name         string
 		options      *ServerRunOptions
 		expectErrors bool
+		gate         bool
 	}{
 		{
 			name:         "no service cidr",
@@ -86,6 +90,24 @@ func TestClusterServiceIPRange(t *testing.T) {
 			name:         "service cidr is too big",
 			expectErrors: true,
 			options:      makeOptionsWithCIDRs("10.0.0.0/8", ""),
+		},
+		{
+			name:         "service cidr IPv4 is too big but gate enbled",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("10.0.0.0/8", ""),
+			gate:         true,
+		},
+		{
+			name:         "service cidr IPv6 is too big but gate enbled",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("2001:db8::/64", ""),
+			gate:         true,
+		},
+		{
+			name:         "service cidr IPv6 is too big despuite gate enbled",
+			expectErrors: true,
+			options:      makeOptionsWithCIDRs("2001:db8::/12", ""),
+			gate:         true,
 		},
 		{
 			name:         "dual-stack secondary cidr too big",
@@ -122,6 +144,8 @@ func TestClusterServiceIPRange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.gate)()
+
 			errs := validateClusterIPFlags(tc.options)
 			if len(errs) > 0 && !tc.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)

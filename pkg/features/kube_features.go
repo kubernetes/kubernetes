@@ -554,6 +554,13 @@ const (
 	// Enables the MultiCIDR Range allocator.
 	MultiCIDRRangeAllocator featuregate.Feature = "MultiCIDRRangeAllocator"
 
+	// owner: @aojea
+	// kep: https://kep.k8s.io/1880
+	// alpha: v1.27
+	//
+	// Enables the dynamic configuration of Service IP ranges
+	MultiCIDRServiceAllocator featuregate.Feature = "MultiCIDRServiceAllocator"
+
 	// owner: @rikatz
 	// kep: https://kep.k8s.io/2943
 	// alpha: v1.24
@@ -1040,6 +1047,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MixedProtocolLBService: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
+
+	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 

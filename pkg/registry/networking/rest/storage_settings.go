@@ -28,6 +28,7 @@ import (
 	clustercidrstore "k8s.io/kubernetes/pkg/registry/networking/clustercidr/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
 	ingressclassstore "k8s.io/kubernetes/pkg/registry/networking/ingressclass/storage"
+	ipaddressstore "k8s.io/kubernetes/pkg/registry/networking/ipaddress/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
@@ -99,6 +100,14 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		storage[resource] = clusterCIDRCStorage
 	}
 
+	// ipaddress
+	if resource := "ipaddresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		ipAddressStorage, err := ipaddressstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = ipAddressStorage
+	}
 	return storage, nil
 }
 
