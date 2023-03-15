@@ -656,7 +656,7 @@ func ValidateIPAddressName(name string, prefix bool) []string {
 	if err != nil {
 		errs = append(errs, err.Error())
 	} else if ip.String() != name {
-		errs = append(errs, "not a valid ip in canonical format")
+		errs = append(errs, "must be a canonical format IP address")
 
 	}
 	return errs
