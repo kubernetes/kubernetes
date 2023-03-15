@@ -510,12 +510,13 @@ func (c *policyController) latestPolicyData() []policyData {
 						Expression: condition.Expression,
 					}
 				}
+				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 				failurePolicy := convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
 				bindingInfo.validator = c.newValidator(
-					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, celconfig.PerCallLimit),
-					matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, expressionOptionalVars, celconfig.PerCallLimit), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name),
-					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), expressionOptionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
+					matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, celconfig.PerCallLimit), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name),
+					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
 					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, celconfig.PerCallLimit),
 					failurePolicy,
 					c.authz,
