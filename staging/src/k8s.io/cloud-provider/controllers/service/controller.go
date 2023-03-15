@@ -943,6 +943,7 @@ var (
 		nodeUnTaintedPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
+		nodeNotDeletedPredicate,
 		nodeIncludedPredicate,
 		// This is not perfect, but probably good enough. We won't update the
 		// LBs just because the taint was added (see shouldSyncUpdatedNode) but
@@ -987,6 +988,10 @@ func nodeReadyPredicate(node *v1.Node) bool {
 		}
 	}
 	return false
+}
+
+func nodeNotDeletedPredicate(node *v1.Node) bool {
+	return node.DeletionTimestamp.IsZero()
 }
 
 // listWithPredicate gets nodes that matches all predicate functions.
