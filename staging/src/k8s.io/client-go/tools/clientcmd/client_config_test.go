@@ -787,6 +787,20 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 		},
 		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:               "https://host-from-overrides.com",
+					CertificateAuthority: "/path/to/ca-from-overrides.crt",
+				},
+				AuthInfo: clientcmdapi.AuthInfo{
+					Token:          "",
+					TokenFile:      "tokenfile-from-override",
+					Impersonate:    "impersonate-user",
+					ImpersonateUID: "impersonate-uid",
+				},
+			},
+		},
+		{
 			overrides: &ConfigOverrides{},
 		},
 	}
@@ -797,6 +811,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		expectedTokenFile := "tokenfile-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
 
+		expectedImpersonation := ""
+		expectedImpersonationUID := ""
+
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
 				return &restclient.Config{
@@ -805,6 +822,10 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 					BearerTokenFile: expectedTokenFile,
 					TLSClientConfig: restclient.TLSClientConfig{
 						CAFile: expectedCAFile,
+					},
+					Impersonate: restclient.ImpersonationConfig{
+						UserName: expectedImpersonation,
+						UID:      expectedImpersonationUID,
 					},
 				}, nil
 			},
@@ -826,6 +847,10 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if overridenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overridenCAFile) > 0 {
 			expectedCAFile = overridenCAFile
 		}
+		if len(tc.overrides.AuthInfo.Impersonate) > 0 {
+			expectedImpersonation = tc.overrides.AuthInfo.Impersonate
+			expectedImpersonationUID = tc.overrides.AuthInfo.ImpersonateUID
+		}
 
 		if clientConfig.Host != expectedServer {
 			t.Errorf("Expected server %v, got %v", expectedServer, clientConfig.Host)
@@ -838,6 +863,12 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
+		}
+		if clientConfig.Impersonate.UserName != expectedImpersonation {
+			t.Errorf("Expected Impersonation %v, got %v", expectedImpersonation, clientConfig.Impersonate.UserName)
+		}
+		if clientConfig.Impersonate.UID != expectedImpersonationUID {
+			t.Errorf("Expected Impersonation UID %v, got %v", expectedImpersonationUID, clientConfig.Impersonate.UID)
 		}
 	}
 }
