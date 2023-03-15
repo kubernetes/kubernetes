@@ -151,10 +151,17 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error) {
 	klog.Info("Starting kubelet")
 
-	// Build kubeconfig
-	kubeconfigPath, err := createKubeconfigCWD()
-	if err != nil {
-		return nil, err
+	framework.Logf("Standalone mode: %v", framework.TestContext.StandaloneMode)
+
+	var kubeconfigPath string
+
+	if !framework.TestContext.StandaloneMode {
+		var err error
+		// Build kubeconfig
+		kubeconfigPath, err = createKubeconfigCWD()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// KubeletConfiguration file path
@@ -253,8 +260,14 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 
 		kc.SystemCgroups = "/system"
 	}
+
+	if !framework.TestContext.StandaloneMode {
+		cmdArgs = append(cmdArgs,
+			"--kubeconfig", kubeconfigPath,
+		)
+	}
+
 	cmdArgs = append(cmdArgs,
-		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
 		"--v", LogVerbosityLevel,
 	)

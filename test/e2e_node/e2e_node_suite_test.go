@@ -104,6 +104,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flags.Var(cliflag.NewMapStringBool(&serviceFeatureGates), "service-feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features for API service.")
+	flags.BoolVar(&framework.TestContext.StandaloneMode, "standalone-mode", false, "If true, starts kubelet in standalone mode.")
 }
 
 func init() {
@@ -231,8 +232,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 		klog.Infof("Running tests without starting services.")
 	}
 
-	klog.Infof("Wait for the node to be ready")
-	waitForNodeReady(ctx)
+	if !framework.TestContext.StandaloneMode {
+		klog.Infof("Wait for the node to be ready")
+		waitForNodeReady(ctx)
+	}
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
@@ -319,12 +322,18 @@ func updateTestContext(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %w", err)
 	}
-	// Update test context with current node object.
-	node, err := getNode(client)
-	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
+
+	if !framework.TestContext.StandaloneMode {
+		// Update test context with current node object.
+		node, err := getNode(client)
+		if err != nil {
+			return fmt.Errorf("failed to get node: %w", err)
+		}
+		framework.TestContext.NodeName = node.Name // Set node name from API server, it is already set to the computer name by default.
 	}
-	framework.TestContext.NodeName = node.Name // Set node name.
+
+	framework.Logf("Node name: %s", framework.TestContext.NodeName)
+
 	// Update test context with current kubelet configuration.
 	// This assumes all tests which dynamically change kubelet configuration
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
