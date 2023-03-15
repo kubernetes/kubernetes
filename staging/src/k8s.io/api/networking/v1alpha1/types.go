@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // +genclient
@@ -143,9 +142,6 @@ type ParentReference struct {
 	// Name is the name of the object being referenced.
 	// +required
 	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
-	// UID is the uid of the object being referenced.
-	// +optional
-	UID types.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
