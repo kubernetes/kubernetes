@@ -277,9 +277,9 @@ func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateIngress(ingress, opts)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
-	if annotationIsSet && ingress.Spec.IngressClassName != nil {
+	if annotationIsSet && ingress.Spec.IngressClassName != nil && annotationVal != *ingress.Spec.IngressClassName {
 		annotationPath := field.NewPath("annotations").Child(annotationIngressClass)
-		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "can not be set when the class field is also set"))
+		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "must match `ingressClassName` when both are specified"))
 	}
 	return allErrs
 }
