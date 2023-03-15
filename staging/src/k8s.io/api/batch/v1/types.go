@@ -23,8 +23,11 @@ import (
 )
 
 const (
-	JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
+	// All Kubernetes labels need to be prefixed with Kubernetes to distinguish them from end-user labels
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
 
+	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
 	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 	// being deleted before being accounted in the Job status.
 	//
@@ -34,7 +37,14 @@ const (
 	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
 	// apiserver and job controller will ignore this annotation and they will
 	// always track jobs using finalizers.
-	JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// The Job labels will use batch.kubernetes.io as a prefix for all labels
+	// Historically the job controller uses unprefixed labels for job-name and controller-uid and
+	// Kubernetes continutes to recognize those unprefixed labels for consistency.
+	JobNameLabel = labelPrefix + "job-name"
+	// ControllerUid is used to programatically get pods corresponding to a Job.
+	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
+	ControllerUidLabel = labelPrefix + "controller-uid"
 )
 
 // +genclient

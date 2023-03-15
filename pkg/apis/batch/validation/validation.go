@@ -70,12 +70,12 @@ var (
 		string(v1.ConditionUnknown))
 )
 
-// ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
+// validateGeneratedSelector validates that the generated selector on a controller object match the controller object
 // metadata, and the labels on the pod template are as generated.
 //
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
 // move to new location.  Replace batch.Job with an interface.
-func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
+func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if obj.Spec.ManualSelector != nil && *obj.Spec.ManualSelector {
 		return allErrs
@@ -100,12 +100,20 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	// have placed certain labels on the pod, but this could have failed if
 	// the user added coflicting labels.  Validate that the expected
 	// generated ones are there.
-
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "controller-uid", string(obj.UID))...)
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "job-name", string(obj.Name))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyControllerUidLabel, string(obj.UID))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyJobNameLabel, string(obj.Name))...)
 	expectedLabels := make(map[string]string)
-	expectedLabels["controller-uid"] = string(obj.UID)
-	expectedLabels["job-name"] = string(obj.Name)
+	if validateBatchLabels {
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.ControllerUidLabel, string(obj.UID))...)
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.JobNameLabel, string(obj.Name))...)
+		expectedLabels[batch.ControllerUidLabel] = string(obj.UID)
+		expectedLabels[batch.JobNameLabel] = string(obj.Name)
+	}
+	// Labels created by the Kubernetes project should have a Kubernetes prefix.
+	// These labels are set due to legacy reasons.
+
+	expectedLabels[batch.LegacyControllerUidLabel] = string(obj.UID)
+	expectedLabels[batch.LegacyJobNameLabel] = string(obj.Name)
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
 	if selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
 		if !selector.Matches(labels.Set(expectedLabels)) {
@@ -120,7 +128,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
+	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
 	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
@@ -596,4 +604,6 @@ type JobValidationOptions struct {
 	AllowMutableSchedulingDirectives bool
 	// Allow elastic indexed jobs
 	AllowElasticIndexedJobs bool
+	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
+	RequirePrefixedLabels bool
 }
