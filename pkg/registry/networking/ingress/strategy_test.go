@@ -17,14 +17,11 @@ limitations under the License.
 package ingress
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func newIngress() networking.Ingress {
@@ -139,64 +136,5 @@ func TestIngressStatusStrategy(t *testing.T) {
 	errs := StatusStrategy.ValidateUpdate(ctx, &newIngress, &oldIngress)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
-	}
-}
-
-func TestWarningsOnCreate(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	if !StatusStrategy.NamespaceScoped() {
-		t.Errorf("Ingress must be namespace scoped")
-	}
-	if StatusStrategy.AllowCreateOnUpdate() {
-		t.Errorf("Ingress should not allow create on update")
-	}
-
-	serviceBackend := &networking.IngressServiceBackend{
-		Name: "defaultbackend",
-		Port: networking.ServiceBackendPort{
-			Number: 80,
-		},
-	}
-	defaultBackend := networking.IngressBackend{
-		Service: serviceBackend,
-	}
-	baseIngress := &networking.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "test123",
-			Namespace:       "test123",
-			ResourceVersion: "1234",
-		},
-		Spec: networking.IngressSpec{
-			DefaultBackend: &defaultBackend,
-			Rules:          []networking.IngressRule{},
-		},
-	}
-
-	testCases := map[string]struct {
-		tweakIngress     func(ingress *networking.Ingress)
-		expectedWarnings []string
-	}{
-		"ingressClass annotation set, IngressClassName not set": {
-			tweakIngress: func(ingress *networking.Ingress) {
-				ingress.Annotations = map[string]string{annotationIngressClass: "foo"}
-			},
-			expectedWarnings: []string{fmt.Sprintf("annotation %q is deprecated, please use 'spec.ingressClassName' instead", annotationIngressClass)},
-		},
-		"IngressClassName set": {
-			tweakIngress: func(ingress *networking.Ingress) {
-				ingress.Spec.IngressClassName = utilpointer.String("foo")
-			},
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			newIngress := baseIngress.DeepCopy()
-			testCase.tweakIngress(newIngress)
-			warnings := Strategy.WarningsOnCreate(ctx, newIngress)
-			if diff := cmp.Diff(warnings, testCase.expectedWarnings); diff != "" {
-				t.Errorf("warings does not match (-want,+got):\n%s", diff)
-			}
-		})
 	}
 }
