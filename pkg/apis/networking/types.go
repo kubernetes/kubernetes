@@ -18,7 +18,6 @@ package networking
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -695,9 +694,6 @@ type ParentReference struct {
 	Namespace string
 	// Name is the name of the object being referenced.
 	Name string
-	// UID is the uid of the object being referenced.
-	// +optional
-	UID types.UID
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
