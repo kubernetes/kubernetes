@@ -504,7 +504,7 @@ func (c *policyController) latestPolicyData() []policyData {
 				}
 				matchConditions := definitionInfo.lastReconciledValue.Spec.MatchConditions
 				matchExpressionAccessors := make([]cel.ExpressionAccessor, len(matchConditions))
-				for i, _ := range matchConditions {
+				for i := range matchConditions {
 					matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
 				}
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
