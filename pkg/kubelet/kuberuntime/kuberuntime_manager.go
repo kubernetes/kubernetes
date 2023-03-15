@@ -529,6 +529,16 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false
+	}
+	if types.IsStaticPod(pod) {
+		return false
+	}
+	return true
+}
+
 func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
 	container := pod.Spec.Containers[containerIdx]
 	if container.Resources.Limits == nil || len(pod.Status.ContainerStatuses) == 0 {
@@ -702,6 +712,11 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		return err
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
+		if podResources.Memory == nil {
+			klog.ErrorS(nil, "podResources.Memory is nil", "pod", pod.Name)
+			result.Fail(fmt.Errorf("podResources.Memory is nil for pod %s", pod.Name))
+			return
+		}
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
 			klog.ErrorS(err, "GetPodCgroupConfig for memory failed", "pod", pod.Name)
@@ -725,6 +740,11 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		}
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
+		if podResources.CPUQuota == nil || podResources.CPUShares == nil {
+			klog.ErrorS(nil, "podResources.CPUQuota or podResources.CPUShares is nil", "pod", pod.Name)
+			result.Fail(fmt.Errorf("podResources.CPUQuota or podResources.CPUShares is nil for pod %s", pod.Name))
+			return
+		}
 		currentPodCpuConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
 		if err != nil {
 			klog.ErrorS(err, "GetPodCgroupConfig for CPU failed", "pod", pod.Name)
@@ -880,7 +900,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		return changes
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if isInPlacePodVerticalScalingAllowed(pod) {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 		latestPodStatus, err := m.GetPodStatus(ctx, podStatus.ID, pod.Name, pod.Namespace)
 		if err == nil {
@@ -931,7 +951,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		restart := shouldRestartOnFailure(pod)
 		// Do not restart if only the Resources field has changed with InPlacePodVerticalScaling enabled
 		if _, _, changed := containerChanged(&container, containerStatus); changed &&
-			(!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) ||
+			(!isInPlacePodVerticalScalingAllowed(pod) ||
 				kubecontainer.HashContainerWithoutResources(&container) != containerStatus.HashWithoutResources) {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
@@ -945,8 +965,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-			!m.computePodResizeAction(pod, idx, containerStatus, &changes) {
+		} else if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue
 		} else {
@@ -1218,7 +1237,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if isInPlacePodVerticalScalingAllowed(pod) {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
 			m.doPodResizeAction(pod, podStatus, podContainerChanges, result)
 		}
