@@ -344,6 +344,11 @@ func (p *jsonPatcher) applyPatchToCurrentObject(requestContext context.Context, 
 		}
 	}
 
+	if p.options == nil {
+		// Provide a more informative error for the crash that would
+		// happen on the next line
+		panic("PatchOptions required but not provided")
+	}
 	objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
 	return objToUpdate, nil
 }

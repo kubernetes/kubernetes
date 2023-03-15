@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -451,6 +452,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	schemaReferenceObj := &examplev1.Pod{}
 	hubVersion := example.SchemeGroupVersion
 
+	fieldmanager, err := managedfields.NewDefaultFieldManager(
+		managedfields.NewDeducedTypeConverter(),
+		convertor, defaulter, creater, kind, hubVersion, "", nil)
+
+	if err != nil {
+		t.Fatalf("failed to create field manager: %v", err)
+	}
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
 		testPatcher := &testPatcher{
@@ -536,10 +544,15 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patch,
+			options: &metav1.PatchOptions{
+				FieldManager: "test-manager",
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, time.Second)
-		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		resultObj, _, err := p.patchResource(ctx, &RequestScope{
+			FieldManager: fieldmanager,
+		})
 		cancel()
 
 		if len(tc.expectedError) != 0 {
