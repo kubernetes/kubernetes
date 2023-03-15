@@ -522,6 +522,17 @@ func ignoreValidatingWebhookMatchConditions(new, old []admissionregistration.Val
 	return true
 }
 
+// ignoreMatchConditions returns true if any new expressions are added
+func ignoreValidatingAdmissionPolicyMatchConditions(new, old *admissionregistration.ValidatingAdmissionPolicy) bool {
+	if !reflect.DeepEqual(new.Spec.ParamKind, old.Spec.ParamKind) {
+		return false
+	}
+	if !reflect.DeepEqual(new.Spec.MatchConditions, old.Spec.MatchConditions) {
+		return false
+	}
+	return true
+}
+
 // mutatingHasUniqueWebhookNames returns true if all webhooks have unique names
 func mutatingHasUniqueWebhookNames(webhooks []admissionregistration.MutatingWebhook) bool {
 	names := sets.NewString()
@@ -642,25 +653,24 @@ const (
 
 // ValidateValidatingAdmissionPolicy validates a ValidatingAdmissionPolicy before creation.
 func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
-	return validateValidatingAdmissionPolicy(p)
+	return validateValidatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false})
 }
 
-func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
+func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, field.NewPath("spec"))...)
+	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, opts, field.NewPath("spec"))...)
 	return allErrors
 }
 
-func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.ValidatingAdmissionPolicySpec, fldPath *field.Path) field.ErrorList {
+func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.ValidatingAdmissionPolicySpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if spec.FailurePolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
 	} else if !supportedFailurePolicies.Has(string(*spec.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, supportedFailurePolicies.List()))
 	}
-	opts := validationOptions{matchConditionsHasParameters: false}
 	if spec.ParamKind != nil {
-		opts = validationOptions{matchConditionsHasParameters: true}
+		opts.matchConditionsHasParameters = true
 		allErrors = append(allErrors, validateParamKind(*spec.ParamKind, fldPath.Child("paramKind"))...)
 	}
 	if spec.MatchConstraints == nil {
@@ -672,7 +682,9 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
 		}
 	}
-	allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)
+	if !opts.ignoreMatchConditions {
+		allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)
+	}
 	if len(spec.Validations) == 0 && len(spec.AuditAnnotations) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), "validations or auditAnnotations must contain at least one item"))
 		allErrors = append(allErrors, field.Required(fldPath.Child("auditAnnotations"), "validations or auditAnnotations must contain at least one item"))
@@ -1002,7 +1014,7 @@ func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) f
 
 // ValidateValidatingAdmissionPolicyUpdate validates update of validating admission policy
 func ValidateValidatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
-	return validateValidatingAdmissionPolicy(newC)
+	return validateValidatingAdmissionPolicy(newC, validationOptions{ignoreMatchConditions: ignoreValidatingAdmissionPolicyMatchConditions(newC, oldC)})
 }
 
 // ValidateValidatingAdmissionPolicyStatusUpdate validates update of status of validating admission policy
