@@ -91,6 +91,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 
 	lcr.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
+	if lcr.Unified == nil {
+		lcr.Unified = map[string]string{}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
 		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
@@ -100,17 +104,17 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 			lcr.MemorySwapLimitInBytes = -1
 		case kubelettypes.LimitedSwap:
 			if libcontainercgroups.IsCgroup2UnifiedMode() {
-				if lcr.Unified == nil {
-					lcr.Unified = map[string]string{}
-				}
-
 				swapMaxValueStr := fmt.Sprintf("%d", container.Resources.Limits.Swap().Value())
 				klog.Info(fmt.Sprintf("setting %s=%s", cm.Cgroup2MaxSwapFilename, swapMaxValueStr))
 				lcr.Unified[cm.Cgroup2MaxSwapFilename] = swapMaxValueStr
 			} else {
 				lcr.MemorySwapLimitInBytes = container.Resources.Limits.Swap().Value()
 			}
-		default:
+		}
+	} else {
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			lcr.Unified[cm.Cgroup2MaxSwapFilename] = "0"
+		} else {
 			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
 			// Some swapping is still possible.
 			// Note that if memory limit is 0, memory swap limit is ignored.
