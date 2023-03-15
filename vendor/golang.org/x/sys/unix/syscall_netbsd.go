@@ -13,7 +13,6 @@
 package unix
 
 import (
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -178,13 +177,13 @@ func sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 }
 
 //sys	ioctl(fd int, req uint, arg uintptr) (err error)
+//sys	ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) = SYS_IOCTL
 
 //sys	sysctl(mib []_C_int, old *byte, oldlen *uintptr, new *byte, newlen uintptr) (err error) = SYS___SYSCTL
 
 func IoctlGetPtmget(fd int, req uint) (*Ptmget, error) {
 	var value Ptmget
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	runtime.KeepAlive(value)
+	err := ioctlPtr(fd, req, unsafe.Pointer(&value))
 	return &value, err
 }
 

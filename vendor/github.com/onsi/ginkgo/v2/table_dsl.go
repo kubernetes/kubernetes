@@ -13,7 +13,7 @@ import (
 /*
 The EntryDescription decorator allows you to pass a format string to DescribeTable() and Entry().  This format string is used to generate entry names via:
 
-    fmt.Sprintf(formatString, parameters...)
+	fmt.Sprintf(formatString, parameters...)
 
 where parameters are the parameters passed into the entry.
 
@@ -32,19 +32,20 @@ DescribeTable describes a table-driven spec.
 
 For example:
 
-    DescribeTable("a simple table",
-        func(x int, y int, expected bool) {
-            Ω(x > y).Should(Equal(expected))
-        },
-        Entry("x > y", 1, 0, true),
-        Entry("x == y", 0, 0, false),
-        Entry("x < y", 0, 1, false),
-    )
+	DescribeTable("a simple table",
+	    func(x int, y int, expected bool) {
+	        Ω(x > y).Should(Equal(expected))
+	    },
+	    Entry("x > y", 1, 0, true),
+	    Entry("x == y", 0, 0, false),
+	    Entry("x < y", 0, 1, false),
+	)
 
 You can learn more about DescribeTable here: https://onsi.github.io/ginkgo/#table-specs
 And can explore some Table patterns here: https://onsi.github.io/ginkgo/#table-specs-patterns
 */
 func DescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	generateTable(description, args...)
 	return true
 }
@@ -53,6 +54,7 @@ func DescribeTable(description string, args ...interface{}) bool {
 You can focus a table with `FDescribeTable`.  This is equivalent to `FDescribe`.
 */
 func FDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Focus)
 	generateTable(description, args...)
 	return true
@@ -62,6 +64,7 @@ func FDescribeTable(description string, args ...interface{}) bool {
 You can mark a table as pending with `PDescribeTable`.  This is equivalent to `PDescribe`.
 */
 func PDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Pending)
 	generateTable(description, args...)
 	return true
@@ -95,26 +98,29 @@ If you want to generate interruptible specs simply write a Table function that a
 You can learn more about Entry here: https://onsi.github.io/ginkgo/#table-specs
 */
 func Entry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can focus a particular entry with FEntry.  This is equivalent to FIt.
 */
 func FEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Focus)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can mark a particular entry as pending with PEntry.  This is equivalent to PIt.
 */
 func PEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Pending)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
@@ -126,7 +132,8 @@ var contextType = reflect.TypeOf(new(context.Context)).Elem()
 var specContextType = reflect.TypeOf(new(SpecContext)).Elem()
 
 func generateTable(description string, args ...interface{}) {
-	cl := types.NewCodeLocation(2)
+	GinkgoHelper()
+	cl := types.NewCodeLocation(0)
 	containerNodeArgs := []interface{}{cl}
 
 	entries := []TableEntry{}
