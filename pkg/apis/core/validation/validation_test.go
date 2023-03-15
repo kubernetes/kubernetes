@@ -15961,6 +15961,14 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "topology annotations are mismatched",
+			tweakSvc: func(s *core.Service) {
+				s.Annotations[core.DeprecatedAnnotationTopologyAwareHints] = "original"
+				s.Annotations[core.AnnotationTopologyMode] = "different"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -18596,6 +18604,14 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.InternalTrafficPolicy = &cluster
 			},
 			numErrs: 0,
+		},
+		{
+			name: "topology annotations are mismatched",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Annotations[core.DeprecatedAnnotationTopologyAwareHints] = "original"
+				newSvc.Annotations[core.AnnotationTopologyMode] = "different"
+			},
+			numErrs: 1,
 		},
 	}
 
