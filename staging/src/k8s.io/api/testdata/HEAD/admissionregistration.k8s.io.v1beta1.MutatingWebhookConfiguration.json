@@ -108,7 +108,13 @@
       "admissionReviewVersions": [
         "admissionReviewVersionsValue"
       ],
-      "reinvocationPolicy": "reinvocationPolicyValue"
+      "reinvocationPolicy": "reinvocationPolicyValue",
+      "matchConditions": [
+        {
+          "name": "nameValue",
+          "expression": "expressionValue"
+        }
+      ]
     }
   ]
 }

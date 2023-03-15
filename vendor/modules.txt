@@ -1413,6 +1413,7 @@ k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alp
 k8s.io/apiserver/pkg/admission/plugin/webhook/errors
 k8s.io/apiserver/pkg/admission/plugin/webhook/generic
 k8s.io/apiserver/pkg/admission/plugin/webhook/initializer
+k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions
 k8s.io/apiserver/pkg/admission/plugin/webhook/mutating
 k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace
 k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object

@@ -39,6 +39,17 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
+- name: io.k8s.api.admissionregistration.v1.MatchCondition
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1.MutatingWebhook
   map:
     fields:
@@ -55,6 +66,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failurePolicy
       type:
         scalar: string
+    - name: matchConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1.MatchCondition
+          elementRelationship: associative
+          keys:
+          - name
     - name: matchPolicy
       type:
         scalar: string
@@ -167,6 +186,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failurePolicy
       type:
         scalar: string
+    - name: matchConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1.MatchCondition
+          elementRelationship: associative
+          keys:
+          - name
     - name: matchPolicy
       type:
         scalar: string
@@ -451,6 +478,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: reason
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1beta1.MatchCondition
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1beta1.MutatingWebhook
   map:
     fields:
@@ -467,6 +505,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failurePolicy
       type:
         scalar: string
+    - name: matchConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1beta1.MatchCondition
+          elementRelationship: associative
+          keys:
+          - name
     - name: matchPolicy
       type:
         scalar: string
@@ -549,6 +595,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failurePolicy
       type:
         scalar: string
+    - name: matchConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1beta1.MatchCondition
+          elementRelationship: associative
+          keys:
+          - name
     - name: matchPolicy
       type:
         scalar: string
