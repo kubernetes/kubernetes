@@ -94,7 +94,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
 		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 		switch m.memorySwapBehavior {
-		case kubelettypes.UnlimitedSwap:
+		case "", kubelettypes.UnlimitedSwap:
 			// -1 = unlimited swap
 			lcr.MemorySwapLimitInBytes = -1
 		case kubelettypes.LimitedSwap:
