@@ -510,9 +510,13 @@ func (c *policyController) latestPolicyData() []policyData {
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 				failurePolicy := convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
+				var matcher matchconditions.Matcher = nil
+				if len(matchExpressionAccessors) > 0 {
+					matcher = matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, celconfig.PerCallLimit), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
+				}
 				bindingInfo.validator = c.newValidator(
 					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
-					matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, celconfig.PerCallLimit), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name),
+					matcher,
 					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
 					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, celconfig.PerCallLimit),
 					failurePolicy,

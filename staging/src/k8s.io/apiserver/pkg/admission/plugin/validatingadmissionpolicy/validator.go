@@ -80,22 +80,24 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		f = *v.failPolicy
 	}
 
-	matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams)
-	if matchResults.Error != nil {
-		return ValidateResult{
-			Decisions: []PolicyDecision{
-				{
-					Action:     policyDecisionActionForError(f),
-					Evaluation: EvalError,
-					Message:    matchResults.Error.Error(),
+	if v.celMatcher != nil {
+		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams)
+		if matchResults.Error != nil {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:     policyDecisionActionForError(f),
+						Evaluation: EvalError,
+						Message:    matchResults.Error.Error(),
+					},
 				},
-			},
+			}
 		}
-	}
 
-	// if preconditions are not met, then do not return any validations
-	if !matchResults.Matches {
-		return ValidateResult{}
+		// if preconditions are not met, then do not return any validations
+		if !matchResults.Matches {
+			return ValidateResult{}
+		}
 	}
 
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}

@@ -837,7 +837,7 @@ func TestValidate(t *testing.T) {
 			matcher: &fakeCELMatcher{matches: false},
 			evaluations: []cel.EvaluationResult{
 				{
-					Error:              errors.New(""),
+					Error:              errors.New("expected"),
 					ExpressionAccessor: &ValidationCondition{},
 				},
 			},
@@ -849,7 +849,7 @@ func TestValidate(t *testing.T) {
 			matcher: &fakeCELMatcher{matches: true, error: fmt.Errorf("test error")},
 			evaluations: []cel.EvaluationResult{
 				{
-					Error:              errors.New(""),
+					Error:              errors.New("expected"),
 					ExpressionAccessor: &ValidationCondition{},
 				},
 			},
