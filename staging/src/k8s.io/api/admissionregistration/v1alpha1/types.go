@@ -181,22 +181,22 @@ type ValidatingAdmissionPolicySpec struct {
 	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
 
 	// MatchConditions is a list of conditions that must be met for a request to be validated.
-	// Match conditions filter requests that have already been matched by the rules, 
-	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. 
-	// There are a maximum of 64 match conditions allowed. 
-	// 
-	// The exact matching logic is (in order): 
-	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped. 
-	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated. 
-	//   3. If any matchCondition evaluates to an error (but none are FALSE): 
+	// Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
 	//      - If failurePolicy=Fail, reject the request
-	//      - If failurePolicy=Ignore, the policy is skipped 
-	// 
-	// +patchMergeKey=name 
-	// +patchStrategy=merge 
-	// +listType=map 
-	// +listMapKey=name 
-	// +optional 
+	//      - If failurePolicy=Ignore, the policy is skipped
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
 }
 

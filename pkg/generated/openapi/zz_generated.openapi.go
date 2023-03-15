@@ -48,6 +48,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/admissionregistration/v1.WebhookClientConfig":                                         schema_k8sio_api_admissionregistration_v1_WebhookClientConfig(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation":                                       schema_k8sio_api_admissionregistration_v1alpha1_AuditAnnotation(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ExpressionWarning":                                     schema_k8sio_api_admissionregistration_v1alpha1_ExpressionWarning(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.MatchCondition":                                        schema_k8sio_api_admissionregistration_v1alpha1_MatchCondition(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.MatchResources":                                        schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.NamedRuleWithOperations":                               schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.ParamKind":                                             schema_k8sio_api_admissionregistration_v1alpha1_ParamKind(ref),
@@ -2008,6 +2009,36 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ExpressionWarning(ref commo
 	}
 }
 
+func schema_k8sio_api_admissionregistration_v1alpha1_MatchCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MatchCondition represents a condition which must be fulfilled for a request to be sent to a webhook.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is an identifier for this match condition, used for strategic merging of MatchConditions, as well as providing an identifier for logging purposes. A good name should be descriptive of the associated expression. Name must be a valid RFC 1123 DNS subdomain, and unique in a set of MatchConditions. Required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/\n\nExpression represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec CEL expressions have access to the contents of the AdmissionRequest, organized into CEL variables:\n\n'object' - The object from the incoming request. The value is null for DELETE requests. 'oldObject' - The existing object. The value is null for CREATE requests. 'request' - Attributes of the admission request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).\n\nRequired.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "expression"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2621,11 +2652,35 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							},
 						},
 					},
+					"matchConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "MatchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the rules, namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1alpha1.MatchCondition"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Validation"},
+			"k8s.io/api/admissionregistration/v1alpha1.AuditAnnotation", "k8s.io/api/admissionregistration/v1alpha1.MatchCondition", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Validation"},
 	}
 }
 
