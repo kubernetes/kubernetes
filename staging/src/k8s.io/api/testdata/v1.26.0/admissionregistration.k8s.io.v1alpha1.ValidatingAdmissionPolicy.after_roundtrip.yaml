@@ -34,7 +34,6 @@ metadata:
   uid: uidValue
 spec:
   failurePolicy: failurePolicyValue
-  matchConditions: null
   matchConstraints:
     excludeResourceRules:
     - apiGroups:

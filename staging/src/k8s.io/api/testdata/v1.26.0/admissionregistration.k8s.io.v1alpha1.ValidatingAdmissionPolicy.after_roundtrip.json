@@ -126,8 +126,7 @@
         "reason": "reasonValue"
       }
     ],
-    "failurePolicy": "failurePolicyValue",
-    "matchConditions": null
+    "failurePolicy": "failurePolicyValue"
   },
   "status": {}
 }
