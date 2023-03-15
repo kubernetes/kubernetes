@@ -2936,8 +2936,24 @@ func TestPodPhaseWithRestartNeverSidecarContainers(t *testing.T) {
 					},
 				},
 			},
-			v1.PodRunning,
+			v1.PodSucceeded,
 			"backoff crashloop sidecar container, main containers succeeded",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithNonZeroTermination("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			"backoff crashloop with non-zero sidecar container, main containers succeeded",
 		},
 	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
