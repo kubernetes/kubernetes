@@ -2052,7 +2052,22 @@ metadata:
 			outBuiltIn := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name)
 			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s --subresource=status", node.Name))
 			outStatusSubresource := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name, "--subresource=status")
-			gomega.Expect(outBuiltIn).To(gomega.Equal(outStatusSubresource))
+			// Avoid comparing values of fields that might end up
+			// changing between the two invocations of kubectl.
+			requiredOutput := [][]string{
+				{"NAME"},
+				{"STATUS"},
+				{"ROLES"},
+				{"AGE"},
+				{"VERSION"},
+				{node.Name},                           // check for NAME
+				{""},                                  // avoid comparing STATUS
+				{""},                                  // avoid comparing ROLES
+				{""},                                  // avoid comparing AGE
+				{node.Status.NodeInfo.KubeletVersion}, // check for VERSION
+			}
+			checkOutput(outBuiltIn, requiredOutput)
+			checkOutput(outStatusSubresource, requiredOutput)
 		})
 	})
 })
