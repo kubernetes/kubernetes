@@ -16,7 +16,11 @@ limitations under the License.
 
 package monitor
 
-import "time"
+import (
+	"time"
+
+	v2 "k8s.io/api/autoscaling/v2"
+)
 
 type ActionLabel string
 type ErrorLabel string
@@ -36,6 +40,7 @@ const (
 // Monitor records some metrics so that people can monitor HPA controller.
 type Monitor interface {
 	ObserveReconciliationResult(action ActionLabel, err ErrorLabel, duration time.Duration)
+	ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType)
 }
 
 type monitor struct{}
@@ -48,4 +53,10 @@ func New() Monitor {
 func (r *monitor) ObserveReconciliationResult(action ActionLabel, err ErrorLabel, duration time.Duration) {
 	reconciliationsTotal.WithLabelValues(string(action), string(err)).Inc()
 	reconciliationsDuration.WithLabelValues(string(action), string(err)).Observe(duration.Seconds())
+}
+
+// ObserveMetricComputationResult observes some metrics from a metric computation result.
+func (r *monitor) ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType) {
+	metricComputationTotal.WithLabelValues(string(action), string(err), string(metricType)).Inc()
+	metricComputationDuration.WithLabelValues(string(action), string(err), string(metricType)).Observe(duration.Seconds())
 }
