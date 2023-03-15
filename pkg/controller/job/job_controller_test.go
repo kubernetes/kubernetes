@@ -64,7 +64,7 @@ var alwaysReady = func() bool { return true }
 
 // testFinishedAt represents time one second later than unix epoch
 // this will be used in various test cases where we don't want back-off to kick in
-var testFinishedAt = metav1.NewTime((metav1.Time{}).Add(1 * time.Second))
+var testFinishedAt = metav1.NewTime((time.Time{}).Add(time.Second))
 
 func newJobWithName(name string, parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
 	j := &batch.Job{
@@ -4229,7 +4229,6 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 			for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{
-					//
 					FinishedAt: testFinishedAt,
 				}}}}
 				podIndexer.Add(pod)

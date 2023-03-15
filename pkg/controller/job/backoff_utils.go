@@ -174,7 +174,7 @@ func getFinishedTime(p *v1.Pod, currentTime time.Time) time.Time {
 		}
 	}
 
-	if finishTime == nil || finishTime.Equal(time.Time{}) {
+	if finishTime == nil || finishTime.IsZero() {
 		return currentTime
 	}
 
