@@ -62,6 +62,10 @@ import (
 var realClock = &clock.RealClock{}
 var alwaysReady = func() bool { return true }
 
+// testFinishedAt represents time one second later than unix epoch
+// this will be used in various test cases where we don't want back-off to kick in
+var testFinishedAt = metav1.NewTime((metav1.Time{}).Add(1 * time.Second))
+
 func newJobWithName(name string, parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
 	j := &batch.Job{
 		TypeMeta: metav1.TypeMeta{Kind: "Job"},
@@ -143,9 +147,11 @@ func newPodList(count int, status v1.PodPhase, job *batch.Job) []*v1.Pod {
 		newPod.Status = v1.PodStatus{Phase: status}
 		newPod.Status.ContainerStatuses = []v1.ContainerStatus{
 			{
-				// This sets ContainerState.Terminated.FinishedAt to unix epoch
-				// This has the effect that backoff periods are already satisfied and the controller can create new pods.
-				State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						FinishedAt: testFinishedAt,
+					},
+				},
 			},
 		}
 		newPod.Finalizers = append(newPod.Finalizers, batch.JobTrackingFinalizer)
@@ -185,7 +191,13 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 		p.Status = v1.PodStatus{Phase: s.Phase}
 		if s.Phase == v1.PodFailed || s.Phase == v1.PodSucceeded {
 			p.Status.ContainerStatuses = []v1.ContainerStatus{
-				{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+				{
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							FinishedAt: testFinishedAt,
+						},
+					},
+				},
 			}
 		}
 		if s.Index != noIndex {
@@ -2110,7 +2122,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Name: "main-container",
 								State: v1.ContainerState{
 									Terminated: &v1.ContainerStateTerminated{
-										ExitCode: 42,
+										ExitCode:   42,
+										FinishedAt: testFinishedAt,
 									},
 								},
 							},
@@ -2341,7 +2354,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Name: "main-container",
 								State: v1.ContainerState{
 									Terminated: &v1.ContainerStateTerminated{
-										ExitCode: 5,
+										ExitCode:   5,
+										FinishedAt: testFinishedAt,
 									},
 								},
 							},
@@ -2536,7 +2550,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Name: "main-container",
 								State: v1.ContainerState{
 									Terminated: &v1.ContainerStateTerminated{
-										ExitCode: 5,
+										ExitCode:   5,
+										FinishedAt: testFinishedAt,
 									},
 								},
 							},
@@ -2770,7 +2785,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 							{
 								State: v1.ContainerState{
 									Terminated: &v1.ContainerStateTerminated{
-										ExitCode: 2,
+										ExitCode:   2,
+										FinishedAt: testFinishedAt,
 									},
 								},
 							},
@@ -2835,7 +2851,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 						ContainerStatuses: []v1.ContainerStatus{
 							{
 								State: v1.ContainerState{
-									Terminated: &v1.ContainerStateTerminated{},
+									Terminated: &v1.ContainerStateTerminated{
+										FinishedAt: testFinishedAt,
+									},
 								},
 							},
 						},
@@ -4210,7 +4228,10 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 			for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
-				pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}}}
+				pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{
+					//
+					FinishedAt: testFinishedAt,
+				}}}}
 				podIndexer.Add(pod)
 			}
 			for _, pod := range newPodList(tc.activePods, tc.activePodsPhase, job) {

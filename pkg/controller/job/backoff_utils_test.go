@@ -267,6 +267,20 @@ func TestGetFinishedTime(t *testing.T) {
 			},
 			wantFinishTime: defaultTestTime,
 		},
+		"Pod with single container with zero finish time": {
+			pod: v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{},
+							},
+						},
+					},
+				},
+			},
+			wantFinishTime: defaultTestTime,
+		},
 	}
 
 	for name, tc := range testCases {
