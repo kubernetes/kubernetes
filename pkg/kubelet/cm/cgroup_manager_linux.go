@@ -48,8 +48,9 @@ const (
 	// MemoryMin is memory.min for cgroup v2
 	MemoryMin string = "memory.min"
 	// MemoryHigh is memory.high for cgroup v2
-	MemoryHigh         string = "memory.high"
-	Cgroup2MaxCpuLimit string = "max"
+	MemoryHigh             string = "memory.high"
+	Cgroup2MaxCpuLimit     string = "max"
+	Cgroup2MaxSwapFilename string = "memory.swap.max"
 )
 
 var RootCgroupName = CgroupName([]string{})

@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"strconv"
@@ -98,7 +99,17 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 			// -1 = unlimited swap
 			lcr.MemorySwapLimitInBytes = -1
 		case kubelettypes.LimitedSwap:
-			fallthrough
+			if libcontainercgroups.IsCgroup2UnifiedMode() {
+				if lcr.Unified == nil {
+					lcr.Unified = map[string]string{}
+				}
+
+				swapMaxValueStr := fmt.Sprintf("%d", container.Resources.Limits.Swap().Value())
+				klog.Info(fmt.Sprintf("setting %s=%s", cm.Cgroup2MaxSwapFilename, swapMaxValueStr))
+				lcr.Unified[cm.Cgroup2MaxSwapFilename] = swapMaxValueStr
+			} else {
+				lcr.MemorySwapLimitInBytes = container.Resources.Limits.Swap().Value()
+			}
 		default:
 			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
 			// Some swapping is still possible.
