@@ -33,10 +33,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -102,8 +104,11 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
-		Pod:                 &REST{store, proxyTransport},
-		Binding:             &BindingREST{store: store},
+		Pod: &REST{store, proxyTransport},
+		Binding: &BindingREST{
+			store:               store,
+			enablePreconditions: feature.DefaultFeatureGate.Enabled(features.PodBindingUIDPrecondition),
+		},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
@@ -142,7 +147,8 @@ func (r *REST) Categories() []string {
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
-	store *genericregistry.Store
+	store               *genericregistry.Store
+	enablePreconditions bool
 }
 
 // NamespaceScoped fulfill rest.Scoper
@@ -195,7 +201,7 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 // handler that this endpoint requires the UID and ResourceVersion to use as
 // preconditions. Other fields, such as timestamp, are ignored.
 func (r *BindingREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
-	return true
+	return r.enablePreconditions
 }
 
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if

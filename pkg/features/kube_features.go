@@ -647,6 +647,13 @@ const (
 	// Requires the CRI implementation supports supplying the required stats.
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
+	// owner: @alculquicondor
+	// deprecated: v1.24
+	//
+	// Enables a precondition check for UID in the pod/binding endpoint.
+	// This feature gate will be removed in 1.27
+	PodBindingUIDPrecondition featuregate.Feature = "PodBindingUIDPrecondition"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	// beta: v1.22
@@ -1063,6 +1070,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAffinityNamespaceSelector: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodBindingUIDPrecondition: {Default: true, PreRelease: featuregate.Deprecated},
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
 
