@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -72,6 +73,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1alpha1"),
 		networking.Resource("clustercidrs").WithVersion("v1alpha1"),
 		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
+		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
