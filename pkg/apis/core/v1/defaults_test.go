@@ -2054,6 +2054,59 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 				},
 			},
 		},
+		"Ephemeral storage limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: nil,
+		},
+		"Ephemeral storage requests and CPU limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"Ephemeral storage requests and limits, memory requests with restartContainer policy are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+						v1.ResourceMemory:           resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			testPod := v1.Pod{}
