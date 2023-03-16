@@ -3150,6 +3150,131 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			},
 			expectedError: `spec.auditAnnotations[0].valueExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>`,
 		},
+		{
+			name: "single match condition must have a name",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `spec.matchConditions[0].name: Required value`,
+		},
+		{
+			name: "match condition with parameters allowed",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					ParamKind: &admissionregistration.ParamKind{
+						Kind:       "Foo",
+						APIVersion: "foobar/v1alpha1",
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "match condition with parameters not allowed if no param kind",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `undeclared reference to 'params'`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -3292,6 +3417,202 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				},
 				Spec: admissionregistration.ValidatingAdmissionPolicySpec{},
 			},
+		},
+		{
+			name: "match conditions re-checked if paramKind changes",
+			oldconfig: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					ParamKind: &admissionregistration.ParamKind{
+						Kind:       "Foo",
+						APIVersion: "foobar/v1alpha1",
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `undeclared reference to 'params'`,
+		},
+		{
+			name: "match conditions not re-checked if no change to paramKind or matchConditions",
+			oldconfig: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Ignore")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 50",
+						},
+					},
+				},
+			},
+			expectedError: "",
 		},
 		// TODO: CustomAuditAnnotations: string valueExpression with {oldObject} is allowed
 	}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -36,6 +37,7 @@ import (
 
 // validator implements the Validator interface
 type validator struct {
+	celMatcher            matchconditions.Matcher
 	validationFilter      cel.Filter
 	auditAnnotationFilter cel.Filter
 	messageFilter         cel.Filter
@@ -43,8 +45,9 @@ type validator struct {
 	authorizer            authorizer.Authorizer
 }
 
-func NewValidator(validationFilter, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
 	return &validator{
+		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
 		auditAnnotationFilter: auditAnnotationFilter,
 		messageFilter:         messageFilter,
@@ -75,6 +78,26 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		f = v1.Fail
 	} else {
 		f = *v.failPolicy
+	}
+
+	if v.celMatcher != nil {
+		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams)
+		if matchResults.Error != nil {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:     policyDecisionActionForError(f),
+						Evaluation: EvalError,
+						Message:    matchResults.Error.Error(),
+					},
+				},
+			}
+		}
+
+		// if preconditions are not met, then do not return any validations
+		if !matchResults.Matches {
+			return ValidateResult{}
+		}
 	}
 
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}

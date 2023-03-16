@@ -145,6 +145,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.AuditAnnotationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ExpressionWarning"):
 		return &admissionregistrationv1alpha1.ExpressionWarningApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("MatchCondition"):
+		return &admissionregistrationv1alpha1.MatchConditionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MatchResources"):
 		return &admissionregistrationv1alpha1.MatchResourcesApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):

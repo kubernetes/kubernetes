@@ -37,6 +37,9 @@ spec:
   - key: keyValue
     valueExpression: valueExpressionValue
   failurePolicy: failurePolicyValue
+  matchConditions:
+  - expression: expressionValue
+    name: nameValue
   matchConstraints:
     excludeResourceRules:
     - apiGroups:
