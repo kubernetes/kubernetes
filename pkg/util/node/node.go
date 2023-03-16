@@ -70,33 +70,48 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 // from this function are used as the `.status.PodIPs` values for host-network pods on the
 // node, and the first IP is used as the `.status.HostIP` for all pods on the node.
 func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
-	// Re-sort the addresses with InternalIPs first and then ExternalIPs
-	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
-	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeInternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
+	var nodeIPs []net.IP
+	externalIPs := make([]net.IP, 0, 2)
+
+	for i := range node.Status.Addresses {
+		switch node.Status.Addresses[i].Type {
+		case v1.NodeInternalIP:
+			ip := netutils.ParseIPSloppy(node.Status.Addresses[i].Address)
 			if ip != nil {
-				allIPs = append(allIPs, ip)
+				if len(nodeIPs) == 0 || netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+					nodeIPs = append(nodeIPs, ip)
+				}
+
+				if len(nodeIPs) == 2 {
+					break
+				}
+			}
+		case v1.NodeExternalIP:
+			if len(externalIPs) == 2 {
+				continue
+			}
+
+			ip := netutils.ParseIPSloppy(node.Status.Addresses[i].Address)
+			if ip != nil {
+				if len(externalIPs) == 0 || netutils.IsIPv6(externalIPs[0]) != netutils.IsIPv6(ip) {
+					externalIPs = append(externalIPs, ip)
+				}
 			}
 		}
-	}
-	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeExternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
-			if ip != nil {
-				allIPs = append(allIPs, ip)
-			}
-		}
-	}
-	if len(allIPs) == 0 {
-		return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
 	}
 
-	nodeIPs := []net.IP{allIPs[0]}
-	for _, ip := range allIPs {
-		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
-			nodeIPs = append(nodeIPs, ip)
-			break
+	switch len(nodeIPs) {
+	case 0:
+		if len(externalIPs) == 0 {
+			return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
+		}
+		nodeIPs = externalIPs
+	case 1:
+		for i := range externalIPs {
+			if netutils.IsIPv6(externalIPs[i]) != netutils.IsIPv6(nodeIPs[0]) {
+				nodeIPs = append(nodeIPs, externalIPs[i])
+				break
+			}
 		}
 	}
 
