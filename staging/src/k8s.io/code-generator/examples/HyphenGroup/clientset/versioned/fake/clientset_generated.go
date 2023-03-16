@@ -57,6 +57,33 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	return cs
 }
 
+// NewSimpleClientsetWithObjectTrackerOption returns a clientset that will respond with the provided objects.
+// its function is consistent with NewSimpleClientset, the difference is that NewSimpleClientsetWithObjectTrackerOption
+// will customize clientSet.ObjectTracker, the current optional is custom watcher
+func NewSimpleClientsetWithObjectTrackerOption(objectTrackerOption testing.ObjectTrackerOptions, objects ...runtime.Object) *Clientset {
+	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder(), objectTrackerOption)
+	for _, obj := range objects {
+		if err := o.Add(obj); err != nil {
+			panic(err)
+		}
+	}
+
+	cs := &Clientset{tracker: o}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := o.Watch(gvr, ns)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, watch, nil
+	})
+
+	return cs
+}
+
 // Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.

@@ -215,21 +215,34 @@ type tracker struct {
 	// Manipulations on resources will broadcast the notification events into the
 	// watchers' channel. Note that too many unhandled events (currently 100,
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
-	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	watchers    map[schema.GroupVersionResource]map[string][]watch.Watcher
+	fakeWatcher *watch.FakeWatcher
 }
 
 var _ ObjectTracker = &tracker{}
 
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
-func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
-	return &tracker{
+func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder, options ...ObjectTrackerOptions) ObjectTracker {
+	t := &tracker{
 		scheme:   scheme,
 		decoder:  decoder,
 		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		watchers: make(map[schema.GroupVersionResource]map[string][]watch.Watcher),
+	}
+	for _, option := range options {
+		option(t)
+	}
+	return t
+}
+
+func WithFakeWatchers(f *watch.FakeWatcher) ObjectTrackerOptions {
+	return func(t *tracker) {
+		t.fakeWatcher = f
 	}
 }
+
+type ObjectTrackerOptions func(*tracker)
 
 func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string) (runtime.Object, error) {
 	// Heuristic for list kind: original kind + List suffix. Might
@@ -274,13 +287,17 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Inter
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	fakewatcher := watch.NewRaceFreeFake()
+	var fakeWatcher watch.Watcher
+	fakeWatcher = watch.NewRaceFreeFake()
+	if t.fakeWatcher != nil {
+		fakeWatcher = t.fakeWatcher
+	}
 
 	if _, exists := t.watchers[gvr]; !exists {
-		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
+		t.watchers[gvr] = make(map[string][]watch.Watcher)
 	}
-	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
-	return fakewatcher, nil
+	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakeWatcher)
+	return fakeWatcher, nil
 }
 
 func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime.Object, error) {
@@ -360,8 +377,8 @@ func (t *tracker) Update(gvr schema.GroupVersionResource, obj runtime.Object, ns
 	return t.add(gvr, obj, ns, true)
 }
 
-func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watch.RaceFreeFakeWatcher {
-	watches := []*watch.RaceFreeFakeWatcher{}
+func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []watch.Watcher {
+	watches := []watch.Watcher{}
 	if t.watchers[gvr] != nil {
 		if w := t.watchers[gvr][ns]; w != nil {
 			watches = append(watches, w...)
