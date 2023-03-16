@@ -653,9 +653,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 	}
 }
 
-// monitorNodeHealth verifies node health are constantly updated by kubelet, and
-// if not, post "NodeReady==ConditionUnknown".
-// This function will taint nodes who are not ready or not reachable for a long period of time.
+// monitorNodeHealth verifies node health are constantly updated by kubelet, and if not, post "NodeReady==ConditionUnknown".
+// This function will
+//   - add nodes who are not ready or not reachable for a long period of time to a rate-limited
+//     queue so that NoExecute taints can be added by the goroutine running the doNoExecuteTaintingPass function,
+//   - update the PodReady condition Pods according to the state of the Node Ready condition.
 func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	start := nc.now()
 	defer func() {
@@ -1200,7 +1202,7 @@ func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
 	return nc.evictionLimiterQPS
 }
 
-// ReducedQPSFunc returns the QPS for when a the cluster is large make
+// ReducedQPSFunc returns the QPS for when the cluster is large make
 // evictions slower, if they're small stop evictions altogether.
 func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 	if int32(nodeNum) > nc.largeClusterThreshold {
