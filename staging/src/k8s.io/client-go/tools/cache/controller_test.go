@@ -496,8 +496,14 @@ func TestTransformingInformer(t *testing.T) {
 			if event.eventType != eventType {
 				t.Errorf("expected type %v, got %v", eventType, event.eventType)
 			}
-			if !apiequality.Semantic.DeepEqual(event.previous, previous) {
-				t.Errorf("expected previous object %#v, got %#v", previous, event.previous)
+			eventObj := event.previous
+			tombstone, ok := eventObj.(DeletedFinalStateUnknown)
+			if ok {
+				// extract tombstone obj before comparing it
+				eventObj = tombstone.Obj
+			}
+			if !apiequality.Semantic.DeepEqual(eventObj, previous) {
+				t.Errorf("expected previous object %#v, got %#v", previous, eventObj)
 			}
 			if !apiequality.Semantic.DeepEqual(event.current, current) {
 				t.Errorf("expected object %#v, got %#v", current, event.current)
@@ -510,15 +516,8 @@ func TestTransformingInformer(t *testing.T) {
 	podTransformer := func(obj interface{}) (interface{}, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
-			tombstone, isTombstone := obj.(DeletedFinalStateUnknown)
-			if !isTombstone {
-				return nil, fmt.Errorf("unexpected object type: %T", obj)
-			}
-			var isPod bool
-			pod, isPod = tombstone.Obj.(*v1.Pod)
-			if !isPod {
-				return nil, fmt.Errorf("unexpected object type: %T", obj)
-			}
+			// if we hit a tombstone, return it, since the inner object is already converted
+			return obj, nil
 		}
 		pod.Spec.Hostname = "new-hostname"
 		pod.Spec.Subdomain = ""
@@ -642,8 +641,14 @@ func TestTransformingInformerWithCustomObjectType(t *testing.T) {
 			if event.eventType != eventType {
 				t.Errorf("expected type %v, got %v", eventType, event.eventType)
 			}
-			if !apiequality.Semantic.DeepEqual(event.previous, previous) {
-				t.Errorf("expected previous object %#v, got %#v", previous, event.previous)
+			eventObj := event.previous
+			tombstone, ok := eventObj.(DeletedFinalStateUnknown)
+			if ok {
+				// extract tombstone obj before comparing it
+				eventObj = tombstone.Obj
+			}
+			if !apiequality.Semantic.DeepEqual(eventObj, previous) {
+				t.Errorf("expected previous object %#v, got %#v", previous, eventObj)
 			}
 			if !apiequality.Semantic.DeepEqual(event.current, current) {
 				t.Errorf("expected object %#v, got %#v", current, event.current)
@@ -656,20 +661,9 @@ func TestTransformingInformerWithCustomObjectType(t *testing.T) {
 	podTransformer := func(obj interface{}) (interface{}, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
-			tombstone, isTombstone := obj.(DeletedFinalStateUnknown)
-			if !isTombstone {
-				return nil, fmt.Errorf("unexpected object type: %T", obj)
-			}
+			// if we hit a tombstone, return it, since the inner object is already converted
+			return obj, nil
 
-			meta, isMeta := tombstone.Obj.(*metav1.ObjectMeta)
-			if isMeta {
-				return meta, nil
-			}
-			var isPod bool
-			pod, isPod = tombstone.Obj.(*v1.Pod)
-			if !isPod {
-				return nil, fmt.Errorf("unexpected object type: %T", obj)
-			}
 		}
 		// Mutating the object like this should be done with caution,
 		// making sure that subsequent runs of the transformer function
