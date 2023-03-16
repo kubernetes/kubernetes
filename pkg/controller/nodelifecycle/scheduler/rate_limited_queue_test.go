@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -335,4 +336,51 @@ func TestAddAfterTry(t *testing.T) {
 		t.Errorf("We shouldn't process the same value if the explicit remove wasn't called.")
 		return true, 0
 	})
+}
+
+func TestUniqueQueue_Get(t *testing.T) {
+	tests := []struct {
+		name  string
+		queue TimedQueue
+		want  TimedValue
+		want1 bool
+	}{
+		{
+			name:  "queue is empty",
+			queue: TimedQueue{},
+			want:  TimedValue{},
+			want1: false,
+		},
+		{
+			name: "queue is not empty",
+			queue: TimedQueue{
+				&TimedValue{
+					Value: "foo",
+				},
+				&TimedValue{
+					Value: "bar",
+				},
+			},
+			want: TimedValue{
+				Value: "foo",
+			},
+			want1: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := &UniqueQueue{
+				lock:  sync.Mutex{},
+				queue: tt.queue,
+				set:   sets.String{},
+			}
+			got, got1 := q.Get()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("UniqueQueue.Get() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("UniqueQueue.Get() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
 }
