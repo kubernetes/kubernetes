@@ -598,6 +598,9 @@ message ListOptions {
   // compatibility reasons) and to false otherwise.
   // +optional
   optional bool sendInitialEvents = 11;
+
+  // +optional
+  optional bool ignoreStorageReadError = 12;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
