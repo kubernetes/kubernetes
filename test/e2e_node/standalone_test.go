@@ -30,8 +30,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -39,66 +40,78 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 	f := framework.NewDefaultFramework("static-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.It("can create a static Pod ", func(ctx context.Context) {
-
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	ginkgo.Context("when creating a static pod", func() {
 		var ns, podPath, staticPodName string
 
-		ns = f.Namespace.Name
-		staticPodName = "static-pod-" + string(uuid.NewUUID())
+		ginkgo.It("the pod should be running", func(ctx context.Context) {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
-		podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			err := createBasicStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
 
-		err := createBasicStaticPod(podPath, staticPodName, ns,
-			imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-		framework.ExpectNoError(err)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+				if err != nil {
+					return fmt.Errorf("error getting pod(%v/%v) from standalone kubelet: %v", ns, staticPodName, err)
+				}
 
-		file := staticPodPath(podPath, staticPodName, ns)
-		defer os.Remove(file)
+				isReady, err := testutils.PodRunningReady(pod)
+				if err != nil {
+					return fmt.Errorf("error checking if pod (%v/%v) is running ready: %v", ns, staticPodName, err)
+				}
+				if !isReady {
+					return fmt.Errorf("pod (%v/%v) is not running", ns, staticPodName)
+				}
+				return nil
+			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.BeNil())
+		})
 
-		gomega.Eventually(ctx, func() error {
-			pod, err := getPodStatus(ctx, staticPodName)
-			if err != nil {
-				return err
-			}
-			if pod.Status.Phase != v1.PodRunning {
-				return fmt.Errorf("pod %s is not running. Status: %v", staticPodName, pod.Status.Phase)
-			}
-			return nil
-		}, 1*time.Minute, 5*time.Second).Should(gomega.Succeed())
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
+			err := deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
+			})
+		})
 	})
 })
 
-func createBasicStaticPod(dir, name, namespace, image string, restart v1.RestartPolicy) error {
+func createBasicStaticPod(dir, name, namespace string) error {
 	podSpec := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
-			InitContainers: []v1.Container{
-				{
-					Name:  "init-1",
-					Image: busyboxImage,
-					Command: ExecCommand("init-1", execCommand{
-						Delay:    1,
-						ExitCode: 0,
-					}),
-				},
-			},
 			Containers: []v1.Container{
 				{
 					Name:  "regular1",
-					Image: busyboxImage,
-					Command: ExecCommand("regular1", execCommand{
-						Delay:    1000,
-						ExitCode: 0,
-					}),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{
+						"/bin/sh", "-c", "touch /tmp/healthy; sleep 10000",
+					},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceMemory: resource.MustParse("15Mi"),
@@ -107,30 +120,34 @@ func createBasicStaticPod(dir, name, namespace, image string, restart v1.Restart
 							v1.ResourceMemory: resource.MustParse("15Mi"),
 						},
 					},
+					ReadinessProbe: &v1.Probe{
+						InitialDelaySeconds: 2,
+						TimeoutSeconds:      2,
+						ProbeHandler: v1.ProbeHandler{
+							Exec: &v1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "cat /tmp/healthy"},
+							},
+						},
+					},
 				},
 			},
 		},
 	}
 
-	podYaml, err := kubeadmutil.MarshalToYaml(podSpec, v1.SchemeGroupVersion)
-	if err != nil {
-		return err
-	}
-
 	file := staticPodPath(dir, name, namespace)
-
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	_, err = f.Write(podYaml)
-	return err
+	y := printers.YAMLPrinter{}
+	y.PrintObj(podSpec, f)
+
+	return nil
 }
 
-// returns a status 200 response from the /configz endpoint or nil if fails
-func getPodStatus(ctx context.Context, name string) (*v1.Pod, error) {
+func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podName string) (*v1.Pod, error) {
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d/pods", ports.KubeletReadOnlyPort)
 	// TODO: we do not need TLS and bearer token for this test
 	tr := &http.Transport{
@@ -142,40 +159,37 @@ func getPodStatus(ctx context.Context, name string) (*v1.Pod, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
 	req.Header.Add("Accept", "application/json")
 
-	var pod *v1.Pod
-
 	resp, err := client.Do(req)
 	if err != nil {
+		framework.Logf("Failed to get /pods: %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("/pods response status not 200. Response was: %+v", resp)
+		framework.Logf("/pods response status not 200. Response was: %+v", resp)
+		return nil, fmt.Errorf("/pods response was not 200: %v", err)
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read body from /pods response %w", err)
+		return nil, fmt.Errorf("/pods response was unable to be read: %v", err)
 	}
 
 	pods, err := decodePods(respBody)
-	framework.ExpectNoError(err)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode /pods: %v", err)
+	}
 
-	found := false
 	for _, p := range pods.Items {
 		// Static pods has a node name suffix so comparing as substring
-		if strings.Contains(p.Name, name) {
-			found = true
-			pod = &p
+		p := p
+		if strings.Contains(p.Name, podName) && strings.Contains(p.Namespace, podNamespace) {
+			return &p, nil
 		}
 	}
 
-	if !found {
-		return nil, fmt.Errorf("pod %s not found in /pods response. Pods were: %v", name, string(respBody))
-	}
-
-	return pod, nil
+	return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, podName)
 }
 
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
