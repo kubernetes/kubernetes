@@ -52,6 +52,7 @@ var (
 		"linux/arm", "linux/386",
 		"windows/amd64", "linux/arm64",
 		"linux/ppc64le", "linux/s390x",
+		"linux/riscv64",
 		"windows/arm64",
 	}
 

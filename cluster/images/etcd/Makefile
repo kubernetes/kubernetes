@@ -51,7 +51,7 @@ OSVERSION ?= 1809
 OUTPUT_TYPE ?= docker
 
 ALL_OS = linux windows
-ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
+ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x riscv64
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
 ALL_OSVERSIONS.windows := 1809 ltsc2022
@@ -105,6 +105,9 @@ ifeq ($(ARCH),ppc64le)
 endif
 ifeq ($(ARCH),s390x)
     BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.3.0
+endif
+ifeq ($(ARCH),riscv64)
+    BASEIMAGE?=docker.io/riscv64/debian:sid-slim
 endif
 
 BASE.windows = mcr.microsoft.com/windows/nanoserver

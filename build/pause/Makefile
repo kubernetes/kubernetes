@@ -20,7 +20,7 @@ IMAGE = $(REGISTRY)/pause
 TAG ?= 3.9
 REV = $(shell git describe --contains --always --match='v*')
 
-# Architectures supported: amd64, arm, arm64, ppc64le and s390x
+# Architectures supported: amd64, arm, arm64, ppc64le, s390x or riscv64
 ARCH ?= amd64
 # Operating systems supported: linux, windows
 OS ?= linux
@@ -32,7 +32,7 @@ OSVERSION ?= 1809 ltsc2022
 OUTPUT_TYPE ?= docker
 
 ALL_OS = linux windows
-ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
+ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x riscv64
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
 ALL_OSVERSIONS.windows := 1809 ltsc2022
@@ -66,6 +66,7 @@ TRIPLE.linux-arm := arm-linux-gnueabihf
 TRIPLE.linux-arm64 := aarch64-linux-gnu
 TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
 TRIPLE.linux-s390x := s390x-linux-gnu
+TRIPLE.linux-riscv64 := riscv64-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base

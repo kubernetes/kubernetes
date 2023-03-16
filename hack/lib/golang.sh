@@ -26,6 +26,7 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/riscv64
 )
 
 # The node platforms we build for
@@ -34,6 +35,7 @@ readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/riscv64
   windows/amd64
 )
 
@@ -46,6 +48,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/riscv64
   darwin/amd64
   darwin/arm64
   windows/amd64
@@ -60,6 +63,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/riscv64
   darwin/amd64
   darwin/arm64
   windows/amd64
@@ -208,8 +212,8 @@ kube::golang::setup_platforms() {
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     host_arch=$(kube::util::host_arch)
-    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" && "${host_arch}" != "s390x" ]]; then
-      # on any platform other than amd64, arm64, ppc64le and s390x, we just default to amd64
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" && "${host_arch}" != "s390x" && "${host_arch}" != "riscv64" ]]; then
+      # on any platform other than amd64, arm64, ppc64le, s390x and riscv64, we just default to amd64
       host_arch="amd64"
     fi
     KUBE_SERVER_PLATFORMS=("linux/${host_arch}")

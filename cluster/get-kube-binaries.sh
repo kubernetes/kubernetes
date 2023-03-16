@@ -28,6 +28,7 @@
 #    * arm64
 #    * ppc64le
 #    * s390x
+#    * riscv64
 #
 #  Set KUBERNETES_CLIENT_OS to choose the client OS to download:
 #    * current OS [default]
@@ -42,6 +43,7 @@
 #    * arm64
 #    * ppc64le
 #    * s390x
+#    * riscv64
 #    * windows
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
@@ -120,9 +122,12 @@ function detect_client_info() {
       s390x*)
         CLIENT_ARCH="s390x"
         ;;
+      riscv64*)
+        CLIENT_ARCH="riscv64"
+        ;;
       *)
         echo "Unknown, unsupported architecture (${machine})." >&2
-        echo "Supported architectures x86_64, i686, arm, arm64, ppc64le, s390x." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, ppc64le, s390x, riscv64." >&2
         echo "Bailing out." >&2
         exit 3
         ;;

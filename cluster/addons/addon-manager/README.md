@@ -54,6 +54,9 @@ $ make push ARCH=ppc64le
 
 $ make push ARCH=s390x
 # ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-s390x:VERSION
+
+$ make push ARCH=riscv64
+# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-riscv64:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
