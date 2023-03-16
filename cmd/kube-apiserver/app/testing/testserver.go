@@ -58,7 +58,7 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 -----END EC PRIVATE KEY-----`
 
 // TearDownFunc is to be called to tear down a test server.
-type TearDownFunc func()
+type TearDownFunc func(restart bool)
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
@@ -99,19 +99,23 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config, oldTestServer *TestServer) (result TestServer, err error) {
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
 	}
 
-	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
+	if oldTestServer != nil && len((*oldTestServer).TmpDir) > 0 {
+		result.TmpDir = (*oldTestServer).TmpDir
+	} else {
+		result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
+		if err != nil {
+			return result, fmt.Errorf("failed to create temp dir: %v", err)
+		}
 	}
 
 	stopCh := make(chan struct{})
 	var errCh chan error
-	tearDown := func() {
+	tearDown := func(restart bool) {
 		// Closing stopCh is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
 		close(stopCh)
@@ -124,11 +128,13 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 				klog.Errorf("Failed to shutdown test server clearly: %v", err)
 			}
 		}
-		os.RemoveAll(result.TmpDir)
+		if !restart {
+			os.RemoveAll(result.TmpDir)
+		}
 	}
 	defer func() {
 		if result.TearDownFn == nil {
-			tearDown()
+			tearDown(false)
 		}
 	}()
 
@@ -345,8 +351,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
-	result.TearDownFn = func() {
-		tearDown()
+	result.TearDownFn = func(restart bool) {
+		tearDown(restart)
 		etcdClient.Close()
 	}
 	result.EtcdClient = etcdClient
@@ -357,7 +363,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
 func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
-	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
+	result, err := StartTestServer(t, instanceOptions, flags, storageConfig, nil)
 	if err == nil {
 		return &result
 	}

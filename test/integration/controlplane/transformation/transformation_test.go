@@ -84,11 +84,19 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string) (*transformTest, error) {
-	e := transformTest{
-		logger:            l,
-		transformerConfig: transformerConfigYAML,
-		storageConfig:     framework.SharedEtcd(),
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, oldTest *transformTest) (*transformTest, error) {
+	var e transformTest
+	if oldTest != nil {
+		e = *oldTest
+		if transformerConfigYAML != "" {
+			e.transformerConfig = transformerConfigYAML
+		}
+	} else {
+		e = transformTest{
+			logger:            l,
+			transformerConfig: transformerConfigYAML,
+			storageConfig:     framework.SharedEtcd(),
+		}
 	}
 
 	var err error
@@ -102,7 +110,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		e.configDir = configDir
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig, &e.kubeAPIServer); err != nil {
 		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
@@ -110,9 +118,10 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
 		return nil, fmt.Errorf("error while creating rest client: %v", err)
 	}
-
-	if e.ns, err = e.createNamespace(testNamespace); err != nil {
-		return nil, err
+	if oldTest == nil {
+		if e.ns, err = e.createNamespace(testNamespace); err != nil {
+			return nil, err
+		}
 	}
 
 	if transformerConfigYAML != "" && reload {
@@ -131,13 +140,12 @@ func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
 
 	if e.kubeAPIServer.ClientConfig != nil {
-		e.shutdownAPIServer()
+		e.shutdownAPIServer(false)
 	}
 }
 
-func (e *transformTest) shutdownAPIServer() {
-	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
-	e.kubeAPIServer.TearDownFn()
+func (e *transformTest) shutdownAPIServer(restart bool) {
+	e.kubeAPIServer.TearDownFn(restart)
 }
 
 func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretFunc unSealSecret, expectedEnvelopePrefix,
@@ -189,7 +197,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 
 	// Data should be un-enveloped on direct reads from Kube API Server.
 	if resource == "secrets" {
-		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
+		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 		}
