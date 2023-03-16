@@ -1091,14 +1091,6 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	}
 
 	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
-	activePods := kl.filterOutInactivePods(allPods)
-	allRegularPods, allStaticPods := splitPodsByStatic(allPods)
-	activeRegularPods, activeStaticPods := splitPodsByStatic(activePods)
-	metrics.DesiredPodCount.WithLabelValues("").Set(float64(len(allRegularPods)))
-	metrics.DesiredPodCount.WithLabelValues("true").Set(float64(len(allStaticPods)))
-	metrics.ActivePodCount.WithLabelValues("").Set(float64(len(activeRegularPods)))
-	metrics.ActivePodCount.WithLabelValues("true").Set(float64(len(activeStaticPods)))
-	metrics.MirrorPodCount.Set(float64(len(mirrorPods)))
 
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave regardless of the restart policy. The statuses
@@ -1195,6 +1187,17 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// pod worker)
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
 	kl.deleteOrphanedMirrorPods()
+
+	// After pruning pod workers for terminated pods get the list of active pods for
+	// metrics and to determine restarts.
+	activePods := kl.filterOutInactivePods(allPods)
+	allRegularPods, allStaticPods := splitPodsByStatic(allPods)
+	activeRegularPods, activeStaticPods := splitPodsByStatic(activePods)
+	metrics.DesiredPodCount.WithLabelValues("").Set(float64(len(allRegularPods)))
+	metrics.DesiredPodCount.WithLabelValues("true").Set(float64(len(allStaticPods)))
+	metrics.ActivePodCount.WithLabelValues("").Set(float64(len(activeRegularPods)))
+	metrics.ActivePodCount.WithLabelValues("true").Set(float64(len(activeStaticPods)))
+	metrics.MirrorPodCount.Set(float64(len(mirrorPods)))
 
 	// At this point, the pod worker is aware of which pods are not desired (SyncKnownPods).
 	// We now look through the set of active pods for those that the pod worker is not aware of
