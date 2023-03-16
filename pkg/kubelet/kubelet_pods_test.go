@@ -2152,11 +2152,17 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod    *v1.Pod
-		status v1.PodPhase
-		test   string
+		pod           *v1.Pod
+		podIsTerminal bool
+		status        v1.PodPhase
+		test          string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "waiting"},
+		{
+			&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}},
+			false,
+			v1.PodPending,
+			"waiting",
+		},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -2167,6 +2173,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"all running",
 		},
@@ -2180,8 +2187,37 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"all stopped with restart always",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			true,
+			v1.PodSucceeded,
+			"all succeeded with restart always, but the pod is terminal",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						failedState("containerB"),
+					},
+				},
+			},
+			true,
+			v1.PodFailed,
+			"all stopped with restart always, but the pod is terminal",
 		},
 		{
 			&v1.Pod{
@@ -2193,6 +2229,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"mixed state #1 with restart always",
 		},
@@ -2205,6 +2242,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"mixed state #2 with restart always",
 		},
@@ -2218,6 +2256,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"mixed state #3 with restart always",
 		},
@@ -2231,12 +2270,13 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"backoff crashloop container with restart always",
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2339,7 +2379,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2439,7 +2479,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2542,7 +2582,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2655,7 +2695,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2785,13 +2825,14 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		currentStatus                  *kubecontainer.PodStatus
 		unreadyContainer               []string
 		previousStatus                 v1.PodStatus
+		isPodTerminal                  bool
 		enablePodDisruptionConditions  bool
 		expected                       v1.PodStatus
 		expectedPodDisruptionCondition v1.PodCondition
 		expectedPodHasNetworkCondition v1.PodCondition
 	}{
 		{
-			name: "pod disruption condition is copied over; PodDisruptionConditions enabled",
+			name: "pod disruption condition is copied over and the phase is set to failed when deleted; PodDisruptionConditions enabled",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -2819,15 +2860,16 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					LastTransitionTime: normalized_now,
 				}},
 			},
+			isPodTerminal:                 true,
 			enablePodDisruptionConditions: true,
 			expected: v1.PodStatus{
-				Phase:    v1.PodRunning,
+				Phase:    v1.PodFailed,
 				HostIP:   "127.0.0.1",
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
-					{Type: v1.PodReady, Status: v1.ConditionTrue},
-					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
 				ContainerStatuses: []v1.ContainerStatus{
@@ -3223,7 +3265,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 				}
 				expected := test.expected.DeepCopy()
-				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
+				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus, test.isPodTerminal)
 				if enablePodHasNetworkCondition {
 					expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, expected.Conditions...)
 				}
@@ -3761,7 +3803,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus)
+			status := kl.generateAPIPodStatus(pod, criStatus, false)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -3874,7 +3916,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			}
 			podStatus.IPs = tc.nodeIPs
 
-			status := kl.generateAPIPodStatus(pod, podStatus)
+			status := kl.generateAPIPodStatus(pod, podStatus, false)
 			if !reflect.DeepEqual(status.PodIPs, tc.expectedPodIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedPodIPs, status.PodIPs)
 			}
@@ -4007,7 +4049,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus)
+			status := kl.generateAPIPodStatus(pod, criStatus, false)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
