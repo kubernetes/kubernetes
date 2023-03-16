@@ -159,7 +159,8 @@ type PodWorkers interface {
 	// returned as knownPods.
 	SyncKnownPods(desiredPods []*v1.Pod) (knownPods map[types.UID]PodWorkerSync)
 
-	// IsPodKnownTerminated returns true if the provided pod UID is known by the pod
+	// IsPodKnownTerminated returns true once SyncTerminatingPod completes
+	// successfully - the provided pod UID it is known by the pod
 	// worker to be terminated. If the pod has been force deleted and the pod worker
 	// has completed termination this method will return false, so this method should
 	// only be used to filter out pods from the desired set such as in admission.
@@ -174,6 +175,19 @@ type PodWorkers interface {
 	// Intended for use by the kubelet config loops, but not subsystems, which should
 	// use ShouldPod*().
 	CouldHaveRunningContainers(uid types.UID) bool
+
+	// ShouldPodBeFinished returns true once SyncTerminatedPod completes
+	// successfully - the provided pod UID it is known to the pod worker to
+	// be terminated and have resources reclaimed. It returns false before the
+	// pod workers have synced (syncPod could be called). Once the pod workers
+	// have synced it returns false if the pod has a sync status until
+	// SyncTerminatedPod completes successfully. If the pod workers have synced,
+	// but the pod does not have a status it returns true.
+	//
+	// Intended for use by subsystem sync loops to avoid performing background setup
+	// after termination has been requested for a pod. Callers must ensure that the
+	// syncPod method is non-blocking when their data is absent.
+	ShouldPodBeFinished(uid types.UID) bool
 	// IsPodTerminationRequested returns true when pod termination has been requested
 	// until the termination completes and the pod is removed from config. This should
 	// not be used in cleanup loops because it will return false if the pod has already
@@ -521,7 +535,7 @@ func (s *podSyncStatus) mergeLastUpdate(other UpdatePodOptions) {
 //	.                         ^ other loops can tear down
 //	.                               .
 //
-// ------------------------------------|  |---- = status manager is waiting for PodResourcesAreReclaimed()
+// ------------------------------------|  |---- = status manager is waiting for SyncTerminatedPod() finished
 //
 //	.                         ^     .
 //
@@ -623,6 +637,17 @@ func (p *podWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 	}
 	// once all pods are synced, any pod without sync status is known to not be running.
 	return !p.podsSynced
+}
+
+func (p *podWorkers) ShouldPodBeFinished(uid types.UID) bool {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if status, ok := p.podSyncStatuses[uid]; ok {
+		return status.IsFinished()
+	}
+	// once all pods are synced, any pod without sync status is assumed to
+	// have SyncTerminatedPod finished.
+	return p.podsSynced
 }
 
 func (p *podWorkers) IsPodTerminationRequested(uid types.UID) bool {

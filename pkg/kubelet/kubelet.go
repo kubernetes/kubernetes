@@ -1479,7 +1479,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		os.Exit(1)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.PodIsFinished, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
@@ -1689,7 +1689,7 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 	}
 
 	// Generate final API pod status with pod and status manager status
-	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
 	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
 	// set pod IP to hostIP directly in runtime.GetPodStatus
@@ -1941,7 +1941,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
-	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
 	}
@@ -2014,6 +2014,13 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 		}
 	}
 
+	// Compute and update the status in cache once the pods are no longer running.
+	// The computation is done here to ensure the pod status used for it contains
+	// information about the container end states (including exit codes) - when
+	// SyncTerminatedPod is called the containers may already be removed.
+	apiPodStatus = kl.generateAPIPodStatus(pod, podStatus, true)
+	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
 	klog.V(4).InfoS("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
 
@@ -2050,8 +2057,8 @@ func (kl *Kubelet) SyncTerminatingRuntimePod(_ context.Context, runningPod *kube
 }
 
 // SyncTerminatedPod cleans up a pod that has terminated (has no running containers).
-// The invocations in this call are expected to tear down what PodResourcesAreReclaimed checks (which
-// gates pod deletion). When this method exits the pod is expected to be ready for cleanup. This method
+// The invocations in this call are expected to tear down all pod resources.
+// When this method exits the pod is expected to be ready for cleanup. This method
 // reduces the latency of pod cleanup but is not guaranteed to get called in all scenarios.
 //
 // Because the kubelet has no local store of information, all actions in this method that modify
@@ -2071,7 +2078,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
-	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, true)
 
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
@@ -2081,6 +2088,21 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		return err
 	}
 	klog.V(4).InfoS("Pod termination unmounted volumes", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if !kl.keepTerminatedPodVolumes {
+		// This waiting loop relies on the background cleanup which starts after pod workers respond
+		// true for ShouldPodRuntimeBeRemoved, which happens after `SyncTerminatingPod` is completed.
+		if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+			volumesExist := kl.podVolumesExist(pod.UID)
+			if volumesExist {
+				klog.V(3).InfoS("Pod is terminated, but some volumes have not been cleaned up", "pod", klog.KObj(pod), "podUID", pod.UID)
+			}
+			return !volumesExist, nil
+		}); err != nil {
+			return err
+		}
+		klog.V(3).InfoS("Pod termination cleaned up volume paths", "pod", klog.KObj(pod), "podUID", pod.UID)
+	}
 
 	// After volume unmount is complete, let the secret and configmap managers know we're done with this pod
 	if kl.secretManager != nil {

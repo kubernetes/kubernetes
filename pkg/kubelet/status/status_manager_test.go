@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
@@ -747,13 +748,25 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 		expectFn func(t *testing.T, status v1.PodStatus)
 	}{
 		{pod: newPod(0, 1, func(pod *v1.Pod) { pod.Status.Phase = v1.PodFailed })},
-		{pod: newPod(0, 1, func(pod *v1.Pod) { pod.Status.Phase = v1.PodRunning })},
-		{pod: newPod(0, 1, func(pod *v1.Pod) {
-			pod.Status.Phase = v1.PodRunning
-			pod.Status.ContainerStatuses = []v1.ContainerStatus{
-				{Name: "0", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}}},
-			}
-		})},
+		{
+			pod: newPod(0, 1, func(pod *v1.Pod) {
+				pod.Status.Phase = v1.PodRunning
+			}),
+			expectFn: func(t *testing.T, status v1.PodStatus) {
+				status.Phase = v1.PodFailed
+			},
+		},
+		{
+			pod: newPod(0, 1, func(pod *v1.Pod) {
+				pod.Status.Phase = v1.PodRunning
+				pod.Status.ContainerStatuses = []v1.ContainerStatus{
+					{Name: "0", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}}},
+				}
+			}),
+			expectFn: func(t *testing.T, status v1.PodStatus) {
+				status.Phase = v1.PodFailed
+			},
+		},
 		{
 			name: "last termination state set",
 			pod: newPod(0, 1, func(pod *v1.Pod) {
@@ -993,6 +1006,78 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 				if len(diff) == 0 {
 					t.Fatalf("diff returned no results for failed DeepEqual: %#v != %#v", expected.Status, status)
 				}
+				t.Fatalf("unexpected status: %s", diff)
+			}
+		})
+	}
+}
+
+func TestTerminatePod_EnsurePodPhaseIsTerminal(t *testing.T) {
+	testCases := map[string]struct {
+		enablePodDisruptionConditions bool
+		status                        v1.PodStatus
+		wantStatus                    v1.PodStatus
+	}{
+		"Pending pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Running pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Succeeded pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+			},
+		},
+		"Failed pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Unknown pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodUnknown,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Unknown phase pod": {
+			status: v1.PodStatus{
+				Phase: v1.PodPhase("SomeUnknownPhase"),
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)
+
+			pod := getTestPod()
+			pod.Status = tc.status
+			syncer.TerminatePod(pod)
+			gotStatus := expectPodStatus(t, syncer, pod.DeepCopy())
+			if diff := cmp.Diff(tc.wantStatus, gotStatus, cmpopts.IgnoreFields(v1.PodStatus{}, "StartTime")); diff != "" {
 				t.Fatalf("unexpected status: %s", diff)
 			}
 		})
@@ -1270,36 +1355,32 @@ func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
 	return status
 }
 
-func TestDeletePods(t *testing.T) {
+func TestDeletePodBeforeFinished(t *testing.T) {
 	pod := getTestPod()
 	t.Logf("Set the deletion timestamp.")
 	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	client := fake.NewSimpleClientset(pod)
 	m := newTestManager(client)
-	m.podDeletionSafety.(*statustest.FakePodDeletionSafetyProvider).Reclaimed = true
 	m.podManager.AddPod(pod)
 	status := getRandomPodStatus()
-	now := metav1.Now()
-	status.StartTime = &now
+	status.Phase = v1.PodFailed
 	m.SetPodStatus(pod, status)
-	t.Logf("Expect to see a delete action.")
-	verifyActions(t, m, []core.Action{getAction(), patchAction(), deleteAction()})
+	t.Logf("Expect not to see a delete action as the pod isn't finished yet (TerminatePod isn't called)")
+	verifyActions(t, m, []core.Action{getAction(), patchAction()})
 }
 
-func TestDeletePodWhileReclaiming(t *testing.T) {
+func TestDeletePodFinished(t *testing.T) {
 	pod := getTestPod()
 	t.Logf("Set the deletion timestamp.")
 	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	client := fake.NewSimpleClientset(pod)
 	m := newTestManager(client)
-	m.podDeletionSafety.(*statustest.FakePodDeletionSafetyProvider).Reclaimed = false
 	m.podManager.AddPod(pod)
 	status := getRandomPodStatus()
-	now := metav1.Now()
-	status.StartTime = &now
-	m.SetPodStatus(pod, status)
-	t.Logf("Expect to see a delete action.")
-	verifyActions(t, m, []core.Action{getAction(), patchAction()})
+	status.Phase = v1.PodFailed
+	m.TerminatePod(pod)
+	t.Logf("Expect to see a delete action as the pod is finished (TerminatePod called)")
+	verifyActions(t, m, []core.Action{getAction(), patchAction(), deleteAction()})
 }
 
 func TestDoNotDeleteMirrorPods(t *testing.T) {

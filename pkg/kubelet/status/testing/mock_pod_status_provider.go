@@ -104,20 +104,6 @@ func (mr *MockPodDeletionSafetyProviderMockRecorder) PodCouldHaveRunningContaine
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodCouldHaveRunningContainers", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodCouldHaveRunningContainers), pod)
 }
 
-// PodResourcesAreReclaimed mocks base method.
-func (m *MockPodDeletionSafetyProvider) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PodResourcesAreReclaimed", pod, status)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// PodResourcesAreReclaimed indicates an expected call of PodResourcesAreReclaimed.
-func (mr *MockPodDeletionSafetyProviderMockRecorder) PodResourcesAreReclaimed(pod, status interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodResourcesAreReclaimed", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodResourcesAreReclaimed), pod, status)
-}
-
 // MockPodStartupLatencyStateHelper is a mock of PodStartupLatencyStateHelper interface.
 type MockPodStartupLatencyStateHelper struct {
 	ctrl     *gomock.Controller
