@@ -243,6 +243,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	if len(configAuthInfo.Impersonate) > 0 {
 		config.Impersonate = rest.ImpersonationConfig{
 			UserName: configAuthInfo.Impersonate,
+			UID:      configAuthInfo.ImpersonateUID,
 			Groups:   configAuthInfo.ImpersonateGroups,
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
