@@ -22,8 +22,14 @@ import (
 	"crypto/cipher"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
@@ -66,7 +72,10 @@ resources:
   - resources:
     - secrets
     providers:
-    - identity: {}
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: dXBlcnByZGVscHJkZWxwCg==
 `
 )
 
@@ -98,6 +107,72 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
 		test.cleanUp()
 	}
+}
+
+func TestWhatHappensWhenStuffStopsWorking(t *testing.T) {
+	test, err := newTransformTest(t, aesGCMConfigYAML, true, "")
+	defer test.cleanUp()
+	if err != nil {
+		t.Errorf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
+		return
+	}
+
+	for _, s := range []string{"a", "b", "c"} {
+		name := "pre-fail-" + s
+		_, err = test.createSecret(name, testNamespace)
+		if err != nil {
+			t.Fatalf("Failed to create test secret, error: %v", err)
+		}
+	}
+	test.secret, err = test.createSecret(testSecret, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+	test.runResource(test.logger, unSealWithGCMTransformer, aesGCMPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
+
+	encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
+	if err := os.WriteFile(encryptionConf, []byte(identityConfigYAML), 0o644); err != nil {
+		t.Fatalf("failed to write encryption config that's going to make encryption fail")
+	}
+
+	var secretErr error
+	err = wait.PollImmediate(1*time.Second, 2*time.Minute, func() (done bool, err error) {
+		if _, secretErr = test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), testSecret, metav1.GetOptions{}); secretErr == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+
+	t.Errorf("correctly failed; secretErr: %v; err: %v", secretErr, err)
+
+	for _, s := range []string{"a", "b", "c"} {
+		name := "post-fail-" + s
+		_, err = test.createSecret(name, testNamespace)
+		if err != nil {
+			t.Fatalf("Failed to create test secret, error: %v", err)
+		}
+	}
+	secret, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), "post-fail-a", metav1.GetOptions{})
+	t.Logf("shouldn't have failed: %v; %s/%s", err, secret.Namespace, secret.Name)
+
+	_, secretErr = test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{})
+
+	t.Logf("secretErr: %v", secretErr)
+	newNS, err := test.restClient.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "pokus"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create the ns: %v", err)
+	}
+
+	_, err = test.createSecret("somesecret", newNS.Name)
+	if err != nil {
+		t.Fatalf("failed to create the ns: %v", err)
+	}
+
+	secretList, secretErr := test.restClient.CoreV1().Secrets(newNS.Name).List(context.Background(), metav1.ListOptions{})
+	t.Logf("listing secrets: %v\n%v", secretErr, secretList)
+
+	secretList, secretErr = test.restClient.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{IgnoreStorageReadError: true})
+	t.Fatalf("listing secrets, ignoring errors: %v\n%v", secretErr, secretList)
 }
 
 // Baseline (no enveloping) - use to contrast with enveloping benchmarks.

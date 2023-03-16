@@ -393,6 +393,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 			client.Close()
 		})
 	}
+	// TODO:(stlaz) - so... here?
 	transformer := c.Transformer
 	if transformer == nil {
 		transformer = identity.NewEncryptCheckTransformer()

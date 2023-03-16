@@ -128,11 +128,11 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 }
 
 func (e *transformTest) cleanUp() {
-	os.RemoveAll(e.configDir)
-
 	if e.kubeAPIServer.ClientConfig != nil {
 		e.shutdownAPIServer()
 	}
+
+	os.RemoveAll(e.configDir)
 }
 
 func (e *transformTest) shutdownAPIServer() {

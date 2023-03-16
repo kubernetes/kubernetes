@@ -274,4 +274,5 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	IgnoreReadError   bool
 }

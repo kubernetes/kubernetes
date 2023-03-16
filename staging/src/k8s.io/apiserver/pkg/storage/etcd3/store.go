@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -98,6 +99,7 @@ func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object,
 	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
 }
 
+// TODO: (stlaz): aaand here is the transformer pasted into an actual store
 func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := storage.APIObjectVersioner{}
 	// for compatibility with etcd2 impl.
@@ -152,9 +154,10 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	}
 	kv := getResp.Kvs[0]
 
+	// TODO: this is where the decrypt would likely fail (among other places)
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return storage.NewInternalError(err.Error())
+		return apierrors.NewStorageReadError(s.groupResource, key, map[string]error{preparedKey: err})
 	}
 
 	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
@@ -750,6 +753,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
+		var failedKeys map[string]error = make(map[string]error)
 		for i, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= pred.Limit {
 				hasMore = true
@@ -759,7 +763,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+				failedKeys[string(kv.Key)] = err
+				continue
 			}
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
@@ -770,6 +775,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
+		}
+		if len(failedKeys) > 0 {
+			err = apierrors.NewStorageReadError(s.groupResource, key, failedKeys)
+			if !opts.IgnoreReadError {
+				return err
+			}
+			warning.AddWarning(ctx, "", err.Error())
 		}
 
 		// indicate to the client which resource version was returned

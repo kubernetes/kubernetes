@@ -363,6 +363,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		ResourceVersion:      options.ResourceVersion,
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            p,
+		IgnoreReadError:      options.IgnoreStorageReadError,
 		Recursive:            true,
 	}
 
@@ -882,6 +883,8 @@ func shouldDeleteDependents(ctx context.Context, e *Store, accessor metav1.Objec
 // The finalizers returned are intended to be handled by the garbage collector.
 // If garbage collection is disabled for the store, this function returns false
 // to ensure finalizers aren't set which will never be cleared.
+//
+// TODO(stlaz): could be important
 func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
 	if !e.EnableGarbageCollection {
 		return false, []string{}
