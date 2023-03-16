@@ -24,14 +24,13 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	netutils "k8s.io/utils/net"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -297,5 +296,36 @@ func TestNodeSyncDelete(t *testing.T) {
 					tc.desc, tc.mode, hasError, tc.fake.events, tc.wantError)
 			}
 		*/
+	}
+}
+
+func TestIsValidMode(t *testing.T) {
+	tests := []struct {
+		name string
+		mode NodeSyncMode
+		want bool
+	}{
+		{
+			name: "node sync mode is SyncFromCloud",
+			mode: "SyncFromCloud",
+			want: true,
+		},
+		{
+			name: "node sync mode is SyncFromCloud",
+			mode: "SyncFromCluster",
+			want: true,
+		},
+		{
+			name: "other mode",
+			mode: "",
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidMode(tt.mode); got != tt.want {
+				t.Errorf("IsValidMode() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
