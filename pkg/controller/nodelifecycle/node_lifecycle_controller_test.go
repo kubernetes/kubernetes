@@ -3365,3 +3365,59 @@ func Test_isNodeExcludedFromDisruptionChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestController_HealthyQPSFunc(t *testing.T) {
+	tests := []struct {
+		name    string
+		qps     float32
+		nodeNum int
+		want    float32
+	}{
+		{
+			name:    "test get qps",
+			qps:     3.14,
+			nodeNum: 0,
+			want:    3.14,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nc := &Controller{
+				evictionLimiterQPS: tt.qps,
+			}
+			if got := nc.HealthyQPSFunc(tt.nodeNum); got != tt.want {
+				t.Errorf("Controller.HealthyQPSFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestController_ReducedQPSFunc(t *testing.T) {
+	tests := []struct {
+		name    string
+		nodeNum int
+		want    float32
+	}{
+		{
+			name:    "nodeNum is larger than largeClusterThreshold",
+			nodeNum: 6,
+			want:    3.14,
+		},
+		{
+			name:    "nodeNum is not larger than largeClusterThreshold",
+			nodeNum: 3,
+			want:    0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nc := &Controller{
+				secondaryEvictionLimiterQPS: 3.14,
+				largeClusterThreshold:       5,
+			}
+			if got := nc.ReducedQPSFunc(tt.nodeNum); got != tt.want {
+				t.Errorf("Controller.ReducedQPSFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
