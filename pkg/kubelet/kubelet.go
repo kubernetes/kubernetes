@@ -2700,6 +2700,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+			return
 		}
 		pod = updatedPod
 	}
@@ -2708,6 +2709,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 		if err := kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(pod))
+			return
 		}
 		pod.Status.Resize = resizeStatus
 	}
