@@ -72,10 +72,14 @@ type globalVolumeInfo struct {
 }
 
 func (rc *reconciler) updateLastSyncTime() {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	rc.timeOfLastSync = time.Now()
 }
 
 func (rc *reconciler) StatesHasBeenSynced() bool {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	return !rc.timeOfLastSync.IsZero()
 }
 

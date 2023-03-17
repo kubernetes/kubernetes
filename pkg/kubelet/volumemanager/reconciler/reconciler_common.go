@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -139,10 +140,12 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
 	kubeletPodsDir                string
-	timeOfLastSync                time.Time
-	volumesFailedReconstruction   []podVolume
-	volumesNeedDevicePath         []v1.UniqueVolumeName
-	volumesNeedReportedInUse      []v1.UniqueVolumeName
+	// lock protects timeOfLastSync for updating and checking
+	timeOfLastSyncLock          sync.Mutex
+	timeOfLastSync              time.Time
+	volumesFailedReconstruction []podVolume
+	volumesNeedDevicePath       []v1.UniqueVolumeName
+	volumesNeedReportedInUse    []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {

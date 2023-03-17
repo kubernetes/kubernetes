@@ -20,6 +20,7 @@ package options
 import (
 	"fmt"
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -138,7 +139,7 @@ func NewKubeletFlags() *KubeletFlags {
 	return &KubeletFlags{
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
 		CertDirectory:           "/var/lib/kubelet/pki",
-		RootDirectory:           defaultRootDir,
+		RootDirectory:           filepath.Clean(defaultRootDir),
 		MaxContainerCount:       -1,
 		MaxPerPodContainerCount: 1,
 		MinimumGCAge:            metav1.Duration{Duration: 0},
