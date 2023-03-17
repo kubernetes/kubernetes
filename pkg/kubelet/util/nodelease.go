@@ -39,7 +39,7 @@ func SetNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordi
 			if node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{}); err == nil {
 				lease.OwnerReferences = []metav1.OwnerReference{
 					{
-						APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+						APIVersion: corev1.SchemeGroupVersion.String(),
 						Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
 						Name:       nodeName,
 						UID:        node.UID,
