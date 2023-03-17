@@ -517,56 +517,55 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tracer := kubeDeps.TracerProvider.Tracer(instrumentationScope)
 
 	klet := &Kubelet{
-		hostname:                                hostname,
-		hostnameOverridden:                      hostnameOverridden,
-		nodeName:                                nodeName,
-		kubeClient:                              kubeDeps.KubeClient,
-		heartbeatClient:                         kubeDeps.HeartbeatClient,
-		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                           filepath.Clean(rootDirectory),
-		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
-		registerNode:                            registerNode,
-		registerWithTaints:                      registerWithTaints,
-		registerSchedulable:                     registerSchedulable,
-		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
-		serviceLister:                           serviceLister,
-		serviceHasSynced:                        serviceHasSynced,
-		nodeLister:                              nodeLister,
-		nodeHasSynced:                           nodeHasSynced,
-		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		recorder:                                kubeDeps.Recorder,
-		cadvisor:                                kubeDeps.CAdvisorInterface,
-		cloud:                                   kubeDeps.Cloud,
-		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
-		providerID:                              providerID,
-		nodeRef:                                 nodeRef,
-		nodeLabels:                              nodeLabels,
-		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
-		nodeStatusReportFrequency:               kubeCfg.NodeStatusReportFrequency.Duration,
-		os:                                      kubeDeps.OSInterface,
-		oomWatcher:                              oomWatcher,
-		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                              kubeCfg.CgroupRoot,
-		mounter:                                 kubeDeps.Mounter,
-		hostutil:                                kubeDeps.HostUtil,
-		subpather:                               kubeDeps.Subpather,
-		maxPods:                                 int(kubeCfg.MaxPods),
-		podsPerCore:                             int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:                         atomic.Value{},
-		daemonEndpoints:                         daemonEndpoints,
-		containerManager:                        kubeDeps.ContainerManager,
-		nodeIPs:                                 nodeIPs,
-		nodeIPValidator:                         validateNodeIP,
-		clock:                                   clock.RealClock{},
-		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
-		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
-		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
-		nodeStatusMaxImages:                     nodeStatusMaxImages,
-		tracer:                                  tracer,
+		hostname:                       hostname,
+		hostnameOverridden:             hostnameOverridden,
+		nodeName:                       nodeName,
+		kubeClient:                     kubeDeps.KubeClient,
+		heartbeatClient:                kubeDeps.HeartbeatClient,
+		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
+		rootDirectory:                  filepath.Clean(rootDirectory),
+		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
+		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		registerNode:                   registerNode,
+		registerWithTaints:             registerWithTaints,
+		registerSchedulable:            registerSchedulable,
+		dnsConfigurer:                  dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
+		serviceLister:                  serviceLister,
+		serviceHasSynced:               serviceHasSynced,
+		nodeLister:                     nodeLister,
+		nodeHasSynced:                  nodeHasSynced,
+		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		recorder:                       kubeDeps.Recorder,
+		cadvisor:                       kubeDeps.CAdvisorInterface,
+		cloud:                          kubeDeps.Cloud,
+		externalCloudProvider:          cloudprovider.IsExternal(cloudProvider),
+		providerID:                     providerID,
+		nodeRef:                        nodeRef,
+		nodeLabels:                     nodeLabels,
+		nodeStatusUpdateFrequency:      kubeCfg.NodeStatusUpdateFrequency.Duration,
+		nodeStatusReportFrequency:      kubeCfg.NodeStatusReportFrequency.Duration,
+		os:                             kubeDeps.OSInterface,
+		oomWatcher:                     oomWatcher,
+		cgroupsPerQOS:                  kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                     kubeCfg.CgroupRoot,
+		mounter:                        kubeDeps.Mounter,
+		hostutil:                       kubeDeps.HostUtil,
+		subpather:                      kubeDeps.Subpather,
+		maxPods:                        int(kubeCfg.MaxPods),
+		podsPerCore:                    int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:                atomic.Value{},
+		daemonEndpoints:                daemonEndpoints,
+		containerManager:               kubeDeps.ContainerManager,
+		nodeIPs:                        nodeIPs,
+		nodeIPValidator:                validateNodeIP,
+		clock:                          clock.RealClock{},
+		enableControllerAttachDetach:   kubeCfg.EnableControllerAttachDetach,
+		makeIPTablesUtilChains:         kubeCfg.MakeIPTablesUtilChains,
+		iptablesMasqueradeBit:          int(kubeCfg.IPTablesMasqueradeBit),
+		iptablesDropBit:                int(kubeCfg.IPTablesDropBit),
+		keepTerminatedPodVolumes:       keepTerminatedPodVolumes,
+		nodeStatusMaxImages:            nodeStatusMaxImages,
+		tracer:                         tracer,
 	}
 
 	if klet.cloud != nil {
@@ -594,10 +593,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 		klet.secretManager = secretManager
 		klet.configMapManager = configMapManager
-	}
-
-	if klet.experimentalHostUserNamespaceDefaulting {
-		klog.InfoS("Experimental host user namespace defaulting is enabled")
 	}
 
 	machineInfo, err := klet.cadvisor.MachineInfo()
@@ -1226,13 +1221,6 @@ type Kubelet struct {
 
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator
-
-	// experimentalHostUserNamespaceDefaulting sets userns=true when users request host namespaces (pid, ipc, net),
-	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
-	// or using host path volumes.
-	// This should only be enabled when the container runtime is performing user remapping AND if the
-	// experimental behavior is desired.
-	experimentalHostUserNamespaceDefaulting bool
 
 	// StatsProvider provides the node and the container stats.
 	StatsProvider *stats.Provider

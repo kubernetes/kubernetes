@@ -294,10 +294,9 @@ const (
 
 	// owner: @pweil-
 	// alpha: v1.5
+	// deprecated: v1.28
 	//
-	// Default userns=host for containers that are using other host namespaces, host mounts, the pod
-	// contains a privileged container, or specific non-namespaced capabilities (MKNOD, SYS_MODULE,
-	// SYS_TIME). This should only be enabled if user namespace remapping is enabled in the docker daemon.
+	// This flag used to be needed for dockershim CRI and currently does nothing.
 	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
 
 	// owner: @yuzhiquan, @bowei, @PxyUp, @SergeyKanzhelev
@@ -998,7 +997,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
+	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.30
 
 	GRPCContainerProbe: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.29
 
