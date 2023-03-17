@@ -229,7 +229,6 @@ name | architectures
 - Updated: Redefine AppProtocol field description and add new standard values ([#115433](https://github.com/kubernetes/kubernetes/pull/115433), [@LiorLieberman](https://github.com/LiorLieberman)) [SIG API Machinery, Apps and Network]
 - ValidatingAdmissionPolicy now provides a status field that contains results of type checking the validation expression.
   The type checking is fully informational, and the behavior of the policy is unchanged. ([#115668](https://github.com/kubernetes/kubernetes/pull/115668), [@jiahuif](https://github.com/jiahuif)) [SIG API Machinery, Auth, Cloud Provider and Testing]
-- Vpa: ResourceResizePolicy type is renamed to ResourceResizeRestartPolicy and RestartRequired policy value is renamed to RestartContainer. If not specified by the user, RestartNotRequired policy defaults for CPU and memory resources. ([#116119](https://github.com/kubernetes/kubernetes/pull/116119), [@vinaykul](https://github.com/vinaykul)) [SIG API Machinery, Apps, Node and Testing]
 - We have removed support for the v1alpha1 kubeletplugin API of DynamicResourceManagement. All plugins must update to v1alpha2 in order to function properly going forward. ([#116558](https://github.com/kubernetes/kubernetes/pull/116558), [@klueska](https://github.com/klueska)) [SIG API Machinery, Apps, CLI, Node, Scheduling and Testing]
 
 ### Feature
@@ -502,13 +501,13 @@ name | architectures
   Add SendInitialEvents field to the ListOptions. When the new option is set together with watch=true, it begins the watch stream with synthetic init events followed by a synthetic "Bookmark" after which the server continues streaming events. ([#115402](https://github.com/kubernetes/kubernetes/pull/115402), [@p0lyn0mial](https://github.com/p0lyn0mial)) [SIG API Machinery]
 - Kubelet: a "maxParallelImagePulls" field can now be specified in the kubelet configuration file to control how many image pulls the kubelet can perform in parallel. ([#115220](https://github.com/kubernetes/kubernetes/pull/115220), [@ruiwen-zhao](https://github.com/ruiwen-zhao)) [SIG API Machinery, Node and Scalability]
 - PodSchedulingReadiness is graduated to beta. ([#115815](https://github.com/kubernetes/kubernetes/pull/115815), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG API Machinery, Apps, Scheduling and Testing]
-- PodSpec.Container.Resources becomes mutable for CPU and memory resource types.
-  - PodSpec.Container.ResizePolicy (new object) gives users control over how their containers are resized.
-  - PodStatus.Resize status describes the state of a requested Pod resize.
-  - PodStatus.AllocatedResources describes node resources allocated to Pod.
-  - PodStatus.Resources describes node resources applied to running containers by CRI.
-  - UpdateContainerResources CRI API now supports both Linux and Windows.
-  
+- In-place resize feature for Kubernetes Pods
+  - Changed the Pod API so that the `resources` defined for containers are mutable for `cpu` and `memory` resource types.
+  - Added `resizePolicy` for containers in a pod to allow users control over how their containers are resized.
+  - Added `allocatedResources` field to container status in pod status that describes the node resources allocated to a pod.
+  - Added `resources` field to container status that reports actual resources applied to running containers.
+  - Added `resize` field to pod status that describes the state of a requested pod resize.
+
   For details, see KEPs below. ([#102884](https://github.com/kubernetes/kubernetes/pull/102884), [@vinaykul](https://github.com/vinaykul)) [SIG API Machinery, Apps, Instrumentation, Node, Scheduling and Testing]
 - The PodDisruptionBudget `spec.unhealthyPodEvictionPolicy` field has graduated to beta and is enabled by default. On servers with the feature enabled, this field may be set to `AlwaysAllow` to always allow unhealthy pods covered by the PodDisruptionBudget to be evicted. ([#115363](https://github.com/kubernetes/kubernetes/pull/115363), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla)) [SIG Apps, Auth and Node]
 - The `DownwardAPIHugePages` kubelet feature graduated to stable / GA. ([#115721](https://github.com/kubernetes/kubernetes/pull/115721), [@saschagrunert](https://github.com/saschagrunert)) [SIG Apps and Node]
