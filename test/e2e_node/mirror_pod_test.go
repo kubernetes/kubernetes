@@ -37,9 +37,11 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
@@ -48,6 +50,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
+		var staticPod *v1.Pod
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
@@ -56,13 +59,14 @@ var _ = SIGDescribe("MirrorPod", func() {
 			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
 			ginkgo.By("create the static pod")
-			err := createStaticPod(podPath, staticPodName, ns,
+			staticPod = basicStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			err := writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
@@ -78,12 +82,13 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
-			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			staticPod = basicStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			err = writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("check the mirror pod container image is updated")
@@ -109,7 +114,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
@@ -129,7 +134,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -145,6 +150,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 	})
 	ginkgo.Context("when create a mirror pod without changes ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
+		var staticPod *v1.Pod
 		ginkgo.BeforeEach(func() {
 		})
 		/*
@@ -159,13 +165,14 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 			ginkgo.By("create the static pod")
-			err := createStaticPod(podPath, staticPodName, ns,
+			staticPod = basicStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			err := writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("delete the pod manifest from disk")
@@ -173,18 +180,19 @@ var _ = SIGDescribe("MirrorPod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("recreate the file")
-			err = createStaticPod(podPath, staticPodName, ns,
+			staticPod = basicStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			err = writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("mirror pod should restart with count 1")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunningWithRestartCount(ctx, 2*time.Second, 2*time.Minute, f.ClientSet, mirrorPodName, ns, 1)
+				return checkMirrorPodRunningWithRestartCount(ctx, 2*time.Second, 2*time.Minute, f.ClientSet, mirrorPodName, ns, 1, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("mirror pod should stay running")
 			gomega.Consistently(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, time.Second*30, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("delete the static pod")
@@ -215,11 +223,11 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By(fmt.Sprintf("Creating nfs test pod: %s", staticPodName))
 
-			err := createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
+			staticPod, err := createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running...", staticPodName))
 			gomega.Eventually(func() error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			mirrorPod, err := c.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
@@ -254,11 +262,11 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 5*time.Minute, 10*time.Second).Should(gomega.BeFalse(), "pod volume should be deleted after nfs server is started")
 
 			// Create the static pod again with the same config and expect it to start running
-			err = createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
+			staticPod, err = createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running (after being recreated)", staticPodName))
 			gomega.Eventually(func() error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 		})
 
@@ -308,7 +316,7 @@ func stopNfsServer(f *framework.Framework, serverPod *v1.Pod) {
 	framework.ExpectNoError(err)
 }
 
-func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir string, name string, ns string) error {
+func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir string, name string, ns string) (*v1.Pod, error) {
 	ginkgo.By("create pod using nfs volume")
 
 	isPrivileged := true
@@ -360,44 +368,61 @@ func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir stri
 	file := staticPodPath(dir, name, ns)
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
 	y := printers.YAMLPrinter{}
 	y.PrintObj(pod, f)
 
-	return nil
+	err = writeStaticPodManifest(dir, name, ns, pod)
+	if err != nil {
+		return nil, err
+	}
+	return pod, nil
 }
 
 func staticPodPath(dir, name, namespace string) string {
 	return filepath.Join(dir, namespace+"-"+name+".yaml")
 }
 
-func createStaticPod(dir, name, namespace, image string, restart v1.RestartPolicy) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  containers:
-  - name: test
-    image: %s
-  restartPolicy: %s
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, image, string(restart))
+func basicStaticPod(dir, name, namespace, image string, restart v1.RestartPolicy) *v1.Pod {
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test",
+					Image: image,
+				},
+			},
+			RestartPolicy: restart,
+		},
+	}
+}
 
+func writeStaticPodManifest(dir, name, namespace string, pod *v1.Pod) error {
+	file := staticPodPath(dir, name, namespace)
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
-		return err
+		return fmt.Errorf("error opening file %s for static pod manifest: %v", file, err)
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(podYaml)
-	return err
+	y := printers.YAMLPrinter{}
+	err = y.PrintObj(pod, f)
+	if err != nil {
+		return fmt.Errorf("error printing static pod manifest: %v", err)
+	}
+
+	return nil
 }
 
 func deleteStaticPod(dir, name, namespace string) error {
@@ -416,7 +441,7 @@ func checkMirrorPodDisappear(ctx context.Context, cl clientset.Interface, name, 
 	return fmt.Errorf("expect mirror pod %v/%v to not exist but got error: %w", namespace, name, err)
 }
 
-func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, namespace string) error {
+func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, namespace string, expectedPod *v1.Pod) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
@@ -429,10 +454,11 @@ func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, na
 			return fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
 		}
 	}
-	return validateMirrorPod(ctx, cl, pod)
+
+	return validateMirrorPod(ctx, cl, pod, expectedPod)
 }
 
-func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Duration, timeout time.Duration, cl clientset.Interface, name, namespace string, count int32) error {
+func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Duration, timeout time.Duration, cl clientset.Interface, name, namespace string, count int32, expectedPod *v1.Pod) error {
 	var pod *v1.Pod
 	var err error
 	err = wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
@@ -461,10 +487,10 @@ func checkMirrorPodRunningWithRestartCount(ctx context.Context, interval time.Du
 	if err != nil {
 		return err
 	}
-	return validateMirrorPod(ctx, cl, pod)
+	return validateMirrorPod(ctx, cl, pod, expectedPod)
 }
 
-func checkMirrorPodRecreatedAndRunning(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
+func checkMirrorPodRecreatedAndRunning(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID, expectedPod *v1.Pod) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %w", name, err)
@@ -475,10 +501,10 @@ func checkMirrorPodRecreatedAndRunning(ctx context.Context, cl clientset.Interfa
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
-	return validateMirrorPod(ctx, cl, pod)
+	return validateMirrorPod(ctx, cl, pod, expectedPod)
 }
 
-func validateMirrorPod(ctx context.Context, cl clientset.Interface, mirrorPod *v1.Pod) error {
+func validateMirrorPod(ctx context.Context, cl clientset.Interface, mirrorPod *v1.Pod, expectedPod *v1.Pod) error {
 	hash, ok := mirrorPod.Annotations[kubetypes.ConfigHashAnnotationKey]
 	if !ok || hash == "" {
 		return fmt.Errorf("expected mirror pod %q to have a hash annotation", mirrorPod.Name)
@@ -517,6 +543,12 @@ func validateMirrorPod(ctx context.Context, cl clientset.Interface, mirrorPod *v
 	ref := mirrorPod.OwnerReferences[0]
 	if !apiequality.Semantic.DeepEqual(ref, expectedOwnerRef) {
 		return fmt.Errorf("unexpected mirror pod %q owner ref: %v", mirrorPod.Name, cmp.Diff(expectedOwnerRef, ref))
+	}
+
+	expectedPodCopy := expectedPod.DeepCopy()
+	legacyscheme.Scheme.Default(expectedPodCopy)
+	if diff := cmp.Diff(expectedPodCopy.Spec, mirrorPod.Spec, cmpopts.IgnoreFields(v1.PodSpec{}, "NodeName", "Tolerations", "Priority", "PreemptionPolicy")); diff != "" {
+		return fmt.Errorf("unexpected pod spec diff; -want, +got:\n" + diff)
 	}
 
 	return nil

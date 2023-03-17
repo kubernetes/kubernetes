@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
@@ -41,6 +42,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
+		var staticPod *v1.Pod
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "graceful-pod-" + string(uuid.NewUUID())
@@ -49,12 +51,13 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
 			ginkgo.By("create the static pod")
-			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
+			staticPod = createStaticPodWithGracePeriod(podPath, staticPodName, ns)
+			err := writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
@@ -84,7 +87,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
-			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			staticPod = basicStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			err = writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
@@ -94,7 +98,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("check the mirror pod container image is updated")
@@ -112,18 +116,20 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("update the pod manifest multiple times during the graceful termination period")
 			for i := 0; i < 300; i++ {
-				err = createStaticPod(podPath, staticPodName, ns,
+				staticPod = basicStaticPod(podPath, staticPodName, ns,
 					fmt.Sprintf("image-%d", i), v1.RestartPolicyAlways)
+				err = writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 				framework.ExpectNoError(err)
 				time.Sleep(100 * time.Millisecond)
 			}
 			image := imageutils.GetPauseImageName()
-			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			staticPod = basicStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			err = writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid, staticPod)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("check the mirror pod container image is updated")
@@ -188,7 +194,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 				ginkgo.By("verifying the mirror pod is running")
 				gomega.Consistently(ctx, func(ctx context.Context) error {
-					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 				}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 
 				ginkgo.By("verifying the pod is described as terminating in metrics")
@@ -316,42 +322,36 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	})
 })
 
-func createStaticPodWithGracePeriod(dir, name, namespace string) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  terminationGracePeriodSeconds: 20
-  containers:
-  - name: m-test
-    image: %s
-    command:
-      - /bin/sh
-    args:
-      - '-c'
-      - |
-        _term() {
-        echo "Caught SIGTERM signal!"
-        sleep 100
-        }
-        trap _term SIGTERM
-        sleep 1000
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, imageutils.GetE2EImage(imageutils.BusyBox))
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+func createStaticPodWithGracePeriod(dir, name, namespace string) *v1.Pod {
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: utilpointer.Int64(20),
+			Containers: []v1.Container{
+				{
+					Name:    "m-test",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sh", "-c"},
+					Args: []string{`
+							_term() {
+								echo "Caught SIGTERM signal!"
+								sleep 100
+							}
+							trap _term SIGTERM
+							sleep 1000
+							`,
+					},
+				},
+			},
+		},
 	}
-	defer f.Close()
-
-	_, err = f.WriteString(podYaml)
-	framework.Logf("has written %v", file)
-	return err
 }
 
 func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {

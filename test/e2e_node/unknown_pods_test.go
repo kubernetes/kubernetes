@@ -50,6 +50,7 @@ var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
 
 	ginkgo.Context("when creating a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
+		var staticPod *v1.Pod
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "unknown-test-pod-" + string(uuid.NewUUID())
@@ -58,12 +59,13 @@ var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
 			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
 			framework.Logf("create the static pod %v", staticPodName)
-			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
+			staticPod = createStaticPodWithGracePeriod(podPath, staticPodName, ns)
+			err := writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
 			framework.ExpectNoError(err)
 
 			framework.Logf("wait for the mirror pod %v to be running", mirrorPodName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeNil())
 		})
 

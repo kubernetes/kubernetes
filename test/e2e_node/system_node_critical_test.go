@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +32,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
@@ -61,6 +61,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 		ginkgo.Context("", func() {
 			var staticPodName, mirrorPodName, podPath string
+			var staticPod *v1.Pod
 			ns := kubeapi.NamespaceSystem
 
 			ginkgo.BeforeEach(func(ctx context.Context) {
@@ -70,15 +71,16 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				podPath = framework.TestContext.KubeletConfig.StaticPodPath
 				// define a static pod consuming disk gradually
 				// the upper limit is 1024 (iterations) * 10485760 bytes (10MB) = 10GB
-				err := createStaticSystemNodeCriticalPod(
+				staticPod = createStaticSystemNodeCriticalPod(
 					podPath, staticPodName, ns, busyboxImage, v1.RestartPolicyNever, 1024,
 					"dd if=/dev/urandom of=file${i} bs=10485760 count=1 2>/dev/null; sleep .1;",
 				)
-				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+				err := writeStaticPodManifest(podPath, staticPodName, ns, staticPod)
+				framework.ExpectNoError(err)
 
 				ginkgo.By("wait for the mirror pod to be running")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 				}, time.Minute, time.Second*2).Should(gomega.Succeed())
 			})
 
@@ -95,7 +97,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 
 				ginkgo.By("check if it's running all the time")
 				gomega.Consistently(ctx, func(ctx context.Context) error {
-					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns, staticPod)
 					if err == nil {
 						framework.Logf("mirror pod %q is running", mirrorPodName)
 					} else {
@@ -133,31 +135,30 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 	})
 })
 
-func createStaticSystemNodeCriticalPod(dir, name, namespace, image string, restart v1.RestartPolicy,
-	iterations int, command string) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  priorityClassName: system-node-critical
-  containers:
-  - name: %s
-    image: %s
-    restartPolicy: %s
-    command: ["sh", "-c", "i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while true; do sleep 5; done"]
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, name, image, string(restart), iterations, command)
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+func createStaticSystemNodeCriticalPod(dir, name, namespace, image string, restart v1.RestartPolicy, iterations int, command string) *v1.Pod {
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			PriorityClassName: "system-node-critical",
+			RestartPolicy:     restart,
+			Containers: []v1.Container{
+				{
+					Name:    name,
+					Image:   image,
+					Command: []string{"sh", "-c"},
+					Args: []string{fmt.Sprintf(`
+							i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while true; do sleep 5; done
+							`, iterations, command),
+					},
+				},
+			},
+		},
 	}
-	defer f.Close()
-
-	_, err = f.WriteString(podYaml)
-	return err
 }
