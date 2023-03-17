@@ -523,7 +523,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeClient:                              kubeDeps.KubeClient,
 		heartbeatClient:                         kubeDeps.HeartbeatClient,
 		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                           rootDirectory,
+		rootDirectory:                           filepath.Clean(rootDirectory),
 		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                            registerNode,
@@ -1321,7 +1321,9 @@ func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
 // 4.  the pod-resources directory
 // 5.  the checkpoint directory
 func (kl *Kubelet) setupDataDirs() error {
-	kl.rootDirectory = filepath.Clean(kl.rootDirectory)
+	if cleanedRoot := filepath.Clean(kl.rootDirectory); cleanedRoot != kl.rootDirectory {
+		return fmt.Errorf("rootDirectory not in canonical form: expected %s, was %s", cleanedRoot, kl.rootDirectory)
+	}
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
 	pluginsDir := kl.getPluginsDir()
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
