@@ -2701,7 +2701,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 		}
-		*pod = *updatedPod
+		pod = updatedPod
 	}
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
