@@ -1,4 +1,5 @@
 - name: SchedulingBasic
+  labels: [performance]
   defaultPodTemplatePath: config/pod-default.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -10,6 +11,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -21,6 +23,7 @@
       measurePods: 1000
 
 - name: SchedulingPodAntiAffinity
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-pod-anti-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -39,6 +42,7 @@
     namespace: sched-1
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 100
@@ -50,6 +54,7 @@
       measurePods: 1000
 
 - name: SchedulingSecrets
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-secret-volume.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -61,6 +66,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -72,6 +78,7 @@
       measurePods: 1000
 
 - name: SchedulingInTreePVs
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -86,6 +93,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -97,6 +105,7 @@
       measurePods: 1000
 
 - name: SchedulingMigratedInTreePVs
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -120,6 +129,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -131,6 +141,7 @@
       measurePods: 1000
 
 - name: SchedulingCSIPVs
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -152,6 +163,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -163,6 +175,7 @@
       measurePods: 1000
 
 - name: SchedulingPodAffinity
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-pod-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -183,6 +196,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -194,6 +208,7 @@
       measurePods: 1000
 
 - name: SchedulingPreferredPodAffinity
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-preferred-pod-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -212,6 +227,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -223,6 +239,7 @@
       measurePods: 1000
 
 - name: SchedulingPreferredPodAntiAffinity
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-preferred-pod-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -241,6 +258,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -252,6 +270,7 @@
       measurePods: 1000
 
 - name: SchedulingNodeAffinity
+  labels: [performance]
   defaultPodTemplatePath: config/pod-with-node-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -267,6 +286,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 500
@@ -278,6 +298,7 @@
       measurePods: 1000
 
 - name: TopologySpreading
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -294,6 +315,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -305,6 +327,7 @@
       measurePods: 2000
 
 - name: PreferredTopologySpreading
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -321,6 +344,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -332,6 +356,7 @@
       measurePods: 2000
 
 - name: MixedSchedulingBasePod
+  labels: [performance]
   defaultPodTemplatePath: config/pod-default.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -367,6 +392,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 200
@@ -378,6 +404,7 @@
       measurePods: 1000
 
 - name: PreemptionBasic
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -404,6 +431,7 @@
 #      measurePods: 5000
 
 - name: PreemptionPVs
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -418,6 +446,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 2000
@@ -432,6 +461,7 @@
 #      measurePods: 5000
 
 - name: Unschedulable
+  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -445,6 +475,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes/200InitPods
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 200
@@ -478,6 +509,7 @@
     collectMetrics: true
   workloads:
   - name: 1000Nodes
+    labels: [fast]
     params:
       initNodes: 1000
       measurePods: 1000
@@ -638,6 +670,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       taintNodes: 100
       normalNodes: 400
