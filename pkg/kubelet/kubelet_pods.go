@@ -1209,8 +1209,13 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Now that we have recorded any terminating pods, and added new pods that should be running,
 	// record a summary here. Not all possible combinations of PodWorkerSync values are valid.
 	counts := make(map[PodWorkerSync]int)
-	for _, sync := range workingPods {
+	for uid, sync := range workingPods {
 		counts[sync]++
+		// debugging error
+		// "Programmer error, did not report a kubelet_working_pods metric for a value returned by SyncKnownPods" counts=map[{State:sync Orphan:false HasConfig:false Static:false}:1].
+		if !sync.HasConfig && !sync.Static && !sync.Orphan {
+			klog.V(3).InfoS("bobbypage Programmer error did not sync state", "uid", uid)
+		}
 	}
 	for validSync, configState := range map[PodWorkerSync]string{
 		{HasConfig: true, Static: true}:                "desired",
@@ -1218,6 +1223,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 		{Orphan: true, HasConfig: true, Static: true}:  "orphan",
 		{Orphan: true, HasConfig: true, Static: false}: "orphan",
 		{Orphan: true, HasConfig: false}:               "runtime_only",
+		// {State:sync Orphan:false HasConfig:false Static:false}
 	} {
 		for _, state := range []PodWorkerState{SyncPod, TerminatingPod, TerminatedPod} {
 			validSync.State = state
