@@ -28,6 +28,8 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler.
 	SchedulerSubsystem = "scheduler"
+	// SchedulingAttemptDurationSeconds - To schedule the attempts for duration
+	SchedulingAttemptDurationSeconds = "scheduling_attempt_duration_seconds"
 )
 
 // Below are possible values for the work and operation label.

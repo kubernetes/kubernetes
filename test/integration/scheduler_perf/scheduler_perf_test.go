@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -82,12 +83,15 @@ const (
 	extensionPointsLabelName = "extension_point"
 )
 
+var schedulerSubsystemAttemptDurationSeconds = metrics.SchedulerSubsystem + "_" + metrics.SchedulingAttemptDurationSeconds
+var metricLabelValues = []string{"Filter", "Score"}
+
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
 		Metrics: map[string]*labelValues{
-			"scheduler_framework_extension_point_duration_seconds": {
+			schedulerSubsystemAttemptDurationSeconds: {
 				label:  extensionPointsLabelName,
-				values: []string{"Filter", "Score"},
+				values: metricLabelValues,
 			},
 			"scheduler_scheduling_attempt_duration_seconds": nil,
 			"scheduler_pod_scheduling_duration_seconds":     nil,
