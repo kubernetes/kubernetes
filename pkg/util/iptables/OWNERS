@@ -1,14 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - dcbw
-  - thockin
-  - danwinship
+  - sig-network-reviewers
 approvers:
-  - dcbw
-  - thockin
-  - danwinship
-emeritus_approvers:
-  - eparis
+  - sig-network-approvers
 labels:
   - sig/network
