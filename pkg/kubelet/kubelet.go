@@ -2629,13 +2629,14 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		klog.ErrorS(err, "getNodeAnyway function failed")
 		return false, nil, ""
 	}
+	podCopy := pod.DeepCopy()
 	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
 	memAvailable := node.Status.Allocatable.Memory().Value()
-	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
-	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
+	cpuRequests := resource.GetResourceRequest(podCopy, v1.ResourceCPU)
+	memRequests := resource.GetResourceRequest(podCopy, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", pod.Name)
-		return false, nil, v1.PodResizeStatusInfeasible
+		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", podCopy.Name)
+		return false, podCopy, v1.PodResizeStatusInfeasible
 	}
 
 	// Treat the existing pod needing resize as a new pod with desired resources seeking admit.
@@ -2647,13 +2648,12 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		}
 	}
 
-	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, pod); !ok {
+	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, podCopy); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
-		klog.V(3).InfoS("Resize cannot be accommodated", "pod", pod.Name, "reason", failReason, "message", failMessage)
-		return false, nil, v1.PodResizeStatusDeferred
+		klog.V(3).InfoS("Resize cannot be accommodated", "pod", podCopy.Name, "reason", failReason, "message", failMessage)
+		return false, podCopy, v1.PodResizeStatusDeferred
 	}
 
-	podCopy := pod.DeepCopy()
 	for _, container := range podCopy.Spec.Containers {
 		idx, found := podutil.GetIndexOfContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
 		if found {
@@ -2695,26 +2695,28 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
 	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
+	if updatedPod == nil {
+		return
+	}
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(updatedPod))
 			return
 		}
-		pod = updatedPod
 	}
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus); err != nil {
+		if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(pod))
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
 			return
 		}
-		pod.Status.Resize = resizeStatus
+		updatedPod.Status.Resize = resizeStatus
 	}
-	kl.podManager.UpdatePod(pod)
-	kl.statusManager.SetPodStatus(pod, pod.Status)
+	kl.podManager.UpdatePod(updatedPod)
+	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
 	return
 }
 
