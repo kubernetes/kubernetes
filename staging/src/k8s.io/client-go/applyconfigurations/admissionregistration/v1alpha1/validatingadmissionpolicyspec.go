@@ -30,7 +30,7 @@ type ValidatingAdmissionPolicySpecApplyConfiguration struct {
 	Validations      []ValidationApplyConfiguration                   `json:"validations,omitempty"`
 	FailurePolicy    *admissionregistrationv1alpha1.FailurePolicyType `json:"failurePolicy,omitempty"`
 	AuditAnnotations []AuditAnnotationApplyConfiguration              `json:"auditAnnotations,omitempty"`
-	MatchConditions  []MatchConditionApplyConfiguration               `json:"matchConditions,omitempty"`
+	MatchConditions  []MatchConditionApplyConfiguration               `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ValidatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicySpec type for use with

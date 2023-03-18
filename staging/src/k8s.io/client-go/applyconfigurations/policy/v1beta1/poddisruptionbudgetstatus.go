@@ -32,7 +32,7 @@ type PodDisruptionBudgetStatusApplyConfiguration struct {
 	CurrentHealthy     *int32                               `json:"currentHealthy,omitempty"`
 	DesiredHealthy     *int32                               `json:"desiredHealthy,omitempty"`
 	ExpectedPods       *int32                               `json:"expectedPods,omitempty"`
-	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // PodDisruptionBudgetStatusApplyConfiguration constructs an declarative configuration of the PodDisruptionBudgetStatus type for use with

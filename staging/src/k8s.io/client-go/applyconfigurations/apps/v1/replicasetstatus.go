@@ -26,7 +26,7 @@ type ReplicaSetStatusApplyConfiguration struct {
 	ReadyReplicas        *int32                                  `json:"readyReplicas,omitempty"`
 	AvailableReplicas    *int32                                  `json:"availableReplicas,omitempty"`
 	ObservedGeneration   *int64                                  `json:"observedGeneration,omitempty"`
-	Conditions           []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions           []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ReplicaSetStatusApplyConfiguration constructs an declarative configuration of the ReplicaSetStatus type for use with

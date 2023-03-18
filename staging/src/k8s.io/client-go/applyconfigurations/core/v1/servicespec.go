@@ -25,7 +25,7 @@ import (
 // ServiceSpecApplyConfiguration represents an declarative configuration of the ServiceSpec type for use
 // with apply.
 type ServiceSpecApplyConfiguration struct {
-	Ports                         []ServicePortApplyConfiguration          `json:"ports,omitempty"`
+	Ports                         []ServicePortApplyConfiguration          `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port"`
 	Selector                      map[string]string                        `json:"selector,omitempty"`
 	ClusterIP                     *string                                  `json:"clusterIP,omitempty"`
 	ClusterIPs                    []string                                 `json:"clusterIPs,omitempty"`

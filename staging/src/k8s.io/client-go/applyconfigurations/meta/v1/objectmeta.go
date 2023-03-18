@@ -37,8 +37,8 @@ type ObjectMetaApplyConfiguration struct {
 	DeletionGracePeriodSeconds *int64                             `json:"deletionGracePeriodSeconds,omitempty"`
 	Labels                     map[string]string                  `json:"labels,omitempty"`
 	Annotations                map[string]string                  `json:"annotations,omitempty"`
-	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty"`
-	Finalizers                 []string                           `json:"finalizers,omitempty"`
+	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid"`
+	Finalizers                 []string                           `json:"finalizers,omitempty" patchStrategy:"merge"`
 }
 
 // ObjectMetaApplyConfiguration constructs an declarative configuration of the ObjectMeta type for use with

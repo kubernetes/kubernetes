@@ -32,7 +32,7 @@ import (
 type ServiceAccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
+	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	ImagePullSecrets                 []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
 	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty"`
 }

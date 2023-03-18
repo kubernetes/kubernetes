@@ -25,7 +25,7 @@ import (
 // LabelSelectorRequirementApplyConfiguration represents an declarative configuration of the LabelSelectorRequirement type for use
 // with apply.
 type LabelSelectorRequirementApplyConfiguration struct {
-	Key      *string                   `json:"key,omitempty"`
+	Key      *string                   `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key"`
 	Operator *v1.LabelSelectorOperator `json:"operator,omitempty"`
 	Values   []string                  `json:"values,omitempty"`
 }

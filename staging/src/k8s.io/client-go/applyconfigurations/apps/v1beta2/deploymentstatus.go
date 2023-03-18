@@ -27,7 +27,7 @@ type DeploymentStatusApplyConfiguration struct {
 	ReadyReplicas       *int32                                  `json:"readyReplicas,omitempty"`
 	AvailableReplicas   *int32                                  `json:"availableReplicas,omitempty"`
 	UnavailableReplicas *int32                                  `json:"unavailableReplicas,omitempty"`
-	Conditions          []DeploymentConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions          []DeploymentConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	CollisionCount      *int32                                  `json:"collisionCount,omitempty"`
 }
 

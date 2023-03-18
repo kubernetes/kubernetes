@@ -25,7 +25,7 @@ import (
 // JobStatusApplyConfiguration represents an declarative configuration of the JobStatus type for use
 // with apply.
 type JobStatusApplyConfiguration struct {
-	Conditions              []JobConditionApplyConfiguration           `json:"conditions,omitempty"`
+	Conditions              []JobConditionApplyConfiguration           `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	StartTime               *metav1.Time                               `json:"startTime,omitempty"`
 	CompletionTime          *metav1.Time                               `json:"completionTime,omitempty"`
 	Active                  *int32                                     `json:"active,omitempty"`

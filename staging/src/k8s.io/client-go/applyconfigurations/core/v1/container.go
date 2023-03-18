@@ -30,13 +30,13 @@ type ContainerApplyConfiguration struct {
 	Command                  []string                                  `json:"command,omitempty"`
 	Args                     []string                                  `json:"args,omitempty"`
 	WorkingDir               *string                                   `json:"workingDir,omitempty"`
-	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty"`
+	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort"`
 	EnvFrom                  []EnvFromSourceApplyConfiguration         `json:"envFrom,omitempty"`
-	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
+	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
 	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
-	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
+	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath"`
+	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath"`
 	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
 	ReadinessProbe           *ProbeApplyConfiguration                  `json:"readinessProbe,omitempty"`
 	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty"`

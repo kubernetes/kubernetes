@@ -28,8 +28,8 @@ type NodeStatusApplyConfiguration struct {
 	Capacity        *v1.ResourceList                       `json:"capacity,omitempty"`
 	Allocatable     *v1.ResourceList                       `json:"allocatable,omitempty"`
 	Phase           *v1.NodePhase                          `json:"phase,omitempty"`
-	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty"`
-	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty"`
+	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	DaemonEndpoints *NodeDaemonEndpointsApplyConfiguration `json:"daemonEndpoints,omitempty"`
 	NodeInfo        *NodeSystemInfoApplyConfiguration      `json:"nodeInfo,omitempty"`
 	Images          []ContainerImageApplyConfiguration     `json:"images,omitempty"`

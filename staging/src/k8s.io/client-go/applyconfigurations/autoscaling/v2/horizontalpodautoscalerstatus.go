@@ -30,7 +30,7 @@ type HorizontalPodAutoscalerStatusApplyConfiguration struct {
 	CurrentReplicas    *int32                                               `json:"currentReplicas,omitempty"`
 	DesiredReplicas    *int32                                               `json:"desiredReplicas,omitempty"`
 	CurrentMetrics     []MetricStatusApplyConfiguration                     `json:"currentMetrics,omitempty"`
-	Conditions         []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions         []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // HorizontalPodAutoscalerStatusApplyConfiguration constructs an declarative configuration of the HorizontalPodAutoscalerStatus type for use with

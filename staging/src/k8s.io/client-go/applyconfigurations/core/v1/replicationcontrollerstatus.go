@@ -26,7 +26,7 @@ type ReplicationControllerStatusApplyConfiguration struct {
 	ReadyReplicas        *int32                                             `json:"readyReplicas,omitempty"`
 	AvailableReplicas    *int32                                             `json:"availableReplicas,omitempty"`
 	ObservedGeneration   *int64                                             `json:"observedGeneration,omitempty"`
-	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ReplicationControllerStatusApplyConfiguration constructs an declarative configuration of the ReplicationControllerStatus type for use with

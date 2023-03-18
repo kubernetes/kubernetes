@@ -26,7 +26,7 @@ import (
 // with apply.
 type ServiceStatusApplyConfiguration struct {
 	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
-	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty"`
+	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with

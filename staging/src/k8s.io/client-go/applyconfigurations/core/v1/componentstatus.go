@@ -32,7 +32,7 @@ import (
 type ComponentStatusApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ComponentStatus constructs an declarative configuration of the ComponentStatus type for use with

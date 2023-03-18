@@ -25,7 +25,7 @@ import (
 // NetworkPolicyStatusApplyConfiguration represents an declarative configuration of the NetworkPolicyStatus type for use
 // with apply.
 type NetworkPolicyStatusApplyConfiguration struct {
-	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // NetworkPolicyStatusApplyConfiguration constructs an declarative configuration of the NetworkPolicyStatus type for use with

@@ -21,7 +21,7 @@ package v1beta3
 // PriorityLevelConfigurationStatusApplyConfiguration represents an declarative configuration of the PriorityLevelConfigurationStatus type for use
 // with apply.
 type PriorityLevelConfigurationStatusApplyConfiguration struct {
-	Conditions []PriorityLevelConfigurationConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions []PriorityLevelConfigurationConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // PriorityLevelConfigurationStatusApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationStatus type for use with

@@ -21,7 +21,7 @@ package v1beta3
 // FlowSchemaStatusApplyConfiguration represents an declarative configuration of the FlowSchemaStatus type for use
 // with apply.
 type FlowSchemaStatusApplyConfiguration struct {
-	Conditions []FlowSchemaConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions []FlowSchemaConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // FlowSchemaStatusApplyConfiguration constructs an declarative configuration of the FlowSchemaStatus type for use with

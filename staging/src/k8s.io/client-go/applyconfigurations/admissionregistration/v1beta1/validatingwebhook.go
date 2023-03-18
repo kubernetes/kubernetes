@@ -37,7 +37,7 @@ type ValidatingWebhookApplyConfiguration struct {
 	SideEffects             *admissionregistrationv1beta1.SideEffectClass   `json:"sideEffects,omitempty"`
 	TimeoutSeconds          *int32                                          `json:"timeoutSeconds,omitempty"`
 	AdmissionReviewVersions []string                                        `json:"admissionReviewVersions,omitempty"`
-	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
+	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ValidatingWebhookApplyConfiguration constructs an declarative configuration of the ValidatingWebhook type for use with

@@ -30,7 +30,7 @@ type DaemonSetStatusApplyConfiguration struct {
 	NumberAvailable        *int32                                 `json:"numberAvailable,omitempty"`
 	NumberUnavailable      *int32                                 `json:"numberUnavailable,omitempty"`
 	CollisionCount         *int32                                 `json:"collisionCount,omitempty"`
-	Conditions             []DaemonSetConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions             []DaemonSetConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // DaemonSetStatusApplyConfiguration constructs an declarative configuration of the DaemonSetStatus type for use with

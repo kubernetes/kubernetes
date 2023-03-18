@@ -32,7 +32,7 @@ import (
 type MutatingWebhookConfigurationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                         []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	Webhooks                         []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // MutatingWebhookConfiguration constructs an declarative configuration of the MutatingWebhookConfiguration type for use with

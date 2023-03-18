@@ -29,7 +29,7 @@ type DeploymentSpecApplyConfiguration struct {
 	Replicas                *int32                                    `json:"replicas,omitempty"`
 	Selector                *v1.LabelSelectorApplyConfiguration       `json:"selector,omitempty"`
 	Template                *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
-	Strategy                *DeploymentStrategyApplyConfiguration     `json:"strategy,omitempty"`
+	Strategy                *DeploymentStrategyApplyConfiguration     `json:"strategy,omitempty" patchStrategy:"retainKeys"`
 	MinReadySeconds         *int32                                    `json:"minReadySeconds,omitempty"`
 	RevisionHistoryLimit    *int32                                    `json:"revisionHistoryLimit,omitempty"`
 	Paused                  *bool                                     `json:"paused,omitempty"`

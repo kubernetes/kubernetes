@@ -25,10 +25,10 @@ import (
 // PodSpecApplyConfiguration represents an declarative configuration of the PodSpec type for use
 // with apply.
 type PodSpecApplyConfiguration struct {
-	Volumes                       []VolumeApplyConfiguration                   `json:"volumes,omitempty"`
-	InitContainers                []ContainerApplyConfiguration                `json:"initContainers,omitempty"`
-	Containers                    []ContainerApplyConfiguration                `json:"containers,omitempty"`
-	EphemeralContainers           []EphemeralContainerApplyConfiguration       `json:"ephemeralContainers,omitempty"`
+	Volumes                       []VolumeApplyConfiguration                   `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	InitContainers                []ContainerApplyConfiguration                `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Containers                    []ContainerApplyConfiguration                `json:"containers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	EphemeralContainers           []EphemeralContainerApplyConfiguration       `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	RestartPolicy                 *corev1.RestartPolicy                        `json:"restartPolicy,omitempty"`
 	TerminationGracePeriodSeconds *int64                                       `json:"terminationGracePeriodSeconds,omitempty"`
 	ActiveDeadlineSeconds         *int64                                       `json:"activeDeadlineSeconds,omitempty"`
@@ -43,13 +43,13 @@ type PodSpecApplyConfiguration struct {
 	HostIPC                       *bool                                        `json:"hostIPC,omitempty"`
 	ShareProcessNamespace         *bool                                        `json:"shareProcessNamespace,omitempty"`
 	SecurityContext               *PodSecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
-	ImagePullSecrets              []LocalObjectReferenceApplyConfiguration     `json:"imagePullSecrets,omitempty"`
+	ImagePullSecrets              []LocalObjectReferenceApplyConfiguration     `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	Hostname                      *string                                      `json:"hostname,omitempty"`
 	Subdomain                     *string                                      `json:"subdomain,omitempty"`
 	Affinity                      *AffinityApplyConfiguration                  `json:"affinity,omitempty"`
 	SchedulerName                 *string                                      `json:"schedulerName,omitempty"`
 	Tolerations                   []TolerationApplyConfiguration               `json:"tolerations,omitempty"`
-	HostAliases                   []HostAliasApplyConfiguration                `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAliasApplyConfiguration                `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"ip"`
 	PriorityClassName             *string                                      `json:"priorityClassName,omitempty"`
 	Priority                      *int32                                       `json:"priority,omitempty"`
 	DNSConfig                     *PodDNSConfigApplyConfiguration              `json:"dnsConfig,omitempty"`
@@ -58,12 +58,12 @@ type PodSpecApplyConfiguration struct {
 	EnableServiceLinks            *bool                                        `json:"enableServiceLinks,omitempty"`
 	PreemptionPolicy              *corev1.PreemptionPolicy                     `json:"preemptionPolicy,omitempty"`
 	Overhead                      *corev1.ResourceList                         `json:"overhead,omitempty"`
-	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty"`
+	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty" patchStrategy:"merge" patchMergeKey:"topologyKey"`
 	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty"`
 	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty"`
 	HostUsers                     *bool                                        `json:"hostUsers,omitempty"`
-	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty"`
-	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
+	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 // PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with

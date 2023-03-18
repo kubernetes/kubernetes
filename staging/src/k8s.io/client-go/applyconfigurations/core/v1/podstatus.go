@@ -27,13 +27,13 @@ import (
 // with apply.
 type PodStatusApplyConfiguration struct {
 	Phase                      *v1.PodPhase                        `json:"phase,omitempty"`
-	Conditions                 []PodConditionApplyConfiguration    `json:"conditions,omitempty"`
+	Conditions                 []PodConditionApplyConfiguration    `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	Message                    *string                             `json:"message,omitempty"`
 	Reason                     *string                             `json:"reason,omitempty"`
 	NominatedNodeName          *string                             `json:"nominatedNodeName,omitempty"`
 	HostIP                     *string                             `json:"hostIP,omitempty"`
 	PodIP                      *string                             `json:"podIP,omitempty"`
-	PodIPs                     []PodIPApplyConfiguration           `json:"podIPs,omitempty"`
+	PodIPs                     []PodIPApplyConfiguration           `json:"podIPs,omitempty" patchStrategy:"merge" patchMergeKey:"ip"`
 	StartTime                  *metav1.Time                        `json:"startTime,omitempty"`
 	InitContainerStatuses      []ContainerStatusApplyConfiguration `json:"initContainerStatuses,omitempty"`
 	ContainerStatuses          []ContainerStatusApplyConfiguration `json:"containerStatuses,omitempty"`

@@ -28,7 +28,7 @@ type PersistentVolumeClaimStatusApplyConfiguration struct {
 	Phase              *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
 	AccessModes        []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
 	Capacity           *v1.ResourceList                                   `json:"capacity,omitempty"`
-	Conditions         []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions         []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	AllocatedResources *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
 	ResizeStatus       *v1.PersistentVolumeClaimResizeStatus              `json:"resizeStatus,omitempty"`
 }

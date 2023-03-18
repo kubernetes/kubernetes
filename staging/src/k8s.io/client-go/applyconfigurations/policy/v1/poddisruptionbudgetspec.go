@@ -28,7 +28,7 @@ import (
 // with apply.
 type PodDisruptionBudgetSpecApplyConfiguration struct {
 	MinAvailable               *intstr.IntOrString                      `json:"minAvailable,omitempty"`
-	Selector                   *v1.LabelSelectorApplyConfiguration      `json:"selector,omitempty"`
+	Selector                   *v1.LabelSelectorApplyConfiguration      `json:"selector,omitempty" patchStrategy:"replace"`
 	MaxUnavailable             *intstr.IntOrString                      `json:"maxUnavailable,omitempty"`
 	UnhealthyPodEvictionPolicy *policyv1.UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty"`
 }

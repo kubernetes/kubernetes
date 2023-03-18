@@ -29,7 +29,7 @@ type StatefulSetStatusApplyConfiguration struct {
 	CurrentRevision    *string                                  `json:"currentRevision,omitempty"`
 	UpdateRevision     *string                                  `json:"updateRevision,omitempty"`
 	CollisionCount     *int32                                   `json:"collisionCount,omitempty"`
-	Conditions         []StatefulSetConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions         []StatefulSetConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	AvailableReplicas  *int32                                   `json:"availableReplicas,omitempty"`
 }
 

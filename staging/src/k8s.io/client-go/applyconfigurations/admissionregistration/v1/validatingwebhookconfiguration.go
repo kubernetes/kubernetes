@@ -32,7 +32,7 @@ import (
 type ValidatingWebhookConfigurationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                         []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	Webhooks                         []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ValidatingWebhookConfiguration constructs an declarative configuration of the ValidatingWebhookConfiguration type for use with

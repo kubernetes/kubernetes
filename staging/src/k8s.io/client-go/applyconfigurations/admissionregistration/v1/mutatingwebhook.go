@@ -37,7 +37,7 @@ type MutatingWebhookApplyConfiguration struct {
 	TimeoutSeconds          *int32                                          `json:"timeoutSeconds,omitempty"`
 	AdmissionReviewVersions []string                                        `json:"admissionReviewVersions,omitempty"`
 	ReinvocationPolicy      *admissionregistrationv1.ReinvocationPolicyType `json:"reinvocationPolicy,omitempty"`
-	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
+	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // MutatingWebhookApplyConfiguration constructs an declarative configuration of the MutatingWebhook type for use with

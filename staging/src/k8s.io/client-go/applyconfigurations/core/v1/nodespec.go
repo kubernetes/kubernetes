@@ -22,7 +22,7 @@ package v1
 // with apply.
 type NodeSpecApplyConfiguration struct {
 	PodCIDR            *string                             `json:"podCIDR,omitempty"`
-	PodCIDRs           []string                            `json:"podCIDRs,omitempty"`
+	PodCIDRs           []string                            `json:"podCIDRs,omitempty" patchStrategy:"merge"`
 	ProviderID         *string                             `json:"providerID,omitempty"`
 	Unschedulable      *bool                               `json:"unschedulable,omitempty"`
 	Taints             []TaintApplyConfiguration           `json:"taints,omitempty"`

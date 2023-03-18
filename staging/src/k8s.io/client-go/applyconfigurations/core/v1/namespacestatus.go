@@ -26,7 +26,7 @@ import (
 // with apply.
 type NamespaceStatusApplyConfiguration struct {
 	Phase      *v1.NamespacePhase                     `json:"phase,omitempty"`
-	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // NamespaceStatusApplyConfiguration constructs an declarative configuration of the NamespaceStatus type for use with
