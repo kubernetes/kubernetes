@@ -20,7 +20,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
-	k8s.io/utils v0.0.0-20230209194617-a36077c30491
+	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
 	sigs.k8s.io/kustomize/api v0.13.2
 	sigs.k8s.io/kustomize/kyaml v0.14.1
 	sigs.k8s.io/yaml v1.3.0
