@@ -3399,14 +3399,10 @@ const (
 	// restrictions in Linux libc name resolution handling.
 	// Max number of DNS name servers.
 	MaxDNSNameservers = 3
-	// Expanded max number of domains in the search path list.
-	MaxDNSSearchPathsExpanded = 32
-	// Expanded max number of characters in the search path.
-	MaxDNSSearchListCharsExpanded = 2048
 	// Max number of domains in the search path list.
-	MaxDNSSearchPathsLegacy = 6
-	// Max number of characters in the search path list.
-	MaxDNSSearchListCharsLegacy = 256
+	MaxDNSSearchPaths = 32
+	// Max number of characters in the search path.
+	MaxDNSSearchListChars = 2048
 )
 
 func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *field.Path) field.ErrorList {
@@ -3455,16 +3451,12 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			}
 		}
 		// Validate searches.
-		maxDNSSearchPaths, maxDNSSearchListChars := MaxDNSSearchPathsLegacy, MaxDNSSearchListCharsLegacy
-		if opts.AllowExpandedDNSConfig {
-			maxDNSSearchPaths, maxDNSSearchListChars = MaxDNSSearchPathsExpanded, MaxDNSSearchListCharsExpanded
-		}
-		if len(dnsConfig.Searches) > maxDNSSearchPaths {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", maxDNSSearchPaths)))
+		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", MaxDNSSearchPaths)))
 		}
 		// Include the space between search paths.
-		if len(strings.Join(dnsConfig.Searches, " ")) > maxDNSSearchListChars {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v characters (including spaces) in the search list", maxDNSSearchListChars)))
+		if len(strings.Join(dnsConfig.Searches, " ")) > MaxDNSSearchListChars {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v characters (including spaces) in the search list", MaxDNSSearchListChars)))
 		}
 		for i, search := range dnsConfig.Searches {
 			// it is fine to have a trailing dot
@@ -3688,8 +3680,6 @@ type PodValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 	// Allow pod spec to use non-integer multiple of huge page unit size
 	AllowIndivisibleHugePagesValues bool
-	// Allow more DNSSearchPaths and longer DNSSearchListChars
-	AllowExpandedDNSConfig bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
