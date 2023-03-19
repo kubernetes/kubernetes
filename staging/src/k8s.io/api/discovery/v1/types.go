@@ -130,7 +130,9 @@ type EndpointConditions struct {
 	// according to whatever system is managing the endpoint. A nil value
 	// indicates an unknown state. In most cases consumers should interpret this
 	// unknown state as ready. For compatibility reasons, ready should never be
-	// "true" for terminating endpoints.
+	// "true" for terminating endpoints, except when the normal readiness
+	// behavior is being explicitly overridden, for example when the associated
+	// Service has set the publishNotReadyAddresses flag.
 	// +optional
 	Ready *bool `json:"ready,omitempty" protobuf:"bytes,1,name=ready"`
 
