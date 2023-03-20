@@ -163,6 +163,7 @@ func (r *BindingREST) Destroy() {
 }
 
 var _ = rest.NamedCreater(&BindingREST{})
+var _ = rest.SubresourceObjectMetaPreserver(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
@@ -189,6 +190,13 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 	err = r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
+}
+
+// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates to a
+// handler that this endpoint requires the UID and ResourceVersion to use as
+// preconditions. Other fields, such as timestamp, are ignored.
+func (r *BindingREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
+	return true
 }
 
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if
