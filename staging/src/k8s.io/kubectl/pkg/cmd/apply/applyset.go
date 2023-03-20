@@ -46,13 +46,13 @@ const (
 	// Tooling should refuse to mutate ApplySets belonging to other tools.
 	// The value must be in the format <toolname>/<semver>.
 	// Example value: "kubectl/v1.27" or "helm/v3" or "kpt/v1.0.0"
-	ApplySetToolingAnnotation = "applyset.k8s.io/tooling"
+	ApplySetToolingAnnotation = "applyset.kubernetes.io/tooling"
 
 	// ApplySetAdditionalNamespacesAnnotation annotation extends the scope of the ApplySet beyond the parent
 	// object's own namespace (if any) to include the listed namespaces. The value is a comma-separated
 	// list of the names of namespaces other than the parent's namespace in which objects are found
 	// Example value: "kube-system,ns1,ns2".
-	ApplySetAdditionalNamespacesAnnotation = "applyset.k8s.io/additional-namespaces"
+	ApplySetAdditionalNamespacesAnnotation = "applyset.kubernetes.io/additional-namespaces"
 
 	// ApplySetGRsAnnotation is a list of group-resources used to optimize listing of ApplySet member objects.
 	// It is optional in the ApplySet specification, as tools can perform discovery or use a different optimization.
@@ -60,11 +60,11 @@ const (
 	// When present, the value of this annotation must be a comma separated list of the group-kinds,
 	// in the fully-qualified name format, i.e. <resourcename>.<group>.
 	// Example value: "certificates.cert-manager.io,configmaps,deployments.apps,secrets,services"
-	ApplySetGRsAnnotation = "applyset.k8s.io/contains-group-resources"
+	ApplySetGRsAnnotation = "applyset.kubernetes.io/contains-group-resources"
 
 	// ApplySetParentIDLabel is the key of the label that makes object an ApplySet parent object.
 	// Its value MUST use the format specified in V1ApplySetIdFormat below
-	ApplySetParentIDLabel = "applyset.k8s.io/id"
+	ApplySetParentIDLabel = "applyset.kubernetes.io/id"
 
 	// V1ApplySetIdFormat is the format required for the value of ApplySetParentIDLabel (and ApplysetPartOfLabel).
 	// The %s segment is the unique ID of the object itself, which MUST be the base64 encoding
@@ -74,11 +74,11 @@ const (
 
 	// ApplysetPartOfLabel is the key of the label which indicates that the object is a member of an ApplySet.
 	// The value of the label MUST match the value of ApplySetParentIDLabel on the parent object.
-	ApplysetPartOfLabel = "applyset.k8s.io/part-of"
+	ApplysetPartOfLabel = "applyset.kubernetes.io/part-of"
 
 	// ApplysetParentCRDLabel is the key of the label that can be set on a CRD to identify
 	// the custom resource type it defines (not the CRD itself) as an allowed parent for an ApplySet.
-	ApplysetParentCRDLabel = "applyset.k8s.io/is-parent-type"
+	ApplysetParentCRDLabel = "applyset.kubernetes.io/is-parent-type"
 )
 
 var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
@@ -88,7 +88,7 @@ type ApplySet struct {
 	// parentRef is a reference to the parent object that is used to track the applyset.
 	parentRef *ApplySetParentRef
 
-	// toolingID is the value to be used and validated in the applyset.k8s.io/tooling annotation.
+	// toolingID is the value to be used and validated in the applyset.kubernetes.io/tooling annotation.
 	toolingID ApplySetTooling
 
 	// currentResources is the set of resources that are part of the sever-side set as of when the current operation started.
