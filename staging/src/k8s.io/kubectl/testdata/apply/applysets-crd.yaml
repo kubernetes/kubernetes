@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: applysets.company.com
   labels:
-    applyset.k8s.io/is-parent-type: "true"
+    applyset.kubernetes.io/is-parent-type: "true"
 spec:
   group: company.com
   names:
