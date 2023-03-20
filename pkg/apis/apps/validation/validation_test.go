@@ -158,6 +158,36 @@ func tweakMaxUnavailable(mu intstr.IntOrString) statefulSetTweak {
 	}
 }
 
+func tweakPVCPolicy(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.PersistentVolumeClaimRetentionPolicy = policy
+	}
+}
+
+type pvcPolicyTweak func(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy)
+
+func mkPVCPolicy(tweaks ...pvcPolicyTweak) *apps.StatefulSetPersistentVolumeClaimRetentionPolicy {
+	policy := &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+
+	for _, tw := range tweaks {
+		tw(policy)
+	}
+
+	return policy
+}
+
+func tweakPVCDeletedPolicy(t apps.PersistentVolumeClaimRetentionPolicyType) pvcPolicyTweak {
+	return func(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+		policy.WhenDeleted = t
+	}
+}
+
+func tweakPVCScalePolicy(t apps.PersistentVolumeClaimRetentionPolicyType) pvcPolicyTweak {
+	return func(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+		policy.WhenScaled = t
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -235,19 +265,12 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "PVC policy " + enableStatefulSetAutoDeletePVC,
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
-						WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
-					},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakPVCPolicy(mkPVCPolicy(
+					tweakPVCDeletedPolicy(apps.DeletePersistentVolumeClaimRetentionPolicyType),
+					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+				)),
+			),
 		},
 		{
 			name: "maxUnavailable with parallel pod management",
@@ -462,16 +485,9 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{},
-					PodManagementPolicy:                  apps.OrderedReadyPodManagement,
-					Selector:                             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:                             validPodTemplate.Template,
-					UpdateStrategy:                       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakPVCPolicy(mkPVCPolicy()),
+			),
 			errs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
 				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
@@ -479,19 +495,12 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled:  apps.PersistentVolumeClaimRetentionPolicyType("invalid-retention-policy"),
-						WhenDeleted: apps.PersistentVolumeClaimRetentionPolicyType("invalid-retention-policy"),
-					},
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakPVCPolicy(mkPVCPolicy(
+					tweakPVCDeletedPolicy("invalid-retention-policy"),
+					tweakPVCScalePolicy("invalid-retention-policy"),
+				)),
+			),
 			errs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
 				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
@@ -867,52 +876,22 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		},
 		{
 			name: "update containers and pvc retention policy 1",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            addContainersValidTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
-						WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
-					},
-				},
-			},
+			old:  mkStatefulSet(addContainersValidTemplate),
+			update: mkStatefulSet(&validPodTemplate,
+				tweakPVCPolicy(mkPVCPolicy(
+					tweakPVCDeletedPolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+				)),
+			),
 		},
 		{
 			name: "update containers and pvc retention policy 2",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            addContainersValidTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: apps.RetainPersistentVolumeClaimRetentionPolicyType,
-					},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			old: mkStatefulSet(&validPodTemplate,
+				tweakPVCPolicy(mkPVCPolicy(
+					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+				)),
+			),
+			update: mkStatefulSet(&validPodTemplate),
 		},
 		{
 			name: "update update strategy",
