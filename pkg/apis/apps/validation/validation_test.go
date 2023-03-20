@@ -134,6 +134,15 @@ func tweakUpdateStrategyType(t apps.StatefulSetUpdateStrategyType) statefulSetTw
 	}
 }
 
+func tweakRollingUpdatePartition(partition int32) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
+			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
+		}
+		ss.Spec.UpdateStrategy.RollingUpdate.Partition = partition
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -203,20 +212,11 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "update strategy",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{
-						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-							return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
-						}()},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+				tweakRollingUpdatePartition(2),
+			),
 		},
 		{
 			name: "PVC policy " + enableStatefulSetAutoDeletePVC,
@@ -412,38 +412,21 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "invalid rolling update",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
-						RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-							return &apps.RollingUpdateStatefulSetStrategy{Partition: 1}
-						}()},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+				tweakRollingUpdatePartition(1),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate"), nil, ""),
 			},
 		},
 		{
 			name: "negative parition",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-							return &apps.RollingUpdateStatefulSetStrategy{Partition: -1}
-						}()},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakRollingUpdatePartition(-1),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "partition"), nil, ""),
 			},
