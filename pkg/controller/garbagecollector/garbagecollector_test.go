@@ -798,13 +798,14 @@ func TestGetDeletableResources(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	for name, test := range tests {
 		t.Logf("testing %q", name)
 		client := &fakeServerResources{
 			PreferredResources: test.serverResources,
 			Error:              test.err,
 		}
-		actual := GetDeletableResources(client)
+		actual := GetDeletableResources(ctx, client)
 		if !reflect.DeepEqual(test.deletableResources, actual) {
 			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
 		}
