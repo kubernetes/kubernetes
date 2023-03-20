@@ -86,6 +86,12 @@ func tweakReplicas(replicas int32) statefulSetTweak {
 	}
 }
 
+func tweakTemplateRestartPolicy(rp api.RestartPolicy) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Template.Spec.RestartPolicy = rp
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -354,80 +360,21 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "invalid restart policy 1",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validLabels,
-						},
-					},
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
 			errs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
 			name: "invalid restart policy 2",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyNever,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validLabels,
-						},
-					},
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
 			errs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
 			name: "empty restart policy",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							DNSPolicy:  api.DNSClusterFirst,
-							Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validLabels,
-						},
-					},
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 			errs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
