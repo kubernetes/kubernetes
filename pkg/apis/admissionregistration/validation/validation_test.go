@@ -3045,6 +3045,37 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `spec.validations[0].messageExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:20: Syntax error: missing ']' at '<EOF>`,
 		},
 		{
+			name: "messageExpression of wrong type",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					Validations: []admissionregistration.Validation{
+						{
+							Expression:        "true",
+							MessageExpression: "0 == 0",
+						},
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"CREATE"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"*/*"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: `spec.validations[0].messageExpression: Invalid value: "0 == 0": must evaluate to string`,
+		},
+		{
 			name: "invalid auditAnnotations key due to key name",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{
