@@ -42,6 +42,38 @@ func intStrAddr(intOrStr intstr.IntOrString) *intstr.IntOrString {
 	return &intOrStr
 }
 
+type statefulSetTweak func(ss *apps.StatefulSet)
+
+func mkStatefulSet(template *api.PodTemplate, tweaks ...statefulSetTweak) apps.StatefulSet {
+	ss := apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: apps.StatefulSetSpec{
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Template:            template.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+		},
+	}
+
+	for _, tw := range tweaks {
+		tw(&ss)
+	}
+
+	return ss
+}
+
+func tweakName(name string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.ObjectMeta.Name = name
+	}
+}
+
+func tweakNamespace(ns string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.ObjectMeta.Namespace = ns
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -95,27 +127,11 @@ func TestValidateStatefulSet(t *testing.T) {
 	successCases := []testCase{
 		{
 			name: "alpha name",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakName("abc")),
 		},
 		{
 			name: "alphanumeric name",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakName("abc-123")),
 		},
 		{
 			name: "parallel pod management",
@@ -212,60 +228,28 @@ func TestValidateStatefulSet(t *testing.T) {
 	errorCases := []testCase{
 		{
 			name: "zero-length name",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakName("")),
 			errs: field.ErrorList{
 				field.Required(field.NewPath("metadata", "name"), ""),
 			},
 		},
 		{
 			name: "name-with-dots",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakName("abc.123")),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), "abc.123", ""),
 			},
 		},
 		{
 			name: "long name",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: strings.Repeat("a", 64), Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakName(strings.Repeat("a", 64))),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 64), ""),
 			},
 		},
 		{
 			name: "missing-namespace",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakNamespace("")),
 			errs: field.ErrorList{
 				field.Required(field.NewPath("metadata", "namespace"), ""),
 			},
@@ -1029,46 +1013,14 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "update containers 1",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            addContainersValidTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			name:   "update containers 1",
+			old:    mkStatefulSet(&validPodTemplate),
+			update: mkStatefulSet(addContainersValidTemplate),
 		},
 		{
-			name: "update containers 2",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            addContainersValidTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			name:   "update containers 2",
+			old:    mkStatefulSet(addContainersValidTemplate),
+			update: mkStatefulSet(&validPodTemplate),
 		},
 		{
 			name: "update containers and pvc retention policy 1",
@@ -1234,49 +1186,17 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 
 	errorCases := []testCase{
 		{
-			name: "update name",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc2", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			name:   "update name",
+			old:    mkStatefulSet(&validPodTemplate, tweakName("abc")),
+			update: mkStatefulSet(&validPodTemplate, tweakName("abc2")),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "name"), nil, ""),
 			},
 		},
 		{
-			name: "update namespace",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault + "1"},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			name:   "update namespace",
+			old:    mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault)),
+			update: mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault+"1")),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), nil, ""),
 			},
@@ -1496,21 +1416,19 @@ func TestValidateControllerRevision(t *testing.T) {
 		}
 	}
 
-	ss := apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			Template: api.PodTemplateSpec{
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
-				},
+	podTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"a": "b"},
 			},
 		},
 	}
+
+	ss := mkStatefulSet(&podTemplate)
 
 	var (
 		valid       = newControllerRevision("validname", "validns", &ss, 0)
@@ -1561,36 +1479,20 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 		}
 	}
 
-	ss := apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			Template: api.PodTemplateSpec{
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
-				},
+	podTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"a": "b"},
 			},
 		},
 	}
-	modifiedss := apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "cdf", Namespace: metav1.NamespaceDefault},
-		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			Template: api.PodTemplateSpec{
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
-				},
-			},
-		},
-	}
+
+	ss := mkStatefulSet(&podTemplate, tweakName("abc"))
+	modifiedss := mkStatefulSet(&podTemplate, tweakName("cdf"))
 
 	var (
 		valid           = newControllerRevision("1", "validname", "validns", &ss, 0)
