@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -867,10 +868,7 @@ func validateMatchCondition(v *admissionregistration.MatchCondition, opts valida
 	if len(trimmedExpression) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), ""))
 	} else {
-		allErrors = append(allErrors, validateCELExpression(trimmedExpression, plugincel.OptionalVariableDeclarations{
-			HasParams:     opts.allowParamsInMatchConditions,
-			HasAuthorizer: true,
-		}, fldPath.Child("expression"))...)
+		allErrors = append(allErrors, validateMatchConditionsExpression(trimmedExpression, opts.allowParamsInMatchConditions, fldPath.Child("expression"))...)
 	}
 	if len(v.Name) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("name"), ""))
@@ -888,20 +886,14 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	if len(trimmedExpression) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), "expression is not specified"))
 	} else {
-		allErrors = append(allErrors, validateCELExpression(v.Expression, plugincel.OptionalVariableDeclarations{
-			HasParams:     paramKind != nil,
-			HasAuthorizer: true,
-		}, fldPath.Child("expression"))...)
+		allErrors = append(allErrors, validateValidationExpression(v.Expression, paramKind != nil, fldPath.Child("expression"))...)
 	}
 	if len(v.MessageExpression) > 0 && len(trimmedMessageExpression) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("messageExpression"), v.MessageExpression, "must be non-empty if specified"))
 	} else if len(trimmedMessageExpression) != 0 {
 		// use v.MessageExpression instead of trimmedMessageExpression so that
 		// the compiler output shows the correct column.
-		allErrors = append(allErrors, validateCELExpression(v.MessageExpression, plugincel.OptionalVariableDeclarations{
-			HasParams:     paramKind != nil,
-			HasAuthorizer: false,
-		}, fldPath.Child("messageExpression"))...)
+		allErrors = append(allErrors, validateMessageExpression(v.MessageExpression, paramKind != nil, fldPath.Child("messageExpression"))...)
 	}
 	if len(v.Message) > 0 && len(trimmedMsg) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must be non-empty if specified"))
@@ -916,17 +908,15 @@ func validateValidation(v *admissionregistration.Validation, paramKind *admissio
 	return allErrors
 }
 
-func validateCELExpression(expression string, variables plugincel.OptionalVariableDeclarations, fldPath *field.Path) field.ErrorList {
+func validateCELCondition(expression plugincel.ExpressionAccessor, variables plugincel.OptionalVariableDeclarations, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	result := plugincel.CompileCELExpression(&validatingadmissionpolicy.ValidationCondition{
-		Expression: expression,
-	}, variables, celconfig.PerCallLimit)
+	result := plugincel.CompileCELExpression(expression, variables, celconfig.PerCallLimit)
 	if result.Error != nil {
 		switch result.Error.Type {
 		case cel.ErrorTypeRequired:
 			allErrors = append(allErrors, field.Required(fldPath, result.Error.Detail))
 		case cel.ErrorTypeInvalid:
-			allErrors = append(allErrors, field.Invalid(fldPath, expression, result.Error.Detail))
+			allErrors = append(allErrors, field.Invalid(fldPath, expression.GetExpression(), result.Error.Detail))
 		case cel.ErrorTypeInternal:
 			allErrors = append(allErrors, field.InternalError(fldPath, result.Error))
 		default:
@@ -934,6 +924,33 @@ func validateCELExpression(expression string, variables plugincel.OptionalVariab
 		}
 	}
 	return allErrors
+}
+
+func validateValidationExpression(expression string, hasParams bool, fldPath *field.Path) field.ErrorList {
+	return validateCELCondition(&validatingadmissionpolicy.ValidationCondition{
+		Expression: expression,
+	}, plugincel.OptionalVariableDeclarations{
+		HasParams:     hasParams,
+		HasAuthorizer: true,
+	}, fldPath)
+}
+
+func validateMatchConditionsExpression(expression string, hasParams bool, fldPath *field.Path) field.ErrorList {
+	return validateCELCondition(&matchconditions.MatchCondition{
+		Expression: expression,
+	}, plugincel.OptionalVariableDeclarations{
+		HasParams:     hasParams,
+		HasAuthorizer: true,
+	}, fldPath)
+}
+
+func validateMessageExpression(expression string, hasParams bool, fldPath *field.Path) field.ErrorList {
+	return validateCELCondition(&validatingadmissionpolicy.MessageExpressionCondition{
+		MessageExpression: expression,
+	}, plugincel.OptionalVariableDeclarations{
+		HasParams:     hasParams,
+		HasAuthorizer: false,
+	}, fldPath)
 }
 
 func validateAuditAnnotation(meta metav1.ObjectMeta, v *admissionregistration.AuditAnnotation, paramKind *admissionregistration.ParamKind, fldPath *field.Path) field.ErrorList {
