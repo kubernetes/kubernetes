@@ -128,6 +128,12 @@ func tweakOrdinalsStart(s int32) statefulSetTweak {
 	}
 }
 
+func tweakPVCTemplate(pvc ...api.PersistentVolumeClaim) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.VolumeClaimTemplates = pvc
+	}
+}
+
 func tweakUpdateStrategyType(t apps.StatefulSetUpdateStrategyType) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		ss.Spec.UpdateStrategy.Type = t
@@ -1003,79 +1009,25 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "update pvc template size",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplate},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplateChangedSize},
-				},
-			},
+			name:   "update pvc template size",
+			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 			errs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
-			name: "update pvc template storage class",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplate},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplateChangedClass},
-				},
-			},
+			name:   "update pvc template storage class",
+			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
 			errs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
-			name: "add new pvc template",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplate},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy:  apps.OrderedReadyPodManagement,
-					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:             validPodTemplate.Template,
-					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplate, validPVCTemplate2},
-				},
-			},
+			name:   "add new pvc template",
+			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 			errs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec"), ""),
 			},
