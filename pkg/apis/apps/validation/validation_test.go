@@ -98,6 +98,12 @@ func tweakMinReadySeconds(t int32) statefulSetTweak {
 	}
 }
 
+func tweakOrdinalsStart(s int32) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Ordinals = &apps.StatefulSetOrdinals{Start: s}
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -219,17 +225,10 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "ordinals.start positive value",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.ParallelPodManagement,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					Ordinals:            &apps.StatefulSetOrdinals{Start: 2},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakOrdinalsStart(2),
+			),
 		},
 	}
 
@@ -580,18 +579,11 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid ordinals.start ",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.ParallelPodManagement,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					Ordinals:            &apps.StatefulSetOrdinals{Start: -2},
-				},
-			},
+			name: "invalid ordinals.start",
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakOrdinalsStart(-2),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
 			},
@@ -1023,28 +1015,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "update existing instance with .spec.ordinals.start",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					Ordinals: &apps.StatefulSetOrdinals{
-						Start: 3,
-					},
-				},
-			},
+			name:   "update existing instance with .spec.ordinals.start",
+			old:    mkStatefulSet(&validPodTemplate),
+			update: mkStatefulSet(&validPodTemplate, tweakOrdinalsStart(3)),
 		},
 	}
 
