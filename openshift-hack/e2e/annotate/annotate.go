@@ -16,7 +16,9 @@ import (
 var reHasSig = regexp.MustCompile(`\[sig-[\w-]+\]`)
 
 // Run generates tests annotations for the targeted package.
-func Run() {
+// It accepts testMaps which defines labeling rules and filter
+// function to remove elements based on test name and their labels.
+func Run(testMaps map[string][]string, filter func(name string) bool) {
 	var errors []string
 
 	if len(os.Args) != 2 && len(os.Args) != 3 {
@@ -25,7 +27,7 @@ func Run() {
 	}
 	filename := os.Args[len(os.Args)-1]
 
-	generator := newGenerator()
+	generator := newGenerator(testMaps)
 	ginkgo.GetSuite().BuildTree()
 	ginkgo.GetSuite().WalkTests(generator.generateRename)
 	if len(generator.errors) > 0 {
@@ -68,8 +70,11 @@ func Run() {
 	}
 
 	var pairs []string
-	for from, to := range generator.output {
-		pairs = append(pairs, fmt.Sprintf("%q:\n%q,", from, to))
+	for testName, labels := range generator.output {
+		if filter(fmt.Sprintf("%s%s", testName, labels)) {
+			continue
+		}
+		pairs = append(pairs, fmt.Sprintf("%q:\n%q,", testName, labels))
 	}
 	sort.Strings(pairs)
 	contents := fmt.Sprintf(`
@@ -105,12 +110,12 @@ func init() {
 	}
 }
 
-func newGenerator() *ginkgoTestRenamer {
+func newGenerator(testMaps map[string][]string) *ginkgoTestRenamer {
 	var allLabels []string
 	matches := make(map[string]*regexp.Regexp)
 	stringMatches := make(map[string][]string)
 
-	for label, items := range TestMaps {
+	for label, items := range testMaps {
 		sort.Strings(items)
 		allLabels = append(allLabels, label)
 		var remain []string
