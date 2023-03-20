@@ -151,9 +151,6 @@ name | architectures
 
 ### (No, really, you MUST read this before you upgrade)
 
- - Migrated the namespace controller (within `kube-controller-manager`) to support [contextual logging](https://k8s.io/docs/concepts/cluster-administration/system-logs/#contextual-logging).
-  
-  No user the kube-controller-manager may now exit with code 1 ([#113443](https://github.com/kubernetes/kubernetes/pull/113443), [@yangjunmyfm192085](https://github.com/yangjunmyfm192085)) [SIG API Machinery, Apps, Instrumentation, Node and Testing]
   - The `IPv6DualStack` feature gate for external cloud providers was removed.
   (The feature became GA in 1.23 and the gate was removed for all other
   components several releases ago.) If you were still manually
@@ -163,7 +160,7 @@ name | architectures
 
 ### Deprecation
 
-- The SecurityContextDeny admission plugin is going deprecated and will be removed in future versions. ([#115879](https://github.com/kubernetes/kubernetes/pull/115879), [@mtardy](https://github.com/mtardy)) [SIG Auth]
+- The alpha SecurityContextDeny admission plugin is deprecated and now requires enabling the alpha `SecurityContextDeny` feature gate to use. It will be removed in a future version. ([#115879](https://github.com/kubernetes/kubernetes/pull/115879), [@mtardy](https://github.com/mtardy)) [SIG Auth]
 
 ### API Change
 
