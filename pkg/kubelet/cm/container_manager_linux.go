@@ -256,6 +256,9 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
 	cgroupManager := NewCgroupManager(logger, subsystems, nodeConfig.CgroupDriver)
 	nodeConfig.CgroupVersion = cgroupManager.Version()
+	if nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) {
+		cgroupManager.SetCPULoadBalanceDisable()
+	}
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.

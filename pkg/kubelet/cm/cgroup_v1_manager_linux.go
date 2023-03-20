@@ -144,3 +144,7 @@ func (c *cgroupV1impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 func (c *cgroupV1impl) getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
 	return readCgroupMemoryConfig(cgroupPath, cgroupv1MemLimitFile)
 }
+
+func (m *cgroupV1impl) SetCPULoadBalanceDisable() {
+	m.cpuLoadBalanceDisable = true
+}
