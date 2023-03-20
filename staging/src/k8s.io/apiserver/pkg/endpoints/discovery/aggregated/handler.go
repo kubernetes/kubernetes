@@ -36,6 +36,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// GroupVersions from the default source take precedence over all others
+var DefaultSource = "default"
+
 // This handler serves the /apis endpoint for an aggregated list of
 // api resources indexed by their group version.
 type ResourceManager interface {
@@ -60,12 +63,55 @@ type ResourceManager interface {
 	// Thread-safe
 	RemoveGroupVersion(gv metav1.GroupVersion)
 
-	// Resets the manager's known list of group-versions and replaces them
-	// with the given groups
-	// Thread-Safe
 	SetGroups([]apidiscoveryv2beta1.APIGroupDiscovery)
 
+	// Returns the same resource manager using a different source
+	// The source is used to decide how to de-duplicate groups.
+	// DefaultSource always takes precedence. Otherwise, the precedence between
+	// two sources is not defined.
+	WithSource(source string) ResourceManager
+
 	http.Handler
+}
+
+type resourceManager struct {
+	source string
+	*resourceDiscoveryManager
+}
+
+func (rm resourceManager) AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
+	rm.resourceDiscoveryManager.AddGroupVersion(rm.source, groupName, value)
+}
+func (rm resourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int) {
+	rm.resourceDiscoveryManager.SetGroupVersionPriority(rm.source, gv, grouppriority, versionpriority)
+}
+func (rm resourceManager) RemoveGroup(groupName string) {
+	rm.resourceDiscoveryManager.RemoveGroup(rm.source, groupName)
+}
+func (rm resourceManager) RemoveGroupVersion(gv metav1.GroupVersion) {
+	rm.resourceDiscoveryManager.RemoveGroupVersion(rm.source, gv)
+}
+func (rm resourceManager) SetGroups(groups []apidiscoveryv2beta1.APIGroupDiscovery) {
+	rm.resourceDiscoveryManager.SetGroups(rm.source, groups)
+}
+
+func (rm resourceManager) WithSource(source string) ResourceManager {
+	return resourceManager{
+		source:                   source,
+		resourceDiscoveryManager: rm.resourceDiscoveryManager,
+	}
+}
+
+type groupKey struct {
+	name string
+
+	// String identifying where this group came from (aggregator, native, apiextensions, etc)
+	source string
+}
+
+type groupVersionKey struct {
+	metav1.GroupVersion
+	source string
 }
 
 type resourceDiscoveryManager struct {
@@ -78,8 +124,8 @@ type resourceDiscoveryManager struct {
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
 	lock              sync.RWMutex
-	apiGroups         map[string]*apidiscoveryv2beta1.APIGroupDiscovery
-	versionPriorities map[metav1.GroupVersion]priorityInfo
+	apiGroups         map[groupKey]*apidiscoveryv2beta1.APIGroupDiscovery
+	versionPriorities map[groupVersionKey]priorityInfo
 }
 
 type priorityInfo struct {
@@ -93,7 +139,7 @@ func NewResourceManager(path string) ResourceManager {
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	rdm := &resourceDiscoveryManager{
 		serializer:        codecs,
-		versionPriorities: make(map[metav1.GroupVersion]priorityInfo),
+		versionPriorities: make(map[groupVersionKey]priorityInfo),
 	}
 	rdm.serveHTTPFunc = metrics.InstrumentHandlerFunc("GET",
 		/* group = */ "",
@@ -105,20 +151,28 @@ func NewResourceManager(path string) ResourceManager {
 		/* deprecated */ false,
 		/* removedRelease */ "",
 		rdm.serveHTTP)
-	return rdm
+	return resourceManager{
+		source:                   DefaultSource,
+		resourceDiscoveryManager: rdm,
+	}
 }
-func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVersion, groupPriorityMinimum, versionPriority int) {
+
+func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(source string, gv metav1.GroupVersion, groupPriorityMinimum, versionPriority int) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	rdm.versionPriorities[gv] = priorityInfo{
+	key := groupVersionKey{
+		GroupVersion: gv,
+		source:       source,
+	}
+	rdm.versionPriorities[key] = priorityInfo{
 		GroupPriorityMinimum: groupPriorityMinimum,
 		VersionPriority:      versionPriority,
 	}
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIGroupDiscovery) {
+func (rdm *resourceDiscoveryManager) SetGroups(source string, groups []apidiscoveryv2beta1.APIGroupDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
@@ -127,13 +181,17 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIG
 
 	for _, group := range groups {
 		for _, version := range group.Versions {
-			rdm.addGroupVersionLocked(group.Name, version)
+			rdm.addGroupVersionLocked(source, group.Name, version)
 		}
 	}
 
 	// Filter unused out priority entries
 	for gv := range rdm.versionPriorities {
-		entry, exists := rdm.apiGroups[gv.Group]
+		key := groupKey{
+			source: source,
+			name:   gv.Group,
+		}
+		entry, exists := rdm.apiGroups[key]
 		if !exists {
 			delete(rdm.versionPriorities, gv)
 			continue
@@ -154,21 +212,26 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIG
 	}
 }
 
-func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
+func (rdm *resourceDiscoveryManager) AddGroupVersion(source string, groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	rdm.addGroupVersionLocked(groupName, value)
+	rdm.addGroupVersionLocked(source, groupName, value)
 }
 
-func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
+func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source string, groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
 	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	if rdm.apiGroups == nil {
-		rdm.apiGroups = make(map[string]*apidiscoveryv2beta1.APIGroupDiscovery)
+		rdm.apiGroups = make(map[groupKey]*apidiscoveryv2beta1.APIGroupDiscovery)
 	}
 
-	if existing, groupExists := rdm.apiGroups[groupName]; groupExists {
+	key := groupKey{
+		source: source,
+		name:   groupName,
+	}
+
+	if existing, groupExists := rdm.apiGroups[key]; groupExists {
 		// If this version already exists, replace it
 		versionExists := false
 
@@ -198,12 +261,16 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 			},
 			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{value},
 		}
-		rdm.apiGroups[groupName] = group
+		rdm.apiGroups[key] = group
 	}
 
 	gv := metav1.GroupVersion{Group: groupName, Version: value.Version}
-	if _, ok := rdm.versionPriorities[gv]; !ok {
-		rdm.versionPriorities[gv] = priorityInfo{
+	gvKey := groupVersionKey{
+		GroupVersion: gv,
+		source:       source,
+	}
+	if _, ok := rdm.versionPriorities[gvKey]; !ok {
+		rdm.versionPriorities[gvKey] = priorityInfo{
 			GroupPriorityMinimum: 1000,
 			VersionPriority:      15,
 		}
@@ -213,10 +280,16 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVersion) {
+func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source string, apiGroup metav1.GroupVersion) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
-	group, exists := rdm.apiGroups[apiGroup.Group]
+
+	key := groupKey{
+		source: source,
+		name:   apiGroup.Group,
+	}
+
+	group, exists := rdm.apiGroups[key]
 	if !exists {
 		return
 	}
@@ -234,20 +307,30 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVer
 		return
 	}
 
-	delete(rdm.versionPriorities, apiGroup)
+	gvKey := groupVersionKey{
+		GroupVersion: apiGroup,
+		source:       source,
+	}
+
+	delete(rdm.versionPriorities, gvKey)
 	if len(group.Versions) == 0 {
-		delete(rdm.apiGroups, group.Name)
+		delete(rdm.apiGroups, key)
 	}
 
 	// Reset response document so it is recreated lazily
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
+func (rdm *resourceDiscoveryManager) RemoveGroup(source string, groupName string) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	delete(rdm.apiGroups, groupName)
+	key := groupKey{
+		source: source,
+		name:   groupName,
+	}
+
+	delete(rdm.apiGroups, key)
 
 	for k := range rdm.versionPriorities {
 		if k.Group == groupName {
@@ -265,8 +348,25 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 	regenerationCounter.Inc()
 	// Re-order the apiGroups by their priority.
 	groups := []apidiscoveryv2beta1.APIGroupDiscovery{}
-	for _, group := range rdm.apiGroups {
+
+	groupsToUse := map[string]apidiscoveryv2beta1.APIGroupDiscovery{}
+	sourcesUsed := map[string]string{}
+
+	for key, group := range rdm.apiGroups {
+		// Skip groups we've already seen before. Only DefaultSource
+		// takes precedence
+		if _, seen := groupsToUse[key.name]; seen && key.source != DefaultSource {
+			continue
+		}
+
+		groupsToUse[key.name] = *group
+		sourcesUsed[key.name] = key.source
+	}
+
+	for _, group := range groupsToUse {
 		copied := *group.DeepCopy()
+
+		source := sourcesUsed[group.Name]
 
 		// Re-order versions based on their priority. Use kube-aware string
 		// comparison as a tie breaker
@@ -274,8 +374,8 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 			iVersion := copied.Versions[i].Version
 			jVersion := copied.Versions[j].Version
 
-			iPriority := rdm.versionPriorities[metav1.GroupVersion{Group: group.Name, Version: iVersion}].VersionPriority
-			jPriority := rdm.versionPriorities[metav1.GroupVersion{Group: group.Name, Version: jVersion}].VersionPriority
+			iPriority := rdm.versionPriorities[groupVersionKey{metav1.GroupVersion{Group: group.Name, Version: iVersion}, source}].VersionPriority
+			jPriority := rdm.versionPriorities[groupVersionKey{metav1.GroupVersion{Group: group.Name, Version: jVersion}, source}].VersionPriority
 
 			// Sort by version string comparator if priority is equal
 			if iPriority == jPriority {
@@ -286,8 +386,7 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 			return iPriority > jPriority
 		})
 
-		groups = append(groups, *copied.DeepCopy())
-
+		groups = append(groups, copied)
 	}
 
 	// For each group, determine the highest minimum group priority and use that
