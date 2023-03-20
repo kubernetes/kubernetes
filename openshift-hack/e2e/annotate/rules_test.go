@@ -65,7 +65,7 @@ func TestStockRules(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testRenamer := newGenerator()
+			testRenamer := newGenerator(TestMaps)
 			testNode := &testNode{
 				text: test.testName,
 			}
