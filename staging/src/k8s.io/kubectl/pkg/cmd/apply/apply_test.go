@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,23 +98,84 @@ func TestApplyExtraArgsFail(t *testing.T) {
 }
 
 func TestAlphaEnablement(t *testing.T) {
-	alphas := map[cmdutil.FeatureGate]string{
-		cmdutil.ApplySet: "applyset",
+	tests := []struct {
+		feature                   cmdutil.FeatureGate
+		flag, value, enabledUsage string
+	}{
+		{
+			feature: cmdutil.ApplySet,
+			flag:    "applyset",
+		},
+		{
+			feature:      cmdutil.AutoServerSide,
+			flag:         "server-side",
+			value:        "auto",
+			enabledUsage: `Must be "true", "false" or [alpha] "auto".`,
+		},
 	}
-	for feature, flag := range alphas {
+	for _, test := range tests {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
 		cmd := &cobra.Command{}
 		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 		flags.AddFlags(cmd)
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
-
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
+		if test.value != "" {
+			if strings.Contains(cmd.Flags().FlagUsages(), test.enabledUsage) {
+				t.Fatalf("%s usage should not include %s without the %s feature enabled", test.flag, test.value, test.feature)
+			}
+		} else {
+			require.Nil(t, cmd.Flags().Lookup(test.flag), "flag %q should not be registered without the %q feature enabled", test.flag, test.feature)
+		}
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{test.feature}, t, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 			flags.AddFlags(cmd)
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
+			if test.value != "" {
+				if !strings.Contains(cmd.Flags().FlagUsages(), test.enabledUsage) {
+					t.Fatalf("%s usage should include %s when the %s feature is enabled", test.flag, test.value, test.feature)
+				}
+			}
+			require.NotNil(t, cmd.Flags().Lookup(test.flag), "flag %q should be registered with the %q feature enabled", test.flag, test.feature)
+		})
+	}
+}
+
+func TestAlphaDisablement(t *testing.T) {
+	tests := []struct {
+		args        [][]string
+		expectedErr string
+	}{
+		{
+			args: [][]string{
+				{"server-side", "auto"},
+			},
+			expectedErr: `invalid value "auto" for "--server-side" flag: value must be a boolean`,
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			f := cmdtesting.NewTestFactory()
+			defer f.Cleanup()
+			f.Client = &fake.RESTClient{}
+			cmd := &cobra.Command{}
+			flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+			flags.AddFlags(cmd)
+			cmd.Flags().Set("filename", "unused")
+			for _, arg := range test.args {
+				if arg[0] == "namespace" {
+					f.WithNamespace(arg[1])
+				} else {
+					cmd.Flags().Set(arg[0], arg[1])
+				}
+			}
+			_, err := flags.ToOptions(f, cmd, "kubectl", []string{})
+			if err == nil {
+				t.Fatalf("missing expected error for case %d with args %+v", i, test.args)
+			}
+			if test.expectedErr != err.Error() {
+				t.Errorf("expected error %s, got %s", test.expectedErr, err)
+			}
 		})
 	}
 }
@@ -135,7 +197,15 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"server-side", "true"},
 				{"dry-run", "client"},
 			},
-			expectedErr: "--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)",
+			expectedErr: "--dry-run=client doesn't work with --server-side=true (did you mean --dry-run=server instead?)",
+		},
+		{
+			args: [][]string{
+				{"server-side", "auto"},
+				{"dry-run", "client"},
+			},
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.AutoServerSide},
+			expectedErr:  "--dry-run=client doesn't work with --server-side=auto",
 		},
 		{
 			args: [][]string{
@@ -183,6 +253,15 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"all", "true"},
 			},
 			expectedErr: "--prune is in alpha and doesn't currently work on objects created by server-side apply",
+		},
+		{
+			args: [][]string{
+				{"server-side", "auto"},
+				{"prune", "true"},
+				{"all", "true"},
+			},
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.AutoServerSide},
+			expectedErr:  "--prune is in alpha and doesn't currently work on objects created by server-side apply",
 		},
 		{
 			args: [][]string{
@@ -3249,4 +3328,240 @@ func TestApplySetDryRun(t *testing.T) {
 		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
 		require.Nil(t, serverSideData[pathSecret], "secret was created")
 	})
+}
+
+func TestApplyObject_ServerSideAuto(t *testing.T) {
+	pathPrefix := "/namespaces/test/replicationcontrollers/"
+	serverSideAppliedName, serverSideAppliedRC := readReplicationController(t, filenameRCNoAnnotation)
+	serverSideAppliedPath := pathPrefix + serverSideAppliedName
+
+	_, noExistRC := readReplicationController(t, filenameNoExistRC)
+
+	clientSideAppliedName, clientSideAppliedRC := readReplicationController(t, filenameRCLASTAPPLIED)
+	clientSideAppliedPath := pathPrefix + clientSideAppliedName
+
+	getRequestBodies := map[string][]byte{
+		serverSideAppliedPath: serverSideAppliedRC,
+		clientSideAppliedPath: clientSideAppliedRC,
+	}
+
+	type requestExpectations struct {
+		gets, applyPatches, smPatches int
+	}
+
+	tests := []struct {
+		name, expectedOut string
+		filePaths         []string
+		expectedRequests  requestExpectations
+	}{
+		{
+			name:        "server-side auto when the annotation does not exist on the live object",
+			filePaths:   []string{filenameRCNoAnnotation},
+			expectedOut: "replicationcontroller/no-annotation serverside-applied\n",
+			expectedRequests: requestExpectations{
+				gets:         1,
+				applyPatches: 1,
+				smPatches:    0,
+			},
+		},
+		{
+			name:        "server-side auto when the object doesn't exist",
+			filePaths:   []string{filenameNoExistRC},
+			expectedOut: "replicationcontroller/no-exist serverside-applied\n",
+			expectedRequests: requestExpectations{
+				gets:         2,
+				applyPatches: 1,
+				smPatches:    0,
+			},
+		},
+		{
+			name:        "server-side auto with annotated object",
+			filePaths:   []string{filenameRCLASTAPPLIED},
+			expectedOut: "replicationcontroller/test-rc configured\n",
+			expectedRequests: requestExpectations{
+				gets:         1,
+				applyPatches: 0,
+				smPatches:    1,
+			},
+		},
+		{
+			name:        "server-side auto with annotated object, not annotated object, and nonexistent object",
+			filePaths:   []string{filenameRCLASTAPPLIED, filenameRCNoAnnotation, filenameNoExistRC},
+			expectedOut: "replicationcontroller/test-rc configured\nreplicationcontroller/no-annotation serverside-applied\nreplicationcontroller/no-exist serverside-applied\n",
+			expectedRequests: requestExpectations{
+				gets:         4,
+				applyPatches: 2,
+				smPatches:    1,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				t.Fatalf("Error running command (exit code %d): %s", code, str)
+			})
+			defer cmdutil.DefaultBehaviorOnFatal()
+
+			var getRequestCount, smpCount, applyPatchCount int
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case m == "GET":
+						getRequestCount += 1
+						data, ok := getRequestBodies[p]
+						if !ok {
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
+						}
+						body := bytes.NewReader(data)
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(body)}, nil
+					case p == clientSideAppliedPath && m == "PATCH":
+						if got := req.Header.Get("Content-Type"); got != string(types.StrategicMergePatchType) {
+							t.Fatalf("content-type header should not be: %s", got)
+						}
+						smpCount += 1
+						patch, err := io.ReadAll(req.Body)
+						require.NoError(t, err)
+						patchMap := map[string]interface{}{}
+						err = json.Unmarshal(patch, &patchMap)
+						require.NoError(t, err)
+						annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+						if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+							t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+						}
+						csBodyRC := io.NopCloser(bytes.NewReader(clientSideAppliedRC))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: csBodyRC}, nil
+					case p != clientSideAppliedPath && m == "PATCH":
+						if got := req.Header.Get("Content-Type"); got != string(types.ApplyPatchType) {
+							t.Fatalf("content-type header should not be: %s", got)
+						}
+						applyPatchCount += 1
+						patch, err := io.ReadAll(req.Body)
+						require.NoError(t, err)
+						objMeta := metav1.PartialObjectMetadata{}
+						require.NoError(t, json.Unmarshal(patch, &objMeta))
+						_, ok := objMeta.Annotations[corev1.LastAppliedConfigAnnotation]
+						require.False(t, ok)
+						bodyRC := io.NopCloser(bytes.NewReader(noExistRC))
+						if p == serverSideAppliedPath {
+							bodyRC = io.NopCloser(bytes.NewReader(serverSideAppliedRC))
+						}
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Errorf("unexpected request to %s", p)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			ioStreams, _, outbuff, errBuf := genericclioptions.NewTestIOStreams()
+			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.AutoServerSide}, t, func(t *testing.T) {
+				cmd := NewCmdApply("kubectl", tf, ioStreams)
+				for _, filePath := range test.filePaths {
+					cmd.Flags().Set("filename", filePath)
+				}
+				cmd.Flags().Set("server-side", "auto")
+				cmd.Run(cmd, []string{})
+			})
+			require.Empty(t, errBuf.String())
+			assert.Equal(t, test.expectedOut, outbuff.String())
+			assert.Equal(t, test.expectedRequests.gets, getRequestCount, "unexpected number of GET requests")
+			assert.Equal(t, test.expectedRequests.applyPatches, applyPatchCount, "unexpected number of SSA patch requests")
+			assert.Equal(t, test.expectedRequests.smPatches, smpCount, "unexpected number of CSA patch requests")
+		})
+	}
+}
+
+func TestFieldMangerSetCorrectly(t *testing.T) {
+	pathPrefix := "/namespaces/test/replicationcontrollers/"
+	serverSideAppliedName, serverSideAppliedRC := readReplicationController(t, filenameRCNoAnnotation)
+	serverSideAppliedPath := pathPrefix + serverSideAppliedName
+
+	clientSideAppliedName, clientSideAppliedRC := readReplicationController(t, filenameRCLASTAPPLIED)
+	clientSideAppliedPath := pathPrefix + clientSideAppliedName
+
+	isManagedName, isManagedRC := readReplicationController(t, filenameNoExistRC)
+	isManagedPath := pathPrefix + isManagedName
+
+	getRequestBodies := map[string][]byte{
+		serverSideAppliedPath: serverSideAppliedRC,
+		clientSideAppliedPath: clientSideAppliedRC,
+		isManagedPath:         isManagedRC,
+	}
+
+	tests := []struct {
+		name, filePath, fieldManager, expectedFieldManager string
+	}{
+		{
+			name:                 "default field manager on server-side apply",
+			filePath:             filenameRCNoAnnotation,
+			fieldManager:         "",
+			expectedFieldManager: fieldManagerServerSideApply,
+		},
+		{
+			name:                 "default field manager on client-side apply",
+			filePath:             filenameRCLASTAPPLIED,
+			fieldManager:         "",
+			expectedFieldManager: FieldManagerClientSideApply,
+		},
+		{
+			name:                 "custom field manager",
+			filePath:             filenameNoExistRC,
+			fieldManager:         "test",
+			expectedFieldManager: "test",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				t.Fatalf("Error running command (exit code %d): %s", code, str)
+			})
+			defer cmdutil.DefaultBehaviorOnFatal()
+			var patchCount = 0
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case m == "GET":
+						data, ok := getRequestBodies[p]
+						if !ok {
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(nil))}, nil
+						}
+						body := bytes.NewReader(data)
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(body)}, nil
+					case m == "PATCH":
+						if got := req.URL.Query().Get("fieldManager"); got != test.expectedFieldManager {
+							t.Fatalf("fieldManager should not be: %s", got)
+						}
+						patchCount += 1
+						data, _ := getRequestBodies[p]
+						body := bytes.NewReader(data)
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(body)}, nil
+					default:
+						t.Errorf("unexpected request to %s", p)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
+			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.AutoServerSide}, t, func(t *testing.T) {
+				cmd := NewCmdApply("kubectl", tf, ioStreams)
+				cmd.Flags().Set("filename", test.filePath)
+				cmd.Flags().Set("server-side", "auto")
+				if test.fieldManager != "" {
+					cmd.Flags().Set("field-manager", test.fieldManager)
+				}
+				cmd.Run(cmd, []string{})
+			})
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+			assert.Equal(t, 1, patchCount)
+		})
+	}
 }

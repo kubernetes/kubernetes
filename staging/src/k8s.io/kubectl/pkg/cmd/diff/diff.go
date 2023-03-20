@@ -102,10 +102,10 @@ func diffError(err error) exec.ExitError {
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 
-	ServerSideApply   bool
-	FieldManager      string
-	ForceConflicts    bool
-	ShowManagedFields bool
+	ServerSideApplyStrategy cmdutil.ServerSideApplyStrategy
+	FieldManager            string
+	ForceConflicts          bool
+	ShowManagedFields       bool
 
 	Selector         string
 	OpenAPISchema    openapi.Resources
@@ -323,7 +323,7 @@ type InfoObject struct {
 	Encoder         runtime.Encoder
 	OpenAPI         openapi.Resources
 	Force           bool
-	ServerSideApply bool
+	ServerSideApply cmdutil.ServerSideApplyStrategy
 	FieldManager    string
 	ForceConflicts  bool
 	genericclioptions.IOStreams
@@ -342,7 +342,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	helper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).
 		DryRun(true).
 		WithFieldManager(obj.FieldManager)
-	if obj.ServerSideApply {
+	if obj.ServerSideApply == cmdutil.ServerSide {
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
 		if err != nil {
 			return nil, err
@@ -627,14 +627,17 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
-	o.FieldManager = apply.GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
+	o.ServerSideApplyStrategy, err = cmdutil.GetServerSideApplyFlag(cmd)
+	if err != nil {
+		return err
+	}
+	o.FieldManager = apply.GetApplyFieldManagerFlag(cmd, o.ServerSideApplyStrategy)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
-	if o.ForceConflicts && !o.ServerSideApply {
+	if o.ForceConflicts && o.ServerSideApplyStrategy != cmdutil.ServerSide {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if !o.ServerSideApply {
+	if o.ServerSideApplyStrategy != cmdutil.ServerSide {
 		o.OpenAPISchema, err = f.OpenAPISchema()
 		if err != nil {
 			return err
@@ -720,7 +723,7 @@ func (o *DiffOptions) Run() error {
 				Encoder:         scheme.DefaultJSONEncoder(),
 				OpenAPI:         o.OpenAPISchema,
 				Force:           force,
-				ServerSideApply: o.ServerSideApply,
+				ServerSideApply: o.ServerSideApplyStrategy,
 				FieldManager:    o.FieldManager,
 				ForceConflicts:  o.ForceConflicts,
 				IOStreams:       o.Diff.IOStreams,
@@ -770,6 +773,10 @@ func (o *DiffOptions) Run() error {
 
 // Validate makes sure provided values for DiffOptions are valid
 func (o *DiffOptions) Validate() error {
+	if cmdutil.AutoServerSide.IsEnabled() && o.ServerSideApplyStrategy == cmdutil.ServerSideAuto {
+		return fmt.Errorf("--server-side=auto is in alpha and not currently supported with diff")
+	}
+
 	return nil
 }
 

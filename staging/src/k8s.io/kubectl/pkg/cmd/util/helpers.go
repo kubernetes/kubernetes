@@ -428,6 +428,7 @@ const (
 	ApplySet              FeatureGate = "KUBECTL_APPLYSET"
 	ExplainOpenapiV3      FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
 	CmdPluginAsSubcommand FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
+	AutoServerSide        FeatureGate = "KUBECTL_SERVER_SIDE_APPLY_AUTO"
 )
 
 func (f FeatureGate) IsEnabled() bool {
@@ -486,7 +487,18 @@ func AddContainerVarFlags(cmd *cobra.Command, p *string, containerName string) {
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
+	if AutoServerSide.IsEnabled() {
+		cmd.Flags().String(
+			"server-side",
+			"false",
+			`Must be "true", "false" or [alpha] "auto". If true, apply runs in the server instead of the client. 
+If auto, the server-side implementation will be used for new objects, and existing objects will retain the strategy 
+used to create them. In other words, resources that have the kubectl.kubernetes.io/last-applied-configuration annotation 
+will be applied on the client, and all others will be applied on the server.`)
+	} else {
+		cmd.Flags().String("server-side", "false", "If true, apply runs in the server instead of the client.")
+	}
+	cmd.Flags().Lookup("server-side").NoOptDefVal = "true"
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
 }
 
@@ -625,8 +637,32 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 	return nil
 }
 
-func GetServerSideApplyFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "server-side")
+type ServerSideApplyStrategy string
+
+const (
+	ServerSide     ServerSideApplyStrategy = "true"
+	ClientSide     ServerSideApplyStrategy = "false"
+	ServerSideAuto ServerSideApplyStrategy = "auto"
+)
+
+func GetServerSideApplyFlag(cmd *cobra.Command) (ServerSideApplyStrategy, error) {
+	var serverSideFlag = GetFlagString(cmd, "server-side")
+	//See if the flag arg is a boolean
+	b, err := strconv.ParseBool(serverSideFlag)
+	//If the flag is not a boolean check input
+	if err != nil {
+		if AutoServerSide.IsEnabled() {
+			if strings.EqualFold(serverSideFlag, string(ServerSideAuto)) {
+				return ServerSideAuto, nil
+			}
+			return ClientSide, fmt.Errorf(`invalid value %q for "--server-side" flag: value must be a boolean or auto`, serverSideFlag)
+		}
+		return ClientSide, fmt.Errorf(`invalid value %q for "--server-side" flag: value must be a boolean`, serverSideFlag)
+	}
+	if b {
+		return ServerSide, nil
+	}
+	return ClientSide, nil
 }
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {

@@ -87,17 +87,17 @@ type ApplyOptions struct {
 
 	DeleteOptions *delete.DeleteOptions
 
-	ServerSideApply bool
-	ForceConflicts  bool
-	FieldManager    string
-	Selector        string
-	DryRunStrategy  cmdutil.DryRunStrategy
-	Prune           bool
-	PruneResources  []prune.Resource
-	cmdBaseName     string
-	All             bool
-	Overwrite       bool
-	OpenAPIPatch    bool
+	ServerSideApplyStrategy cmdutil.ServerSideApplyStrategy
+	ForceConflicts          bool
+	FieldManager            string
+	Selector                string
+	DryRunStrategy          cmdutil.DryRunStrategy
+	Prune                   bool
+	PruneResources          []prune.Resource
+	cmdBaseName             string
+	All                     bool
+	Overwrite               bool
+	OpenAPIPatch            bool
 
 	ValidationDirective string
 	Validator           validation.Schema
@@ -244,7 +244,10 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 
-	serverSideApply := cmdutil.GetServerSideApplyFlag(cmd)
+	serverSideApply, err := cmdutil.GetServerSideApplyFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
 	forceConflicts := cmdutil.GetForceConflictsFlag(cmd)
 	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
@@ -338,18 +341,18 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 
 		PrintFlags: flags.PrintFlags,
 
-		DeleteOptions:   deleteOptions,
-		ToPrinter:       toPrinter,
-		ServerSideApply: serverSideApply,
-		ForceConflicts:  forceConflicts,
-		FieldManager:    fieldManager,
-		Selector:        flags.Selector,
-		DryRunStrategy:  dryRunStrategy,
-		Prune:           flags.Prune,
-		PruneResources:  flags.PruneResources,
-		All:             flags.All,
-		Overwrite:       flags.Overwrite,
-		OpenAPIPatch:    flags.OpenAPIPatch,
+		DeleteOptions:           deleteOptions,
+		ToPrinter:               toPrinter,
+		ServerSideApplyStrategy: serverSideApply,
+		ForceConflicts:          forceConflicts,
+		FieldManager:            fieldManager,
+		Selector:                flags.Selector,
+		DryRunStrategy:          dryRunStrategy,
+		Prune:                   flags.Prune,
+		PruneResources:          flags.PruneResources,
+		All:                     flags.All,
+		Overwrite:               flags.Overwrite,
+		OpenAPIPatch:            flags.OpenAPIPatch,
 
 		Recorder:            recorder,
 		Namespace:           namespace,
@@ -379,15 +382,19 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 
 // Validate verifies if ApplyOptions are valid and without conflicts.
 func (o *ApplyOptions) Validate() error {
-	if o.ForceConflicts && !o.ServerSideApply {
+	if o.ForceConflicts && o.ServerSideApplyStrategy != cmdutil.ServerSide {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApply {
-		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
+	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApplyStrategy == cmdutil.ServerSide {
+		return fmt.Errorf("--dry-run=client doesn't work with --server-side=true (did you mean --dry-run=server instead?)")
 	}
 
-	if o.ServerSideApply && o.DeleteOptions.ForceDeletion {
+	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApplyStrategy == cmdutil.ServerSideAuto {
+		return fmt.Errorf("--dry-run=client doesn't work with --server-side=auto")
+	}
+
+	if o.ServerSideApplyStrategy == cmdutil.ServerSide && o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--force cannot be used with --server-side")
 	}
 
@@ -426,7 +433,7 @@ func (o *ApplyOptions) Validate() error {
 			if !o.All && o.Selector == "" {
 				return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
 			}
-			if o.ServerSideApply {
+			if o.ServerSideApplyStrategy == cmdutil.ServerSide || o.ServerSideApplyStrategy == cmdutil.ServerSideAuto {
 				return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
 			}
 		}
@@ -557,11 +564,16 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 
 	helper := resource.NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-		WithFieldManager(o.FieldManager).
 		WithFieldValidation(o.ValidationDirective)
 
-	if o.ServerSideApply {
-		return o.ServerSideApplyOneObject(info, helper)
+	// preserve the original data so that we can check for the last applied annotation when server-side=auto
+	originalData, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+	if err != nil {
+		return cmdutil.AddSourceToErr("apply", info.Source, err)
+	}
+
+	if o.ServerSideApplyStrategy == cmdutil.ServerSide {
+		return o.serverSideApplyOneObject(info, helper, originalData)
 	}
 
 	// Get the modified configuration of the object. Embed the result
@@ -576,6 +588,15 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		if !errors.IsNotFound(err) {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}
+
+		// If the object doesn't exist and serverSideAuto is set
+		// server-side apply
+		if o.ServerSideApplyStrategy == cmdutil.ServerSideAuto {
+			return o.serverSideApplyOneObject(info, helper, originalData)
+		}
+
+		// Set the field manager now that we have eliminated ServerSideAuto
+		helper = helper.WithFieldManager(o.FieldManager)
 
 		// Create the resource if it doesn't exist
 		// First, update the annotation used by kubectl apply
@@ -608,6 +629,24 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 			return err
 		}
 		return nil
+	}
+
+	// if server-side auto is set check last_applied
+	// if no last_applied annotation server-side apply
+	if o.ServerSideApplyStrategy == cmdutil.ServerSideAuto {
+		metadata, _ := meta.Accessor(info.Object)
+		annotationMap := metadata.GetAnnotations()
+		_, hasAnnotation := annotationMap[corev1.LastAppliedConfigAnnotation]
+
+		if !hasAnnotation {
+			return o.serverSideApplyOneObject(info, helper, originalData)
+		}
+	}
+
+	if o.FieldManager == fieldManagerUnset {
+		helper = helper.WithFieldManager(FieldManagerClientSideApply)
+	} else {
+		helper = helper.WithFieldManager(o.FieldManager)
 	}
 
 	if err := o.MarkObjectVisited(info); err != nil {
@@ -661,11 +700,12 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 	return nil
 }
 
-func (o *ApplyOptions) ServerSideApplyOneObject(info *resource.Info, helper *resource.Helper) error {
+func (o *ApplyOptions) serverSideApplyOneObject(info *resource.Info, helper *resource.Helper, data []byte) error {
 	// Send the full object to be applied on the server side.
-	data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
-	if err != nil {
-		return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
+	if o.FieldManager == fieldManagerUnset {
+		helper = helper.WithFieldManager(fieldManagerServerSideApply)
+	} else {
+		helper = helper.WithFieldManager(o.FieldManager)
 	}
 
 	options := metav1.PatchOptions{
@@ -774,7 +814,7 @@ func (o *ApplyOptions) saveLastApplyAnnotationIfNecessary(
 	helper *resource.Helper,
 	info *resource.Info,
 ) error {
-	if o.FieldManager != fieldManagerServerSideApply {
+	if helper.FieldManager != fieldManagerServerSideApply {
 		// There is no point in preserving the annotation if the field manager
 		// will not remain default. This is because the server will not keep
 		// the annotation up to date.
@@ -852,7 +892,7 @@ func (o *ApplyOptions) saveLastApplyAnnotationIfNecessary(
 // The migration merges the client-side-managed fields into the
 // server-side-managed fields, leaving the last_applied_configuration
 // annotation in place. Server will keep the annotation up to date
-// after every server-side-apply where the following conditions are ment:
+// after every server-side-apply where the following conditions are met:
 //
 //  1. field manager is 'kubectl'
 //  2. annotation already exists
@@ -891,7 +931,7 @@ func (o *ApplyOptions) migrateToSSAIfNecessary(
 		var obj runtime.Object
 
 		patchData, err = csaupgrade.UpgradeManagedFieldsPatch(
-			info.Object, managerNames, o.FieldManager)
+			info.Object, managerNames, helper.FieldManager)
 
 		if err != nil {
 			// If patch generation failed there was likely a bug.
@@ -1052,6 +1092,8 @@ const (
 	fieldManagerServerSideApply = "kubectl"
 
 	fieldManagerLastAppliedAnnotation = "kubectl-last-applied"
+
+	fieldManagerUnset = ""
 )
 
 var (
@@ -1067,14 +1109,18 @@ var (
 //
 // The default field manager is not `kubectl-apply` to distinguish between
 // client-side and server-side apply.
-func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide bool) string {
+func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide cmdutil.ServerSideApplyStrategy) string {
 	// The field manager flag was set
 	if cmd.Flag("field-manager").Changed {
 		return cmdutil.GetFlagString(cmd, "field-manager")
 	}
 
-	if serverSide {
+	if serverSide == cmdutil.ServerSide {
 		return fieldManagerServerSideApply
+	}
+
+	if serverSide == cmdutil.ServerSideAuto {
+		return fieldManagerUnset
 	}
 
 	return FieldManagerClientSideApply

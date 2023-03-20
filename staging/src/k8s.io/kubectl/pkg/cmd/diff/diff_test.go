@@ -19,6 +19,9 @@ package diff
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"os"
 	"path"
 	"path/filepath"
@@ -60,6 +63,10 @@ func (f *FakeObject) Live() runtime.Object {
 	}
 	return &unstructured.Unstructured{Object: f.live}
 }
+
+const (
+	filenameRC = "../../../testdata/apply/rc.yaml"
+)
 
 func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
@@ -633,6 +640,49 @@ func TestMasker(t *testing.T) {
 					t.Errorf("to: (-want +got):\n%s", diff)
 				}
 			}
+		})
+	}
+}
+
+func TestValidateFields(t *testing.T) {
+	tests := []struct {
+		args         [][]string
+		enableAlphas []cmdutil.FeatureGate
+		expectedErr  string
+	}{
+		{
+			args: [][]string{
+				{"server-side", "auto"},
+			},
+			enableAlphas: []cmdutil.FeatureGate{cmdutil.AutoServerSide},
+			expectedErr:  "error: --server-side=auto is in alpha and not currently supported with diff",
+		},
+		{
+			args: [][]string{
+				{"server-side", "auto"},
+			},
+			expectedErr: `error: invalid value "auto" for "--server-side" flag: value must be a boolean`,
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			f := cmdtesting.NewTestFactory()
+			defer f.Cleanup()
+			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
+				cmdutil.BehaviorOnFatal(func(str string, code int) {
+					panic(str)
+				})
+				defer func() {
+					actualError := recover()
+					require.Equal(t, test.expectedErr, actualError)
+				}()
+				cmd := NewCmdDiff(f, genericclioptions.NewTestIOStreamsDiscard())
+				cmd.Flags().Set("filename", filenameRC)
+				for _, arg := range test.args {
+					cmd.Flags().Set(arg[0], arg[1])
+				}
+				cmd.Run(cmd, []string{})
+			})
 		})
 	}
 }
