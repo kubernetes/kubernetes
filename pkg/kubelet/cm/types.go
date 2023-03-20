@@ -93,6 +93,8 @@ type CgroupManager interface {
 	SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error
 	// Version of the cgroup implementation on the host
 	Version() int
+	// Toggle whether CPU load balancing should be disabled for new cgroups the kubelet creates
+	SetCPULoadBalanceDisable()
 }
 
 // QOSContainersInfo stores the names of containers per qos
