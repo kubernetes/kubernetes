@@ -220,3 +220,7 @@ func cpuSharesToCPUWeight(cpuShares uint64) uint64 {
 func cpuWeightToCPUShares(cpuWeight uint64) uint64 {
 	return uint64((((cpuWeight - 1) * 262142) / 9999) + 2)
 }
+
+func (m *cgroupV2impl) SetCPULoadBalanceDisable() {
+	m.cpuLoadBalanceDisable = true
+}
