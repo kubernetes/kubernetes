@@ -74,6 +74,15 @@ func tweakNamespace(ns string) statefulSetTweak {
 	}
 }
 
+func tweakLabels(key string, value string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		if ss.ObjectMeta.Labels == nil {
+			ss.ObjectMeta.Labels = map[string]string{}
+		}
+		ss.ObjectMeta.Labels[key] = value
+	}
+}
+
 func tweakAnnotations(key string, value string) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		if ss.ObjectMeta.Annotations == nil {
@@ -315,21 +324,9 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "invalid_label",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
 			},
