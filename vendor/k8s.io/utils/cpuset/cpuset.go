@@ -23,6 +23,8 @@ limitations under the License.
 // See http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS for details.
 //
 // Future work can migrate this to use a 'set' library, and relax the dubious 'immutable' property.
+//
+// This package was originally developed in the 'kubernetes' repository.
 package cpuset
 
 import (
