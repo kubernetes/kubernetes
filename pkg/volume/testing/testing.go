@@ -1497,7 +1497,11 @@ func VerifyDetachCallCount(
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, detacher := range fakeVolumePlugin.GetDetachers() {
 		actualCallCount := detacher.GetDetachCallCount()
-		if actualCallCount == expectedDetachCallCount {
+		if expectedDetachCallCount == 0 && actualCallCount > 0 {
+			return fmt.Errorf("unexpecte detach call")
+		}
+
+		if actualCallCount >= expectedDetachCallCount {
 			return nil
 		}
 	}

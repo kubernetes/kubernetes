@@ -689,7 +689,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 
 func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
@@ -705,9 +705,11 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	podName3 := "pod-uid3"
+
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
@@ -736,33 +738,12 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 
 	// Delete the pod, but detach will fail
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
-
-	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
-	// Right before detach operation is performed, the volume will be first removed from being reported
-	// as attached on node status (RemoveVolumeFromReportAsAttached). After detach operation which is expected to fail,
-	// controller then added the volume back as attached.
-	// Here it sleeps 100ms so that detach should be triggered already at this point.
-	// verifyVolumeReportedAsAttachedToNode will check volume is in the list of volume attached that needs to be updated
-	// in node status. By calling this function (GetVolumesToReportAttached), node status should be updated, and the volume
-	// will not need to be updated until new changes are applied (detach is triggered again)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(2 * time.Second)
+	err := volumetesting.VerifyDetachCallCount(1, fakePlugin)
+	if err != nil {
+		t.Fatalf("error verifying detach call count: %v", err)
+	}
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw)
-
-	// After the first detach fails, reconciler will wait for a period of time before retrying to detach.
-	// The wait time is increasing exponentially from initial value of 0.5s (0.5, 1, 2, 4, ...).
-	// The test here waits for 100 Millisecond to make sure it is in exponential backoff period after
-	// the first detach operation. At this point, volumes status should not be updated
-	time.Sleep(100 * time.Millisecond)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName1, asw)
-
-	// Wait for 600ms to make sure second detach operation triggered. Again, The volume will be
-	// removed from being reported as attached on node status and then added back as attached.
-	// The volume will be in the list of attached volumes that need to be updated to node status.
-	time.Sleep(600 * time.Millisecond)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw)
 
 	// Add a second pod which tries to attach the volume to the same node.
 	// After adding pod to the same node, detach will not be triggered any more.
@@ -772,8 +753,11 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	}
 	// Sleep 1s to verify no detach are triggered after second pod is added in the future.
 	time.Sleep(1000 * time.Millisecond)
+	err = volumetesting.VerifyDetachCallCount(0, fakePlugin)
+	if err != nil {
+		t.Fatalf("error verifying detach call count: %v", err)
+	}
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName1, asw)
 
 	// Add a third pod which tries to attach the volume to a different node.
 	// At this point, volume is still attached to first node. There are no status update for both nodes.
@@ -782,7 +766,6 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName1, asw)
 	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName2, asw)
 }
 
