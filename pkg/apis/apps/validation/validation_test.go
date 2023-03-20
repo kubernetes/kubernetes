@@ -74,6 +74,12 @@ func tweakNamespace(ns string) statefulSetTweak {
 	}
 }
 
+func tweakFinalizers(finalizers ...string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.ObjectMeta.Finalizers = finalizers
+	}
+}
+
 func tweakPodManagementPolicy(policy apps.PodManagementPolicyType) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		ss.Spec.PodManagementPolicy = policy
@@ -994,25 +1000,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			update: mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(10)),
 		},
 		{
-			name: "update existing instance with now-invalid name",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault, Finalizers: []string{"final"}},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault, Finalizers: []string{}},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			name:   "update existing instance with now-invalid name",
+			old:    mkStatefulSet(&validPodTemplate, tweakFinalizers("final")),
+			update: mkStatefulSet(&validPodTemplate, tweakFinalizers()),
 		},
 		{
 			name:   "update existing instance with .spec.ordinals.start",
