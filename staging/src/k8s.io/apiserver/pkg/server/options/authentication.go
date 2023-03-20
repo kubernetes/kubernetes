@@ -76,6 +76,16 @@ func (s *RequestHeaderAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, err)
 	}
 
+	if len(s.UsernameHeaders) > 0 && !caseInsensitiveHas(s.UsernameHeaders, "X-Remote-User") {
+		klog.Warningf("--requestheader-username-headers is set without specifying the standard X-Remote-User header - API aggregation will not work")
+	}
+	if len(s.GroupHeaders) > 0 && !caseInsensitiveHas(s.GroupHeaders, "X-Remote-Group") {
+		klog.Warningf("--requestheader-group-headers is set without specifying the standard X-Remote-Group header - API aggregation will not work")
+	}
+	if len(s.ExtraHeaderPrefixes) > 0 && !caseInsensitiveHas(s.ExtraHeaderPrefixes, "X-Remote-Extra-") {
+		klog.Warningf("--requestheader-extra-headers-prefix is set without specifying the standard X-Remote-Extra- header prefix - API aggregation will not work")
+	}
+
 	return allErrors
 }
 
@@ -87,6 +97,15 @@ func checkForWhiteSpaceOnly(flag string, headerNames ...string) error {
 	}
 
 	return nil
+}
+
+func caseInsensitiveHas(headers []string, header string) bool {
+	for _, h := range headers {
+		if strings.EqualFold(h, header) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -357,6 +376,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 	if requestHeaderConfig != nil {
 		cfg.RequestHeaderConfig = requestHeaderConfig
+		authenticationInfo.RequestHeaderConfig = requestHeaderConfig
 		if err = authenticationInfo.ApplyClientCert(cfg.RequestHeaderConfig.CAContentProvider, servingInfo); err != nil {
 			return fmt.Errorf("unable to load request-header-client-ca-file: %v", err)
 		}

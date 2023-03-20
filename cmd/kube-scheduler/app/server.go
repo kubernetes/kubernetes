@@ -250,7 +250,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 
 	handler = genericapifilters.WithAuthorization(handler, authz, scheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
+	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHTTPLogging(handler)
