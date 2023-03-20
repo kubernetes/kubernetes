@@ -143,6 +143,15 @@ func tweakRollingUpdatePartition(partition int32) statefulSetTweak {
 	}
 }
 
+func tweakMaxUnavailable(mu intstr.IntOrString) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
+			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
+		}
+		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = intStrAddr(mu)
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -236,22 +245,12 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "maxUnavailable with parallel pod management",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.ParallelPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{
-						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-							Partition:      2,
-							MaxUnavailable: intStrAddr(intstr.FromInt(2)),
-						},
-					},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+				tweakRollingUpdatePartition(2),
+				tweakMaxUnavailable(intstr.FromInt(2)),
+			),
 		},
 		{
 			name: "ordinals.start positive value",
@@ -494,63 +493,33 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "zero maxUnavailable",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{
-						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-							MaxUnavailable: intStrAddr(intstr.FromInt(0)),
-						},
-					},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+				tweakMaxUnavailable(intstr.FromInt(0)),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
 		},
 		{
 			name: "zero percent maxUnavailable",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.ParallelPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{
-						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-							MaxUnavailable: intStrAddr(intstr.FromString("0%")),
-						},
-					},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+				tweakMaxUnavailable(intstr.FromString("0%")),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
 		},
 		{
 			name: "greater than 100 percent maxUnavailable",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.ParallelPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					Replicas:            3,
-					UpdateStrategy: apps.StatefulSetUpdateStrategy{
-						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-							MaxUnavailable: intStrAddr(intstr.FromString("101%")),
-						},
-					},
-				},
-			},
+			set: mkStatefulSet(&validPodTemplate,
+				tweakReplicas(3),
+				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+				tweakMaxUnavailable(intstr.FromString("101%")),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
