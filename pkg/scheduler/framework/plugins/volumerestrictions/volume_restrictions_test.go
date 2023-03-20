@@ -19,12 +19,14 @@ package volumerestrictions
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -356,6 +358,33 @@ func TestAccessModeConflicts(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdateWithPod(t *testing.T) {
+	setPvc := sets.New("pvc")
+	state := &preFilterState{readWriteOncePodPVCs: setPvc, conflictingPVCRefCount: 0}
+	pod := st.MakePod().Name("foo").PVC("pvc").Obj()
+	podInfo := &framework.PodInfo{Pod: pod}
+	var wg sync.WaitGroup
+	wgCount, conflicts, multiplier := 4, 100, -1
+	wg.Add(wgCount)
+	for i := 0; i < wgCount; i++ {
+		multiplier *= -1
+		copyVal := multiplier
+		if i == wgCount-1 {
+			copyVal = 0
+		}
+		go func() {
+			for i := 0; i < conflicts; i++ {
+				state.updateWithPod(podInfo, copyVal)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	if state.conflictingPVCRefCount != int32(conflicts) {
+		t.Errorf("Unexpected conflictingPVCRefCount: %d", state.conflictingPVCRefCount)
 	}
 }
 

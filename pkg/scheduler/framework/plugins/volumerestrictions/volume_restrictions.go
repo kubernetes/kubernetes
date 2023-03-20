@@ -19,6 +19,7 @@ package volumerestrictions
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,11 +62,14 @@ type preFilterState struct {
 	// Names of the pod's volumes using the ReadWriteOncePod access mode.
 	readWriteOncePodPVCs sets.Set[string]
 	// The number of references to these ReadWriteOncePod volumes by scheduled pods.
-	conflictingPVCRefCount int
+	conflictingPVCRefCount int32
 }
 
 func (s *preFilterState) updateWithPod(podInfo *framework.PodInfo, multiplier int) {
-	s.conflictingPVCRefCount += multiplier * s.conflictingPVCRefCountForPod(podInfo)
+	conflicts := int32(multiplier * s.conflictingPVCRefCountForPod(podInfo))
+	if conflicts != 0 {
+		atomic.AddInt32(&s.conflictingPVCRefCount, conflicts)
+	}
 }
 
 func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo) int {
@@ -229,7 +233,7 @@ func (pl *VolumeRestrictions) calPreFilterState(ctx context.Context, pod *v1.Pod
 	}
 	return &preFilterState{
 		readWriteOncePodPVCs:   pvcs,
-		conflictingPVCRefCount: conflictingPVCRefCount,
+		conflictingPVCRefCount: int32(conflictingPVCRefCount),
 	}, nil
 }
 
