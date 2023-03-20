@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
@@ -37,6 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -470,6 +472,19 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
 	if err := manager.Set(libcontainerCgroupConfig.Resources); err != nil {
 		utilruntime.HandleError(fmt.Errorf("cgroup manager.Set failed: %w", err))
+	}
+
+	// Disable cpuset.sched_load_balance for all cgroups Kubelet creates when kubelet has workloads to manage.
+	// This way, CRI can disable sched_load_balance for pods that must have load balance
+	// disabled, but the slices can contain all cpus (as the guaranteed cpus are known dynamically).
+	if managed.IsEnabled() && !libcontainercgroups.IsCgroup2UnifiedMode() {
+		path := manager.Path("cpuset")
+		if path == "" {
+			return fmt.Errorf("Failed to find cpuset for newly created cgroup")
+		}
+		if err := cgroups.WriteFile(path, "cpuset.sched_load_balance", "0"); err != nil {
+			return err
+		}
 	}
 
 	return nil
