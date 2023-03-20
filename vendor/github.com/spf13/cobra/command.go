@@ -998,6 +998,10 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	// initialize completion at the last point to allow for user overriding
 	c.InitDefaultCompletionCmd()
 
+	// Now that all commands have been created, let's make sure all groups
+	// are properly created also
+	c.checkCommandGroups()
+
 	args := c.args
 
 	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
@@ -1090,6 +1094,19 @@ func (c *Command) ValidateRequiredFlags() error {
 		return fmt.Errorf(`required flag(s) "%s" not set`, strings.Join(missingFlagNames, `", "`))
 	}
 	return nil
+}
+
+// checkCommandGroups checks if a command has been added to a group that does not exists.
+// If so, we panic because it indicates a coding error that should be corrected.
+func (c *Command) checkCommandGroups() {
+	for _, sub := range c.commands {
+		// if Group is not defined let the developer know right away
+		if sub.GroupID != "" && !c.ContainsGroup(sub.GroupID) {
+			panic(fmt.Sprintf("group id '%s' is not defined for subcommand '%s'", sub.GroupID, sub.CommandPath()))
+		}
+
+		sub.checkCommandGroups()
+	}
 }
 
 // InitDefaultHelpFlag adds default help flag to c.
@@ -1218,10 +1235,6 @@ func (c *Command) AddCommand(cmds ...*Command) {
 			panic("Command can't be a child of itself")
 		}
 		cmds[i].parent = c
-		// if Group is not defined let the developer know right away
-		if x.GroupID != "" && !c.ContainsGroup(x.GroupID) {
-			panic(fmt.Sprintf("Group id '%s' is not defined for subcommand '%s'", x.GroupID, cmds[i].CommandPath()))
-		}
 		// update max lengths
 		usageLen := len(x.Use)
 		if usageLen > c.commandsMaxUseLen {

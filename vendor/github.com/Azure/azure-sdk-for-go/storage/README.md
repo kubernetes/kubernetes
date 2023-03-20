@@ -14,7 +14,7 @@ The `github.com/Azure/azure-sdk-for-go/storage` package is used to manage
 resources: containers, blobs, tables, and queues.
 
 To manage storage *accounts* use Azure Resource Manager (ARM) via the packages
-at [github.com/Azure/azure-sdk-for-go/services/storage](https://github.com/Azure/azure-sdk-for-go/tree/master/services/storage).
+at [github.com/Azure/azure-sdk-for-go/services/storage](https://github.com/Azure/azure-sdk-for-go/tree/main/services/storage).
 
 This package also supports the [Azure Storage
 Emulator](https://azure.microsoft.com/documentation/articles/storage-use-emulator/)

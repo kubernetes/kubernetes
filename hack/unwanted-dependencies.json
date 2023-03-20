@@ -3,6 +3,7 @@
     "unwantedModules": {
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
+      "github.com/docker/distribution": "refer to #103849",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",

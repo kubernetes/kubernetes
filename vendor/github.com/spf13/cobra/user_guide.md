@@ -492,10 +492,11 @@ around it. In fact, you can provide your own if you want.
 
 ### Grouping commands in help
 
-Cobra supports grouping of available commands. Groups must be explicitly defined by `AddGroup` and set by
-the `GroupId` element of a subcommand. The groups will appear in the same order as they are defined.
-If you use the generated `help` or `completion` commands, you can set the group ids by `SetHelpCommandGroupId`
-and `SetCompletionCommandGroupId`, respectively.
+Cobra supports grouping of available commands in the help output.  To group commands, each group must be explicitly
+defined using `AddGroup()` on the parent command.  Then a subcommand can be added to a group using the `GroupID` element
+of that subcommand. The groups will appear in the help output in the same order as they are defined using different
+calls to `AddGroup()`.  If you use the generated `help` or `completion` commands, you can set their group ids using
+`SetHelpCommandGroupId()` and `SetCompletionCommandGroupId()` on the root command, respectively.
 
 ### Defining your own help
 
