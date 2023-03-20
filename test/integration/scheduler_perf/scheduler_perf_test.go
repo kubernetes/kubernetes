@@ -79,22 +79,20 @@ const (
 )
 
 const (
-	configFile               = "config/performance-config.yaml"
-	extensionPointsLabelName = "extension_point"
+	configFile                               = "config/performance-config.yaml"
+	extensionPointsLabelName                 = "extension_point"
+	schedulerSubsystemAttemptDurationSeconds = metrics.SchedulerSubsystem + "_" + metrics.SchedulingAttemptDurationSeconds
 )
-
-var schedulerSubsystemAttemptDurationSeconds = metrics.SchedulerSubsystem + "_" + metrics.SchedulingAttemptDurationSeconds
-var metricLabelValues = []string{"Filter", "Score"}
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
 		Metrics: map[string]*labelValues{
 			schedulerSubsystemAttemptDurationSeconds: {
 				label:  extensionPointsLabelName,
-				values: metricLabelValues,
+				values: []string{metrics.Filter, metrics.Score},
 			},
-			"scheduler_scheduling_attempt_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds":     nil,
+			schedulerSubsystemAttemptDurationSeconds:    nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
 		},
 	}
 )

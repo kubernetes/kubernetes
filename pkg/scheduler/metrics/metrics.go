@@ -28,7 +28,7 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler.
 	SchedulerSubsystem = "scheduler"
-	// SchedulingAttemptDurationSeconds - To schedule the attempts for duration
+	// SchedulingAttemptDurationSeconds - Scheduling attempt latency in seconds
 	SchedulingAttemptDurationSeconds = "scheduling_attempt_duration_seconds"
 )
 
@@ -71,7 +71,7 @@ var (
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_attempt_duration_seconds",
+			Name:           SchedulingAttemptDurationSeconds,
 			Help:           "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.STABLE,
