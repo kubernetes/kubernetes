@@ -52,6 +52,7 @@ type ServerRunOptions struct {
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
 	GoawayChance                float64
+	DisableHTTP2                bool
 	LivezGracePeriod            time.Duration
 	MinRequestTimeout           int
 	ShutdownDelayDuration       time.Duration
@@ -119,6 +120,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
+	c.SecureServing.DisableHTTP2 = s.DisableHTTP2
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
@@ -169,6 +171,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.GoawayChance < 0 || s.GoawayChance > 0.02 {
 		errors = append(errors, fmt.Errorf("--goaway-chance can not be less than 0 or greater than 0.02"))
+	}
+
+	if s.GoawayChance != 0 && s.DisableHTTP2 {
+		errors = append(errors, fmt.Errorf("--goaway-chance and --disable-http2 are mutually exclusive"))
 	}
 
 	if s.MinRequestTimeout < 0 {
@@ -312,7 +318,13 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"To prevent HTTP/2 clients from getting stuck on a single apiserver, randomly close a connection (GOAWAY). "+
 		"The client's other in-flight requests won't be affected, and the client will reconnect, likely landing on a different apiserver after going through the load balancer again. "+
 		"This argument sets the fraction of requests that will be sent a GOAWAY. Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. "+
-		"Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.")
+		"Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point. "+
+		"Mutually exclusive with --disable-http2.")
+
+	fs.BoolVar(&s.DisableHTTP2, "disable-http2", s.DisableHTTP2, ""+
+		"If true, completely disables the use of HTTP/2. This is useful when a load balancer wants complete control over routing "+
+		"and, therefore, HTTP/2 clients cannot be used since they can get stuck on a single apiserver. "+
+		"Mutually exclusive with --goaway-chance.")
 
 	fs.DurationVar(&s.LivezGracePeriod, "livez-grace-period", s.LivezGracePeriod, ""+
 		"This option represents the maximum amount of time it should take for apiserver to complete its startup sequence "+

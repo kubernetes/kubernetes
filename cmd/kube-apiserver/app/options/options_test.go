@@ -99,6 +99,7 @@ func TestAddFlags(t *testing.T) {
 		"--cloud-provider=azure",
 		"--cors-allowed-origins=10.10.10.100,10.10.10.200",
 		"--contention-profiling=true",
+		"--disable-http2",
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
 		"--enable-aggregator-routing=true",
 		"--enable-priority-and-fairness=false",
@@ -107,7 +108,7 @@ func TestAddFlags(t *testing.T) {
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
-		"--http2-max-streams-per-connection=42",
+		"--http2-max-streams-per-connection=42", // TODO make incompatible with --disable-http2
 		"--kubelet-read-only-port=10255",
 		"--kubelet-timeout=5s",
 		"--kubelet-client-certificate=/var/run/kubernetes/ceserver.crt",
@@ -139,6 +140,7 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
+			DisableHTTP2:                true,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -322,6 +324,6 @@ func TestAddFlags(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, apiserveroptions.EtcdOptions{})))
 	}
 }
