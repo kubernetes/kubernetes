@@ -110,6 +110,16 @@ func tweakReplicas(replicas int32) statefulSetTweak {
 	}
 }
 
+func tweakSelectorLabels(labels map[string]string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		if labels == nil {
+			ss.Spec.Selector = nil
+		} else {
+			ss.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
+		}
+	}
+}
+
 func tweakTemplateRestartPolicy(rp api.RestartPolicy) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		ss.Spec.Template.Spec.RestartPolicy = rp
@@ -321,14 +331,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "empty selector",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(nil)),
 			errs: field.ErrorList{
 				field.Required(field.NewPath("spec", "selector"), ""),
 				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
@@ -336,15 +339,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "selector_doesnt_match",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(map[string]string{"foo": "bar"})),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 			},
@@ -367,21 +362,10 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 		{
 			name: "invalid_label 2",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: invalidLabels},
-					Template:            invalidPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			set: mkStatefulSet(&invalidPodTemplate,
+				tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
+				tweakSelectorLabels(invalidLabels),
+			),
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
 				field.Invalid(field.NewPath("spec", "selector"), nil, ""),
@@ -941,24 +925,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		},
 		{
 			name: "update selector",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels2},
-					Template:            validPodTemplate2.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
+			old:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(validLabels)),
+			update: mkStatefulSet(&validPodTemplate2,
+				tweakSelectorLabels(validLabels2),
+			),
 			errs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec"), ""),
 			},
