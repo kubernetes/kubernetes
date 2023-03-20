@@ -248,6 +248,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
+	if nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) {
+		cgroupManager.SetCPULoadBalanceDisable()
+	}
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
