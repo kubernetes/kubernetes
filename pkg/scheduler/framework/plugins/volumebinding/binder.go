@@ -157,7 +157,7 @@ type SchedulerVolumeBinder interface {
 	//
 	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
 	// and all nodes should be considered.
-	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set)
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -386,7 +386,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeCla
 //
 // Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
 // should be considered.
-func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set) {
 	if len(boundClaims) == 0 {
 		return
 	}
@@ -1112,7 +1112,7 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 		return false
 	}
 
-	var mpaSet sets.String
+	var mpaSet sets.Set
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
 		mpaSet = sets.NewString()

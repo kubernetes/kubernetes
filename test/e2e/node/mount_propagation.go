@@ -158,7 +158,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Now check that mounts are propagated to the right containers.
 		// expectedMounts is map of pod name -> expected mounts visible in the
 		// pod.
-		expectedMounts := map[string]sets.String{
+		expectedMounts := map[string]sets.Set{
 			// Master sees only its own mount and not the slave's one.
 			"master": sets.NewString("master", "host"),
 			// Slave sees master's mount + itself.

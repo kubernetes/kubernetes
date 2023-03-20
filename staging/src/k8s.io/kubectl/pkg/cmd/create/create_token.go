@@ -139,7 +139,7 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	cmd.Flags().DurationVar(&o.Duration, "duration", o.Duration, "Requested lifetime of the issued token. The server may return a token with a longer or shorter lifetime.")
 
 	cmd.Flags().StringVar(&o.BoundObjectKind, "bound-object-kind", o.BoundObjectKind, "Kind of an object to bind the token to. "+
-		"Supported kinds are "+strings.Join(sets.StringKeySet(boundObjectKindToAPIVersion).List(), ", ")+". "+
+		"Supported kinds are "+strings.Join(sets.SetKeySet(boundObjectKindToAPIVersion).List(), ", ")+". "+
 		"If set, --bound-object-name must be provided.")
 	cmd.Flags().StringVar(&o.BoundObjectName, "bound-object-name", o.BoundObjectName, "Name of an object to bind the token to. "+
 		"The token will expire when the object is deleted. "+
@@ -215,7 +215,7 @@ func (o *TokenOptions) Validate() error {
 		}
 	} else {
 		if _, ok := boundObjectKindToAPIVersion[o.BoundObjectKind]; !ok {
-			return fmt.Errorf("supported --bound-object-kind values are %s", strings.Join(sets.StringKeySet(boundObjectKindToAPIVersion).List(), ", "))
+			return fmt.Errorf("supported --bound-object-kind values are %s", strings.Join(sets.SetKeySet(boundObjectKindToAPIVersion).List(), ", "))
 		}
 		if len(o.BoundObjectName) == 0 {
 			return fmt.Errorf("--bound-object-name is required if --bound-object-kind is provided")

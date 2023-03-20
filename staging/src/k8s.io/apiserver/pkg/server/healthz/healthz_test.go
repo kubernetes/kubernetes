@@ -211,7 +211,7 @@ func TestGetExcludedChecks(t *testing.T) {
 	tests := []struct {
 		name string
 		r    *http.Request
-		want sets.String
+		want sets.Set
 	}{
 		{"Should have no excluded health checks",
 			createGetRequestWithUrl("/healthz?verbose=true"),

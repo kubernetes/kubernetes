@@ -62,10 +62,10 @@ var (
 	)
 )
 
-func IsKubeletServingCSR(req *x509.CertificateRequest, usages sets.String) bool {
+func IsKubeletServingCSR(req *x509.CertificateRequest, usages sets.Set) bool {
 	return ValidateKubeletServingCSR(req, usages) == nil
 }
-func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String) error {
+func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.Set) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
 		return organizationNotSystemNodesErr
 	}
@@ -105,10 +105,10 @@ var (
 	)
 )
 
-func IsKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) bool {
+func IsKubeletClientCSR(req *x509.CertificateRequest, usages sets.Set) bool {
 	return ValidateKubeletClientCSR(req, usages) == nil
 }
-func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) error {
+func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.Set) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
 		return organizationNotSystemNodesErr
 	}

@@ -515,7 +515,7 @@ func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodN
 }
 
 // GetClusterZones returns the values of zone label collected from all nodes.
-func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.Set, error) {
 	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %w", err)
@@ -536,7 +536,7 @@ func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, e
 }
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
-func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.Set, error) {
 	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
 	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {

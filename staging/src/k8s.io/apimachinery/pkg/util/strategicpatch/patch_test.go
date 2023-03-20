@@ -6852,7 +6852,7 @@ func TestUnknownField(t *testing.T) {
 		mergeItemOpenapiSchema,
 	}
 
-	for _, k := range sets.StringKeySet(testcases).List() {
+	for _, k := range sets.SetKeySet(testcases).List() {
 		tc := testcases[k]
 		for _, schema := range schemas {
 			func() {

@@ -38,7 +38,7 @@ type Snapshot struct {
 	havePodsWithRequiredAntiAffinityNodeInfoList []*framework.NodeInfo
 	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
 	// keyed in the format "namespace/name".
-	usedPVCSet sets.String
+	usedPVCSet sets.Set
 	generation int64
 }
 
@@ -103,7 +103,7 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 	return nodeNameToInfo
 }
 
-func createUsedPVCSet(pods []*v1.Pod) sets.String {
+func createUsedPVCSet(pods []*v1.Pod) sets.Set {
 	usedPVCSet := sets.NewString()
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
@@ -123,7 +123,7 @@ func createUsedPVCSet(pods []*v1.Pod) sets.String {
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
+func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.Set) map[string]*framework.ImageStateSummary {
 	imageStates := make(map[string]*framework.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
@@ -138,8 +138,8 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 }
 
 // createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
-func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
-	imageExistenceMap := make(map[string]sets.String)
+func createImageExistenceMap(nodes []*v1.Node) map[string]sets.Set {
+	imageExistenceMap := make(map[string]sets.Set)
 	for _, node := range nodes {
 		for _, image := range node.Status.Images {
 			for _, name := range image.Names {

@@ -3117,7 +3117,7 @@ func TestGetResourceGroups(t *testing.T) {
 	tests := []struct {
 		name               string
 		nodeResourceGroups map[string]string
-		expected           sets.String
+		expected           sets.Set
 		informerSynced     bool
 		expectError        bool
 	}{
@@ -3232,7 +3232,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	// delete node appearing in unmanagedNodes and excludeLoadBalancerNodes
 	zone := fmt.Sprintf("%s-0", az.Location)
 	nodesInZone := sets.NewString("prevNode")
-	az.nodeZones = map[string]sets.String{zone: nodesInZone}
+	az.nodeZones = map[string]sets.Set{zone: nodesInZone}
 	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
 	az.unmanagedNodes = sets.NewString("prevNode")
 	az.excludeLoadBalancerNodes = sets.NewString("prevNode")
@@ -3286,7 +3286,7 @@ func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
 
 	zone := fmt.Sprintf("%s-0", az.Location)
 	nodesInZone := sets.NewString("prevNode")
-	az.nodeZones = map[string]sets.String{zone: nodesInZone}
+	az.nodeZones = map[string]sets.Set{zone: nodesInZone}
 	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
 	az.unmanagedNodes = sets.NewString("prevNode")
 	az.excludeLoadBalancerNodes = sets.NewString()
@@ -3404,7 +3404,7 @@ func TestGetActiveZones(t *testing.T) {
 	az.nodeInformerSynced = func() bool { return true }
 	zone := fmt.Sprintf("%s-0", az.Location)
 	nodesInZone := sets.NewString("node1")
-	az.nodeZones = map[string]sets.String{zone: nodesInZone}
+	az.nodeZones = map[string]sets.Set{zone: nodesInZone}
 
 	expectedZones := sets.NewString(zone)
 	zones, err = az.GetActiveZones()

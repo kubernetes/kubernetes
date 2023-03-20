@@ -363,7 +363,7 @@ func validateKey(key config.Key, fieldPath *field.Path, expectedLen []int) field
 	return allErrs
 }
 
-func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set, reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateKMSConfigName(c, fieldPath.Child("name"), kmsProviderNames, reload)...)
@@ -425,7 +425,7 @@ func validateKMSAPIVersion(c *config.KMSConfiguration, fieldPath *field.Path) fi
 	return allErrs
 }
 
-func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set, reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Name == "" {
 		allErrs = append(allErrs, field.Required(fieldPath, fmt.Sprintf(mandatoryFieldErrFmt, "name", "provider")))

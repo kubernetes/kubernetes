@@ -672,7 +672,7 @@ func TestCleanupOutdatedRoutes(t *testing.T) {
 	for _, testCase := range []struct {
 		description                          string
 		existingRoutes, expectedRoutes       []network.Route
-		existingNodeNames                    sets.String
+		existingNodeNames                    sets.Set
 		expectedChanged, enableIPV6DualStack bool
 	}{
 		{

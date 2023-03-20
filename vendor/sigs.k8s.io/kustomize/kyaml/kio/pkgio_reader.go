@@ -74,7 +74,7 @@ type LocalPackageReadWriter struct {
 	// NoDeleteFiles if set to true, LocalPackageReadWriter won't delete any files
 	NoDeleteFiles bool `yaml:"noDeleteFiles,omitempty"`
 
-	files sets.String
+	files sets.Set
 
 	// FileSkipFunc is a function which returns true if reader should ignore
 	// the file
@@ -144,8 +144,8 @@ func (r *LocalPackageReadWriter) Write(nodes []*yaml.RNode) error {
 	return nil
 }
 
-func (r *LocalPackageReadWriter) getFiles(nodes []*yaml.RNode) (sets.String, error) {
-	val := sets.String{}
+func (r *LocalPackageReadWriter) getFiles(nodes []*yaml.RNode) (sets.Set, error) {
+	val := sets.Set{}
 	for _, n := range nodes {
 		path, _, err := kioutil.GetFileAnnotations(n)
 		if err != nil {

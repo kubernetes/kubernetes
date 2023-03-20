@@ -62,8 +62,8 @@ func NewDevicesPerNUMA() DevicesPerNUMA {
 }
 
 // Devices is a function that returns all device ids for all NUMA nodes
-// and represent it as sets.String
-func (dev DevicesPerNUMA) Devices() sets.String {
+// and represent it as sets.Set
+func (dev DevicesPerNUMA) Devices() sets.Set {
 	result := sets.NewString()
 
 	for _, devs := range dev {

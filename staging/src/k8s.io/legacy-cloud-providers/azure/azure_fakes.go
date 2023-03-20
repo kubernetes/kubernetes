@@ -66,7 +66,7 @@ func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 			MaximumLoadBalancerRuleCount: 250,
 			VMType:                       vmTypeStandard,
 		},
-		nodeZones:                map[string]sets.String{},
+		nodeZones:                map[string]sets.Set{},
 		nodeInformerSynced:       func() bool { return true },
 		nodeResourceGroups:       map[string]string{},
 		unmanagedNodes:           sets.NewString(),

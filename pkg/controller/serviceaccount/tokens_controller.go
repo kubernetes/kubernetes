@@ -554,7 +554,7 @@ func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) (
 	return items, nil
 }
 
-func getSecretReferences(serviceAccount *v1.ServiceAccount) sets.String {
+func getSecretReferences(serviceAccount *v1.ServiceAccount) sets.Set {
 	references := sets.NewString()
 	for _, secret := range serviceAccount.Secrets {
 		references.Insert(secret.Name)

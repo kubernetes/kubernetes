@@ -642,7 +642,7 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	return true
 }
 
-func serviceKeys(services []*v1.Service) sets.String {
+func serviceKeys(services []*v1.Service) sets.Set {
 	ret := sets.NewString()
 	for _, service := range services {
 		key, _ := cache.MetaNamespaceKeyFunc(service)
@@ -651,7 +651,7 @@ func serviceKeys(services []*v1.Service) sets.String {
 	return ret
 }
 
-func nodeNames(nodes []*v1.Node) sets.String {
+func nodeNames(nodes []*v1.Node) sets.Set {
 	ret := sets.NewString()
 	for _, node := range nodes {
 		ret.Insert(node.Name)
@@ -684,7 +684,7 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 
 // syncNodes handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
-func (c *Controller) syncNodes(ctx context.Context, workers int) sets.String {
+func (c *Controller) syncNodes(ctx context.Context, workers int) sets.Set {
 	startTime := time.Now()
 	defer func() {
 		latency := time.Since(startTime).Seconds()
@@ -730,7 +730,7 @@ func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.N
 // updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the latest list of nodes with input number of workers.
 // Returns the list of services that couldn't be updated.
-func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry sets.String) {
+func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry sets.Set) {
 	klog.V(4).Infof("Running updateLoadBalancerHosts(len(services)==%d, workers==%d)", len(services), workers)
 
 	// Include all nodes and let nodeSyncService filter and figure out if

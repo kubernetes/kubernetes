@@ -231,7 +231,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		quota             v1.ResourceQuota
 		status            v1.ResourceQuotaStatus
 		expectedError     string
-		expectedActionSet sets.String
+		expectedActionSet sets.Set
 	}{
 		"non-matching-best-effort-scoped-quota": {
 			gvr: v1.SchemeGroupVersion.WithResource("pods"),

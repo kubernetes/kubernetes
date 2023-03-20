@@ -116,7 +116,7 @@ var globalNonRoundTrippableTypes = sets.NewString(
 //	        // roundtrip test
 //	    })
 //	}
-func GlobalNonRoundTrippableTypes() sets.String {
+func GlobalNonRoundTrippableTypes() sets.Set {
 	return sets.NewString(globalNonRoundTrippableTypes.List()...)
 }
 
@@ -220,7 +220,7 @@ func fuzzInternalObject(t *testing.T, fuzzer *fuzz.Fuzzer, object runtime.Object
 }
 
 func groupsFromScheme(scheme *runtime.Scheme) []string {
-	ret := sets.String{}
+	ret := sets.Set{}
 	for gvk := range scheme.AllKnownTypes() {
 		ret.Insert(gvk.Group)
 	}

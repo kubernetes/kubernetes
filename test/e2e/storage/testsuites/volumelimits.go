@@ -104,7 +104,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		podNames []string
 
 		// All created PVs, incl. the one in resource
-		pvNames sets.String
+		pvNames sets.Set
 	}
 	var (
 		l local
@@ -273,7 +273,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 	})
 }
 
-func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podNames, pvcNames []string, pvNames sets.String, timeout time.Duration) error {
+func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podNames, pvcNames []string, pvNames sets.Set, timeout time.Duration) error {
 	var cleanupErrors []string
 	for _, podName := range podNames {
 		err := cs.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})
@@ -320,7 +320,7 @@ func cleanupTest(ctx context.Context, cs clientset.Interface, ns string, podName
 }
 
 // waitForAllPVCsBound waits until the given PVCs are all bound. It then returns the bound PVC names as a set.
-func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout time.Duration, ns string, pvcNames []string) (sets.String, error) {
+func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout time.Duration, ns string, pvcNames []string) (sets.Set, error) {
 	pvNames := sets.NewString()
 	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		unbound := 0

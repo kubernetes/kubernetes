@@ -965,7 +965,7 @@ func testSubpathReconstruction(ctx context.Context, f *framework.Framework, host
 	// points and verify after the test that we do not leak any global mount point.
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err, "while listing schedulable nodes")
-	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
+	globalMountPointsByNode := make(map[string]sets.Set, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		globalMountPointsByNode[node.Name] = storageutils.FindVolumeGlobalMountPoints(ctx, hostExec, &node)
 	}

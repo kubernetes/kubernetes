@@ -380,7 +380,7 @@ func pdNameFromVolumeID(id string) (string, error) {
 // TODO: Replace this with the imported one from GCE PD CSI Driver when
 // the driver removes all k8s/k8s dependencies
 func gceGetRegionFromZones(zones []string) (string, error) {
-	regions := sets.String{}
+	regions := sets.Set{}
 	if len(zones) < 1 {
 		return "", fmt.Errorf("no zones specified")
 	}

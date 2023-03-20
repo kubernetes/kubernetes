@@ -2343,7 +2343,7 @@ func TestGetEligibleNodes(t *testing.T) {
 		nodes []*v1.Node
 
 		// Expected return values
-		eligibleNodes sets.String
+		eligibleNodes sets.Set
 	}
 
 	scenarios := map[string]scenarioType{
@@ -2449,7 +2449,7 @@ func TestGetEligibleNodes(t *testing.T) {
 			fmt.Println("foo")
 		}
 
-		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.String) bool {
+		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.Set) bool {
 			return reflect.DeepEqual(a, b)
 		})); compDiff != "" {
 			t.Errorf("Unexpected eligible nodes (-want +got):\n%s", compDiff)

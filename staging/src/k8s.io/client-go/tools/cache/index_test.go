@@ -71,7 +71,7 @@ func TestMultiIndexKeys(t *testing.T) {
 	index.Add(pod2)
 	index.Add(pod3)
 
-	expected := map[string]sets.String{}
+	expected := map[string]sets.Set{}
 	expected["ernie"] = sets.NewString("one", "tre")
 	expected["bert"] = sets.NewString("one", "two")
 	expected["elmo"] = sets.NewString("tre")
@@ -79,7 +79,7 @@ func TestMultiIndexKeys(t *testing.T) {
 	expected["elmo1"] = sets.NewString()
 	{
 		for k, v := range expected {
-			found := sets.String{}
+			found := sets.Set{}
 			indexResults, err := index.ByIndex("byUser", k)
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)

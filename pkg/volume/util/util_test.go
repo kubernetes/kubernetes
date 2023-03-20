@@ -622,8 +622,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 	tests := []struct {
 		name                    string
 		pod                     *v1.Pod
-		expectedMounts          sets.String
-		expectedDevices         sets.String
+		expectedMounts          sets.Set
+		expectedDevices         sets.Set
 		expectedSELinuxContexts map[string][]*v1.SELinuxOptions
 	}{
 		{

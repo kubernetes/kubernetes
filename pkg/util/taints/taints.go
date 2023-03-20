@@ -90,7 +90,7 @@ func validateTaintEffect(effect v1.TaintEffect) error {
 // It also validates the spec. For example, the form `<key>` may be used to remove a taint, but not to add one.
 func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 	var taints, taintsToRemove []v1.Taint
-	uniqueTaints := map[v1.TaintEffect]sets.String{}
+	uniqueTaints := map[v1.TaintEffect]sets.Set{}
 
 	for _, taintSpec := range spec {
 		if strings.HasSuffix(taintSpec, "-") {
@@ -114,7 +114,7 @@ func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 			}
 			// add taint to existingTaints for uniqueness check
 			if len(uniqueTaints[newTaint.Effect]) == 0 {
-				uniqueTaints[newTaint.Effect] = sets.String{}
+				uniqueTaints[newTaint.Effect] = sets.Set{}
 			}
 			uniqueTaints[newTaint.Effect].Insert(newTaint.Key)
 

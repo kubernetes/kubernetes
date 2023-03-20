@@ -45,7 +45,7 @@ var (
 	domain    = flag.String("domain", "", "The Cluster Domain which is used by the Cluster, if not set tries to determine it from /etc/resolv.conf file.")
 )
 
-func lookup(svcName string) (sets.String, error) {
+func lookup(svcName string) (sets.Set, error) {
 	endpoints := sets.NewString()
 	_, srvRecords, err := net.LookupSRV("", "", svcName)
 	if err != nil {

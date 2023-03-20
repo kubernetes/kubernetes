@@ -245,12 +245,12 @@ func assertNotReachableHTTPTimeout(ip, path string, port int, timeout time.Durat
 }
 
 // testHitNodesFromOutside checks HTTP connectivity from outside.
-func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
+func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.Set) error {
 	return testHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
 }
 
 // testHitNodesFromOutsideWithCount checks HTTP connectivity from outside with count.
-func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
+func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.Set,
 	countToSucceed int) error {
 	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
 	hittedHosts := sets.NewString()

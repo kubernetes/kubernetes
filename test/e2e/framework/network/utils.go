@@ -220,12 +220,12 @@ type NetexecDialResponse struct {
 }
 
 // DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.   Returns an error to be handled by the caller.
-func (config *NetworkingTestConfig) DialFromEndpointContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
+func (config *NetworkingTestConfig) DialFromEndpointContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.Set) error {
 	return config.DialFromContainer(ctx, protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialFromTestContainer executes a curl via kubectl exec in a test container. Returns an error to be handled by the caller.
-func (config *NetworkingTestConfig) DialFromTestContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
+func (config *NetworkingTestConfig) DialFromTestContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.Set) error {
 	return config.DialFromContainer(ctx, protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
@@ -250,7 +250,7 @@ func (config *NetworkingTestConfig) DialEchoFromTestContainer(ctx context.Contex
 // diagnoseMissingEndpoints prints debug information about the endpoints that
 // are NOT in the given list of foundEndpoints. These are the endpoints we
 // expected a response from.
-func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets.String) {
+func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets.Set) {
 	for _, e := range config.EndpointPods {
 		if foundEndpoints.Has(e.Name) {
 			continue
@@ -263,7 +263,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 }
 
 // EndpointHostnames returns a set of hostnames for existing endpoints.
-func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
+func (config *NetworkingTestConfig) EndpointHostnames() sets.Set {
 	expectedEps := sets.NewString()
 	for _, p := range config.EndpointPods {
 		if config.EndpointsHostNetwork {
@@ -307,7 +307,7 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
 // Returns nil if no error, or error message if failed after trying maxTries.
-func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) error {
+func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.Set) error {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
@@ -348,7 +348,7 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.
-func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(ctx context.Context, protocol, targetIP string, targetPort, tries int) (sets.String, error) {
+func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(ctx context.Context, protocol, targetIP string, targetPort, tries int) (sets.Set, error) {
 	return config.GetEndpointsFromContainer(ctx, protocol, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, tries)
 }
 
@@ -357,7 +357,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(ctx context.Co
 // in the url. It returns all different endpoints from multiple retries.
 //   - tries is the number of curl attempts. If this many attempts pass and
 //     we don't see any endpoints, the test fails.
-func (config *NetworkingTestConfig) GetEndpointsFromContainer(ctx context.Context, protocol, containerIP, targetIP string, containerHTTPPort, targetPort, tries int) (sets.String, error) {
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(ctx context.Context, protocol, containerIP, targetIP string, containerHTTPPort, targetPort, tries int) (sets.Set, error) {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, "hostName", protocol, targetIP, targetPort)
 
@@ -451,7 +451,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(ctx context.Con
 //   - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
 //     success on all endpoints).
 //     In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
-func (config *NetworkingTestConfig) DialFromNode(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
+func (config *NetworkingTestConfig) DialFromNode(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.Set) error {
 	var cmd string
 	if protocol == "udp" {
 		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)

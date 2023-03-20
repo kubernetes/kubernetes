@@ -1581,7 +1581,7 @@ var (
 	}
 	// fstype
 	defaultLocalVolumeSupportedFsTypes = sets.NewString("")
-	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.String{
+	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.Set{
 		utils.LocalVolumeBlock: sets.NewString(
 			"", // Default fsType
 			"ext4",

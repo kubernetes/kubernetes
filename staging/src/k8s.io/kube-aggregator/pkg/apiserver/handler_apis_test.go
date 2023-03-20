@@ -38,7 +38,7 @@ import (
 func TestAPIs(t *testing.T) {
 	tests := []struct {
 		name        string
-		enabled     sets.String
+		enabled     sets.Set
 		apiservices []*apiregistration.APIService
 		expected    *metav1.APIGroupList
 	}{

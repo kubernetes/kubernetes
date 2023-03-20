@@ -594,7 +594,7 @@ func (testcase *testcase) CreateDisk(name string, diskType string, zone string, 
 	return nil, errors.New("not implemented")
 }
 
-func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
+func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.Set, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
 	return nil, errors.New("not implemented")
 }
 

@@ -73,13 +73,13 @@ type ManagerImpl struct {
 	allDevices ResourceDeviceInstances
 
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
-	healthyDevices map[string]sets.String
+	healthyDevices map[string]sets.Set
 
 	// unhealthyDevices contains all of the unhealthy devices and their exported device IDs.
-	unhealthyDevices map[string]sets.String
+	unhealthyDevices map[string]sets.Set
 
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
-	allocatedDevices map[string]sets.String
+	allocatedDevices map[string]sets.Set
 
 	// podDevices contains pod to allocated device mapping.
 	podDevices        *podDevices
@@ -107,7 +107,7 @@ type endpointInfo struct {
 type sourcesReadyStub struct{}
 
 // PodReusableDevices is a map by pod name of devices to reuse.
-type PodReusableDevices map[string]map[string]sets.String
+type PodReusableDevices map[string]map[string]sets.Set
 
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
@@ -133,9 +133,9 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		endpoints: make(map[string]endpointInfo),
 
 		allDevices:            NewResourceDeviceInstances(),
-		healthyDevices:        make(map[string]sets.String),
-		unhealthyDevices:      make(map[string]sets.String),
-		allocatedDevices:      make(map[string]sets.String),
+		healthyDevices:        make(map[string]sets.Set),
+		unhealthyDevices:      make(map[string]sets.Set),
+		allocatedDevices:      make(map[string]sets.Set),
 		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
@@ -307,7 +307,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	m.setPodPendingAdmission(pod)
 
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
-		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
+		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set)
 	}
 	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
 	for podUID := range m.devicesToReuse {
@@ -528,7 +528,7 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
+func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.Set) (sets.Set, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -560,7 +560,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 
 	// Create a closure to help with device allocation
 	// Returns 'true' once no more devices need to be allocated.
-	allocateRemainingFrom := func(devices sets.String) bool {
+	allocateRemainingFrom := func(devices sets.Set) bool {
 		for device := range devices.Difference(allocated) {
 			m.allocatedDevices[resource].Insert(device)
 			allocated.Insert(device)
@@ -643,7 +643,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 }
 
-func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.String) (sets.String, sets.String, sets.String) {
+func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.Set) (sets.Set, sets.Set, sets.Set) {
 	// If alignment information is not available, just pass the available list back.
 	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
 	if !m.deviceHasTopologyAlignment(resource) || hint.NUMANodeAffinity == nil {
@@ -654,7 +654,7 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it
 	// to a list of NUMA Nodes for the fake NUMANode -1.
-	perNodeDevices := make(map[int]sets.String)
+	perNodeDevices := make(map[int]sets.Set)
 	for d := range available {
 		if m.allDevices[resource][d].Topology == nil || len(m.allDevices[resource][d].Topology.Nodes) == 0 {
 			if _, ok := perNodeDevices[nodeWithoutTopology]; !ok {
@@ -744,7 +744,7 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -927,7 +927,7 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 
 // callGetPreferredAllocationIfAvailable issues GetPreferredAllocation grpc
 // call for device plugin resource with GetPreferredAllocationAvailable option set.
-func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, resource string, available, mustInclude sets.String, size int) (sets.String, error) {
+func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, resource string, available, mustInclude sets.Set, size int) (sets.Set, error) {
 	eI, ok := m.endpoints[resource]
 	if !ok {
 		return nil, fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)

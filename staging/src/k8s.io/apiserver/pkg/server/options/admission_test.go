@@ -28,7 +28,7 @@ import (
 func TestEnabledPluginNames(t *testing.T) {
 	scenarios := []struct {
 		expectedPluginNames       []string
-		setDefaultOffPlugins      sets.String
+		setDefaultOffPlugins      sets.Set
 		setRecommendedPluginOrder []string
 		setEnablePlugins          []string
 		setDisablePlugins         []string

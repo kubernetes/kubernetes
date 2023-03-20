@@ -120,7 +120,7 @@ func TestBootstrapNamespaceRoles(t *testing.T) {
 	roles := map[string]runtime.Object{}
 
 	namespaceRoles := bootstrappolicy.NamespaceRoles()
-	for _, namespace := range sets.StringKeySet(namespaceRoles).List() {
+	for _, namespace := range sets.SetKeySet(namespaceRoles).List() {
 		bootstrapRoles := namespaceRoles[namespace]
 		for i := range bootstrapRoles {
 			role := bootstrapRoles[i]
@@ -142,7 +142,7 @@ func TestBootstrapNamespaceRoleBindings(t *testing.T) {
 	roleBindings := map[string]runtime.Object{}
 
 	namespaceRoleBindings := bootstrappolicy.NamespaceRoleBindings()
-	for _, namespace := range sets.StringKeySet(namespaceRoleBindings).List() {
+	for _, namespace := range sets.SetKeySet(namespaceRoleBindings).List() {
 		bootstrapRoleBindings := namespaceRoleBindings[namespace]
 		for i := range bootstrapRoleBindings {
 			roleBinding := bootstrapRoleBindings[i]

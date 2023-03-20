@@ -823,7 +823,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}()
 
 	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
-	var serviceChanged, endpointsChanged sets.String
+	var serviceChanged, endpointsChanged sets.Set
 	if tryPartialSync {
 		serviceChanged = proxier.serviceChanges.PendingChanges()
 		endpointsChanged = proxier.endpointsChanges.PendingChanges()

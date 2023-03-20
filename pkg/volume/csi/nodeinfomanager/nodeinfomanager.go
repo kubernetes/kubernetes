@@ -474,7 +474,7 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 		nodeInfoAnnotations = map[string]string{}
 	}
 
-	var oldAnnotationSet sets.String
+	var oldAnnotationSet sets.Set
 	mpa := nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey]
 	tok := strings.Split(mpa, ",")
 	if len(mpa) == 0 {
@@ -526,7 +526,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	topologyKeys := make(sets.String)
+	topologyKeys := make(sets.Set)
 	for k := range topology {
 		topologyKeys.Insert(k)
 	}

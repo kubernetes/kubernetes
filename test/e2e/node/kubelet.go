@@ -56,7 +56,7 @@ const (
 
 // getPodMatches returns a set of pod names on the given node that matches the
 // podNamePrefix and namespace.
-func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
+func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.Set {
 	matches := sets.NewString()
 	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
 	runningPods, err := e2ekubelet.GetKubeletPods(ctx, c, nodeName)
@@ -80,9 +80,9 @@ func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, 
 // information; they are reconstructed by examining the container runtime. In
 // the scope of this test, we do not expect pod naming conflicts so
 // podNamePrefix should be sufficient to identify the pods.
-func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nodeNames sets.String, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
+func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nodeNames sets.Set, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
 	return wait.PollWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
-		matchCh := make(chan sets.String, len(nodeNames))
+		matchCh := make(chan sets.Set, len(nodeNames))
 		for _, item := range nodeNames.List() {
 			// Launch a goroutine per node to check the pods running on the nodes.
 			nodeName := item
@@ -282,7 +282,7 @@ var _ = SIGDescribe("kubelet", func() {
 	ginkgo.Describe("Clean up pods on node", func() {
 		var (
 			numNodes        int
-			nodeNames       sets.String
+			nodeNames       sets.Set
 			nodeLabels      map[string]string
 			resourceMonitor *e2ekubelet.ResourceMonitor
 		)

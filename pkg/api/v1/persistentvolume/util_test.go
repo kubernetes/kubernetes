@@ -263,7 +263,7 @@ func TestPVSecrets(t *testing.T) {
 }
 
 // collectSecretPaths traverses the object, computing all the struct paths that lead to fields with "secret" in the name.
-func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.String {
+func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.Set {
 	secretPaths := sets.NewString()
 
 	if tp.Kind() == reflect.Pointer {

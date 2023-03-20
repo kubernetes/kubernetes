@@ -35,7 +35,7 @@ var (
 
 // VerifyGroupNames ensures that all groups in the scheme ends with the k8s.io suffix.
 // Exceptions can be tolerated using the legacyUnsuffixedGroups parameter
-func VerifyGroupNames(scheme *runtime.Scheme, legacyUnsuffixedGroups sets.String) error {
+func VerifyGroupNames(scheme *runtime.Scheme, legacyUnsuffixedGroups sets.Set) error {
 	errs := []error{}
 	for _, gv := range scheme.PrioritizedVersionsAllGroups() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {

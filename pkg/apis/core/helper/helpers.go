@@ -461,7 +461,7 @@ func toResourceNames(resources core.ResourceList) []core.ResourceName {
 	return result
 }
 
-func toSet(resourceNames []core.ResourceName) sets.String {
+func toSet(resourceNames []core.ResourceName) sets.Set {
 	result := sets.NewString()
 	for _, resourceName := range resourceNames {
 		result.Insert(string(resourceName))
@@ -470,14 +470,14 @@ func toSet(resourceNames []core.ResourceName) sets.String {
 }
 
 // toContainerResourcesSet returns a set of resources names in container resource requirements
-func toContainerResourcesSet(ctr *core.Container) sets.String {
+func toContainerResourcesSet(ctr *core.Container) sets.Set {
 	resourceNames := toResourceNames(ctr.Resources.Requests)
 	resourceNames = append(resourceNames, toResourceNames(ctr.Resources.Limits)...)
 	return toSet(resourceNames)
 }
 
 // ToPodResourcesSet returns a set of resource names in all containers in a pod.
-func ToPodResourcesSet(podSpec *core.PodSpec) sets.String {
+func ToPodResourcesSet(podSpec *core.PodSpec) sets.Set {
 	result := sets.NewString()
 	for i := range podSpec.InitContainers {
 		result = result.Union(toContainerResourcesSet(&podSpec.InitContainers[i]))

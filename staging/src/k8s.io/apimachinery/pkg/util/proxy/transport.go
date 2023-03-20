@@ -41,7 +41,7 @@ import (
 // Sources: http://www.w3.org/TR/REC-html40/index/attributes.html
 //
 //	http://www.w3.org/html/wg/drafts/html/master/index.html#attributes-1
-var atomsToAttrs = map[atom.Atom]sets.String{
+var atomsToAttrs = map[atom.Atom]sets.Set{
 	atom.A:          sets.NewString("href"),
 	atom.Applet:     sets.NewString("codebase"),
 	atom.Area:       sets.NewString("href"),

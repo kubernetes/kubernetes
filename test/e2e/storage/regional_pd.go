@@ -569,7 +569,7 @@ func getTwoRandomZones(ctx context.Context, c clientset.Interface) []string {
 
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
-func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {
+func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.Set, match bool) error {
 	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelTopologyZone])
 	if err != nil {
 		return err
@@ -590,7 +590,7 @@ func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZo
 // checkZoneLabelAndAffinity checks the LabelTopologyZone label of PV and terms
 // with key LabelTopologyZone in PV's node affinity contains zone
 // matchZones is used to indicate if zones should match perfectly
-func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
+func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.Set, matchZones bool) {
 	ginkgo.By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
 		framework.Failf("nil pv passed")

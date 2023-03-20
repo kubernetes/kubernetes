@@ -1358,7 +1358,7 @@ func Test_getModifiedLabels(t *testing.T) {
 		name string
 		a    map[string]string
 		b    map[string]string
-		want sets.String
+		want sets.Set
 	}{
 		{
 			name: "empty",

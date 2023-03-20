@@ -31,7 +31,7 @@ const extensionPrefix = "x-kubernetes-"
 type extensionAttributes struct {
 	xName         string
 	kind          types.Kind
-	allowedValues sets.String
+	allowedValues sets.Set
 	enforceArray  bool
 }
 
@@ -83,7 +83,7 @@ func (e extension) hasAllowedValues() bool {
 	return tagToExtension[e.idlTag].allowedValues.Len() > 0
 }
 
-func (e extension) allowedValues() sets.String {
+func (e extension) allowedValues() sets.Set {
 	return tagToExtension[e.idlTag].allowedValues
 }
 

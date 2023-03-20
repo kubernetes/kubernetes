@@ -139,7 +139,7 @@ func (l Walker) valueIfPresent(node *yaml.MapNode) (*yaml.RNode, *openapi.Resour
 // fieldNames returns a sorted slice containing the names of all fields that appear in any of
 // the sources
 func (l Walker) fieldNames() []string {
-	fields := sets.String{}
+	fields := sets.Set{}
 	for _, s := range l.Sources {
 		if s == nil {
 			continue

@@ -455,7 +455,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 		paths map[string]struct {
 			expectNamespaceParam bool
 			expectNameParam      bool
-			expectedActions      sets.String
+			expectedActions      sets.Set
 		}
 	}{
 		{
@@ -463,7 +463,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
-				expectedActions      sets.String
+				expectedActions      sets.Set
 			}{
 				"/apis/foo-group/foo-version/foos":                                      {expectNamespaceParam: false, expectNameParam: false, expectedActions: sets.NewString("list")},
 				"/apis/foo-group/foo-version/namespaces/{namespace}/foos":               {expectNamespaceParam: true, expectNameParam: false, expectedActions: sets.NewString("post", "list", "deletecollection")},
@@ -477,7 +477,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
-				expectedActions      sets.String
+				expectedActions      sets.Set
 			}{
 				"/apis/foo-group/foo-version/foos":               {expectNamespaceParam: false, expectNameParam: false, expectedActions: sets.NewString("post", "list", "deletecollection")},
 				"/apis/foo-group/foo-version/foos/{name}":        {expectNamespaceParam: false, expectNameParam: true, expectedActions: sets.NewString("get", "put", "patch", "delete")},
@@ -551,7 +551,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 	}
 }
 
-func properties(p map[string]spec.Schema) sets.String {
+func properties(p map[string]spec.Schema) sets.Set {
 	ret := sets.NewString()
 	for k := range p {
 		ret.Insert(k)

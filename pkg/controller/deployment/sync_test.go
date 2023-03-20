@@ -475,7 +475,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 	tests := []struct {
 		oldRSs               []*apps.ReplicaSet
 		revisionHistoryLimit int32
-		expectedDeletedRSs   sets.String
+		expectedDeletedRSs   sets.Set
 	}{
 		{
 			// revision order: rs1 < rs2, delete rs1
@@ -574,7 +574,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
 		controller.cleanupDeployment(ctx, test.oldRSs, d)
 
-		deletedRSs := sets.String{}
+		deletedRSs := sets.Set{}
 		for _, action := range fake.Actions() {
 			deleteAction, ok := action.(testclient.DeleteActionImpl)
 			if !ok {

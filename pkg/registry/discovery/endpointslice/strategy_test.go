@@ -933,7 +933,7 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 	testcases := []struct {
 		name              string
 		endpointSlice     *discovery.EndpointSlice
-		expectedNodeNames sets.String
+		expectedNodeNames sets.Set
 	}{
 		{
 			name: "2 nodes",

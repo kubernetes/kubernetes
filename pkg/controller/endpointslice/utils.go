@@ -361,7 +361,7 @@ func getAddressTypesForService(service *v1.Service) map[discovery.AddressType]st
 }
 
 func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery.EndpointSlice) []*discovery.EndpointSlice {
-	changedSliceNames := sets.String{}
+	changedSliceNames := sets.Set{}
 	for _, slice := range slicesToUpdate {
 		changedSliceNames.Insert(slice.Name)
 	}

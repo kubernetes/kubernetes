@@ -50,8 +50,8 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 
 // GetPodServiceMemberships returns a set of Service keys for Services that have
 // a selector matching the given pod.
-func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.String, error) {
-	set := sets.String{}
+func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.Set, error) {
+	set := sets.Set{}
 	services, err := serviceLister.Services(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return set, err
@@ -160,26 +160,26 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 
 // GetServicesToUpdateOnPodChange returns a set of Service keys for Services
 // that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
+func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.Set {
 	newPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs
-		return sets.String{}
+		return sets.Set{}
 	}
 
 	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
 
 	// If both the pod and labels are unchanged, no update is needed
 	if !podChanged && !labelsChanged {
-		return sets.String{}
+		return sets.Set{}
 	}
 
 	services, err := GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
-		return sets.String{}
+		return sets.Set{}
 	}
 
 	if labelsChanged {
@@ -220,7 +220,7 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
+func determineNeededServiceUpdates(oldServices, services sets.Set, podChanged bool) sets.Set {
 	if podChanged {
 		// if the labels and pod changed, all services need to be updated
 		services = services.Union(oldServices)

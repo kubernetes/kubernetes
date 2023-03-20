@@ -67,7 +67,7 @@ type quotaEvaluator struct {
 	workLock   sync.Mutex
 	work       map[string][]*admissionWaiter
 	dirtyWork  map[string][]*admissionWaiter
-	inProgress sets.String
+	inProgress sets.Set
 
 	// controls the run method so that we can cleanly conform to the Evaluator interface
 	workers int
@@ -127,7 +127,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		queue:      workqueue.NewNamed("admission_quota_controller"),
 		work:       map[string][]*admissionWaiter{},
 		dirtyWork:  map[string][]*admissionWaiter{},
-		inProgress: sets.String{},
+		inProgress: sets.Set{},
 
 		workers: workers,
 		stopCh:  stopCh,
@@ -446,7 +446,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	// track the cumulative set of resources that were required across all quotas
 	// this is needed to know if we have satisfied any constraints where consumption
 	// was limited by default.
-	restrictedResourcesSet := sets.String{}
+	restrictedResourcesSet := sets.Set{}
 	restrictedScopes := []corev1.ScopedResourceSelectorRequirement{}
 	for i := range quotas {
 		resourceQuota := quotas[i]

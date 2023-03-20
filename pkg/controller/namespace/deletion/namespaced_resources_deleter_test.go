@@ -136,8 +136,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 
 	scenarios := map[string]struct {
 		testNamespace           *v1.Namespace
-		kubeClientActionSet     sets.String
-		metadataClientActionSet sets.String
+		kubeClientActionSet     sets.Set
+		metadataClientActionSet sets.Set
 		gvrError                error
 		expectErrorOnDelete     error
 		expectStatus            *v1.NamespaceStatus

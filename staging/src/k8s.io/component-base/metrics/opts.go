@@ -310,7 +310,7 @@ func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
 }
 
 type MetricLabelAllowList struct {
-	labelToAllowList map[string]sets.String
+	labelToAllowList map[string]sets.Set
 }
 
 func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, labelValueList []string) {
@@ -346,7 +346,7 @@ func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
 		if ok {
 			allowList.labelToAllowList[labelName] = valueSet
 		} else {
-			labelToAllowList := make(map[string]sets.String)
+			labelToAllowList := make(map[string]sets.Set)
 			labelToAllowList[labelName] = valueSet
 			labelValueAllowLists[metricName] = &MetricLabelAllowList{
 				labelToAllowList,

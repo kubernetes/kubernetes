@@ -37,15 +37,15 @@ func TestZonesToSet(t *testing.T) {
 	// Second part: want no error
 	tests := []struct {
 		zones string
-		want  sets.String
+		want  sets.Set
 	}{
 		{
 			zones: "us-east-1a",
-			want:  sets.String{"us-east-1a": sets.Empty{}},
+			want:  sets.Set{"us-east-1a": sets.Empty{}},
 		},
 		{
 			zones: "us-east-1a, us-west-2a",
-			want: sets.String{
+			want: sets.Set{
 				"us-east-1a": sets.Empty{},
 				"us-west-2a": sets.Empty{},
 			},
@@ -68,10 +68,10 @@ func TestChooseZonesForVolume(t *testing.T) {
 	checkFnv32(t, "", 2166136261)
 
 	tests := []struct {
-		Zones      sets.String
+		Zones      sets.Set
 		VolumeName string
 		NumZones   uint32
-		Expected   sets.String
+		Expected   sets.Set
 	}{
 		// Test for PVC names that don't have a dash
 		{
@@ -756,7 +756,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			var zonesParameter, zonesWithNodes sets.String
+			var zonesParameter, zonesWithNodes sets.Set
 			var err error
 
 			if test.Zones != "" {
@@ -1418,7 +1418,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var zonesParameter, zonesWithNodes sets.String
+		var zonesParameter, zonesWithNodes sets.Set
 		var err error
 
 		if test.Zones != "" {

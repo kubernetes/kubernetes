@@ -38,7 +38,7 @@ import (
 type testListener struct {
 	lock              sync.RWMutex
 	resyncPeriod      time.Duration
-	expectedItemNames sets.String
+	expectedItemNames sets.Set
 	receivedItemNames []string
 	name              string
 }

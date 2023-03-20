@@ -86,9 +86,9 @@ func NewNamingConditionController(
 	return c
 }
 
-func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allResources sets.String, allKinds sets.String) {
-	allResources = sets.String{}
-	allKinds = sets.String{}
+func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allResources sets.Set, allKinds sets.Set) {
+	allResources = sets.Set{}
+	allKinds = sets.Set{}
 
 	list, err := c.crdLister.List(labels.Everything())
 	if err != nil {
@@ -220,7 +220,7 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	return newNames, namesAcceptedCondition, establishedCondition
 }
 
-func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.String) error {
+func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.Set) error {
 	if requestedName == acceptedName {
 		return nil
 	}

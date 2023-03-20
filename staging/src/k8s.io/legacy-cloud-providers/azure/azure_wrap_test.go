@@ -63,7 +63,7 @@ func TestIsNodeUnmanaged(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		unmanagedNodes sets.String
+		unmanagedNodes sets.Set
 		node           string
 		expected       bool
 		expectErr      bool

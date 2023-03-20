@@ -277,7 +277,7 @@ func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {
 }
 
 func getAwsRegionFromZones(zones []string) (string, error) {
-	regions := sets.String{}
+	regions := sets.Set{}
 	if len(zones) < 1 {
 		return "", fmt.Errorf("no zones specified")
 	}

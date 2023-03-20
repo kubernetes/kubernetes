@@ -485,7 +485,7 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 	for _, value := range old {
 		oldUIDToRef[string(value.UID)] = value
 	}
-	oldUIDSet := sets.StringKeySet(oldUIDToRef)
+	oldUIDSet := sets.SetKeySet(oldUIDToRef)
 	for _, value := range new {
 		newUID := string(value.UID)
 		if oldUIDSet.Has(newUID) {

@@ -60,7 +60,7 @@ func TestKubeletConfigurationPathFields(t *testing.T) {
 
 // allPrimitiveFieldPaths returns the set of field paths in type `tp`, rooted at `path`.
 // It recursively descends into the definition of type `tp` accumulating paths to primitive leaf fields or paths in `skipRecurseList`.
-func allPrimitiveFieldPaths(t *testing.T, skipRecurseList sets.String, tp reflect.Type, path *field.Path) sets.String {
+func allPrimitiveFieldPaths(t *testing.T, skipRecurseList sets.Set, tp reflect.Type, path *field.Path) sets.Set {
 	// if the current field path is in the list of paths we should not recurse into,
 	// return here rather than descending and accumulating child field paths
 	if pathStr := path.String(); len(pathStr) > 0 && skipRecurseList.Has(pathStr) {

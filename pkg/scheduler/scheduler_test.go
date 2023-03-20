@@ -319,7 +319,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 		nodes            []v1.Node
 		nodeNameToDelete string
 		injectErr        error
-		expectNodeNames  sets.String
+		expectNodeNames  sets.Set
 	}{
 		{
 			name:             "node is deleted during a scheduling cycle",

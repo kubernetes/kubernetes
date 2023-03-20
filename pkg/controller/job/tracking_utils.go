@@ -40,7 +40,7 @@ var uidSetKeyFunc = func(obj interface{}) (string, error) {
 // uidTrackingExpectations to remember which UID it has seen/still waiting for.
 type uidSet struct {
 	sync.RWMutex
-	set sets.String
+	set sets.Set
 	key string
 }
 
@@ -60,7 +60,7 @@ func (u *uidTrackingExpectations) getSet(controllerKey string) *uidSet {
 	return nil
 }
 
-func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.String {
+func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Set {
 	uids := u.getSet(controllerKey)
 	if uids == nil {
 		return nil

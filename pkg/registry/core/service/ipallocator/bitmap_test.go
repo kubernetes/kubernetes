@@ -292,7 +292,7 @@ func TestForEach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testCases := []sets.String{
+	testCases := []sets.Set{
 		sets.NewString(),
 		sets.NewString("192.168.1.1"),
 		sets.NewString("192.168.1.1", "192.168.1.254"),

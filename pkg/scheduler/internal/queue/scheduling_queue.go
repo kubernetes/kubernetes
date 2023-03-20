@@ -174,7 +174,7 @@ type PriorityQueue struct {
 	// when we received move request.
 	moveRequestCycle int64
 
-	clusterEventMap map[framework.ClusterEvent]sets.String
+	clusterEventMap map[framework.ClusterEvent]sets.Set
 	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
 
@@ -197,7 +197,7 @@ type priorityQueueOptions struct {
 	podLister                         listersv1.PodLister
 	metricsRecorder                   metrics.MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
-	clusterEventMap                   map[framework.ClusterEvent]sets.String
+	clusterEventMap                   map[framework.ClusterEvent]sets.Set
 	preEnqueuePluginMap               map[string][]framework.PreEnqueuePlugin
 }
 
@@ -233,7 +233,7 @@ func WithPodLister(pl listersv1.PodLister) Option {
 }
 
 // WithClusterEventMap sets clusterEventMap for PriorityQueue.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+func WithClusterEventMap(m map[framework.ClusterEvent]sets.Set) Option {
 	return func(o *priorityQueueOptions) {
 		o.clusterEventMap = m
 	}
@@ -1170,7 +1170,7 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, cluste
 	return false
 }
 
-func intersect(x, y sets.String) bool {
+func intersect(x, y sets.Set) bool {
 	if len(x) > len(y) {
 		x, y = y, x
 	}

@@ -229,7 +229,7 @@ func (c *CompatibilityTestOptions) Run(t *testing.T) {
 	})
 }
 
-func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind, usedFiles sets.String) {
+func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind, usedFiles sets.Set) {
 	expectedObject := c.FilledObjects[gvk]
 	expectedJSON, expectedYAML, expectedProto := c.encode(t, expectedObject)
 
@@ -331,7 +331,7 @@ func (c *CompatibilityTestOptions) encode(t *testing.T, obj runtime.Object) (jso
 	return jsonBytes.Bytes(), yamlBytes.Bytes(), protoBytes.Bytes()
 }
 
-func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.String) (json, yaml, proto []byte, err error) {
+func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.Set) (json, yaml, proto []byte, err error) {
 	jsonFilename := makeName(gvk) + suffix + ".json"
 	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, jsonFilename))
 	yamlFilename := makeName(gvk) + suffix + ".yaml"
@@ -370,7 +370,7 @@ func deleteFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, e
 	}
 }
 
-func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string, usedFiles sets.String) {
+func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string, usedFiles sets.Set) {
 	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "", usedFiles)
 	if os.IsNotExist(err) || (len(jsonBeforeRoundTrip) == 0 && len(yamlBeforeRoundTrip) == 0 && len(protoBeforeRoundTrip) == 0) {
 		t.SkipNow()

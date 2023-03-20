@@ -1272,7 +1272,7 @@ func TestSelectHost(t *testing.T) {
 	tests := []struct {
 		name          string
 		list          []framework.NodePluginScores
-		possibleHosts sets.String
+		possibleHosts sets.Set
 		expectsErr    bool
 	}{
 		{
@@ -1525,7 +1525,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 		pvcs               []v1.PersistentVolumeClaim
 		pod                *v1.Pod
 		pods               []*v1.Pod
-		wantNodes          sets.String
+		wantNodes          sets.Set
 		wantEvaluatedNodes *int32
 		wErr               error
 	}{
@@ -1949,7 +1949,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
-					UnschedulablePlugins: sets.String{},
+					UnschedulablePlugins: sets.Set{},
 					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
 				},
 			},
@@ -1975,7 +1975,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
-					UnschedulablePlugins: sets.String{},
+					UnschedulablePlugins: sets.Set{},
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
 				},
 			},

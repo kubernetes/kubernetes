@@ -220,7 +220,7 @@ func (q *fakeQueue) Items() []FakeQueueItem {
 	return append(make([]FakeQueueItem, 0, len(q.queue)), q.queue...)
 }
 
-func (q *fakeQueue) Set() sets.String {
+func (q *fakeQueue) Set() sets.Set {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	work := sets.NewString()
@@ -964,7 +964,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	}
 }
 
-func newUIDSet(uids ...types.UID) sets.String {
+func newUIDSet(uids ...types.UID) sets.Set {
 	set := sets.NewString()
 	for _, uid := range uids {
 		set.Insert(string(uid))
@@ -975,7 +975,7 @@ func newUIDSet(uids ...types.UID) sets.String {
 type terminalPhaseSync struct {
 	lock     sync.Mutex
 	fn       syncPodFnType
-	terminal sets.String
+	terminal sets.Set
 }
 
 func (s *terminalPhaseSync) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {

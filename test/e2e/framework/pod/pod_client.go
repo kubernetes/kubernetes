@@ -63,7 +63,7 @@ const (
 // ImagePrePullList is the images used in the current test suite. It should be initialized in test suite and
 // the images in the list should be pre-pulled in the test suite.  Currently, this is only used by
 // node e2e test.
-var ImagePrePullList sets.String
+var ImagePrePullList sets.Set
 
 // NewPodClient is a convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for

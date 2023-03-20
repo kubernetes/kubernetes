@@ -974,7 +974,7 @@ func (j *TestJig) ConstructFirewallForIngress(ctx context.Context, firewallRuleN
 }
 
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
-func (j *TestJig) GetDistinctResponseFromIngress(ctx context.Context) (sets.String, error) {
+func (j *TestJig) GetDistinctResponseFromIngress(ctx context.Context) (sets.Set, error) {
 	// Wait for the loadbalancer IP.
 	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client)
 	address, err := j.WaitForIngressAddress(ctx, j.Client, j.Ingress.Namespace, j.Ingress.Name, propagationTimeout)

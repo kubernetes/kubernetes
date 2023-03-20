@@ -685,7 +685,7 @@ func TestGetAutoLabelsForPD(t *testing.T) {
 		name          string
 		zoneInfo      zoneType
 		region        string
-		wantZoneLabel sets.String
+		wantZoneLabel sets.Set
 		wantErr       bool
 	}{
 		{
@@ -772,7 +772,7 @@ type FakeServiceManager struct {
 	gceProjectID  string
 	gceRegion     string
 	zonalDisks    map[string]string      // zone: diskName
-	regionalDisks map[string]sets.String // diskName: zones
+	regionalDisks map[string]sets.Set // diskName: zones
 	opError       error
 
 	// Fields for TestCreateDisk
@@ -789,7 +789,7 @@ type FakeServiceManager struct {
 func newFakeManager(gceProjectID string, gceRegion string) *FakeServiceManager {
 	return &FakeServiceManager{
 		zonalDisks:    make(map[string]string),
-		regionalDisks: make(map[string]sets.String),
+		regionalDisks: make(map[string]sets.Set),
 		gceProjectID:  gceProjectID,
 		gceRegion:     gceRegion,
 	}
@@ -855,7 +855,7 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
-	zones sets.String) (*Disk, error) {
+	zones sets.Set) (*Disk, error) {
 
 	manager.createDiskCalled = true
 	diskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
@@ -1012,8 +1012,8 @@ func (manager *FakeServiceManager) DeleteRegionalDiskOnCloudProvider(
 	}
 }
 
-func createNodeZones(zones []string) map[string]sets.String {
-	nodeZones := map[string]sets.String{}
+func createNodeZones(zones []string) map[string]sets.Set {
+	nodeZones := map[string]sets.Set{}
 	for _, zone := range zones {
 		nodeZones[zone] = sets.NewString("dummynode")
 	}

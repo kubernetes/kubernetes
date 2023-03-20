@@ -48,7 +48,7 @@ type HTTPExtender struct {
 	weight           int64
 	client           *http.Client
 	nodeCacheCapable bool
-	managedResources sets.String
+	managedResources sets.Set
 	ignorable        bool
 }
 

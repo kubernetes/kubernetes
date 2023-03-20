@@ -370,7 +370,7 @@ type InitFuncConstructor func(initcontext ControllerInitContext, completedConfig
 
 // ControllerNames indicate the default controller we are known.
 func ControllerNames(controllerInitFuncConstructors map[string]ControllerInitFuncConstructor) []string {
-	ret := sets.StringKeySet(controllerInitFuncConstructors)
+	ret := sets.SetKeySet(controllerInitFuncConstructors)
 	return ret.List()
 }
 

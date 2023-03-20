@@ -113,7 +113,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	// to the cloud provider.
 	diskType := ""
 	configuredZone := ""
-	var configuredZones sets.String
+	var configuredZones sets.Set
 	zonePresent := false
 	zonesPresent := false
 	replicationType := replicationTypeNone
@@ -145,7 +145,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
 	}
 
-	var activezones sets.String
+	var activezones sets.Set
 	activezones, err = cloud.GetAllCurrentZones()
 	if err != nil {
 		return "", 0, nil, "", err
@@ -202,7 +202,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 }
 
 // Returns the first path that exists, or empty string if none exist.
-func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName string) (string, error) {
+func verifyDevicePath(devicePaths []string, sdBeforeSet sets.Set, diskName string) (string, error) {
 	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
 		// It's possible udevadm was called on other disks so it should not block this
 		// call. If it did fail on this disk, then the devicePath will either
@@ -309,7 +309,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.Cloud, e
 // --action=change" for newly created "/dev/sd*" drives (exist only in
 // after set). This is workaround for Issue #7972. Once the underlying
 // issue has been resolved, this may be removed.
-func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
+func udevadmChangeToNewDrives(sdBeforeSet sets.Set) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("error filepath.Glob(\"%s\"): %v\r", diskSDPattern, err)

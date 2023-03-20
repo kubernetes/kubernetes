@@ -29,7 +29,7 @@ type FakeMirrorClient struct {
 	mirrorPodLock sync.RWMutex
 	// Note that a real mirror manager does not store the mirror pods in
 	// itself. This fake manager does this to track calls.
-	mirrorPods   sets.String
+	mirrorPods   sets.Set
 	createCounts map[string]int
 	deleteCounts map[string]int
 }

@@ -643,7 +643,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
 
-					m := make(map[framework.ClusterEvent]sets.String)
+					m := make(map[framework.ClusterEvent]sets.Set)
 					// - All plugins registered for events[0], which is NodeAdd.
 					// - 1/2 of plugins registered for events[1]
 					// - 1/3 of plugins registered for events[2]
@@ -702,7 +702,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{
+	m := map[framework.ClusterEvent]sets.Set{
 		{Resource: framework.Node, ActionType: framework.Add}: sets.NewString("fooPlugin"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -764,7 +764,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	labelPod := st.MakePod().Name("lbp").Namespace(affinityPod.Namespace).Label("service", "securityscan").Node("node1").Obj()
 
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{AssignedPodAdd: sets.NewString("fakePlugin")}
+	m := map[framework.ClusterEvent]sets.Set{AssignedPodAdd: sets.NewString("fakePlugin")}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
@@ -1305,7 +1305,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 // activeQ after one minutes if it is in unschedulablePods.
 func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{
+	m := map[framework.ClusterEvent]sets.Set{
 		NodeAdd: sets.NewString("fakePlugin"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2091,14 +2091,14 @@ func TestPodMatchesEvent(t *testing.T) {
 		name            string
 		podInfo         *framework.QueuedPodInfo
 		event           framework.ClusterEvent
-		clusterEventMap map[framework.ClusterEvent]sets.String
+		clusterEventMap map[framework.ClusterEvent]sets.Set
 		want            bool
 	}{
 		{
 			name:    "event not registered",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj()),
 			event:   EmptyEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent: sets.NewString("foo"),
 			},
 			want: false,
@@ -2107,7 +2107,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin matches but event does not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   AssignedPodAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent: sets.NewString("foo", "bar"),
 			},
 			want: false,
@@ -2116,7 +2116,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "wildcard event wins regardless of event matching",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   WildCardEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent: sets.NewString("foo"),
 			},
 			want: true,
@@ -2125,7 +2125,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin and event both match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent: sets.NewString("foo", "bar"),
 			},
 			want: true,
@@ -2134,7 +2134,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin registers fine-grained event",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent:    sets.NewString("foo"),
 				NodeTaintChange: sets.NewString("bar"),
 			},
@@ -2144,7 +2144,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "if pod failed by multiple plugins, a single match gets a final match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo", "bar"),
 			event:   NodeAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				NodeAllEvent: sets.NewString("bar"),
 			},
 			want: true,
@@ -2153,7 +2153,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent and plugin name matches",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				WildCardEvent: sets.NewString("foo"),
 			},
 			want: true,
@@ -2162,7 +2162,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent but plugin name not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
+			clusterEventMap: map[framework.ClusterEvent]sets.Set{
 				WildCardEvent: sets.NewString("bar"),
 			},
 			want: false,

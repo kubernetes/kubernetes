@@ -224,7 +224,7 @@ func TestGetZoneByProviderID(t *testing.T) {
 
 func TestAvailabilitySetGetZoneByNodeName(t *testing.T) {
 	az := &Cloud{
-		unmanagedNodes: sets.String{"vm-0": sets.Empty{}},
+		unmanagedNodes: sets.Set{"vm-0": sets.Empty{}},
 		nodeInformerSynced: func() bool {
 			return true
 		},
@@ -234,7 +234,7 @@ func TestAvailabilitySetGetZoneByNodeName(t *testing.T) {
 	assert.Equal(t, cloudprovider.Zone{}, zone)
 
 	az = &Cloud{
-		unmanagedNodes: sets.String{"vm-0": sets.Empty{}},
+		unmanagedNodes: sets.Set{"vm-0": sets.Empty{}},
 		nodeInformerSynced: func() bool {
 			return false
 		},

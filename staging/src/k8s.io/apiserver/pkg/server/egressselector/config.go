@@ -102,7 +102,7 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 		}
 	}
 
-	seen := sets.String{}
+	seen := sets.Set{}
 	for i, service := range config.EgressSelections {
 		canonicalName := strings.ToLower(service.Name)
 		fldPath := field.NewPath("service", "connection")

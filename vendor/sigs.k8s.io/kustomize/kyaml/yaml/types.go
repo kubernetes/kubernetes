@@ -209,7 +209,7 @@ func String(node *yaml.Node, opts ...string) (string, error) {
 	if node == nil {
 		return "", nil
 	}
-	optsSet := sets.String{}
+	optsSet := sets.Set{}
 	optsSet.Insert(opts...)
 	if optsSet.Has(Flow) {
 		oldStyle := node.Style

@@ -321,7 +321,7 @@ func getCPUWeight(cpuShares *uint64) uint64 {
 }
 
 // readUnifiedControllers reads the controllers available at the specified cgroup
-func readUnifiedControllers(path string) (sets.String, error) {
+func readUnifiedControllers(path string) (sets.Set, error) {
 	controllersFileContent, err := os.ReadFile(filepath.Join(path, "cgroup.controllers"))
 	if err != nil {
 		return nil, err
@@ -332,11 +332,11 @@ func readUnifiedControllers(path string) (sets.String, error) {
 
 var (
 	availableRootControllersOnce sync.Once
-	availableRootControllers     sets.String
+	availableRootControllers     sets.Set
 )
 
 // getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
-func getSupportedUnifiedControllers() sets.String {
+func getSupportedUnifiedControllers() sets.Set {
 	// This is the set of controllers used by the Kubelet
 	supportedControllers := sets.NewString("cpu", "cpuset", "memory", "hugetlb", "pids")
 	// Memoize the set of controllers that are present in the root cgroup

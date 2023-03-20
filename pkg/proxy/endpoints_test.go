@@ -45,11 +45,11 @@ func (proxier *FakeProxier) deleteEndpointSlice(slice *discovery.EndpointSlice) 
 func TestGetLocalEndpointIPs(t *testing.T) {
 	testCases := []struct {
 		endpointsMap EndpointsMap
-		expected     map[types.NamespacedName]sets.String
+		expected     map[types.NamespacedName]sets.Set
 	}{{
 		// Case[0]: nothing
 		endpointsMap: EndpointsMap{},
-		expected:     map[types.NamespacedName]sets.String{},
+		expected:     map[types.NamespacedName]sets.Set{},
 	}, {
 		// Case[1]: unnamed port
 		endpointsMap: EndpointsMap{
@@ -57,7 +57,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expected: map[types.NamespacedName]sets.String{},
+		expected: map[types.NamespacedName]sets.Set{},
 	}, {
 		// Case[2]: unnamed port local
 		endpointsMap: EndpointsMap{
@@ -65,7 +65,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expected: map[types.NamespacedName]sets.String{
+		expected: map[types.NamespacedName]sets.Set{
 			{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.1"),
 		},
 	}, {
@@ -80,7 +80,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expected: map[types.NamespacedName]sets.String{
+		expected: map[types.NamespacedName]sets.Set{
 			{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.2"),
 		},
 	}, {
@@ -104,7 +104,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expected: map[types.NamespacedName]sets.String{
+		expected: map[types.NamespacedName]sets.Set{
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
@@ -129,7 +129,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expected: map[types.NamespacedName]sets.String{
+		expected: map[types.NamespacedName]sets.Set{
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
@@ -154,7 +154,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: false, Serving: true, Terminating: true},
 			},
 		},
-		expected: make(map[types.NamespacedName]sets.String, 0),
+		expected: make(map[types.NamespacedName]sets.Set, 0),
 	}}
 
 	for tci, tc := range testCases {
@@ -506,7 +506,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints    []ServiceEndpoint
 		expectedNewlyActiveUDPServices map[ServicePortName]bool
 		expectedLocalEndpoints         map[types.NamespacedName]int
-		expectedChangedEndpoints       sets.String
+		expectedChangedEndpoints       sets.Set
 	}{{
 		name:                           "empty",
 		oldEndpoints:                   map[ServicePortName][]*BaseEndpointInfo{},
@@ -1273,7 +1273,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		paramRemoveSlice         bool
 		expectedReturnVal        bool
 		expectedCurrentChange    map[ServicePortName][]*BaseEndpointInfo
-		expectedChangedEndpoints sets.String
+		expectedChangedEndpoints sets.Set
 	}{
 		// test starting from an empty state
 		"add a simple slice that doesn't already exist": {

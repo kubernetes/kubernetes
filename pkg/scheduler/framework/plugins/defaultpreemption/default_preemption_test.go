@@ -1676,8 +1676,8 @@ func TestPreempt(t *testing.T) {
 				podInformer.GetStore().Add(test.pods[i])
 			}
 
-			deletedPodNames := make(sets.String)
-			patchedPodNames := make(sets.String)
+			deletedPodNames := make(sets.Set)
+			patchedPodNames := make(sets.Set)
 			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				patchedPodNames.Insert(action.(clienttesting.PatchAction).GetName())
 				return true, nil, nil

@@ -201,7 +201,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 		}, err
 	}
 
-	deletedNamespaces := sets.String{}
+	deletedNamespaces := sets.Set{}
 	deleteErrors := []error{}
 	for _, item := range allResources.(*unstructured.UnstructuredList).Items {
 		metadata, err := meta.Accessor(&item)

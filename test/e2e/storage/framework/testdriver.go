@@ -222,11 +222,11 @@ type DriverInfo struct {
 	// The range of disk size supported by this driver
 	SupportedSizeRange e2evolume.SizeRange
 	// Map of string for supported fs type
-	SupportedFsType sets.String
+	SupportedFsType sets.Set
 	// Map of string for supported mount option
-	SupportedMountOption sets.String
+	SupportedMountOption sets.Set
 	// [Optional] Map of string for required mount option
-	RequiredMountOption sets.String
+	RequiredMountOption sets.Set
 	// Map that represents plugin capabilities
 	Capabilities map[Capability]bool
 	// [Optional] List of access modes required for provisioning, defaults to

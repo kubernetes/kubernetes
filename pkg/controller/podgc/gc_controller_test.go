@@ -65,8 +65,8 @@ func TestGCTerminated(t *testing.T) {
 		name                          string
 		pods                          []nameToPhase
 		threshold                     int
-		deletedPodNames               sets.String
-		patchedPodNames               sets.String
+		deletedPodNames               sets.Set
+		patchedPodNames               sets.Set
 		enablePodDisruptionConditions bool
 	}{
 		{
@@ -209,8 +209,8 @@ func TestGCOrphaned(t *testing.T) {
 		deletedInformerNodes          []*v1.Node
 		pods                          []*v1.Pod
 		itemsInQueue                  int
-		deletedPodNames               sets.String
-		patchedPodNames               sets.String
+		deletedPodNames               sets.Set
+		patchedPodNames               sets.Set
 		enablePodDisruptionConditions bool
 	}{
 		{
@@ -419,8 +419,8 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	testCases := []struct {
 		name                          string
 		pods                          []nameToPhase
-		deletedPodNames               sets.String
-		patchedPodNames               sets.String
+		deletedPodNames               sets.Set
+		patchedPodNames               sets.Set
 		enablePodDisruptionConditions bool
 	}{
 		{
@@ -507,8 +507,8 @@ func TestGCTerminating(t *testing.T) {
 		name                          string
 		pods                          []nameToPodConfig
 		nodes                         []node
-		deletedPodNames               sets.String
-		patchedPodNames               sets.String
+		deletedPodNames               sets.Set
+		patchedPodNames               sets.Set
 		enablePodDisruptionConditions bool
 	}{
 		{
@@ -657,7 +657,7 @@ func TestGCTerminating(t *testing.T) {
 	testDeletingPodsMetrics(t, 7)
 }
 
-func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.String) {
+func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.Set) {
 	t.Helper()
 	deletedPodNames := getDeletedPodNames(client)
 	if diff := cmp.Diff(wantDeletedPodNames, deletedPodNames); diff != "" {
@@ -701,7 +701,7 @@ func setupNewSimpleClient(nodes []*v1.Node, pods []*v1.Pod) *fake.Clientset {
 	return fake.NewSimpleClientset(nodeList, podList)
 }
 
-func getDeletedPodNames(client *fake.Clientset) sets.String {
+func getDeletedPodNames(client *fake.Clientset) sets.Set {
 	deletedPodNames := sets.NewString()
 	for _, action := range client.Actions() {
 		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
@@ -712,7 +712,7 @@ func getDeletedPodNames(client *fake.Clientset) sets.String {
 	return deletedPodNames
 }
 
-func getPatchedPodNames(client *fake.Clientset) sets.String {
+func getPatchedPodNames(client *fake.Clientset) sets.Set {
 	patchedPodNames := sets.NewString()
 	for _, action := range client.Actions() {
 		if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" {

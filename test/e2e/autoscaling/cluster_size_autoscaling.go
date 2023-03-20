@@ -561,7 +561,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			setMigSizes(newSizes)
 		}
 
-		removeLabels := func(nodesToClean sets.String) {
+		removeLabels := func(nodesToClean sets.Set) {
 			ginkgo.By("Removing labels from nodes")
 			for node := range nodesToClean {
 				e2enode.RemoveLabelOffNode(c, node, labelKey)

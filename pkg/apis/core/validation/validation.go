@@ -387,8 +387,8 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) (map[string]core.VolumeSource, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
-	allNames := sets.String{}
-	allCreatedPVCs := sets.String{}
+	allNames := sets.Set{}
+	allCreatedPVCs := sets.Set{}
 	// Determine which PVCs will be created for this pod. We need
 	// the exact name of the pod for this. Without it, this sanity
 	// check has to be skipped.
@@ -1084,7 +1084,7 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *core.DownwardAPIVolumeSo
 
 func validateProjectionSources(projection *core.ProjectedVolumeSource, projectionMode *int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allPaths := sets.String{}
+	allPaths := sets.Set{}
 
 	for i, source := range projection.Sources {
 		numSources := 0
@@ -1700,7 +1700,7 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 		allErrs = append(allErrs, field.Required(fldPath.Child("accessModes"), ""))
 	}
 
-	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
+	expandedSupportedAccessModes := sets.SetKeySet(supportedAccessModes)
 	if opts.AllowReadWriteOncePod {
 		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
 	}
@@ -2142,7 +2142,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 
-	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
+	expandedSupportedAccessModes := sets.SetKeySet(supportedAccessModes)
 	if opts.AllowReadWriteOncePod {
 		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
 	}
@@ -2348,7 +2348,7 @@ var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(cor
 func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allNames := sets.String{}
+	allNames := sets.Set{}
 	for i, port := range ports {
 		idxPath := fldPath.Index(i)
 		if len(port.Name) > 0 {
@@ -2458,7 +2458,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	return allErrs
 }
 
-func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
+func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets.Set, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(fs.APIVersion) == 0 {
@@ -2493,7 +2493,7 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	return allErrs
 }
 
-func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.String, prefixes *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
+func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.Set, prefixes *sets.Set, fldPath *field.Path, volume bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if volume && len(fs.ContainerName) == 0 {
@@ -2767,8 +2767,8 @@ func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodReso
 // gatherPodResourceClaimNames returns a set of all non-empty
 // PodResourceClaim.Name values. Validation that those names are valid is
 // handled by validatePodResourceClaims.
-func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.String {
-	podClaimNames := sets.String{}
+func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.Set {
+	podClaimNames := sets.Set{}
 	for _, claim := range claims {
 		if claim.Name != "" {
 			podClaimNames.Insert(claim.Name)
@@ -2777,7 +2777,7 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.String {
 	return podClaimNames
 }
 
-func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.Set, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if claim.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -2893,7 +2893,7 @@ func validateAffinityTimeout(timeout *int32, fldPath *field.Path) field.ErrorLis
 
 // AccumulateUniqueHostPorts extracts each HostPort of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniqueHostPorts(containers []core.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+func AccumulateUniqueHostPorts(containers []core.Container, accumulator *sets.Set, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for ci, ctr := range containers {
@@ -2919,7 +2919,7 @@ func AccumulateUniqueHostPorts(containers []core.Container, accumulator *sets.St
 // checkHostPortConflicts checks for colliding Port.HostPort values across
 // a slice of containers.
 func checkHostPortConflicts(containers []core.Container, fldPath *field.Path) field.ErrorList {
-	allPorts := sets.String{}
+	allPorts := sets.Set{}
 	return AccumulateUniqueHostPorts(containers, &allPorts, fldPath)
 }
 
@@ -3074,14 +3074,14 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
-func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(ephemeralContainers) == 0 {
 		return allErrs
 	}
 
-	otherNames, allNames := sets.String{}, sets.String{}
+	otherNames, allNames := sets.Set{}, sets.Set{}
 	for _, c := range containers {
 		otherNames.Insert(c.Name)
 		allNames.Insert(c.Name)
@@ -3157,10 +3157,10 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 }
 
 // validateInitContainers is called by pod spec and template validation to validate the list of init containers
-func validateInitContainers(containers []core.Container, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateInitContainers(containers []core.Container, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allNames := sets.String{}
+	allNames := sets.Set{}
 	for _, ctr := range regularContainers {
 		allNames.Insert(ctr.Name)
 	}
@@ -3204,7 +3204,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, path *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set, path *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
 	namePath := path.Child("name")
@@ -3294,14 +3294,14 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 }
 
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
-func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
 		return append(allErrs, field.Required(fldPath, ""))
 	}
 
-	allNames := sets.String{}
+	allNames := sets.Set{}
 	for i, ctr := range containers {
 		path := fldPath.Index(i)
 
@@ -3419,7 +3419,7 @@ func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *fie
 func validateSchedulingGates(schedulingGates []core.PodSchedulingGate, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// There should be no duplicates in the list of scheduling gates.
-	seen := sets.String{}
+	seen := sets.Set{}
 	for i, schedulingGate := range schedulingGates {
 		allErrs = append(allErrs, ValidateQualifiedName(schedulingGate.Name, fldPath.Index(i))...)
 		if seen.Has(schedulingGate.Name) {
@@ -3761,7 +3761,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 		}
 
 		// There should be no duplicates in list of Pod.PodIPs
-		seen := sets.String{} // := make(map[string]int)
+		seen := sets.Set{} // := make(map[string]int)
 		for i, podIP := range pod.Status.PodIPs {
 			if seen.Has(podIP.IP) {
 				allErrs = append(allErrs, field.Duplicate(podIPsField.Index(i), podIP))
@@ -4059,9 +4059,9 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) 
 
 // validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data,
 // and constructs a set containing all of its Values.
-func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) (sets.String, field.ErrorList) {
+func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) (sets.Set, field.ErrorList) {
 	allErrs := field.ErrorList{}
-	valueSet := make(sets.String)
+	valueSet := make(sets.Set)
 	valuesPath := fldPath.Child("values")
 	if len(rq.Values) == 0 {
 		allErrs = append(allErrs, field.Required(valuesPath, ""))
@@ -4082,9 +4082,9 @@ func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequi
 
 // ValidateTopologySelectorTerm tests that the specified topology selector term has valid data,
 // and constructs a map representing the term in raw form.
-func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) (map[string]sets.String, field.ErrorList) {
+func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) (map[string]sets.Set, field.ErrorList) {
 	allErrs := field.ErrorList{}
-	exprMap := make(map[string]sets.String)
+	exprMap := make(map[string]sets.Set)
 	exprPath := fldPath.Child("matchLabelExpressions")
 
 	// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
@@ -4950,7 +4950,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		}
 	}
 
-	allPortNames := sets.String{}
+	allPortNames := sets.Set{}
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
 		portPath := portsPath.Index(i)
@@ -5079,7 +5079,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allNames *sets.Set, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if requireName && len(sp.Name) == 0 {
@@ -5379,7 +5379,7 @@ func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *fie
 func validateNodeTaints(taints []core.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 
-	uniqueTaints := map[core.TaintEffect]sets.String{}
+	uniqueTaints := map[core.TaintEffect]sets.Set{}
 
 	for i, currTaint := range taints {
 		idxPath := fldPath.Index(i)
@@ -5402,7 +5402,7 @@ func validateNodeTaints(taints []core.Taint, fldPath *field.Path) field.ErrorLis
 
 		// add taint to existingTaints for uniqueness check
 		if len(uniqueTaints[currTaint.Effect]) == 0 {
-			uniqueTaints[currTaint.Effect] = sets.String{}
+			uniqueTaints[currTaint.Effect] = sets.Set{}
 		}
 		uniqueTaints[currTaint.Effect].Insert(currTaint.Key)
 	}
@@ -5460,7 +5460,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 			}
 
 			// PodCIDRs must not contain duplicates
-			seen := sets.String{}
+			seen := sets.Set{}
 			for i, value := range node.Spec.PodCIDRs {
 				if seen.Has(value) {
 					allErrs = append(allErrs, field.Duplicate(podCIDRsField.Index(i), value))
@@ -5768,7 +5768,7 @@ func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
 		}
 		limitTypeSet[limit.Type] = true
 
-		keys := sets.String{}
+		keys := sets.Set{}
 		min := map[string]resource.Quantity{}
 		max := map[string]resource.Quantity{}
 		defaults := map[string]resource.Quantity{}
@@ -6055,7 +6055,7 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 // Validates resource requirement spec.
-func ValidateResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidateResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
@@ -6126,9 +6126,9 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, podCl
 // validateResourceClaimNames checks that the names in
 // ResourceRequirements.Claims have a corresponding entry in
 // PodSpec.ResourceClaims.
-func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
+func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.Set, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	names := sets.String{}
+	names := sets.Set{}
 	for i, claim := range claims {
 		name := claim.Name
 		if name == "" {
@@ -6192,7 +6192,7 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, fld 
 		}
 		scopeSet.Insert(string(scope))
 	}
-	invalidScopePairs := []sets.String{
+	invalidScopePairs := []sets.Set{
 		sets.NewString(string(core.ResourceQuotaScopeBestEffort), string(core.ResourceQuotaScopeNotBestEffort)),
 		sets.NewString(string(core.ResourceQuotaScopeTerminating), string(core.ResourceQuotaScopeNotTerminating)),
 	}
@@ -6246,7 +6246,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 		}
 		scopeSet.Insert(string(req.ScopeName))
 	}
-	invalidScopePairs := []sets.String{
+	invalidScopePairs := []sets.Set{
 		sets.NewString(string(core.ResourceQuotaScopeBestEffort), string(core.ResourceQuotaScopeNotBestEffort)),
 		sets.NewString(string(core.ResourceQuotaScopeTerminating), string(core.ResourceQuotaScopeNotTerminating)),
 	}
@@ -7000,7 +7000,7 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 	}
 
 	var allErrs field.ErrorList
-	labelSelectorKeys := sets.String{}
+	labelSelectorKeys := sets.Set{}
 
 	if labelSelector != nil {
 		for key := range labelSelector.MatchLabels {
@@ -7059,7 +7059,7 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 
 	// ipfamilies stand alone validation
 	// must be either IPv4 or IPv6
-	seen := sets.String{}
+	seen := sets.Set{}
 	for i, ipFamily := range service.Spec.IPFamilies {
 		if !supportedServiceIPFamily.Has(string(ipFamily)) {
 			allErrs = append(allErrs, field.NotSupported(ipFamiliesField.Index(i), ipFamily, supportedServiceIPFamily.List()))

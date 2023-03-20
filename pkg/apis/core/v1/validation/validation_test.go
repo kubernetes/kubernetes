@@ -336,7 +336,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 	successCase := []struct {
 		name        string
 		containers  []v1.Container
-		accumulator *sets.String
+		accumulator *sets.Set
 		fldPath     *field.Path
 	}{
 		{
@@ -359,7 +359,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 					},
 				},
 			},
-			accumulator: &sets.String{},
+			accumulator: &sets.Set{},
 			fldPath:     field.NewPath("spec", "containers"),
 		},
 		{
@@ -382,7 +382,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 					},
 				},
 			},
-			accumulator: &sets.String{},
+			accumulator: &sets.Set{},
 			fldPath:     field.NewPath("spec", "containers"),
 		},
 	}
@@ -396,7 +396,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 	errorCase := []struct {
 		name        string
 		containers  []v1.Container
-		accumulator *sets.String
+		accumulator *sets.Set
 		fldPath     *field.Path
 	}{
 		{
@@ -419,7 +419,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 					},
 				},
 			},
-			accumulator: &sets.String{},
+			accumulator: &sets.Set{},
 			fldPath:     field.NewPath("spec", "containers"),
 		},
 		{
@@ -442,7 +442,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 					},
 				},
 			},
-			accumulator: &sets.String{"8080/UDP": sets.Empty{}},
+			accumulator: &sets.Set{"8080/UDP": sets.Empty{}},
 			fldPath:     field.NewPath("spec", "containers"),
 		},
 	}

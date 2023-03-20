@@ -303,7 +303,7 @@ func (j *TestJig) ListNodesWithEndpoint(ctx context.Context) ([]v1.Node, error) 
 
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
-func (j *TestJig) GetEndpointNodeNames(ctx context.Context) (sets.String, error) {
+func (j *TestJig) GetEndpointNodeNames(ctx context.Context) (sets.Set, error) {
 	err := j.waitForAvailableEndpoint(ctx, ServiceEndpointsTimeout)
 	if err != nil {
 		return nil, err

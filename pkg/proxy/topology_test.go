@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func checkExpectedEndpoints(expected sets.String, actual []Endpoint) error {
+func checkExpectedEndpoints(expected sets.Set, actual []Endpoint) error {
 	var errs []error
 
 	expectedCopy := sets.NewString(expected.UnsortedList()...)
@@ -55,14 +55,14 @@ func TestCategorizeEndpoints(t *testing.T) {
 		endpoints    []Endpoint
 
 		// We distinguish `nil` ("service doesn't use this kind of endpoints") from
-		// `sets.String()` ("service uses this kind of endpoints but has no endpoints").
+		// `sets.Set()` ("service uses this kind of endpoints but has no endpoints").
 		// allEndpoints can be left unset if only one of clusterEndpoints and
 		// localEndpoints is set, and allEndpoints is identical to it.
 		// onlyRemoteEndpoints should be true if CategorizeEndpoints returns true for
 		// hasAnyEndpoints despite allEndpoints being empty.
-		clusterEndpoints    sets.String
-		localEndpoints      sets.String
-		allEndpoints        sets.String
+		clusterEndpoints    sets.Set
+		localEndpoints      sets.Set
+		allEndpoints        sets.Set
 		onlyRemoteEndpoints bool
 	}{{
 		name:         "hints enabled, hints annotation == auto",
@@ -512,7 +512,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 				}
 			}
 
-			var expectedAllEndpoints sets.String
+			var expectedAllEndpoints sets.Set
 			if tc.clusterEndpoints != nil && tc.localEndpoints == nil {
 				expectedAllEndpoints = tc.clusterEndpoints
 			} else if tc.localEndpoints != nil && tc.clusterEndpoints == nil {

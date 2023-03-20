@@ -57,7 +57,7 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 }
 
 // IsControllerEnabled check if a specified controller enabled or not.
-func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers []string) bool {
+func IsControllerEnabled(name string, disabledByDefaultControllers sets.Set, controllers []string) bool {
 	hasStar := false
 	for _, ctrl := range controllers {
 		if ctrl == name {

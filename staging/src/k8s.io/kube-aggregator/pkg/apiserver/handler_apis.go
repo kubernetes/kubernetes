@@ -42,7 +42,7 @@ type apisHandler struct {
 	discoveryGroup metav1.APIGroup
 }
 
-func discoveryGroup(enabledVersions sets.String) metav1.APIGroup {
+func discoveryGroup(enabledVersions sets.Set) metav1.APIGroup {
 	retval := metav1.APIGroup{
 		Name: apiregistrationv1api.GroupName,
 		Versions: []metav1.GroupVersionForDiscovery{

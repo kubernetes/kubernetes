@@ -199,11 +199,11 @@ func dropTopologyOnV1(ctx context.Context, oldEPS, newEPS *discovery.EndpointSli
 
 // getDeprecatedTopologyNodeNames returns a set of node names present in
 // deprecatedTopology fields within the provided EndpointSlice.
-func getDeprecatedTopologyNodeNames(eps *discovery.EndpointSlice) sets.String {
+func getDeprecatedTopologyNodeNames(eps *discovery.EndpointSlice) sets.Set {
 	if eps == nil {
 		return nil
 	}
-	var names sets.String
+	var names sets.Set
 	for _, ep := range eps.Endpoints {
 		if nodeName, ok := ep.DeprecatedTopology[corev1.LabelHostname]; ok && len(nodeName) > 0 {
 			if names == nil {

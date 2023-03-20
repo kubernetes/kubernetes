@@ -41,14 +41,14 @@ import (
 type monitorFakeExec struct {
 	sync.Mutex
 
-	tables map[string]sets.String
+	tables map[string]sets.Set
 
 	block      bool
 	wasBlocked bool
 }
 
 func newMonitorFakeExec() *monitorFakeExec {
-	tables := make(map[string]sets.String)
+	tables := make(map[string]sets.Set)
 	tables["mangle"] = sets.NewString()
 	tables["filter"] = sets.NewString()
 	tables["nat"] = sets.NewString()

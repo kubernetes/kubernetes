@@ -333,7 +333,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		}
 	}
 	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
+		knownResources := sets.SetKeySet(storageversionhashdata.GVRToStorageVersionHash)
 		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
 	}
 }

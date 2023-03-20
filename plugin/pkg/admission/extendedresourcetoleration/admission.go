@@ -68,7 +68,7 @@ func (p *plugin) Admit(ctx context.Context, attributes admission.Attributes, o a
 		return errors.NewBadRequest(fmt.Sprintf("expected *core.Pod but got %T", attributes.GetObject()))
 	}
 
-	resources := sets.String{}
+	resources := sets.Set{}
 	for _, container := range pod.Spec.Containers {
 		for resourceName := range container.Resources.Requests {
 			if helper.IsExtendedResourceName(resourceName) {

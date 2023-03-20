@@ -95,7 +95,7 @@ func NewServiceHealthServer(hostname string, recorder events.EventRecorder, node
 type server struct {
 	hostname string
 	// node addresses where health check port will listen on
-	nodeAddresses sets.String
+	nodeAddresses sets.Set
 	recorder      events.EventRecorder // can be nil
 	listener      listener
 	httpFactory   httpServerFactory

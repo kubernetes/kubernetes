@@ -1343,7 +1343,7 @@ func TestKMSProviderName(t *testing.T) {
 		desc             string
 		in               *config.KMSConfiguration
 		reload           bool
-		kmsProviderNames sets.String
+		kmsProviderNames sets.Set
 		want             field.ErrorList
 	}{
 		{

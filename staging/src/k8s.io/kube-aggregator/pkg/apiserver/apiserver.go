@@ -134,7 +134,7 @@ type APIAggregator struct {
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
 	// handledGroups are the groups that already have routes
-	handledGroups sets.String
+	handledGroups sets.Set
 
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
@@ -215,7 +215,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		delegateHandler:            delegationTarget.UnprotectedHandler(),
 		proxyTransport:             c.ExtraConfig.ProxyTransport,
 		proxyHandlers:              map[string]*proxyHandler{},
-		handledGroups:              sets.String{},
+		handledGroups:              sets.Set{},
 		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers:   informerFactory,
 		serviceResolver:            c.ExtraConfig.ServiceResolver,

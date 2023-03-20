@@ -227,7 +227,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		}
 	}
 
-	seenPluginConfig := make(sets.String)
+	seenPluginConfig := make(sets.Set)
 
 	for i := range profile.PluginConfig {
 		pluginConfigPath := path.Child("pluginConfig").Index(i)

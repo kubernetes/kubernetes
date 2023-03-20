@@ -447,7 +447,7 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 }
 
 // getModifiedLabels returns the set of label keys that are different between the two maps
-func getModifiedLabels(a, b map[string]string) sets.String {
+func getModifiedLabels(a, b map[string]string) sets.Set {
 	modified := sets.NewString()
 	for k, v1 := range a {
 		if v2, ok := b[k]; !ok || v1 != v2 {
@@ -481,7 +481,7 @@ func getLabelNamespace(key string) string {
 }
 
 // getForbiddenLabels returns the set of labels that may not be added, removed, or modified by the node on create or update.
-func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String) sets.String {
+func (p *Plugin) getForbiddenLabels(modifiedLabels sets.Set) sets.Set {
 	if len(modifiedLabels) == 0 {
 		return nil
 	}

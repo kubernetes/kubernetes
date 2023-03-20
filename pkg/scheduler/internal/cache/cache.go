@@ -61,7 +61,7 @@ type cacheImpl struct {
 	mu sync.RWMutex
 	// a set of assumed pod keys.
 	// The key could further be used to get an entry in podStates.
-	assumedPods sets.String
+	assumedPods sets.Set
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*nodeInfoListItem
@@ -86,7 +86,7 @@ type imageState struct {
 	// Size of the image
 	size int64
 	// A set of node names for nodes having this image present
-	nodes sets.String
+	nodes sets.Set
 }
 
 // createImageStateSummary returns a summarizing snapshot of the given image's state.
@@ -105,7 +105,7 @@ func newCache(ttl, period time.Duration, stop <-chan struct{}) *cacheImpl {
 
 		nodes:       make(map[string]*nodeInfoListItem),
 		nodeTree:    newNodeTree(nil),
-		assumedPods: make(sets.String),
+		assumedPods: make(sets.Set),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
 	}

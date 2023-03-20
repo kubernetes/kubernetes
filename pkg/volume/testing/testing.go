@@ -228,7 +228,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
-	volume.VolumesAttached = make(map[string]sets.String)
+	volume.VolumesAttached = make(map[string]sets.Set)
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
 	if list != nil {
@@ -669,7 +669,7 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	volume.MetricsNil
-	VolumesAttached  map[string]sets.String
+	VolumesAttached  map[string]sets.Set
 	DeviceMountState map[string]string
 	VolumeMountState map[string]string
 

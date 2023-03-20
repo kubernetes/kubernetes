@@ -957,7 +957,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		expectedUpdateCalls   []fakecloud.UpdateBalancerCall
 		worker                int
 		nodeListerErr         error
-		expectedRetryServices sets.String
+		expectedRetryServices sets.Set
 	}{
 		{
 			desc:  "only 1 node",

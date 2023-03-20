@@ -55,16 +55,16 @@ const (
 )
 
 var (
-	supportedPodFailurePolicyActions sets.String = sets.NewString(
+	supportedPodFailurePolicyActions sets.Set = sets.NewString(
 		string(batch.PodFailurePolicyActionCount),
 		string(batch.PodFailurePolicyActionFailJob),
 		string(batch.PodFailurePolicyActionIgnore))
 
-	supportedPodFailurePolicyOnExitCodesOperator sets.String = sets.NewString(
+	supportedPodFailurePolicyOnExitCodesOperator sets.Set = sets.NewString(
 		string(batch.PodFailurePolicyOnExitCodesOpIn),
 		string(batch.PodFailurePolicyOnExitCodesOpNotIn))
 
-	supportedPodFailurePolicyOnPodConditionsStatus sets.String = sets.NewString(
+	supportedPodFailurePolicyOnPodConditionsStatus sets.Set = sets.NewString(
 		string(v1.ConditionFalse),
 		string(v1.ConditionTrue),
 		string(v1.ConditionUnknown))
@@ -249,7 +249,7 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.Set) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -290,7 +290,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.Set) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {

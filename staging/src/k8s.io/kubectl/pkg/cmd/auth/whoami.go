@@ -234,7 +234,7 @@ func printTableSelfSubjectAccessReview(obj runtime.Object, out io.Writer) error 
 	}
 
 	if len(ui.Extra) > 0 {
-		for _, k := range sets.StringKeySet(ui.Extra).List() {
+		for _, k := range sets.SetKeySet(ui.Extra).List() {
 			v := ui.Extra[k]
 			_, err := fmt.Fprintf(w, "Extra: %s\t%v\n", k, v)
 			if err != nil {

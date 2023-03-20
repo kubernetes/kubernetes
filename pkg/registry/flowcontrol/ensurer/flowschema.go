@@ -98,7 +98,7 @@ func GetFlowSchemaRemoveCandidates(lister flowcontrollisters.FlowSchemaLister, b
 		return nil, fmt.Errorf("failed to list FlowSchema - %w", err)
 	}
 
-	bootstrapNames := sets.String{}
+	bootstrapNames := sets.Set{}
 	for i := range bootstrap {
 		bootstrapNames.Insert(bootstrap[i].GetName())
 	}

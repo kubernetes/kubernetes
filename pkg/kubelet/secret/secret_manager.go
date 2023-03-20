@@ -99,7 +99,7 @@ func (s *secretManager) UnregisterPod(pod *v1.Pod) {
 	s.manager.UnregisterPod(pod)
 }
 
-func getSecretNames(pod *v1.Pod) sets.String {
+func getSecretNames(pod *v1.Pod) sets.Set {
 	result := sets.NewString()
 	podutil.VisitPodSecretNames(pod, func(name string) bool {
 		result.Insert(name)

@@ -156,7 +156,7 @@ type removedInterface interface {
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
-	for apiVersion := range sets.StringKeySet(versionedResourcesStorageMap) {
+	for apiVersion := range sets.SetKeySet(versionedResourcesStorageMap) {
 		versionToResource := versionedResourcesStorageMap[apiVersion]
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
@@ -186,7 +186,7 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 	}
 }
 
-func shouldRemoveResourceAndSubresources(resourcesToRemove sets.String, resourceName string) bool {
+func shouldRemoveResourceAndSubresources(resourcesToRemove sets.Set, resourceName string) bool {
 	for _, resourceToRemove := range resourcesToRemove.List() {
 		if resourceName == resourceToRemove {
 			return true

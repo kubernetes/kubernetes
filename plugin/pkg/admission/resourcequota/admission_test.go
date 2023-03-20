@@ -2136,7 +2136,7 @@ func TestPodResourcesResizeWithResourceQuota(t *testing.T) {
 		newPod        *api.Pod
 		fgEnabled     bool
 		expectError   string
-		expectActions sets.String
+		expectActions sets.Set
 	}
 	testCases := map[string]testCase{
 		"pod resize featuregate enabled, increase CPU within quota": {

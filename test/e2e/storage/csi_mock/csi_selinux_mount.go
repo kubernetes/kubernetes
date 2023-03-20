@@ -286,7 +286,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 			volumeMode              v1.PersistentVolumeAccessMode
 			waitForSecondPodStart   bool
 			secondPodFailureEvent   string
-			expectIncreases         sets.String
+			expectIncreases         sets.Set
 		}{
 			{
 				name:                    "warning is not bumped on two Pods with the same context on RWO volume",
@@ -381,7 +381,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	})
 })
 
-func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, metricNames sets.String) (map[string]float64, error) {
+func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, metricNames sets.Set) (map[string]float64, error) {
 	response, err := grabber.GrabFromKubelet(ctx, nodeName)
 	framework.ExpectNoError(err)
 
@@ -406,8 +406,8 @@ func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName stri
 	return metrics, nil
 }
 
-func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, allMetricNames, expectedIncreaseNames sets.String, initialValues map[string]float64, timeout time.Duration) error {
-	var noIncreaseMetrics sets.String
+func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, allMetricNames, expectedIncreaseNames sets.Set, initialValues map[string]float64, timeout time.Duration) error {
+	var noIncreaseMetrics sets.Set
 	var metrics map[string]float64
 
 	err := wait.Poll(time.Second, timeout, func() (bool, error) {

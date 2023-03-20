@@ -35,7 +35,7 @@ func TestGetNodeAddresses(t *testing.T) {
 		name          string
 		cidrs         []string
 		itfAddrsPairs []InterfaceAddrsPair
-		expected      sets.String
+		expected      sets.Set
 	}{
 		{
 			name:  "IPv4 single",

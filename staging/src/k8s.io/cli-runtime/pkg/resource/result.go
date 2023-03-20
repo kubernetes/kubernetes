@@ -144,7 +144,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		return nil, err
 	}
 
-	versions := sets.String{}
+	versions := sets.Set{}
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {

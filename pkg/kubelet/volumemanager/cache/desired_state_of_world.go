@@ -150,7 +150,7 @@ func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr, seLinuxTran
 	return &desiredStateOfWorld{
 		volumesToMount:    make(map[v1.UniqueVolumeName]volumeToMount),
 		volumePluginMgr:   volumePluginMgr,
-		podErrors:         make(map[types.UniquePodName]sets.String),
+		podErrors:         make(map[types.UniquePodName]sets.Set),
 		seLinuxTranslator: seLinuxTranslator,
 	}
 }
@@ -165,7 +165,7 @@ type desiredStateOfWorld struct {
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
 	// podErrors are errors caught by desiredStateOfWorldPopulator about volumes for a given pod.
-	podErrors map[types.UniquePodName]sets.String
+	podErrors map[types.UniquePodName]sets.Set
 	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
 	seLinuxTranslator util.SELinuxLabelTranslator
 

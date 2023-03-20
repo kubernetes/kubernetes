@@ -95,7 +95,7 @@ func sysctls_1_27(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Check
 	return sysctls(podMetadata, podSpec, sysctls_allowed_1_27)
 }
 
-func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctls_allowed_set sets.String) CheckResult {
+func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctls_allowed_set sets.Set) CheckResult {
 	var forbiddenSysctls []string
 
 	if podSpec.SecurityContext != nil {

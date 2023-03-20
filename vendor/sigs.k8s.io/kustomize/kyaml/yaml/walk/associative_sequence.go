@@ -86,7 +86,7 @@ func appendListNode(dst, src *yaml.RNode, keys []string) (*yaml.RNode, error) {
 func validateKeys(valuesList [][]string, values []string, keys []string) ([]string, []string) {
 	validKeys := make([]string, 0)
 	validValues := make([]string, 0)
-	validKeySet := sets.String{}
+	validKeySet := sets.Set{}
 	for _, values := range valuesList {
 		for i, v := range values {
 			if v != "" {
@@ -312,7 +312,7 @@ func (l Walker) elementKey() (string, error) {
 func (l Walker) elementValues(keys []string) [][]string {
 	// use slice to to keep elements in the original order
 	var returnValues [][]string
-	var seen sets.StringList
+	var seen sets.SetList
 
 	// if we are doing append, dest node should be the first.
 	// otherwise dest node should be the last.
@@ -344,7 +344,7 @@ func (l Walker) elementValues(keys []string) [][]string {
 func (l Walker) elementPrimitiveValues() [][]string {
 	// use slice to to keep elements in the original order
 	var returnValues [][]string
-	seen := sets.String{}
+	seen := sets.Set{}
 	// if we are doing append, dest node should be the first.
 	// otherwise dest node should be the last.
 	beginIdx := 0

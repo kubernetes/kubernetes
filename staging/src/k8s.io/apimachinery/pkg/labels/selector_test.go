@@ -336,7 +336,7 @@ func TestRequirementConstructor(t *testing.T) {
 	requirementConstructorTests := []struct {
 		Key     string
 		Op      selection.Operator
-		Vals    sets.String
+		Vals    sets.Set
 		WantErr field.ErrorList
 	}{
 		{
@@ -710,7 +710,7 @@ func TestSetSelectorParser(t *testing.T) {
 	}
 }
 
-func getRequirement(key string, op selection.Operator, vals sets.String, t *testing.T) Requirement {
+func getRequirement(key string, op selection.Operator, vals sets.Set, t *testing.T) Requirement {
 	req, err := NewRequirement(key, op, vals.List())
 	if err != nil {
 		t.Errorf("NewRequirement(%v, %v, %v) resulted in error:%v", key, op, vals, err)

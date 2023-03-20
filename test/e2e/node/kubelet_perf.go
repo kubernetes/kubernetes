@@ -65,7 +65,7 @@ func logPodsOnNodes(ctx context.Context, c clientset.Interface, nodeNames []stri
 	}
 }
 
-func runResourceTrackingTest(ctx context.Context, f *framework.Framework, podsPerNode int, nodeNames sets.String, rm *e2ekubelet.ResourceMonitor,
+func runResourceTrackingTest(ctx context.Context, f *framework.Framework, podsPerNode int, nodeNames sets.Set, rm *e2ekubelet.ResourceMonitor,
 	expectedCPU map[string]map[float64]float64, expectedMemory e2ekubelet.ResourceUsagePerContainer) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
@@ -196,7 +196,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 
 // Slow by design (1 hour)
 var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
-	var nodeNames sets.String
+	var nodeNames sets.Set
 	f := framework.NewDefaultFramework("kubelet-perf")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var om *e2ekubelet.RuntimeOperationMonitor

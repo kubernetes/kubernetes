@@ -570,7 +570,7 @@ func setTargetKind(obj Object, kind schema.GroupVersionKind) {
 // SetVersionPriority allows specifying a precise order of priority. All specified versions must be in the same group,
 // and the specified order overwrites any previously specified order for this group
 func (s *Scheme) SetVersionPriority(versions ...schema.GroupVersion) error {
-	groups := sets.String{}
+	groups := sets.Set{}
 	order := []string{}
 	for _, version := range versions {
 		if len(version.Version) == 0 || version.Version == APIVersionInternal {

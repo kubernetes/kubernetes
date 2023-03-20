@@ -270,16 +270,16 @@ type Cloud struct {
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.RWMutex
 	// nodeNames holds current nodes for tracking added nodes in VM caches.
-	nodeNames sets.String
-	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
+	nodeNames sets.Set
+	// nodeZones is a mapping from Zone to a sets.Set of Node's names in the Zone
 	// it is updated by the nodeInformer
-	nodeZones map[string]sets.String
+	nodeZones map[string]sets.Set
 	// nodeResourceGroups holds nodes external resource groups
 	nodeResourceGroups map[string]string
 	// unmanagedNodes holds a list of nodes not managed by Azure cloud provider.
-	unmanagedNodes sets.String
+	unmanagedNodes sets.Set
 	// excludeLoadBalancerNodes holds a list of nodes that should be excluded from LoadBalancer.
-	excludeLoadBalancerNodes sets.String
+	excludeLoadBalancerNodes sets.Set
 	// nodeInformerSynced is for determining if the informer has synced.
 	nodeInformerSynced cache.InformerSynced
 
@@ -342,7 +342,7 @@ func NewCloudWithoutFeatureGates(configReader io.Reader) (*Cloud, error) {
 
 	az := &Cloud{
 		nodeNames:                sets.NewString(),
-		nodeZones:                map[string]sets.String{},
+		nodeZones:                map[string]sets.Set{},
 		nodeResourceGroups:       map[string]string{},
 		unmanagedNodes:           sets.NewString(),
 		excludeLoadBalancerNodes: sets.NewString(),
@@ -875,7 +875,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 }
 
 // GetActiveZones returns all the zones in which k8s nodes are currently running.
-func (az *Cloud) GetActiveZones() (sets.String, error) {
+func (az *Cloud) GetActiveZones() (sets.Set, error) {
 	if az.nodeInformerSynced == nil {
 		return nil, fmt.Errorf("azure cloud provider doesn't have informers set")
 	}
@@ -923,7 +923,7 @@ func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
 }
 
 // GetNodeNames returns a set of all node names in the k8s cluster.
-func (az *Cloud) GetNodeNames() (sets.String, error) {
+func (az *Cloud) GetNodeNames() (sets.Set, error) {
 	// Kubelet won't set az.nodeInformerSynced, return nil.
 	if az.nodeInformerSynced == nil {
 		return nil, nil
@@ -939,7 +939,7 @@ func (az *Cloud) GetNodeNames() (sets.String, error) {
 }
 
 // GetResourceGroups returns a set of resource groups that all nodes are running on.
-func (az *Cloud) GetResourceGroups() (sets.String, error) {
+func (az *Cloud) GetResourceGroups() (sets.Set, error) {
 	// Kubelet won't set az.nodeInformerSynced, always return configured resourceGroup.
 	if az.nodeInformerSynced == nil {
 		return sets.NewString(az.ResourceGroup), nil
@@ -960,7 +960,7 @@ func (az *Cloud) GetResourceGroups() (sets.String, error) {
 }
 
 // GetUnmanagedNodes returns a list of nodes not managed by Azure cloud provider (e.g. on-prem nodes).
-func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
+func (az *Cloud) GetUnmanagedNodes() (sets.Set, error) {
 	// Kubelet won't set az.nodeInformerSynced, always return nil.
 	if az.nodeInformerSynced == nil {
 		return nil, nil

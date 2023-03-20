@@ -330,7 +330,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 // PendingChanges returns a set whose keys are the names of the services that have changed
 // since the last time sct was used to update a ServiceMap. (You must call this _before_
 // calling sm.Update(sct).)
-func (sct *ServiceChangeTracker) PendingChanges() sets.String {
+func (sct *ServiceChangeTracker) PendingChanges() sets.Set {
 	sct.lock.Lock()
 	defer sct.lock.Unlock()
 
@@ -346,7 +346,7 @@ type UpdateServiceMapResult struct {
 	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
 	// that had UDP ports. Callers can use this to abort timeout-waits or clear
 	// connection-tracking information.
-	DeletedUDPClusterIPs sets.String
+	DeletedUDPClusterIPs sets.Set
 }
 
 // Update updates ServicePortMap base on the given changes.
@@ -407,7 +407,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 
 // apply the changes to ServicePortMap and update the deleted UDP cluster IP set.
 // apply triggers processServiceMapChange on every change.
-func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPClusterIPs sets.String) {
+func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPClusterIPs sets.Set) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
@@ -446,7 +446,7 @@ func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPCluster
 //	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //	  produce string set {"ns/cluster-ip:http"}
-func (sm *ServicePortMap) merge(other ServicePortMap) sets.String {
+func (sm *ServicePortMap) merge(other ServicePortMap) sets.Set {
 	// existingPorts is going to store all identifiers of all services in `other` ServicePortMap.
 	existingPorts := sets.NewString()
 	for svcPortName, info := range other {
@@ -475,7 +475,7 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 
 // unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
 // updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
-func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.String) {
+func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.Set) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {

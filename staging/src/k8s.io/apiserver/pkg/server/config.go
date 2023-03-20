@@ -134,7 +134,7 @@ type Config struct {
 	EnableContentionProfiling bool
 	EnableMetrics             bool
 
-	DisabledPostStartHooks sets.String
+	DisabledPostStartHooks sets.Set
 	// done values in this values for this map are ignored.
 	PostStartHooks map[string]PostStartHookConfigEntry
 
@@ -176,7 +176,7 @@ type Config struct {
 	ReadyzChecks []healthz.HealthChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
-	LegacyAPIGroupPrefixes sets.String
+	LegacyAPIGroupPrefixes sets.Set
 	// RequestInfoResolver is used to assign attributes (used by admission and authorization) based on a request URL.
 	// Use-cases that are like kubelets may need to customize this.
 	RequestInfoResolver apirequest.RequestInfoResolver
@@ -1008,7 +1008,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
 	apiPrefixes := sets.NewString(strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
-	legacyAPIPrefixes := sets.String{}                               // APIPrefixes that won't have groups (legacy)
+	legacyAPIPrefixes := sets.Set{}                               // APIPrefixes that won't have groups (legacy)
 	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
 		apiPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
 		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))

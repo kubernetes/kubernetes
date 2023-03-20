@@ -133,7 +133,7 @@ func getTopologyValues(pv *v1.PersistentVolume, key string) []string {
 // addTopology appends the topology to the given PV to all Terms.
 func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) error {
 	// Make sure there are no duplicate or empty strings
-	filteredZones := sets.String{}
+	filteredZones := sets.Set{}
 	for i := range zones {
 		zone := strings.TrimSpace(zones[i])
 		if len(zone) > 0 {

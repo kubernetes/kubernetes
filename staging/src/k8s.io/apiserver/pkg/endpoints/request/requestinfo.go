@@ -81,8 +81,8 @@ var namespaceSubresources = sets.NewString("status", "finalize")
 var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
 type RequestInfoFactory struct {
-	APIPrefixes          sets.String // without leading and trailing slashes
-	GrouplessAPIPrefixes sets.String // without leading and trailing slashes
+	APIPrefixes          sets.Set // without leading and trailing slashes
+	GrouplessAPIPrefixes sets.Set // without leading and trailing slashes
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses

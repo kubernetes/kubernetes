@@ -98,7 +98,7 @@ func (c *configMapManager) UnregisterPod(pod *v1.Pod) {
 	c.manager.UnregisterPod(pod)
 }
 
-func getConfigMapNames(pod *v1.Pod) sets.String {
+func getConfigMapNames(pod *v1.Pod) sets.Set {
 	result := sets.NewString()
 	podutil.VisitPodConfigmapNames(pod, func(name string) bool {
 		result.Insert(name)

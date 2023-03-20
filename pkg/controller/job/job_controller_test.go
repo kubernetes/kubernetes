@@ -983,7 +983,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 	cases := map[string]struct {
 		job                  batch.Job
 		pods                 []*v1.Pod
-		expectedRmFinalizers sets.String
+		expectedRmFinalizers sets.Set
 		wantSucceeded        int32
 		wantFailed           int32
 	}{
@@ -1098,7 +1098,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		job                     batch.Job
 		pods                    []*v1.Pod
 		finishedCond            *batch.JobCondition
-		expectedRmFinalizers    sets.String
+		expectedRmFinalizers    sets.Set
 		needsFlush              bool
 		statusUpdateErr         error
 		podControlErr           error

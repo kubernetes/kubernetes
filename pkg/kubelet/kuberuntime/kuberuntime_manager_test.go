@@ -245,7 +245,7 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
+func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.Set) (sets.Set, bool) {
 	actual := sets.NewString()
 	for _, c := range fakeRuntime.Containers {
 		actual.Insert(c.Id)

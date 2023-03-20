@@ -256,8 +256,8 @@ func (r *Requirement) Operator() selection.Operator {
 }
 
 // Values returns requirement values
-func (r *Requirement) Values() sets.String {
-	ret := sets.String{}
+func (r *Requirement) Values() sets.Set {
+	ret := sets.Set{}
 	for i := range r.strValues {
 		ret.Insert(r.strValues[i])
 	}
@@ -661,7 +661,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	if err != nil {
 		return nil, err
 	}
-	var values sets.String
+	var values sets.Set
 	switch operator {
 	case selection.In, selection.NotIn:
 		values, err = p.parseValues()
@@ -727,7 +727,7 @@ func (p *Parser) parseOperator() (op selection.Operator, err error) {
 }
 
 // parseValues parses the values for set based matching (x,y,z)
-func (p *Parser) parseValues() (sets.String, error) {
+func (p *Parser) parseValues() (sets.Set, error) {
 	tok, lit := p.consume(Values)
 	if tok != OpenParToken {
 		return nil, fmt.Errorf("found '%s' expected: '('", lit)
@@ -753,7 +753,7 @@ func (p *Parser) parseValues() (sets.String, error) {
 
 // parseIdentifiersList parses a (possibly empty) list of
 // of comma separated (possibly empty) identifiers
-func (p *Parser) parseIdentifiersList() (sets.String, error) {
+func (p *Parser) parseIdentifiersList() (sets.Set, error) {
 	s := sets.NewString()
 	for {
 		tok, lit := p.consume(Values)
@@ -789,7 +789,7 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 }
 
 // parseExactValue parses the only value for exact match style
-func (p *Parser) parseExactValue() (sets.String, error) {
+func (p *Parser) parseExactValue() (sets.Set, error) {
 	s := sets.NewString()
 	tok, lit := p.lookahead(Values)
 	if tok == EndOfStringToken || tok == CommaToken {

@@ -30,17 +30,17 @@ import (
 )
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
-func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
+func LabelZonesToSet(labelZonesValue string) (sets.Set, error) {
 	return stringToSet(labelZonesValue, cloudvolume.LabelMultiZoneDelimiter)
 }
 
 // ZonesSetToLabelValue converts zones set to label value
-func ZonesSetToLabelValue(strSet sets.String) string {
+func ZonesSetToLabelValue(strSet sets.Set) string {
 	return strings.Join(strSet.UnsortedList(), cloudvolume.LabelMultiZoneDelimiter)
 }
 
 // ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
+func ZonesToSet(zonesString string) (sets.Set, error) {
 	zones, err := stringToSet(zonesString, ",")
 	if err != nil {
 		return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", zonesString, err)
@@ -49,13 +49,13 @@ func ZonesToSet(zonesString string) (sets.String, error) {
 }
 
 // StringToSet converts a string containing list separated by specified delimiter to a set
-func stringToSet(str, delimiter string) (sets.String, error) {
+func stringToSet(str, delimiter string) (sets.Set, error) {
 	zonesSlice := strings.Split(str, delimiter)
-	zonesSet := make(sets.String)
+	zonesSet := make(sets.Set)
 	for _, zone := range zonesSlice {
 		trimmedZone := strings.TrimSpace(zone)
 		if trimmedZone == "" {
-			return make(sets.String), fmt.Errorf(
+			return make(sets.Set), fmt.Errorf(
 				"%q separated list (%q) must not contain an empty string",
 				delimiter,
 				str)
@@ -88,7 +88,7 @@ func stringToList(str, delimiter string) ([]string, error) {
 
 // SelectZoneForVolume is a wrapper around SelectZonesForVolume
 // to select a single zone for a volume based on parameters
-func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
+func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.Set, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
 	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcName, 1)
 	if err != nil {
 		return "", err
@@ -103,7 +103,7 @@ func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneP
 // SelectZonesForVolume selects zones for a volume based on several factors:
 // node.zone, allowedTopologies, zone/zones parameters from storageclass,
 // zones with active nodes from the cluster. The number of zones = replicas.
-func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.String, error) {
+func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.Set, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.Set, error) {
 	if zoneParameterPresent && zonesParameterPresent {
 		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
@@ -184,8 +184,8 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 }
 
 // ZonesFromAllowedTopologies returns a list of zones specified in allowedTopologies
-func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (sets.String, error) {
-	zones := make(sets.String)
+func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (sets.Set, error) {
+	zones := make(sets.Set)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
 			if exp.Key == v1.LabelTopologyZone || exp.Key == v1.LabelFailureDomainBetaZone {
@@ -203,7 +203,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 // chooseZonesForVolumeIncludingZone is a wrapper around ChooseZonesForVolume that ensures zoneToInclude is chosen
 // zoneToInclude can either be empty in which case it is ignored. If non-empty, zoneToInclude is expected to be member of zones.
 // numReplicas is expected to be > 0 and <= zones.Len()
-func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
+func chooseZonesForVolumeIncludingZone(zones sets.Set, pvcName, zoneToInclude string, numReplicas uint32) (sets.Set, error) {
 	if numReplicas == 0 {
 		return nil, fmt.Errorf("invalid number of replicas passed")
 	}
@@ -228,7 +228,7 @@ func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude
 }
 
 // ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
-func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+func ChooseZonesForVolume(zones sets.Set, pvcName string, numZones uint32) sets.Set {
 	// No zones available, return empty set.
 	replicaZones := sets.NewString()
 	if zones.Len() == 0 {

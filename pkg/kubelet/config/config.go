@@ -68,7 +68,7 @@ type PodConfig struct {
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
-	sources     sets.String
+	sources     sets.Set
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -80,7 +80,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder,
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
-		sources: sets.String{},
+		sources: sets.Set{},
 	}
 	return podConfig
 }
@@ -96,7 +96,7 @@ func (c *PodConfig) Channel(ctx context.Context, source string) chan<- interface
 
 // SeenAllSources returns true if seenSources contains all sources in the
 // config, and also this config has received a SET message from each source.
-func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
+func (c *PodConfig) SeenAllSources(seenSources sets.Set) bool {
 	if c.pods == nil {
 		return false
 	}
@@ -133,7 +133,7 @@ type podStorage struct {
 
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.RWMutex
-	sourcesSeen     sets.String
+	sourcesSeen     sets.Set
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
@@ -149,7 +149,7 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 		pods:               make(map[string]map[types.UID]*v1.Pod),
 		mode:               mode,
 		updates:            updates,
-		sourcesSeen:        sets.String{},
+		sourcesSeen:        sets.Set{},
 		recorder:           recorder,
 		startupSLIObserver: startupSLIObserver,
 	}
@@ -332,7 +332,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 }
 
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
-	names := sets.String{}
+	names := sets.Set{}
 	for i, pod := range pods {
 		// Pods from each source are assumed to have passed validation individually.
 		// This function only checks if there is any naming conflict.

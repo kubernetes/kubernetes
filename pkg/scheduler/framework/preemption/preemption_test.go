@@ -86,7 +86,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	tests := []struct {
 		name          string
 		nodesStatuses framework.NodeToStatusMap
-		expected      sets.String // set of expected node names.
+		expected      sets.Set // set of expected node names.
 	}{
 		{
 			name: "No node should be attempted",

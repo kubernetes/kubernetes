@@ -406,7 +406,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 }
 
 // GetAllCurrentZones returns all the zones in which k8s nodes are currently running
-func (g *Cloud) GetAllCurrentZones() (sets.String, error) {
+func (g *Cloud) GetAllCurrentZones() (sets.Set, error) {
 	if g.nodeInformerSynced == nil {
 		klog.Warning("Cloud object does not have informers set, should only happen in E2E binary.")
 		return g.GetAllZonesFromCloudProvider()
@@ -432,7 +432,7 @@ func (g *Cloud) GetAllCurrentZones() (sets.String, error) {
 // a non-k8s compute in us-central1-a. This func will return a,b, and c.
 //
 // TODO: this should be removed from the cloud provider.
-func (g *Cloud) GetAllZonesFromCloudProvider() (sets.String, error) {
+func (g *Cloud) GetAllZonesFromCloudProvider() (sets.Set, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 

@@ -61,8 +61,8 @@ func TestGetTopologyHints(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:       NewResourceDeviceInstances(),
-			healthyDevices:   make(map[string]sets.String),
-			allocatedDevices: make(map[string]sets.String),
+			healthyDevices:   make(map[string]sets.Set),
+			allocatedDevices: make(map[string]sets.Set),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
@@ -414,8 +414,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:            NewResourceDeviceInstances(),
-			healthyDevices:        make(map[string]sets.String),
-			allocatedDevices:      make(map[string]sets.String),
+			healthyDevices:        make(map[string]sets.Set),
+			allocatedDevices:      make(map[string]sets.Set),
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
@@ -603,8 +603,8 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:            NewResourceDeviceInstances(),
-			healthyDevices:        make(map[string]sets.String),
-			allocatedDevices:      make(map[string]sets.String),
+			healthyDevices:        make(map[string]sets.Set),
+			allocatedDevices:      make(map[string]sets.Set),
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
@@ -903,7 +903,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 
 	for _, tc := range tcases {
 		m := ManagerImpl{
-			healthyDevices: make(map[string]sets.String),
+			healthyDevices: make(map[string]sets.Set),
 		}
 
 		for _, res := range tc.registeredDevices {
@@ -925,8 +925,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:       NewResourceDeviceInstances(),
-			healthyDevices:   make(map[string]sets.String),
-			allocatedDevices: make(map[string]sets.String),
+			healthyDevices:   make(map[string]sets.Set),
+			allocatedDevices: make(map[string]sets.Set),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}} },

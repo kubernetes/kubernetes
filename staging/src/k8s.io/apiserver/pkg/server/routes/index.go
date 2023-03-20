@@ -36,7 +36,7 @@ type ListedPathProviders []ListedPathProvider
 
 // ListedPaths unions and sorts the included paths.
 func (p ListedPathProviders) ListedPaths() []string {
-	ret := sets.String{}
+	ret := sets.Set{}
 	for _, provider := range p {
 		for _, path := range provider.ListedPaths() {
 			ret.Insert(path)

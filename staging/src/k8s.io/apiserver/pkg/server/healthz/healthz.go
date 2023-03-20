@@ -214,7 +214,7 @@ func (c *healthzCheck) Check(r *http.Request) error {
 }
 
 // getExcludedChecks extracts the health check names to be excluded from the query param
-func getExcludedChecks(r *http.Request) sets.String {
+func getExcludedChecks(r *http.Request) sets.Set {
 	checks, found := r.URL.Query()["exclude"]
 	if found {
 		return sets.NewString(checks...)

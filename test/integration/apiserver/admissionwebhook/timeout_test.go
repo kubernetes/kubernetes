@@ -358,7 +358,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 type timeoutRecorder struct {
 	mu          sync.Mutex
-	markers     sets.String
+	markers     sets.Set
 	invocations []invocation
 }
 
@@ -371,7 +371,7 @@ func (i *timeoutRecorder) Reset() {
 }
 
 // MarkerReceived records the specified markers were received and returns the set of received markers
-func (i *timeoutRecorder) MarkerReceived(markers ...string) sets.String {
+func (i *timeoutRecorder) MarkerReceived(markers ...string) sets.Set {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.markers.Insert(markers...)

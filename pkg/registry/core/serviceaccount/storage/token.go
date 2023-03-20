@@ -55,7 +55,7 @@ type TokenREST struct {
 	secrets              getter
 	issuer               token.TokenGenerator
 	auds                 authenticator.Audiences
-	audsSet              sets.String
+	audsSet              sets.Set
 	maxExpirationSeconds int64
 	extendExpiration     bool
 }

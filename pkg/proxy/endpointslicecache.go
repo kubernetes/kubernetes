@@ -81,7 +81,7 @@ type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
 	Zone      *string
-	ZoneHints sets.String
+	ZoneHints sets.Set
 
 	Ready       bool
 	Serving     bool
@@ -141,7 +141,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
-					epInfo.ZoneHints = sets.String{}
+					epInfo.ZoneHints = sets.Set{}
 					for _, zone := range endpoint.Hints.ForZones {
 						epInfo.ZoneHints.Insert(zone.Name)
 					}
@@ -190,7 +190,7 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 
 // pendingChanges returns a set whose keys are the names of the services whose endpoints
 // have changed since the last time checkoutChanges was called
-func (cache *EndpointSliceCache) pendingChanges() sets.String {
+func (cache *EndpointSliceCache) pendingChanges() sets.Set {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 

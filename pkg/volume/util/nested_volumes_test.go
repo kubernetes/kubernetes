@@ -31,7 +31,7 @@ import (
 type testCases struct {
 	name     string
 	err      bool
-	expected sets.String
+	expected sets.Set
 	volname  string
 	pod      v1.Pod
 }

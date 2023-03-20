@@ -20681,7 +20681,7 @@ func TestValidateSchedulingGates(t *testing.T) {
 }
 
 // collectResourcePaths traverses the object, computing all the struct paths.
-func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.Type, path *field.Path) sets.String {
+func collectResourcePaths(t *testing.T, skipRecurseList sets.Set, tp reflect.Type, path *field.Path) sets.Set {
 	if pathStr := path.String(); len(pathStr) > 0 && skipRecurseList.Has(pathStr) {
 		return sets.NewString(pathStr)
 	}

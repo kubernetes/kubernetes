@@ -81,7 +81,7 @@ func (h *TimedQueue) Pop() interface{} {
 type UniqueQueue struct {
 	lock  sync.Mutex
 	queue TimedQueue
-	set   sets.String
+	set   sets.Set
 }
 
 // Add a new value to the queue if it wasn't added before, or was

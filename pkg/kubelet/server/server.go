@@ -107,8 +107,8 @@ type Server struct {
 	auth                 AuthInterface
 	host                 HostInterface
 	restfulCont          containerInterface
-	metricsBuckets       sets.String
-	metricsMethodBuckets sets.String
+	metricsBuckets       sets.Set
+	metricsMethodBuckets sets.Set
 	resourceAnalyzer     stats.ResourceAnalyzer
 }
 

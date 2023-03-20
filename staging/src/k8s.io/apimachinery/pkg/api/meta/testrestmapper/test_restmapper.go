@@ -55,7 +55,7 @@ func TestOnlyStaticRESTMapper(scheme *runtime.Scheme, versionPatterns ...schema.
 	resourcePriority, kindPriority := prioritiesForGroups(scheme, prioritizedGroups...)
 
 	prioritizedGroupsSet := sets.NewString(prioritizedGroups...)
-	remainingGroups := sets.String{}
+	remainingGroups := sets.Set{}
 	for _, enabledVersion := range scheme.PrioritizedVersionsAllGroups() {
 		if !prioritizedGroupsSet.Has(enabledVersion.Group) {
 			remainingGroups.Insert(enabledVersion.Group)

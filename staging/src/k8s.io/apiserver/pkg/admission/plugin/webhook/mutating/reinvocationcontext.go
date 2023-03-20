@@ -27,9 +27,9 @@ type webhookReinvokeContext struct {
 	lastWebhookOutput runtime.Object
 	// previouslyInvokedReinvocableWebhooks holds the set of webhooks that have been invoked and
 	// should be reinvoked if a later mutation occurs
-	previouslyInvokedReinvocableWebhooks sets.String
+	previouslyInvokedReinvocableWebhooks sets.Set
 	// reinvokeWebhooks holds the set of webhooks that should be reinvoked
-	reinvokeWebhooks sets.String
+	reinvokeWebhooks sets.Set
 }
 
 func (rc *webhookReinvokeContext) ShouldReinvokeWebhook(webhook string) bool {

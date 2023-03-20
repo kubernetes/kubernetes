@@ -33,7 +33,7 @@ func TestDaemonSetLister(t *testing.T) {
 	testCases := []struct {
 		inDSs             []*extensions.DaemonSet
 		list              func() ([]*extensions.DaemonSet, error)
-		outDaemonSetNames sets.String
+		outDaemonSetNames sets.Set
 		expectErr         bool
 	}{
 		// Basic listing

@@ -35,7 +35,7 @@ const mb int64 = 1024 * 1024
 func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
-		imageExistenceMap map[string]sets.String
+		imageExistenceMap map[string]sets.Set
 		expected          map[string]*framework.ImageStateSummary
 	}{
 		{
@@ -58,7 +58,7 @@ func TestGetNodeImageStates(t *testing.T) {
 					},
 				},
 			},
-			imageExistenceMap: map[string]sets.String{
+			imageExistenceMap: map[string]sets.Set{
 				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
 				"gcr.io/200:v1": sets.NewString("node-0"),
 			},
@@ -78,7 +78,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
 				Status:     v1.NodeStatus{},
 			},
-			imageExistenceMap: map[string]sets.String{
+			imageExistenceMap: map[string]sets.Set{
 				"gcr.io/10:v1":  sets.NewString("node-1"),
 				"gcr.io/200:v1": sets.NewString(),
 			},
@@ -99,7 +99,7 @@ func TestGetNodeImageStates(t *testing.T) {
 func TestCreateImageExistenceMap(t *testing.T) {
 	tests := []struct {
 		nodes    []*v1.Node
-		expected map[string]sets.String
+		expected map[string]sets.Set
 	}{
 		{
 			nodes: []*v1.Node{
@@ -136,7 +136,7 @@ func TestCreateImageExistenceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string]sets.String{
+			expected: map[string]sets.Set{
 				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
 				"gcr.io/200:v1": sets.NewString("node-1"),
 			},
@@ -167,7 +167,7 @@ func TestCreateImageExistenceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string]sets.String{
+			expected: map[string]sets.Set{
 				"gcr.io/10:v1":  sets.NewString("node-1"),
 				"gcr.io/200:v1": sets.NewString("node-1"),
 			},
@@ -188,7 +188,7 @@ func TestCreateUsedPVCSet(t *testing.T) {
 	tests := []struct {
 		name     string
 		pods     []*v1.Pod
-		expected sets.String
+		expected sets.Set
 	}{
 		{
 			name:     "empty pods list",
@@ -252,7 +252,7 @@ func TestNewSnapshot(t *testing.T) {
 		expectedNumNodes             int
 		expectedPodsWithAffinity     int
 		expectedPodsWithAntiAffinity int
-		expectedUsedPVCSet           sets.String
+		expectedUsedPVCSet           sets.Set
 	}{
 		{
 			name:  "no pods no nodes",

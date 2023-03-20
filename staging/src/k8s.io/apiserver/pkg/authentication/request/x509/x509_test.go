@@ -554,7 +554,7 @@ func TestX509Verifier(t *testing.T) {
 
 		Opts x509.VerifyOptions
 
-		AllowedCNs sets.String
+		AllowedCNs sets.Set
 
 		ExpectOK  bool
 		ExpectErr bool

@@ -321,7 +321,7 @@ func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name str
 //
 // This function shares the common logic for both FlowSchema and
 // PriorityLevelConfiguration type and hence it accepts metav1.Object only.
-func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Object) []string {
+func getDanglingBootstrapObjectNames(bootstrap sets.Set, current []metav1.Object) []string {
 	if len(current) == 0 {
 		return nil
 	}

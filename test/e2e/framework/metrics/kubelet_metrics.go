@@ -166,7 +166,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 
 // GetKubeletLatencyMetrics filters ms to include only those contained in the metricNames set,
 // then constructs a KubeletLatencyMetrics list based on the samples associated with those metrics.
-func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) KubeletLatencyMetrics {
+func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.Set) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
 	for name, samples := range ms {
 		if !filterMetricNames.Has(name) {

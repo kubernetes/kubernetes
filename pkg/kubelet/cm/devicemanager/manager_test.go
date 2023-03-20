@@ -305,7 +305,7 @@ func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) plugin
 }
 
 func runPluginManager(pluginManager pluginmanager.PluginManager) {
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set) bool { return true })
 	go pluginManager.Run(sourcesReady, wait.NeverStop)
 }
 
@@ -452,8 +452,8 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// properly rejected instead of being incorrectly started.
 	err = testManager.writeCheckpoint()
 	as.Nil(err)
-	testManager.healthyDevices = make(map[string]sets.String)
-	testManager.unhealthyDevices = make(map[string]sets.String)
+	testManager.healthyDevices = make(map[string]sets.Set)
+	testManager.unhealthyDevices = make(map[string]sets.Set)
 	err = testManager.readCheckpoint()
 	as.Nil(err)
 	as.Equal(1, len(testManager.endpoints))
@@ -606,9 +606,9 @@ func TestCheckpoint(t *testing.T) {
 	as.Nil(err)
 	testManager := &ManagerImpl{
 		endpoints:         make(map[string]endpointInfo),
-		healthyDevices:    make(map[string]sets.String),
-		unhealthyDevices:  make(map[string]sets.String),
-		allocatedDevices:  make(map[string]sets.String),
+		healthyDevices:    make(map[string]sets.Set),
+		unhealthyDevices:  make(map[string]sets.Set),
+		allocatedDevices:  make(map[string]sets.Set),
 		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}
@@ -744,9 +744,9 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		return nil, err
 	}
 	m := &ManagerImpl{
-		healthyDevices:        make(map[string]sets.String),
-		unhealthyDevices:      make(map[string]sets.String),
-		allocatedDevices:      make(map[string]sets.String),
+		healthyDevices:        make(map[string]sets.Set),
+		unhealthyDevices:      make(map[string]sets.Set),
+		allocatedDevices:      make(map[string]sets.Set),
 		endpoints:             make(map[string]endpointInfo),
 		podDevices:            newPodDevices(),
 		devicesToReuse:        make(PodReusableDevices),
@@ -870,10 +870,10 @@ func TestFilterByAffinity(t *testing.T) {
 	}
 
 	testCases := []struct {
-		available               sets.String
-		fromAffinityExpected    sets.String
-		notFromAffinityExpected sets.String
-		withoutTopologyExpected sets.String
+		available               sets.Set
+		fromAffinityExpected    sets.Set
+		notFromAffinityExpected sets.Set
+		withoutTopologyExpected sets.Set
 	}{
 		{
 			available:               sets.NewString("dev1", "dev2"),
@@ -1176,8 +1176,8 @@ func TestUpdatePluginResources(t *testing.T) {
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
 	m := &ManagerImpl{
-		allocatedDevices:  make(map[string]sets.String),
-		healthyDevices:    make(map[string]sets.String),
+		allocatedDevices:  make(map[string]sets.Set),
+		healthyDevices:    make(map[string]sets.Set),
 		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}
@@ -1296,9 +1296,9 @@ func TestResetExtendedResource(t *testing.T) {
 	as.Nil(err)
 	testManager := &ManagerImpl{
 		endpoints:         make(map[string]endpointInfo),
-		healthyDevices:    make(map[string]sets.String),
-		unhealthyDevices:  make(map[string]sets.String),
-		allocatedDevices:  make(map[string]sets.String),
+		healthyDevices:    make(map[string]sets.Set),
+		unhealthyDevices:  make(map[string]sets.Set),
+		allocatedDevices:  make(map[string]sets.Set),
 		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}

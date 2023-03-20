@@ -36,7 +36,7 @@ const invalidScore = -1
 type preScoreState struct {
 	Constraints []topologySpreadConstraint
 	// IgnoredNodes is a set of node names which miss some Constraints[*].topologyKey.
-	IgnoredNodes sets.String
+	IgnoredNodes sets.Set
 	// TopologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
 	TopologyPairToPodCounts map[topologyPair]*int64
 	// TopologyNormalizingWeight is the weight we give to the counts per topology.

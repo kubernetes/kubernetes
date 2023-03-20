@@ -110,7 +110,7 @@ func Example() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := sets.String{}
+	outputSet := sets.Set{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -167,7 +167,7 @@ func ExampleNewInformer() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := sets.String{}
+	outputSet := sets.Set{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -243,7 +243,7 @@ func TestHammerController(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
-			currentNames := sets.String{}
+			currentNames := sets.Set{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			for i := 0; i < 100; i++ {

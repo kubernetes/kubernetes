@@ -99,7 +99,7 @@ func GetPriorityLevelRemoveCandidates(lister flowcontrollisters.PriorityLevelCon
 		return nil, fmt.Errorf("failed to list PriorityLevelConfiguration - %w", err)
 	}
 
-	bootstrapNames := sets.String{}
+	bootstrapNames := sets.Set{}
 	for i := range bootstrap {
 		bootstrapNames.Insert(bootstrap[i].GetName())
 	}

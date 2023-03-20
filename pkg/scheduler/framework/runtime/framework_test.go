@@ -906,12 +906,12 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 	tests := []struct {
 		name    string
 		plugins []framework.Plugin
-		want    map[framework.ClusterEvent]sets.String
+		want    map[framework.ClusterEvent]sets.Set
 	}{
 		{
 			name:    "no-op plugin",
 			plugins: []framework.Plugin{&fakeNoopPlugin{}},
-			want: map[framework.ClusterEvent]sets.String{
+			want: map[framework.ClusterEvent]sets.Set{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
@@ -923,7 +923,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "node plugin",
 			plugins: []framework.Plugin{&fakeNodePlugin{}},
-			want: map[framework.ClusterEvent]sets.String{
+			want: map[framework.ClusterEvent]sets.Set{
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.NewString("fakeNode"),
 				{Resource: framework.Node, ActionType: framework.All}:                          sets.NewString(bindPlugin, queueSortPlugin),
@@ -937,7 +937,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "pod plugin",
 			plugins: []framework.Plugin{&fakePodPlugin{}},
-			want: map[framework.ClusterEvent]sets.String{
+			want: map[framework.ClusterEvent]sets.Set{
 				{Resource: framework.Pod, ActionType: framework.All}:                      sets.NewString("fakePod", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:  sets.NewString("fakePod"),
 				{Resource: framework.Node, ActionType: framework.All}:                     sets.NewString(bindPlugin, queueSortPlugin),
@@ -951,7 +951,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "node and pod plugin",
 			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
-			want: map[framework.ClusterEvent]sets.String{
+			want: map[framework.ClusterEvent]sets.Set{
 				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.NewString("fakeNode"),
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:       sets.NewString("fakePod"),
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", "fakePod", bindPlugin, queueSortPlugin),
@@ -967,7 +967,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "no-op runtime plugin",
 			plugins: []framework.Plugin{&fakeNoopRuntimePlugin{}},
-			want: map[framework.ClusterEvent]sets.String{
+			want: map[framework.ClusterEvent]sets.Set{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
@@ -991,7 +991,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				cfgPls.Filter.Enabled = append(cfgPls.Filter.Enabled, config.Plugin{Name: pl.Name()})
 			}
 
-			got := make(map[framework.ClusterEvent]sets.String)
+			got := make(map[framework.ClusterEvent]sets.Set)
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
 			stopCh := make(chan struct{})
 			defer close(stopCh)

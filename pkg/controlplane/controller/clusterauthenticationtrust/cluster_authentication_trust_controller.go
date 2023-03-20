@@ -335,7 +335,7 @@ func jsonDeserializeStringSlice(in string) (headerrequest.StringSliceProvider, e
 
 func combineUniqueStringSlices(lhs, rhs headerrequest.StringSliceProvider) headerrequest.StringSliceProvider {
 	ret := []string{}
-	present := sets.String{}
+	present := sets.Set{}
 
 	if lhs != nil {
 		for _, curr := range lhs.Value() {

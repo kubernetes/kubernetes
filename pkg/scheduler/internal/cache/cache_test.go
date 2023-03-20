@@ -1427,7 +1427,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		operations                   []operation
 		expected                     []*v1.Node
 		expectedHavePodsWithAffinity int
-		expectedUsedPVCSet           sets.String
+		expectedUsedPVCSet           sets.Set
 	}{
 		{
 			name:               "Empty cache",

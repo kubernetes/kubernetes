@@ -87,7 +87,7 @@ func newWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig
 }
 
 func WebhookNames(webhooks map[string]WebhookConfig) []string {
-	ret := sets.StringKeySet(webhooks)
+	ret := sets.SetKeySet(webhooks)
 	return ret.List()
 }
 

@@ -339,7 +339,7 @@ func Test_removeDeletedKinds(t *testing.T) {
 func Test_shouldRemoveResource(t *testing.T) {
 	tests := []struct {
 		name              string
-		resourcesToRemove sets.String
+		resourcesToRemove sets.Set
 		resourceName      string
 		want              bool
 	}{

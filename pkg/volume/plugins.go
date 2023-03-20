@@ -454,7 +454,7 @@ type VolumePluginMgr struct {
 	plugins                   map[string]VolumePlugin
 	prober                    DynamicPluginProber
 	probedPlugins             map[string]VolumePlugin
-	loggedDeprecationWarnings sets.String
+	loggedDeprecationWarnings sets.Set
 	Host                      VolumeHost
 }
 

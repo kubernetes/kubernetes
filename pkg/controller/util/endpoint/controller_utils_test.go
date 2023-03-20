@@ -33,10 +33,10 @@ import (
 func TestDetermineNeededServiceUpdates(t *testing.T) {
 	testCases := []struct {
 		name  string
-		a     sets.String
-		b     sets.String
-		union sets.String
-		xor   sets.String
+		a     sets.Set
+		b     sets.Set
+		union sets.Set
+		xor   sets.Set
 	}{
 		{
 			name:  "no services changed",
@@ -362,7 +362,7 @@ func TestGetPodServiceMemberships(t *testing.T) {
 	tests := []struct {
 		name   string
 		pod    *v1.Pod
-		expect sets.String
+		expect sets.Set
 	}{
 		{
 			name:   "get servicesMemberships for pod-0",

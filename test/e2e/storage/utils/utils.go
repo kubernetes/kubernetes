@@ -572,7 +572,7 @@ func findMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node, dir 
 }
 
 // FindVolumeGlobalMountPoints returns all volume global mount points on the node of given pod.
-func FindVolumeGlobalMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node) sets.String {
+func FindVolumeGlobalMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node) sets.Set {
 	return sets.NewString(findMountPoints(ctx, hostExec, node, "/var/lib/kubelet/plugins")...)
 }
 

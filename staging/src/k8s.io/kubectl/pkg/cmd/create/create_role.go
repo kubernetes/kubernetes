@@ -424,7 +424,7 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 
 	// Create separate rule for each of the api group.
 	rules := []rbacv1.PolicyRule{}
-	for _, g := range sets.StringKeySet(groupResourceMapping).List() {
+	for _, g := range sets.SetKeySet(groupResourceMapping).List() {
 		rule := rbacv1.PolicyRule{}
 		rule.Verbs = verbs
 		rule.Resources = groupResourceMapping[g]

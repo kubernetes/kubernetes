@@ -315,9 +315,9 @@ func contactOthers(state *State) {
 }
 
 // getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
-func getWebserverEndpoints(client clientset.Interface) sets.String {
+func getWebserverEndpoints(client clientset.Interface) sets.Set {
 	endpoints, err := client.CoreV1().Endpoints(namespace).Get(context.TODO(), service, v1.GetOptions{})
-	eps := sets.String{}
+	eps := sets.Set{}
 	if err != nil {
 		state.Logf("Unable to read the endpoints for %v/%v: %v.", namespace, service, err)
 		return eps

@@ -533,7 +533,7 @@ func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expect
 
 // filterUnmountedVolumes adds each element of expectedVolumes that is not in
 // mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string) []string {
+func filterUnmountedVolumes(mountedVolumes sets.Set, expectedVolumes []string) []string {
 	unmountedVolumes := []string{}
 	for _, expectedVolume := range expectedVolumes {
 		if !mountedVolumes.Has(expectedVolume) {

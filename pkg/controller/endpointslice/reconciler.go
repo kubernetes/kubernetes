@@ -413,9 +413,9 @@ func (r *reconciler) reconcileByPortMapping(
 	endpointMeta *endpointMeta,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}
-	sliceNamesUnchanged := sets.String{}
-	sliceNamesToUpdate := sets.String{}
-	sliceNamesToDelete := sets.String{}
+	sliceNamesUnchanged := sets.Set{}
+	sliceNamesToUpdate := sets.Set{}
+	sliceNamesToDelete := sets.Set{}
 	numRemoved := 0
 
 	// 1. Iterate through existing slices to delete endpoints no longer desired

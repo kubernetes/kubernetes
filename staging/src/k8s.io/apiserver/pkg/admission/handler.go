@@ -34,7 +34,7 @@ type ReadyFunc func() bool
 // Handler is a base for admission control handlers that
 // support a predefined set of operations
 type Handler struct {
-	operations sets.String
+	operations sets.Set
 	readyFunc  ReadyFunc
 }
 

@@ -218,7 +218,7 @@ type podInfo struct {
 type PodDiff map[string]*podInfo
 
 // Print formats and prints the give PodDiff.
-func (p PodDiff) String(ignorePhases sets.String) string {
+func (p PodDiff) String(ignorePhases sets.Set) string {
 	ret := ""
 	for name, info := range p {
 		if ignorePhases.Has(info.phase) {
@@ -720,7 +720,7 @@ type RCStartupStatus struct {
 	Inactive              int
 	FailedContainers      int
 	Created               []*v1.Pod
-	ContainerRestartNodes sets.String
+	ContainerRestartNodes sets.Set
 }
 
 func (s *RCStartupStatus) String(name string) string {

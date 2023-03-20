@@ -390,7 +390,7 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace + "-list"
 
-	names := sets.String{}
+	names := sets.Set{}
 	for _, createVersion := range ctc.crd.Spec.Versions {
 		name := "converted-" + createVersion.Name
 		client := ctc.versionedClient(ns, createVersion.Name)
@@ -415,7 +415,7 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 			if len(obj.Items) != len(ctc.crd.Spec.Versions) {
 				t.Fatal("unexpected number of items")
 			}
-			foundNames := sets.String{}
+			foundNames := sets.Set{}
 			for _, u := range obj.Items {
 				foundNames.Insert(u.GetName())
 				verifyMultiVersionObject(t, listVersion.Name, &u)

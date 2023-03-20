@@ -260,7 +260,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 	}
 }
 
-func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNodeNames sets.String) (sets.String, bool) {
+func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNodeNames sets.Set) (sets.Set, bool) {
 	deletedNodesNames := sets.NewString()
 	for gcc.nodeQueue.Len() > 0 {
 		item, quit := gcc.nodeQueue.Get()

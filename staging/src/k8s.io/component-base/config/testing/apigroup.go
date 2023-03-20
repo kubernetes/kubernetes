@@ -38,7 +38,7 @@ type ComponentConfigPackage struct {
 	GroupName                   string
 	SchemeGroupVersion          schema.GroupVersion
 	AddToScheme                 func(*runtime.Scheme) error
-	SkipTests                   sets.String
+	SkipTests                   sets.Set
 	AllowedTags                 map[reflect.Type]bool
 	AllowedNonstandardJSONNames map[reflect.Type]string
 }

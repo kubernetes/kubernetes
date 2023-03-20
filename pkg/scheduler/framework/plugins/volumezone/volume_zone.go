@@ -60,7 +60,7 @@ const (
 type pvTopology struct {
 	pvName string
 	key    string
-	values sets.String
+	values sets.Set
 }
 
 // the state is initialized in PreFilter phase. because we save the pointer in

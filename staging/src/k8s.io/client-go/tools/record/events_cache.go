@@ -227,7 +227,7 @@ func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messag
 type aggregateRecord struct {
 	// we track the number of unique local keys we have seen in the aggregate set to know when to actually aggregate
 	// if the size of this set exceeds the max, we know we need to aggregate
-	localKeys sets.String
+	localKeys sets.Set
 	// The last time at which the aggregate was recorded
 	lastTimestamp metav1.Time
 }

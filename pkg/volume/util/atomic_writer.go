@@ -159,7 +159,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 	}
 	oldTsPath := filepath.Join(w.targetDir, oldTsDir)
 
-	var pathsToRemove sets.String
+	var pathsToRemove sets.Set
 	// if there was no old version, there's nothing to remove
 	if len(oldTsDir) != 0 {
 		// (3)
@@ -338,7 +338,7 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 // pathsToRemove walks the current version of the data directory and
 // determines which paths should be removed (if any) after the payload is
 // written to the target directory.
-func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir string) (sets.String, error) {
+func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir string) (sets.Set, error) {
 	paths := sets.NewString()
 	visitor := func(path string, info os.FileInfo, err error) error {
 		relativePath := strings.TrimPrefix(path, oldTsDir)
@@ -470,7 +470,7 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 
 // removeUserVisiblePaths removes the set of paths from the user-visible
 // portion of the writer's target directory.
-func (w *AtomicWriter) removeUserVisiblePaths(paths sets.String) error {
+func (w *AtomicWriter) removeUserVisiblePaths(paths sets.Set) error {
 	ps := string(os.PathSeparator)
 	var lasterr error
 	for p := range paths {

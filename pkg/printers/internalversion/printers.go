@@ -664,7 +664,7 @@ func AddHandlers(h printers.PrintHandler) {
 }
 
 // Pass ports=nil for all ports.
-func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
+func formatEndpoints(endpoints *api.Endpoints, ports sets.Set) string {
 	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}

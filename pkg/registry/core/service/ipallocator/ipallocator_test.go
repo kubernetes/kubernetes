@@ -319,7 +319,7 @@ func TestForEachIPAllocator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testCases := []sets.String{
+	testCases := []sets.Set{
 		sets.NewString(),
 		sets.NewString("192.168.1.1"),
 		sets.NewString("192.168.1.1", "192.168.1.254"),

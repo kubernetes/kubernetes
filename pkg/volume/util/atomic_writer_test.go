@@ -134,7 +134,7 @@ func TestPathsToRemove(t *testing.T) {
 		name     string
 		payload1 map[string]FileProjection
 		payload2 map[string]FileProjection
-		expected sets.String
+		expected sets.Set
 	}{
 		{
 			name: "simple",
@@ -819,7 +819,7 @@ func TestValidatePayload(t *testing.T) {
 	cases := []struct {
 		name     string
 		payload  map[string]FileProjection
-		expected sets.String
+		expected sets.Set
 		valid    bool
 	}{
 		{
@@ -875,7 +875,7 @@ func TestValidatePayload(t *testing.T) {
 			expected: sets.NewString("foo/bar"),
 		},
 	}
-	getPayloadPaths := func(payload map[string]FileProjection) sets.String {
+	getPayloadPaths := func(payload map[string]FileProjection) sets.Set {
 		paths := sets.NewString()
 		for path := range payload {
 			paths.Insert(path)

@@ -158,13 +158,13 @@ func (ctr *ctlrTestRequest) Finish(execute func()) bool {
 	return ctr.cqs.countActive == 0
 }
 
-func (cts *ctlrTestState) getQueueSetNames() sets.String {
+func (cts *ctlrTestState) getQueueSetNames() sets.Set {
 	cts.lock.Lock()
 	defer cts.lock.Unlock()
-	return sets.StringKeySet(cts.queues)
+	return sets.SetKeySet(cts.queues)
 }
 
-func (cts *ctlrTestState) getNonIdleQueueSetNames() sets.String {
+func (cts *ctlrTestState) getNonIdleQueueSetNames() sets.Set {
 	cts.lock.Lock()
 	defer cts.lock.Unlock()
 	ans := sets.NewString()
@@ -221,7 +221,7 @@ func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCou
 	}
 }
 
-var mandQueueSetNames, exclQueueSetNames = func() (sets.String, sets.String) {
+var mandQueueSetNames, exclQueueSetNames = func() (sets.Set, sets.Set) {
 	mandQueueSetNames := sets.NewString()
 	exclQueueSetNames := sets.NewString()
 	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
@@ -495,7 +495,7 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 	startWG.Wait()
 }
 
-func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*flowcontrol.PriorityLevelConfiguration, plMap map[string]*flowcontrol.PriorityLevelConfiguration, goodNames, badNames sets.String) {
+func genPLs(rng *rand.Rand, trial string, oldPLNames sets.Set, n int) (pls []*flowcontrol.PriorityLevelConfiguration, plMap map[string]*flowcontrol.PriorityLevelConfiguration, goodNames, badNames sets.Set) {
 	pls = make([]*flowcontrol.PriorityLevelConfiguration, 0, n)
 	plMap = make(map[string]*flowcontrol.PriorityLevelConfiguration, n)
 	goodNames = sets.NewString()
@@ -526,7 +526,7 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 	return
 }
 
-func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
+func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.Set, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	newFTRs = map[string]*fsTestingRecord{}
 	catchAlls = map[bool]*flowcontrol.FlowSchema{
 		false: fcboot.MandatoryFlowSchemaCatchAll,

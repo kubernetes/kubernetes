@@ -356,7 +356,7 @@ func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSTy
 
 // getAllFSTypesAsSet returns all actual volume types, regardless
 // of feature gates. The special policy.All pseudo type is not included.
-func getAllFSTypesAsSet() sets.String {
+func getAllFSTypesAsSet() sets.Set {
 	fstypes := sets.NewString()
 	fstypes.Insert(
 		string(policy.HostPath),

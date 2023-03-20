@@ -60,8 +60,8 @@ type vmssEntry struct {
 }
 
 type availabilitySetEntry struct {
-	vmNames   sets.String
-	nodeNames sets.String
+	vmNames   sets.Set
+	nodeNames sets.Set
 }
 
 func (ss *scaleSet) newVMSSCache() (*azcache.TimedCache, error) {

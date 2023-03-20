@@ -1595,9 +1595,9 @@ func TestGroupPods(t *testing.T) {
 		metrics             metricsclient.PodMetricsInfo
 		resource            v1.ResourceName
 		expectReadyPodCount int
-		expectUnreadyPods   sets.String
-		expectMissingPods   sets.String
-		expectIgnoredPods   sets.String
+		expectUnreadyPods   sets.Set
+		expectMissingPods   sets.Set
+		expectIgnoredPods   sets.Set
 	}{
 		{
 			name:                "void",
