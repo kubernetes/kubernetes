@@ -265,6 +265,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	})
 	if c.resourceManager != nil {
 		c.resourceManager.AddGroupVersion(version.Group, apidiscoveryv2beta1.APIVersionDiscovery{
+			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
 			Version:   version.Version,
 			Resources: aggregatedApiResourcesForDiscovery,
 		})

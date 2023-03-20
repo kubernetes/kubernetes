@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -90,6 +91,15 @@ type waitForGroupVersionsV2 []metav1.GroupVersion
 
 // Wait for groupversions to disappear from v2 discovery
 type waitForAbsentGroupVersionsV2 []metav1.GroupVersion
+
+type waitForStaleGroupVersionsV2 []metav1.GroupVersion
+type waitForFreshGroupVersionsV2 []metav1.GroupVersion
+
+type waitForResourcesV1 []metav1.GroupVersionResource
+type waitForResourcesAbsentV1 []metav1.GroupVersionResource
+
+type waitForResourcesV2 []metav1.GroupVersionResource
+type waitForResourcesAbsentV2 []metav1.GroupVersionResource
 
 // Assert something about the current state of v2 discovery
 type inlineAction func(ctx context.Context, client testClient) error
@@ -165,6 +175,13 @@ func (a applyCRD) Do(ctx context.Context, client testClient) error {
 		Spec: apiextensionsv1.CustomResourceDefinitionSpec(a),
 	}
 
+	if strings.HasSuffix(obj.Name, ".k8s.io") {
+		if obj.Annotations == nil {
+			obj.Annotations = map[string]string{}
+		}
+		obj.Annotations["api-approved.kubernetes.io"] = "https://github.com/kubernetes/kubernetes/fake"
+	}
+
 	unstructuredContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return err
@@ -224,6 +241,40 @@ func (d deleteObject) Do(ctx context.Context, client testClient) error {
 			Namespace(d.Namespace).
 			Delete(ctx, d.Name, metav1.DeleteOptions{})
 	}
+}
+
+func (w waitForStaleGroupVersionsV2) Do(ctx context.Context, client testClient) error {
+	err := WaitForResultWithCondition(ctx, client, func(result apidiscoveryv2beta1.APIGroupDiscoveryList) bool {
+		for _, gv := range w {
+			if info := FindGroupVersionV2(result, gv); info == nil || info.Freshness != apidiscoveryv2beta1.DiscoveryFreshnessStale {
+				return false
+			}
+		}
+
+		return true
+	})
+
+	if err != nil {
+		return fmt.Errorf("waiting for stale groupversions v2 (%v): %w", w, err)
+	}
+	return nil
+}
+
+func (w waitForFreshGroupVersionsV2) Do(ctx context.Context, client testClient) error {
+	err := WaitForResultWithCondition(ctx, client, func(result apidiscoveryv2beta1.APIGroupDiscoveryList) bool {
+		for _, gv := range w {
+			if info := FindGroupVersionV2(result, gv); info == nil || info.Freshness != apidiscoveryv2beta1.DiscoveryFreshnessCurrent {
+				return false
+			}
+		}
+
+		return true
+	})
+
+	if err != nil {
+		return fmt.Errorf("waiting for fresh groupversions v2 (%v): %w", w, err)
+	}
+	return nil
 }
 
 func (w waitForGroupVersionsV2) Do(ctx context.Context, client testClient) error {
@@ -294,6 +345,137 @@ func (w waitForAbsentGroupVersionsV1) Do(ctx context.Context, client testClient)
 	return nil
 }
 
+func (w waitForResourcesV1) Do(ctx context.Context, client testClient) error {
+	requiredResources := map[metav1.GroupVersion][]string{}
+
+	for _, gvr := range w {
+		gv := metav1.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+		if existing, ok := requiredResources[gv]; ok {
+			requiredResources[gv] = append(existing, gvr.Resource)
+		} else {
+			requiredResources[gv] = []string{gvr.Resource}
+		}
+	}
+
+	for gv, resourceNames := range requiredResources {
+		err := WaitForV1ResourcesWithCondition(ctx, client, gv, func(result metav1.APIResourceList) bool {
+			for _, name := range resourceNames {
+				found := false
+
+				for _, resultResource := range result.APIResources {
+					if resultResource.Name == name {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					return false
+				}
+			}
+
+			return true
+		})
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("waiting for resources v1 (%v): %w", w, err)
+		}
+	}
+
+	return nil
+}
+
+func (w waitForResourcesAbsentV1) Do(ctx context.Context, client testClient) error {
+	requiredResources := map[metav1.GroupVersion][]string{}
+
+	for _, gvr := range w {
+		gv := metav1.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+		if existing, ok := requiredResources[gv]; ok {
+			requiredResources[gv] = append(existing, gvr.Resource)
+		} else {
+			requiredResources[gv] = []string{gvr.Resource}
+		}
+	}
+
+	for gv, resourceNames := range requiredResources {
+		err := WaitForV1ResourcesWithCondition(ctx, client, gv, func(result metav1.APIResourceList) bool {
+			for _, name := range resourceNames {
+				for _, resultResource := range result.APIResources {
+					if resultResource.Name == name {
+						return false
+					}
+				}
+			}
+
+			return true
+		})
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("waiting for absent resources v1 (%v): %w", w, err)
+		}
+	}
+
+	return nil
+}
+
+func (w waitForResourcesV2) Do(ctx context.Context, client testClient) error {
+	err := WaitForResultWithCondition(ctx, client, func(result apidiscoveryv2beta1.APIGroupDiscoveryList) bool {
+		for _, gvr := range w {
+			if info := FindGroupVersionV2(result, metav1.GroupVersion{Group: gvr.Group, Version: gvr.Version}); info == nil {
+				return false
+			} else {
+				found := false
+				for _, resultResoure := range info.Resources {
+					if resultResoure.Resource == gvr.Resource {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					return false
+				}
+			}
+		}
+
+		return true
+	})
+
+	if err != nil {
+		return fmt.Errorf("waiting for resources v2 (%v): %w", w, err)
+	}
+	return nil
+}
+
+func (w waitForResourcesAbsentV2) Do(ctx context.Context, client testClient) error {
+	err := WaitForResultWithCondition(ctx, client, func(result apidiscoveryv2beta1.APIGroupDiscoveryList) bool {
+		for _, gvr := range w {
+			if info := FindGroupVersionV2(result, metav1.GroupVersion{Group: gvr.Group, Version: gvr.Version}); info == nil {
+				return false
+			} else {
+				for _, resultResoure := range info.Resources {
+					if resultResoure.Resource == gvr.Resource {
+						return false
+					}
+				}
+			}
+		}
+
+		return true
+	})
+
+	if err != nil {
+		return fmt.Errorf("waiting for absent resources v2 (%v): %w", w, err)
+	}
+	return nil
+}
+
 func (i inlineAction) Do(ctx context.Context, client testClient) error {
 	return i(ctx, client)
 }
@@ -334,7 +516,7 @@ func FetchV1DiscoveryGroupsAtPath(ctx context.Context, client testClient, path s
 		Discovery().
 		RESTClient().
 		Get().
-		AbsPath("/apis").
+		AbsPath(path).
 		SetHeader("Accept", acceptV1JSON).
 		Do(ctx).
 		Raw()
@@ -352,7 +534,7 @@ func FetchV1DiscoveryGroupsAtPath(ctx context.Context, client testClient, path s
 	return groupList, nil
 }
 
-func FetchV1DiscoveryResource(ctx context.Context, client testClient, gv metav1.GroupVersion) (metav1.APIGroupList, error) {
+func FetchV1DiscoveryResource(ctx context.Context, client testClient, gv metav1.GroupVersion) (metav1.APIResourceList, error) {
 	result, err := client.
 		Discovery().
 		RESTClient().
@@ -363,13 +545,13 @@ func FetchV1DiscoveryResource(ctx context.Context, client testClient, gv metav1.
 		Raw()
 
 	if err != nil {
-		return metav1.APIGroupList{}, err
+		return metav1.APIResourceList{}, err
 	}
 
-	groupList := metav1.APIGroupList{}
+	groupList := metav1.APIResourceList{}
 	err = json.Unmarshal(result, &groupList)
 	if err != nil {
-		return metav1.APIGroupList{}, err
+		return metav1.APIResourceList{}, err
 	}
 
 	return groupList, nil
@@ -438,6 +620,28 @@ func WaitForV1GroupsWithCondition(ctx context.Context, client testClient, condit
 			}
 
 			if condition(groupList) {
+				return true, nil
+			}
+
+			return false, nil
+		})
+}
+
+func WaitForV1ResourcesWithCondition(ctx context.Context, client testClient, gv metav1.GroupVersion, condition func(result metav1.APIResourceList) bool) error {
+	// Keep repeatedly fetching document from aggregator.
+	// Check to see if it contains our service within a reasonable amount of time
+	return wait.PollWithContext(
+		ctx,
+		250*time.Millisecond,
+		1*time.Second,
+		func(ctx context.Context) (done bool, err error) {
+			resourceList, err := FetchV1DiscoveryResource(ctx, client, gv)
+
+			if err != nil {
+				return false, err
+			}
+
+			if condition(resourceList) {
 				return true, nil
 			}
 

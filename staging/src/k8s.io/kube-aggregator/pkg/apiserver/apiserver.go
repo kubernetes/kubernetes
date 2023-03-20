@@ -397,7 +397,9 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.discoveryAggregationController = NewDiscoveryManager(
-			s.GenericAPIServer.AggregatedDiscoveryGroupManager,
+			// Use aggregator as the source name to avoid overwriting native/CRD
+			// groups
+			s.GenericAPIServer.AggregatedDiscoveryGroupManager.WithSource(aggregated.AggregatorSource),
 		)
 
 		// Setup discovery endpoint
