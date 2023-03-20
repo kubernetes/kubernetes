@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,14 +28,23 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/templates"
 )
+
+func GetPluginCommandGroup(kubectl *cobra.Command) templates.CommandGroup {
+	// Find root level
+	return templates.CommandGroup{
+		Message:  "User-Installed Plugin Commands:",
+		Commands: registerPluginCommands(kubectl, 1, false),
+	}
+}
 
 // SetupPluginCompletion adds a Cobra command to the command tree for each
 // plugin.  This is only done when performing shell completion that relate
 // to plugins.
 func SetupPluginCompletion(cmd *cobra.Command, args []string) {
+	kubectl := cmd.Root()
 	if len(args) > 0 {
 		if strings.HasPrefix(args[0], "-") {
 			// Plugins are not supported if the first argument is a flag,
@@ -45,7 +55,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 		if len(args) == 1 {
 			// We are completing a subcommand at the first level so
 			// we should include all plugins names.
-			addPluginCommands(cmd)
+			registerPluginCommands(kubectl, math.MaxInt, true)
 			return
 		}
 
@@ -54,7 +64,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 		// If we don't it could be a plugin and we'll need to add
 		// the plugin commands for completion to work.
 		found := false
-		for _, subCmd := range cmd.Root().Commands() {
+		for _, subCmd := range kubectl.Commands() {
 			if args[0] == subCmd.Name() {
 				found = true
 				break
@@ -70,19 +80,21 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 			// to avoid them being included in the completion choices.
 			// This must be done *before* adding the plugin commands so that
 			// when creating those plugin commands, the flags don't exist.
-			cmd.Root().ResetFlags()
+			kubectl.ResetFlags()
 			cobra.CompDebugln("Cleared global flags for plugin completion", true)
 
-			addPluginCommands(cmd)
+			registerPluginCommands(kubectl, math.MaxInt, true)
 		}
 	}
 }
 
-// addPluginCommand adds a Cobra command to the command tree
-// for each plugin so that the completion logic knows about the plugins
-func addPluginCommands(cmd *cobra.Command) {
-	kubectl := cmd.Root()
-	streams := genericiooptions.IOStreams{
+// registerPluginCommand allows adding Cobra command to the command tree or extracting them for usage in
+// e.g. the help function or for registering the completion function
+func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (cmds []*cobra.Command) {
+
+	userDefinedCommands := []*cobra.Command{}
+
+	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    io.Discard,
 		ErrOut: io.Discard,
@@ -98,7 +110,17 @@ func addPluginCommands(cmd *cobra.Command) {
 
 		// Plugins are named "kubectl-<name>" or with more - such as
 		// "kubectl-<name>-<subcmd1>..."
-		for _, arg := range strings.Split(plugin, "-")[1:] {
+		// Respect the search depth to find the plugin name
+		rawPluginArgs := strings.Split(plugin, "-")[1:]
+		actualDepth := len(rawPluginArgs)
+		if depth < actualDepth {
+			actualDepth = depth
+		}
+		pluginArgs := rawPluginArgs[0:actualDepth]
+
+		// Iterate through all segments, for kubectl-my_plugin-sub_cmd, we will end up with
+		// two iterations: one for my_plugin and one for sub_cmd.
+		for _, arg := range pluginArgs {
 			// Underscores (_) in plugin's filename are replaced with dashes(-)
 			// e.g. foo_bar -> foo-bar
 			args = append(args, strings.Replace(arg, "_", "-", -1))
@@ -124,10 +146,18 @@ func addPluginCommands(cmd *cobra.Command) {
 				// A Run is required for it to be a valid command
 				Run: func(cmd *cobra.Command, args []string) {},
 			}
-			parentCmd.AddCommand(cmd)
-			parentCmd = cmd
+			// Add the plugin command to the list of user defined commands
+			userDefinedCommands = append(userDefinedCommands, cmd)
+
+			// Add the plugin command to the command tree, when requested
+			if register {
+				parentCmd.AddCommand(cmd)
+				parentCmd = cmd
+			}
 		}
 	}
+
+	return userDefinedCommands
 }
 
 // pluginCompletion deals with shell completion beyond the plugin name, it allows to complete
