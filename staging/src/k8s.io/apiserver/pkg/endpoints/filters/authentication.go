@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -38,14 +40,19 @@ type recordMetrics func(context.Context, *authenticator.Response, bool, error, a
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, "Authorization" header is removed from the request and handler
 // is invoked to serve the request.
-func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
-	return withAuthentication(handler, auth, failed, apiAuds, recordAuthMetrics)
+func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, requestHeaderConfig *authenticatorfactory.RequestHeaderConfig) http.Handler {
+	return withAuthentication(handler, auth, failed, apiAuds, requestHeaderConfig, recordAuthMetrics)
 }
 
-func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, metrics recordMetrics) http.Handler {
+func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, requestHeaderConfig *authenticatorfactory.RequestHeaderConfig, metrics recordMetrics) http.Handler {
 	if auth == nil {
 		klog.Warning("Authentication is disabled")
 		return handler
+	}
+	standardRequestHeaderConfig := &authenticatorfactory.RequestHeaderConfig{
+		UsernameHeaders:     headerrequest.StaticStringSlice{"X-Remote-User"},
+		GroupHeaders:        headerrequest.StaticStringSlice{"X-Remote-Group"},
+		ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"X-Remote-Extra-"},
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		authenticationStart := time.Now()
@@ -75,6 +82,24 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 
 		// authorization header is not required anymore in case of a successful authentication.
 		req.Header.Del("Authorization")
+
+		// delete standard front proxy headers
+		headerrequest.ClearAuthenticationHeaders(
+			req.Header,
+			standardRequestHeaderConfig.UsernameHeaders,
+			standardRequestHeaderConfig.GroupHeaders,
+			standardRequestHeaderConfig.ExtraHeaderPrefixes,
+		)
+
+		// also delete any custom front proxy headers
+		if requestHeaderConfig != nil {
+			headerrequest.ClearAuthenticationHeaders(
+				req.Header,
+				requestHeaderConfig.UsernameHeaders,
+				requestHeaderConfig.GroupHeaders,
+				requestHeaderConfig.ExtraHeaderPrefixes,
+			)
+		}
 
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 		handler.ServeHTTP(w, req)
