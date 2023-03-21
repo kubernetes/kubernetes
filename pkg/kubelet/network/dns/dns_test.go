@@ -19,6 +19,7 @@ package dns
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -536,6 +537,7 @@ func testGetPodDNS(t *testing.T) {
 	}
 
 	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
+	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -600,11 +602,20 @@ func TestGetPodDNSCustom(t *testing.T) {
 		},
 	}
 
-	resolvConf, cleanup := getResolvConf(t)
-	defer cleanup()
+	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
+	tmpfile, err := os.CreateTemp("", "tmpResolvConf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	if _, err := tmpfile.Write(resolvConfContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatal(err)
+	}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, resolvConf)
-	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
+	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
 
 	testCases := []struct {
 		desc              string

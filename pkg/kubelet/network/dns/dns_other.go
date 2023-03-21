@@ -19,35 +19,5 @@ limitations under the License.
 
 package dns
 
-import (
-	"fmt"
-	"os"
-
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
-)
-
-func getHostDNSConfig(resolverConfig string) (*runtimeapi.DNSConfig, error) {
-	var hostDNS, hostSearch, hostOptions []string
-	// Get host DNS settings
-	if resolverConfig != "" {
-		f, err := os.Open(resolverConfig)
-		if err != nil {
-			klog.ErrorS(err, "Could not open resolv conf file.")
-			return nil, err
-		}
-		defer f.Close()
-
-		hostDNS, hostSearch, hostOptions, err = parseResolvConf(f)
-		if err != nil {
-			err := fmt.Errorf("Encountered error while parsing resolv conf file. Error: %w", err)
-			klog.ErrorS(err, "Could not parse resolv conf file.")
-			return nil, err
-		}
-	}
-	return &runtimeapi.DNSConfig{
-		Servers:  hostDNS,
-		Searches: hostSearch,
-		Options:  hostOptions,
-	}, nil
-}
+// Read the DNS configuration from a resolv.conf file.
+var getHostDNSConfig = getDNSConfig
