@@ -144,6 +144,37 @@ func TestDefaultKubernetesUserAgent(t *testing.T) {
 	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
 }
 
+func TestAddUserAgent(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		ua     string
+		want   string
+	}{
+		{
+			name: "empty user agent should concatenate the default agent with the suffix",
+			config: &Config{
+				UserAgent: "",
+			},
+			ua:   "test",
+			want: DefaultKubernetesUserAgent() + "/test",
+		}, {
+			name: "non-empty user agent should concatenate the existing agent with the suffix",
+			config: &Config{
+				UserAgent: "existing",
+			},
+			ua:   "test",
+			want: "existing/test",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			AddUserAgent(tt.config, tt.ua)
+			assert.Equal(t, tt.want, tt.config.UserAgent)
+		})
+	}
+}
+
 func TestRESTClientRequires(t *testing.T) {
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: scheme.Codecs}}); err == nil {
 		t.Errorf("unexpected non-error")
