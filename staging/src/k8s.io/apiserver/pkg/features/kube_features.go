@@ -44,6 +44,7 @@ const (
 
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
@@ -150,6 +151,7 @@ const (
 	// kep: https://kep.k8s.io/2896
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables kubernetes to publish OpenAPI v3
 	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
