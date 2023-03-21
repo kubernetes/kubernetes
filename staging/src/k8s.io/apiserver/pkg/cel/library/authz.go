@@ -156,7 +156,7 @@ import (
 // allowed
 //
 // Returns true if the authorizer's decision for the check is "allow".  Note that if the authorizer's decision is
-// "no opinion", that both the 'allowed' and 'denied' functions will return false.
+// "no opinion", that the 'allowed' function will return false.
 //
 //	<Decision>.allowed() <bool>
 //
