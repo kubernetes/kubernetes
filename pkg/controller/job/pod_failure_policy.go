@@ -97,10 +97,8 @@ func getMatchingContainerFromList(containerStatuses []v1.ContainerStatus, requir
 			continue
 		}
 		if requirement.ContainerName == nil || *requirement.ContainerName == containerStatus.Name {
-			if containerStatus.State.Terminated.ExitCode != 0 {
-				if isOnExitCodesOperatorMatching(containerStatus.State.Terminated.ExitCode, requirement) {
-					return &containerStatus
-				}
+			if isOnExitCodesOperatorMatching(containerStatus.State.Terminated.ExitCode, requirement) {
+				return &containerStatus
 			}
 		}
 	}

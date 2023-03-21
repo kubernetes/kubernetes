@@ -1326,6 +1326,35 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.podFailurePolicy",
 			},
 		},
+		"update mutable fields, old job with 0 in failure policy (operator In)": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{0},
+								},
+							},
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = pointer.Int32(2)
+				job.Spec.ActiveDeadlineSeconds = pointer.Int64(3)
+				job.Spec.TTLSecondsAfterFinished = pointer.Int32(2)
+				job.Spec.ManualSelector = pointer.Bool(true)
+			},
+			opts: JobValidationOptions{
+				AllowZeroInPodFailurePolicy: true,
+			},
+		},
 		"immutable pod template": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -1893,68 +1922,118 @@ func TestValidateCronJob(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 
-	successCases := map[string]batch.CronJob{
+	successCases := map[string]struct {
+		batch.CronJob
+		JobValidationOptions
+	}{
 		"basic scheduled job": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "* * * * ?",
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+			CronJob: batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpec,
+						},
 					},
 				},
 			},
+			JobValidationOptions: JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}},
 		},
 		"non-standard scheduled": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "@hourly",
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+			CronJob: batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "@hourly",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpec,
+						},
 					},
 				},
 			},
+			JobValidationOptions: JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}},
 		},
 		"correct timeZone value": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "0 * * * *",
-				TimeZone:          &timeZoneCorrect,
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+			CronJob: batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "0 * * * *",
+					TimeZone:          &timeZoneCorrect,
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpec,
+						},
 					},
 				},
+			},
+			JobValidationOptions: JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}},
+		},
+		"job with 0 for In operator with PodFailurePolicy": {
+			CronJob: batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: api.PodTemplateSpec{
+								Spec: api.PodSpec{
+									RestartPolicy: api.RestartPolicyNever,
+									DNSPolicy:     api.DNSClusterFirst,
+									Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+								},
+							},
+							PodFailurePolicy: &batch.PodFailurePolicy{
+								Rules: []batch.PodFailurePolicyRule{
+									{
+										Action: batch.PodFailurePolicyActionIgnore,
+										OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+											Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+											Values:   []int32{0},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			JobValidationOptions: JobValidationOptions{
+				PodValidationOptions:        corevalidation.PodValidationOptions{},
+				AllowZeroInPodFailurePolicy: true,
 			},
 		},
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidateCronJobCreate(&v.CronJob, v.JobValidationOptions); len(errs) != 0 {
 				t.Errorf("expected success for %s: %v", k, errs)
 			}
 
 			// Update validation should pass same success cases
 			// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-			v = *v.DeepCopy()
+			v.CronJob = *v.CronJob.DeepCopy()
 			v.ResourceVersion = "1"
-			if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidateCronJobUpdate(&v.CronJob, &v.CronJob, v.JobValidationOptions); len(errs) != 0 {
 				t.Errorf("expected success for %s: %v", k, errs)
 			}
 		})
@@ -2344,11 +2423,43 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"spec.jobTemplate.spec.podFailurePolicy.rules[0].onExitCodes.values[0]: Invalid value: 0: must not be 0 for the In operator": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: api.PodTemplateSpec{
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyNever,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+							},
+						},
+						PodFailurePolicy: &batch.PodFailurePolicy{
+							Rules: []batch.PodFailurePolicyRule{
+								{
+									Action: batch.PodFailurePolicyActionIgnore,
+									OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+										Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+										Values:   []int32{0},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{})
+			errs := ValidateCronJobCreate(&v, JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			} else {
@@ -2368,7 +2479,7 @@ func TestValidateCronJob(t *testing.T) {
 			newSpec := *v.DeepCopy()
 			newSpec.ResourceVersion = "2"
 
-			errs = ValidateCronJobUpdate(&newSpec, &oldSpec, corevalidation.PodValidationOptions{})
+			errs = ValidateCronJobUpdate(&newSpec, &oldSpec, JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}})
 			if len(errs) == 0 {
 				if k == "metadata.name: must be no more than 52 characters" {
 					return
@@ -2578,7 +2689,7 @@ func TestValidateCronJobSpec(t *testing.T) {
 	}
 
 	for k, v := range cases {
-		errs := validateCronJobSpec(v.new, v.old, field.NewPath("spec"), corevalidation.PodValidationOptions{})
+		errs := validateCronJobSpec(v.new, v.old, field.NewPath("spec"), JobValidationOptions{PodValidationOptions: corevalidation.PodValidationOptions{}})
 		if len(errs) > 0 && !v.expectErr {
 			t.Errorf("unexpected error for %s: %v", k, errs)
 		} else if len(errs) == 0 && v.expectErr {

@@ -129,7 +129,7 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
-	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts)...)
 	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
 	}
@@ -155,7 +155,7 @@ func hasJobTrackingAnnotation(job *batch.Job) bool {
 }
 
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
-func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(spec, fldPath, opts)
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -176,7 +176,7 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	return allErrs
 }
 
-func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if spec.Parallelism != nil {
@@ -209,10 +209,10 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	}
 
 	if spec.PodFailurePolicy != nil {
-		allErrs = append(allErrs, validatePodFailurePolicy(spec, fldPath.Child("podFailurePolicy"))...)
+		allErrs = append(allErrs, validatePodFailurePolicy(spec, fldPath.Child("podFailurePolicy"), opts)...)
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts.PodValidationOptions)...)
 
 	// spec.Template.Spec.RestartPolicy can be defaulted as RestartPolicyAlways
 	// by SetDefaults_PodSpec function when the user does not explicitly specify a value for it,
@@ -230,7 +230,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	return allErrs
 }
 
-func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	rulesPath := fldPath.Child("rules")
 	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
@@ -244,12 +244,12 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 		containerNames.Insert(containerSpec.Name)
 	}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(&rule, rulesPath.Index(i), containerNames)...)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(&rule, rulesPath.Index(i), containerNames, opts)...)
 	}
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String, opts JobValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -258,7 +258,7 @@ func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *fi
 		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, supportedPodFailurePolicyActions.List()))
 	}
 	if rule.OnExitCodes != nil {
-		allErrs = append(allErrs, validatePodFailurePolicyRuleOnExitCodes(rule.OnExitCodes, rulePath.Child("onExitCodes"), containerNames)...)
+		allErrs = append(allErrs, validatePodFailurePolicyRuleOnExitCodes(rule.OnExitCodes, rulePath.Child("onExitCodes"), containerNames, opts)...)
 	}
 	if len(rule.OnPodConditions) > 0 {
 		allErrs = append(allErrs, validatePodFailurePolicyRuleOnPodConditions(rule.OnPodConditions, rulePath.Child("onPodConditions"))...)
@@ -290,7 +290,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String, opts JobValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {
@@ -311,8 +311,10 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	uniqueValues := sets.NewInt32()
 	for j, exitCodeValue := range onExitCode.Values {
 		valuePath := valuesPath.Index(j)
-		if onExitCode.Operator == batch.PodFailurePolicyOnExitCodesOpIn && exitCodeValue == 0 {
-			allErrs = append(allErrs, field.Invalid(valuePath, exitCodeValue, "must not be 0 for the In operator"))
+		if !opts.AllowZeroInPodFailurePolicy {
+			if onExitCode.Operator == batch.PodFailurePolicyOnExitCodesOpIn && exitCodeValue == 0 {
+				allErrs = append(allErrs, field.Invalid(valuePath, exitCodeValue, "must not be 0 for the In operator"))
+			}
 		}
 		if uniqueValues.Has(exitCodeValue) {
 			allErrs = append(allErrs, field.Duplicate(valuePath, exitCodeValue))
@@ -383,7 +385,7 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 // ValidateJobSpecUpdate validates an update to a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
+	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts)...)
 	allErrs = append(allErrs, validateCompletions(spec, oldSpec, fldPath.Child("completions"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
@@ -430,7 +432,7 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 }
 
 // ValidateCronJobCreate validates a CronJob on creation and returns an ErrorList with any errors.
-func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateCronJobCreate(cronJob *batch.CronJob, opts JobValidationOptions) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
@@ -445,7 +447,7 @@ func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidat
 }
 
 // ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
-func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts JobValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)...)
 
@@ -455,7 +457,7 @@ func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodVal
 }
 
 // validateCronJobSpec validates a CronJobSpec and returns an ErrorList with any errors.
-func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -554,7 +556,7 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateJobTemplateSpec validates a JobTemplateSpec and returns an ErrorList with any errors.
-func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"), opts)
 
 	// jobtemplate will always have the selector automatically generated
@@ -606,4 +608,6 @@ type JobValidationOptions struct {
 	AllowElasticIndexedJobs bool
 	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
 	RequirePrefixedLabels bool
+	// Allow podFailurePolicy to use 0 in onExitCodes field
+	AllowZeroInPodFailurePolicy bool
 }

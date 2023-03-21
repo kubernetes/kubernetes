@@ -191,8 +191,25 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		_, hadJobName := oldJob.Spec.Template.Labels[batch.JobNameLabel]
 		_, hadControllerUid := oldJob.Spec.Template.Labels[batch.ControllerUidLabel]
 		opts.RequirePrefixedLabels = hadJobName && hadControllerUid
+		opts.AllowZeroInPodFailurePolicy = IsZeroUsedInPodFailurePolicy(oldJob.Spec.PodFailurePolicy)
 	}
 	return opts
+}
+
+func IsZeroUsedInPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy) bool {
+	if podFailurePolicy == nil {
+		return false
+	}
+	for _, rule := range podFailurePolicy.Rules {
+		if rule.OnExitCodes != nil {
+			for _, exitCodeValue := range rule.OnExitCodes.Values {
+				if exitCodeValue == 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

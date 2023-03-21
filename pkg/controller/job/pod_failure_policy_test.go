@@ -243,7 +243,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
-		"successful containers are skipped by the rules": {
+		"successful containers hit the rule with exit code 0": {
 			podFailurePolicy: &batch.PodFailurePolicy{
 				Rules: []batch.PodFailurePolicyRule{
 					{
@@ -289,8 +289,9 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: nil,
+			wantJobFailureMessage: pointer.String("Container suppport-container for pod default/mypod failed with exit code 0 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"pod failure policy with NotIn operator and value 0": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -329,6 +330,38 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 				},
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 1 matching FailJob rule at index 0"),
+			wantCountFailed:       true,
+			wantAction:            &failJob,
+		},
+		"pod failure policy with In operator and value 0": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						Action: batch.PodFailurePolicyActionFailJob,
+						OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+							Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+							Values:   []int32{0},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 0 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},

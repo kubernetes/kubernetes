@@ -19,7 +19,10 @@ package cronjob
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -31,6 +34,13 @@ var (
 	validPodTemplateSpec = api.PodTemplateSpec{
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	validPodTemplateSpecWithRestartPolicyNever = api.PodTemplateSpec{
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
 			DNSPolicy:     api.DNSClusterFirst,
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
@@ -424,6 +434,197 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 			gotWarnings := Strategy.WarningsOnUpdate(ctx, tc.cronjob, tc.oldCronJob)
 			if len(gotWarnings) != int(tc.wantWarningsCount) {
 				t.Errorf("%s: got warning length of %d but expected %d", val, len(gotWarnings), tc.wantWarningsCount)
+			}
+		})
+	}
+}
+
+func TestCronJobStrategy_Validate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	if !Strategy.NamespaceScoped() {
+		t.Errorf("CronJob must be namespace scoped")
+	}
+	if Strategy.AllowCreateOnUpdate() {
+		t.Errorf("CronJob should not allow create on update")
+	}
+
+	testcases := map[string]struct {
+		job *batch.CronJob
+		err *field.Error
+	}{
+		"job with invalid value 0 for In operator with PodFailurePolicy": {
+			job: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpecWithRestartPolicyNever,
+							PodFailurePolicy: &batch.PodFailurePolicy{
+								Rules: []batch.PodFailurePolicyRule{
+									{
+										Action: batch.PodFailurePolicyActionIgnore,
+										OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+											Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+											Values:   []int32{0},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.jobTemplate.spec.podFailurePolicy.rules[0].onExitCodes.values[0]",
+			},
+		},
+
+		"job with valid value 1 for In operator with PodFailurePolicy": {
+			job: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mycronjob",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpecWithRestartPolicyNever,
+							PodFailurePolicy: &batch.PodFailurePolicy{
+								Rules: []batch.PodFailurePolicyRule{
+									{
+										Action: batch.PodFailurePolicyActionIgnore,
+										OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+											Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+											Values:   []int32{1},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			errs := Strategy.Validate(ctx, tc.job)
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCronJobStrategy_ValidateUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	if !Strategy.NamespaceScoped() {
+		t.Errorf("CronJob must be namespace scoped")
+	}
+	if Strategy.AllowCreateOnUpdate() {
+		t.Errorf("CronJob should not allow create on update")
+	}
+
+	cases := map[string]struct {
+		job      *batch.CronJob
+		update   func(job *batch.CronJob)
+		wantErrs field.ErrorList
+	}{
+		"old job with value 0 for In operator with PodFailurePolicy": {
+			job: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpecWithRestartPolicyNever,
+							PodFailurePolicy: &batch.PodFailurePolicy{
+								Rules: []batch.PodFailurePolicyRule{
+									{
+										Action: batch.PodFailurePolicyActionIgnore,
+										OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+											Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+											Values:   []int32{0},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			update: func(job *batch.CronJob) {
+				job.Spec.JobTemplate.Spec.Parallelism = pointer.Int32(2)
+			},
+		},
+		"job with invalid restartPolicy for In operator with PodFailurePolicy": {
+			job: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "* * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: validPodTemplateSpec,
+							PodFailurePolicy: &batch.PodFailurePolicy{
+								Rules: []batch.PodFailurePolicyRule{
+									{
+										Action: batch.PodFailurePolicyActionIgnore,
+										OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+											Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+											Values:   []int32{1},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			update: func(job *batch.CronJob) {
+				job.Spec.JobTemplate.Spec.Parallelism = pointer.Int32(2)
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:     "FieldValueInvalid",
+					Field:    "spec.jobTemplate.spec.template.spec.restartPolicy",
+					BadValue: "OnFailure",
+					Detail:   "only \"Never\" is supported when podFailurePolicy is specified",
+				},
+			},
+		},
+	}
+
+	ignoreErrValueDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			newJob := tc.job.DeepCopy()
+			tc.update(newJob)
+			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
 		})
 	}

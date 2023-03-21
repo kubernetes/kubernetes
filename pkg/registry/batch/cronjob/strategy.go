@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/registry/batch/job"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -110,7 +111,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
+	opts := validationOptionsForCronJob(cronJob, nil)
 	return batchvalidation.ValidateCronJobCreate(cronJob, opts)
 }
 
@@ -146,7 +147,7 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	opts := validationOptionsForCronJob(newCronJob, oldCronJob)
 	return batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
 }
 
@@ -197,4 +198,17 @@ func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 // WarningsOnUpdate returns warnings for the given update.
 func (cronJobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+func validationOptionsForCronJob(newJob, oldJob *batch.CronJob) batchvalidation.JobValidationOptions {
+	opts := batchvalidation.JobValidationOptions{}
+
+	if oldJob == nil {
+		opts.PodValidationOptions = pod.GetValidationOptionsFromPodTemplate(&newJob.Spec.JobTemplate.Spec.Template, nil)
+	} else {
+		opts.PodValidationOptions = pod.GetValidationOptionsFromPodTemplate(&newJob.Spec.JobTemplate.Spec.Template, &oldJob.Spec.JobTemplate.Spec.Template)
+		opts.AllowZeroInPodFailurePolicy = job.IsZeroUsedInPodFailurePolicy(oldJob.Spec.JobTemplate.Spec.PodFailurePolicy)
+	}
+
+	return opts
 }

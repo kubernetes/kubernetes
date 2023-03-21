@@ -467,6 +467,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 // TestJobPodFailurePolicy tests handling of pod failures with respect to the
 // configured pod failure policy rules
 func TestJobPodFailurePolicy(t *testing.T) {
+	//TODO(#115688): Add tests for pod failure policy with 0 exit code for the In operator when exit code=0/code!=0 in v1.29
 	job := batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
