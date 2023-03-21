@@ -28,16 +28,16 @@ import (
 	"testing"
 	"time"
 
-	clientset "k8s.io/client-go/kubernetes"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -677,8 +677,12 @@ func TestMatchConditions_validation(t *testing.T) {
 			}
 
 			_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, metav1.CreateOptions{})
-			if testcase.expectError && err == nil {
-				t.Fatalf("Expected error creating ValidatingWebhookConfiguration")
+			if testcase.expectError {
+				if err == nil {
+					t.Fatalf("Expected error creating ValidatingWebhookConfiguration; got nil")
+				} else if !apierrors.IsInvalid(err) {
+					t.Errorf("Expected Invalid error creating ValidatingWebhookConfiguration; got: %v", err)
+				}
 			} else if !testcase.expectError && err != nil {
 				t.Fatalf("Unexpected error creating ValidatingWebhookConfiguration: %v", err)
 			}
@@ -700,8 +704,12 @@ func TestMatchConditions_validation(t *testing.T) {
 			}
 
 			_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, metav1.CreateOptions{})
-			if testcase.expectError && err == nil {
-				t.Fatalf("Expected error creating MutatingWebhookConfiguration")
+			if testcase.expectError {
+				if err == nil {
+					t.Fatalf("Expected error creating MutatingWebhookConfiguration; got: nil")
+				} else if !apierrors.IsInvalid(err) {
+					t.Errorf("Expected Invalid error creating MutatingWebhookConfiguration; got: %v", err)
+				}
 			} else if !testcase.expectError && err != nil {
 				t.Fatalf("Unexpected error creating MutatingWebhookConfiguration: %v", err)
 			}
