@@ -32,7 +32,7 @@ option go_package = "k8s.io/api/coordination/v1beta1";
 message Lease {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the specification of the Lease.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -45,7 +45,7 @@ message LeaseList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of schema objects.
   repeated Lease items = 2;
@@ -65,12 +65,12 @@ message LeaseSpec {
 
   // acquireTime is a time when the current lease was acquired.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime acquireTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime acquireTime = 3;
 
   // renewTime is a time when the current holder of a lease has last
   // updated the lease.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime renewTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime renewTime = 4;
 
   // leaseTransitions is the number of transitions of a lease between
   // holders.

@@ -40,7 +40,7 @@ message MetricIdentifier {
   // the query used to fetch this metric.
   // When left blank, only the metric's Name will be used to gather metrics.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 }
 
 // MetricListOptions is used to select metrics by their label selectors
@@ -58,12 +58,12 @@ message MetricListOptions {
 // MetricValue is the metric value for some object
 message MetricValue {
   // a reference to the described object
-  optional k8s.io.api.core.v1.ObjectReference describedObject = 1;
+  optional .k8s.io.api.core.v1.ObjectReference describedObject = 1;
 
   optional MetricIdentifier metric = 2;
 
   // indicates the time at which the metrics were produced
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timestamp = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timestamp = 3;
 
   // indicates the window ([Timestamp-Window, Timestamp]) from
   // which these metrics were calculated, when returning rate
@@ -72,12 +72,12 @@ message MetricValue {
   optional int64 windowSeconds = 4;
 
   // the value of the metric for this
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;
 }
 
 // MetricValueList is a list of values for a given metric for some set of objects
 message MetricValueList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // the value of the metric across the described objects
   repeated MetricValue items = 2;

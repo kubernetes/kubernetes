@@ -63,7 +63,7 @@ message SelfSubjectReview {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Status is filled in by the server with the user attributes.
   optional SelfSubjectReviewStatus status = 2;
@@ -81,7 +81,7 @@ message TokenRequest {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional TokenRequestSpec spec = 2;
@@ -123,7 +123,7 @@ message TokenRequestStatus {
   optional string token = 1;
 
   // ExpirationTimestamp is the time of expiration of the returned token.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time expirationTimestamp = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time expirationTimestamp = 2;
 }
 
 // TokenReview attempts to authenticate a token to a known user.
@@ -133,7 +133,7 @@ message TokenReview {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional TokenReviewSpec spec = 2;

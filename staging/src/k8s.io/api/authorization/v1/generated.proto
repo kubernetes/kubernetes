@@ -44,7 +44,7 @@ message LocalSubjectAccessReview {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
   // you made the request against.  If empty, it is defaulted.
@@ -145,7 +145,7 @@ message SelfSubjectAccessReview {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated.  user and groups must be empty
   optional SelfSubjectAccessReviewSpec spec = 2;
@@ -177,7 +177,7 @@ message SelfSubjectRulesReview {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated.
   optional SelfSubjectRulesReviewSpec spec = 2;
@@ -198,7 +198,7 @@ message SubjectAccessReview {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional SubjectAccessReviewSpec spec = 2;
