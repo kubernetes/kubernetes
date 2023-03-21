@@ -2401,12 +2401,12 @@ func TestApplySetParentManagement(t *testing.T) {
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2435,12 +2435,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2470,12 +2470,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2505,12 +2505,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2537,19 +2537,19 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     "",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.k8s.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.kubernetes.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
 		},
 		"group-resources annotation should not contain invalid resources": {
 			grsAnnotation:     "does-not-exist",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.k8s.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.kubernetes.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
 		},
 		"tooling annotation is required": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.k8s.io/tooling\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.kubernetes.io/tooling\"",
 		},
 		"tooling annotation must have kubectl prefix": {
 			grsAnnotation:     validGrsAnnotation,
@@ -2573,13 +2573,13 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "",
-			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.k8s.io/id",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.kubernetes.io/id",
 		},
 		"ID label must match the ApplySet's real ID": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "somethingelse",
-			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.k8s.io/id\" (got: somethingelse, want: %s)", validIDLabel),
+			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.kubernetes.io/id\" (got: somethingelse, want: %s)", validIDLabel),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2668,12 +2668,12 @@ func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
 kind: ApplySet
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: test
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: test
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
+    applyset.kubernetes.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
   name: my-set
 `, string(updatedCRYaml))
 }
@@ -2885,12 +2885,12 @@ func TestApplySetUpdateConflictsAreRetried(t *testing.T) {
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
 `
@@ -2915,7 +2915,7 @@ metadata:
 				if req.URL.Path == pathSecret {
 					if !forceConflicts {
 						applyReturnedConflict = true
-						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader("Apply failed with 1 conflict: conflict with \"other\": .metadata.annotations.applyset.k8s.io/contains-group-resources"))}, nil
+						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader("Apply failed with 1 conflict: conflict with \"other\": .metadata.annotations.applyset.kubernetes.io/contains-group-resources"))}, nil
 					}
 					appliedWithConflictsForced = true
 				}
