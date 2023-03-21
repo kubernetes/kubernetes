@@ -41,6 +41,7 @@ export KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1
 #
 # TODO: KUBE_CI_VERSION_REGEX is used in hack/get-build.sh and KUBE_CI_VERSION_DASHED_REGEX is used in cluster/gce/util.sh,
 # make sure to remove these vars when not used anymore
+#                              v1                .26               .0              -rc            .0              (  .1                +014f      )?
 export KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-[a-zA-Z0-9]+\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
 export KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-[a-zA-Z0-9]+-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
 
