@@ -580,7 +580,14 @@ func TestMatchConditions_validation(t *testing.T) {
 		matchConditions []admissionregistrationv1.MatchCondition
 		expectError     bool
 	}{{
-		name: "valid match conditions",
+		// 	name: "valid match condition",
+		// 	matchConditions: []admissionregistrationv1.MatchCondition{{
+		// 		Name:       "true",
+		// 		Expression: "true",
+		// 	}},
+		// 	expectError: false,
+		// }, {
+		name: "multiple valid match conditions",
 		matchConditions: []admissionregistrationv1.MatchCondition{{
 			Name:       "exclude-leases",
 			Expression: "!(request.resource.group == 'coordination.k8s.io' && request.resource.resource == 'leases')",
@@ -644,6 +651,9 @@ func TestMatchConditions_validation(t *testing.T) {
 		expectError: true,
 	}}
 
+	dryRunCreate := metav1.CreateOptions{
+		DryRun: []string{metav1.DryRunAll},
+	}
 	endpoint := "https://localhost:1234/server"
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
@@ -676,7 +686,7 @@ func TestMatchConditions_validation(t *testing.T) {
 				},
 			}
 
-			_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, metav1.CreateOptions{})
+			_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, dryRunCreate)
 			if testcase.expectError {
 				if err == nil {
 					t.Fatalf("Expected error creating ValidatingWebhookConfiguration; got nil")
@@ -703,7 +713,7 @@ func TestMatchConditions_validation(t *testing.T) {
 				},
 			}
 
-			_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, metav1.CreateOptions{})
+			_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, dryRunCreate)
 			if testcase.expectError {
 				if err == nil {
 					t.Fatalf("Expected error creating MutatingWebhookConfiguration; got: nil")
