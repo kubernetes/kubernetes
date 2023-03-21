@@ -28,8 +28,6 @@ import (
 	"testing"
 	"time"
 
-	clientset "k8s.io/client-go/kubernetes"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,10 +36,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+type matchConditionsTestCase struct {
+	name            string
+	matchConditions []admissionregistrationv1.MatchCondition
+	pods            []*corev1.Pod
+	matchedPods     []*corev1.Pod
+	expectErrorWH   bool
+	expectErrorPod  bool
+	failPolicy      *admissionregistrationv1.FailurePolicyType
+}
 
 type admissionRecorder struct {
 	mu       sync.Mutex
@@ -112,15 +121,7 @@ func Test_MatchConditions(t *testing.T) {
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
 
-	testcases := []struct {
-		name            string
-		matchConditions []admissionregistrationv1.MatchCondition
-		pods            []*corev1.Pod
-		matchedPods     []*corev1.Pod
-		expectErrorWH   bool
-		expectErrorPod  bool
-		failPolicy      *admissionregistrationv1.FailurePolicyType
-	}{
+	testcases := []matchConditionsTestCase{
 		{
 			name: "pods in namespace kube-system is ignored",
 			matchConditions: []admissionregistrationv1.MatchCondition{
@@ -402,7 +403,6 @@ func Test_MatchConditions(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			upCh := recorder.Reset()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
@@ -432,247 +432,196 @@ func Test_MatchConditions(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Run test cases with validatingwebhookconfigurations
+			testAdmissionWebhook(t, recorder, client, testcase, webhookServer.URL, marker.Name, false)
 
-			endpoint := webhookServer.URL
-			markerEndpoint := webhookServer.URL + "/marker"
-			validatingwebhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "admission.integration.test",
+			// Run test cases with mutatingwebhookconfigurations
+			testAdmissionWebhook(t, recorder, client, testcase, webhookServer.URL, marker.Name, true)
+		})
+	}
+}
+
+// Runs same checks against mutating and validating webhook configurations based on isMutating flag
+func testAdmissionWebhook(t *testing.T, recorder *admissionRecorder, client *clientset.Clientset, testcase matchConditionsTestCase, serverEndpoint, markerName string, isMutating bool) {
+	// Reset and rerun against mutating webhook configuration
+	upCh := recorder.Reset()
+
+	markerNs := "marker"
+	markerEndpoint := serverEndpoint + "/marker"
+
+	rules := []admissionregistrationv1.RuleWithOperations{{
+		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
+		Rule: admissionregistrationv1.Rule{
+			APIGroups:   []string{""},
+			APIVersions: []string{"v1"},
+			Resources:   []string{"pods"},
+		},
+	}}
+	markerRules := []admissionregistrationv1.RuleWithOperations{{
+		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+		Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}
+
+	clientConfig := admissionregistrationv1.WebhookClientConfig{
+		URL:      &serverEndpoint,
+		CABundle: localhostCert,
+	}
+	markerClientConfig := admissionregistrationv1.WebhookClientConfig{
+		URL:      &markerEndpoint,
+		CABundle: localhostCert,
+	}
+
+	namespaceSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"marker"},
+			},
+		},
+	}
+
+	markerNamespaceSelector := &metav1.LabelSelector{MatchLabels: map[string]string{
+		corev1.LabelMetadataName: "marker",
+	}}
+	if isMutating {
+		webhook := &admissionregistrationv1.MutatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "admission.integration.test",
+			},
+			Webhooks: []admissionregistrationv1.MutatingWebhook{
+				{
+					Name:         "admission.integration.test",
+					Rules:        rules,
+					ClientConfig: clientConfig,
+					// ignore pods in the marker namespace
+					NamespaceSelector:       namespaceSelector,
+					FailurePolicy:           testcase.failPolicy,
+					SideEffects:             &noSideEffects,
+					AdmissionReviewVersions: []string{"v1"},
+					MatchConditions:         testcase.matchConditions,
 				},
-				Webhooks: []admissionregistrationv1.ValidatingWebhook{
-					{
-						Name: "admission.integration.test",
-						Rules: []admissionregistrationv1.RuleWithOperations{{
-							Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
-							Rule: admissionregistrationv1.Rule{
-								APIGroups:   []string{""},
-								APIVersions: []string{"v1"},
-								Resources:   []string{"pods"},
-							},
-						}},
-						ClientConfig: admissionregistrationv1.WebhookClientConfig{
-							URL:      &endpoint,
-							CABundle: localhostCert,
-						},
-						// ignore pods in the marker namespace
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      corev1.LabelMetadataName,
-									Operator: metav1.LabelSelectorOpNotIn,
-									Values:   []string{"marker"},
-								},
-							}},
-						FailurePolicy:           testcase.failPolicy,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: []string{"v1"},
-						MatchConditions:         testcase.matchConditions,
-					},
-					{
-						Name: "admission.integration.test.marker",
-						Rules: []admissionregistrationv1.RuleWithOperations{{
-							Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
-							Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
-						}},
-						ClientConfig: admissionregistrationv1.WebhookClientConfig{
-							URL:      &markerEndpoint,
-							CABundle: localhostCert,
-						},
-						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
-						}},
-						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
-						FailurePolicy:           testcase.failPolicy,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: []string{"v1"},
-					},
+				{
+					Name:                    "admission.integration.test.marker",
+					Rules:                   markerRules,
+					ClientConfig:            markerClientConfig,
+					NamespaceSelector:       markerNamespaceSelector,
+					ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
+					FailurePolicy:           testcase.failPolicy,
+					SideEffects:             &noSideEffects,
+					AdmissionReviewVersions: []string{"v1"},
 				},
-			}
+			},
+		}
 
-			validatingcfg, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, metav1.CreateOptions{})
-			if testcase.expectErrorWH == false && err != nil {
-				t.Fatal(err)
-			} else if testcase.expectErrorWH == true {
-				if err == nil {
-					t.Fatal("expected error creating ValidatingWebhookConfigurations")
-				}
-				return
-			}
-			vhwHasBeenCleanedUp := false
-			defer func() {
-				if !vhwHasBeenCleanedUp {
-					err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingcfg.GetName(), metav1.DeleteOptions{})
-					if err != nil {
-						t.Fatal(err)
-					}
-				}
-			}()
-
-			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods(markerNs).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-				select {
-				case <-upCh:
-					return true, nil
-				default:
-					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
-					return false, nil
-				}
-			}); err != nil {
+		mutatingcfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), webhook, metav1.CreateOptions{})
+		handleWebhookCreateError(t, testcase.expectErrorWH, err)
+		if testcase.expectErrorWH {
+			return
+		}
+		defer func() {
+			err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingcfg.GetName(), metav1.DeleteOptions{})
+			if err != nil {
 				t.Fatal(err)
 			}
+		}()
+	} else {
+		validatingwebhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "admission.integration.test",
+			},
+			Webhooks: []admissionregistrationv1.ValidatingWebhook{
+				{
+					Name:         "admission.integration.test",
+					Rules:        rules,
+					ClientConfig: clientConfig,
+					// ignore pods in the marker namespace
+					NamespaceSelector:       namespaceSelector,
+					FailurePolicy:           testcase.failPolicy,
+					SideEffects:             &noSideEffects,
+					AdmissionReviewVersions: []string{"v1"},
+					MatchConditions:         testcase.matchConditions,
+				},
+				{
+					Name:                    "admission.integration.test.marker",
+					Rules:                   markerRules,
+					ClientConfig:            markerClientConfig,
+					NamespaceSelector:       markerNamespaceSelector,
+					ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
+					FailurePolicy:           testcase.failPolicy,
+					SideEffects:             &noSideEffects,
+					AdmissionReviewVersions: []string{"v1"},
+				},
+			},
+		}
 
-			for _, pod := range testcase.pods {
-				_, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-				if testcase.expectErrorPod == false && err != nil {
-					t.Fatalf("unexpected error creating test pod: %v", err)
-				} else if testcase.expectErrorWH == true {
-					if err == nil {
-						t.Fatal("expected error creating pods")
-					}
-					return
-				}
-			}
-
-			if len(recorder.requests) != len(testcase.matchedPods) {
-				t.Errorf("unexpected requests %v, expected %v", recorder.requests, testcase.matchedPods)
-			}
-
-			for i, request := range recorder.requests {
-				if request.Name != testcase.matchedPods[i].Name {
-					t.Errorf("unexpected pod name %v, expected %v", request.Name, testcase.matchedPods[i].Name)
-				}
-				if request.Namespace != testcase.matchedPods[i].Namespace {
-					t.Errorf("unexpected pod namespace %v, expected %v", request.Namespace, testcase.matchedPods[i].Namespace)
-				}
-			}
-
-			//Reset and rerun against mutating webhook configuration
-			//TODO: private helper function for validation after creating vwh or mwh
-			upCh = recorder.Reset()
+		validatingcfg, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, metav1.CreateOptions{})
+		handleWebhookCreateError(t, testcase.expectErrorWH, err)
+		if testcase.expectErrorWH {
+			return
+		}
+		defer func() {
 			err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingcfg.GetName(), metav1.DeleteOptions{})
 			if err != nil {
 				t.Fatal(err)
-			} else {
-				vhwHasBeenCleanedUp = true
 			}
+		}()
+	}
 
-			mutatingwebhook := &admissionregistrationv1.MutatingWebhookConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "admission.integration.test",
-				},
-				Webhooks: []admissionregistrationv1.MutatingWebhook{
-					{
-						Name: "admission.integration.test",
-						Rules: []admissionregistrationv1.RuleWithOperations{{
-							Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
-							Rule: admissionregistrationv1.Rule{
-								APIGroups:   []string{""},
-								APIVersions: []string{"v1"},
-								Resources:   []string{"pods"},
-							},
-						}},
-						ClientConfig: admissionregistrationv1.WebhookClientConfig{
-							URL:      &endpoint,
-							CABundle: localhostCert,
-						},
-						// ignore pods in the marker namespace
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      corev1.LabelMetadataName,
-									Operator: metav1.LabelSelectorOpNotIn,
-									Values:   []string{"marker"},
-								},
-							}},
-						FailurePolicy:           testcase.failPolicy,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: []string{"v1"},
-						MatchConditions:         testcase.matchConditions,
-					},
-					{
-						Name: "admission.integration.test.marker",
-						Rules: []admissionregistrationv1.RuleWithOperations{{
-							Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
-							Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
-						}},
-						ClientConfig: admissionregistrationv1.WebhookClientConfig{
-							URL:      &markerEndpoint,
-							CABundle: localhostCert,
-						},
-						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
-						}},
-						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
-						FailurePolicy:           testcase.failPolicy,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: []string{"v1"},
-					},
-				},
-			}
+	// wait until new webhook is called the first time
+	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := client.CoreV1().Pods(markerNs).Patch(context.TODO(), markerName, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		select {
+		case <-upCh:
+			return true, nil
+		default:
+			t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+			return false, nil
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-			mutatingcfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, metav1.CreateOptions{})
-			if testcase.expectErrorWH == false && err != nil {
-				t.Fatal(err)
-			} else if testcase.expectErrorWH == true {
-				if err == nil {
-					t.Fatal("expected error creating MutatingWebhookConfiguration")
-				}
-				return
+	for _, pod := range testcase.pods {
+		_, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if testcase.expectErrorPod == false && err != nil {
+			t.Fatalf("unexpected error creating test pod: %v", err)
+		} else if testcase.expectErrorWH == true {
+			if err == nil {
+				t.Fatal("expected error creating pods")
 			}
-			defer func() {
-				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingcfg.GetName(), metav1.DeleteOptions{})
-				if err != nil {
-					t.Fatal(err)
-				}
-			}()
+			return
+		}
+		if !testcase.expectErrorPod {
+			err = client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			if err != nil {
+				t.Errorf("unexpected error deleting pod %v", err.Error())
+			}
+		}
+	}
 
-			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods(markerNs).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-				select {
-				case <-upCh:
-					return true, nil
-				default:
-					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
-					return false, nil
-				}
-			}); err != nil {
-				t.Fatal(err)
-			}
+	if len(recorder.requests) != len(testcase.matchedPods) {
+		t.Fatalf("unexpected requests %v, expected %v", recorder.requests, testcase.matchedPods)
+	}
 
-			for _, pod := range testcase.pods {
-				if !testcase.expectErrorPod {
-					err := client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-					//TODO: should probably confirm deleted
-					if err != nil {
-						t.Errorf("unexpected error deleting pods %v", err.Error())
-					}
-				}
-				_, err = client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-				if testcase.expectErrorPod == false && err != nil {
-					t.Fatalf("unexpected error creating test pod: %v", err)
-				} else if testcase.expectErrorWH == true {
-					if err == nil {
-						t.Fatal("expected error creating pods")
-					}
-					return
-				}
-			}
+	for i, request := range recorder.requests {
+		if request.Name != testcase.matchedPods[i].Name {
+			t.Errorf("unexpected pod name %v, expected %v", request.Name, testcase.matchedPods[i].Name)
+		}
+		if request.Namespace != testcase.matchedPods[i].Namespace {
+			t.Errorf("unexpected pod namespace %v, expected %v", request.Namespace, testcase.matchedPods[i].Namespace)
+		}
+	}
+}
 
-			if len(recorder.requests) != len(testcase.matchedPods) {
-				t.Errorf("unexpected requests %v, expected %v", recorder.requests, testcase.matchedPods)
-			}
-
-			for i, request := range recorder.requests {
-				if request.Name != testcase.matchedPods[i].Name {
-					t.Errorf("unexpected pod name %v, expected %v", request.Name, testcase.matchedPods[i].Name)
-				}
-				if request.Namespace != testcase.matchedPods[i].Namespace {
-					t.Errorf("unexpected pod namespace %v, expected %v", request.Namespace, testcase.matchedPods[i].Namespace)
-				}
-			}
-		})
+func handleWebhookCreateError(t *testing.T, expectErrorWH bool, err error) {
+	if expectErrorWH == false && err != nil {
+		t.Fatal(err)
+	} else if expectErrorWH == true {
+		if err == nil {
+			t.Fatal("expected error creating admission webhook")
+		}
+		return
 	}
 }
 
