@@ -776,6 +776,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 				s.AggregatedDiscoveryGroupManager.AddGroupVersion(
 					groupVersion.Group,
 					apidiscoveryv2beta1.APIVersionDiscovery{
+						Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
 						Version:   groupVersion.Version,
 						Resources: discoveryAPIResources,
 					},
@@ -785,6 +786,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 				s.AggregatedLegacyDiscoveryGroupManager.AddGroupVersion(
 					groupVersion.Group,
 					apidiscoveryv2beta1.APIVersionDiscovery{
+						Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
 						Version:   groupVersion.Version,
 						Resources: discoveryAPIResources,
 					},
