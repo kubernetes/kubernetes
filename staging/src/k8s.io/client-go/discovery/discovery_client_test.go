@@ -988,7 +988,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 	}
 	tests := []struct {
 		response func(w http.ResponseWriter, req *http.Request)
-		expected map[schema.GroupVersionResource]struct{}
+		expected sets.Set[schema.GroupVersionResource]
 	}{
 		{
 			// Combines discovery for /api and /apis.
@@ -1032,7 +1032,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: map[schema.GroupVersionResource]struct{}{
+			expected: sets.Set[schema.GroupVersionResource]{
 				{Group: "", Version: "v1", Resource: "pods"}:      {},
 				{Group: "", Version: "v1", Resource: "services"}:  {},
 				{Group: "batch", Version: "v1", Resource: "jobs"}: {},
@@ -1078,7 +1078,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: map[schema.GroupVersionResource]struct{}{
+			expected: sets.Set[schema.GroupVersionResource]{
 				{Group: "batch", Version: "v1", Resource: "jobs"}:           {},
 				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},
@@ -1121,7 +1121,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: map[schema.GroupVersionResource]struct{}{
+			expected: sets.Set[schema.GroupVersionResource]{
 				{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:     {},
 				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},

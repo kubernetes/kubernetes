@@ -65,7 +65,7 @@ type ControllerOptions struct {
 	// Discover list of supported resources on the server.
 	DiscoveryFunc NamespacedResourcesFunc
 	// A function that returns the list of resources to ignore
-	IgnoredResourcesFunc func() map[schema.GroupResource]struct{}
+	IgnoredResourcesFunc func() sets.Set[schema.GroupResource]
 	// InformersStarted knows if informers were started.
 	InformersStarted <-chan struct{}
 	// InformerFactory interfaces with informers.
@@ -433,7 +433,7 @@ func (rq *Controller) replenishQuota(ctx context.Context, groupResource schema.G
 // Sync periodically resyncs the controller when new resources are observed from discovery.
 func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResourcesFunc, period time.Duration) {
 	// Something has changed, so track the new state and perform a sync.
-	oldResources := make(map[schema.GroupVersionResource]struct{})
+	oldResources := make(sets.Set[schema.GroupVersionResource])
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		// Get the current resource list from discovery.
 		newResources, err := GetQuotableResources(discoveryFunc)
@@ -495,7 +495,7 @@ func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResource
 }
 
 // printDiff returns a human-readable summary of what resources were added and removed
-func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct{}) string {
+func printDiff(oldResources, newResources sets.Set[schema.GroupVersionResource]) string {
 	removed := sets.NewString()
 	for oldResource := range oldResources {
 		if _, ok := newResources[oldResource]; !ok {
@@ -526,7 +526,7 @@ func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan 
 
 // resyncMonitors starts or stops quota monitors as needed to ensure that all
 // (and only) those resources present in the map are monitored.
-func (rq *Controller) resyncMonitors(ctx context.Context, resources map[schema.GroupVersionResource]struct{}) error {
+func (rq *Controller) resyncMonitors(ctx context.Context, resources sets.Set[schema.GroupVersionResource]) error {
 	if rq.quotaMonitor == nil {
 		return nil
 	}
@@ -542,7 +542,7 @@ func (rq *Controller) resyncMonitors(ctx context.Context, resources map[schema.G
 // It requires a resource supports the following verbs: 'create','list','delete'
 // This function may return both results and an error.  If that happens, it means that the discovery calls were only
 // partially successful.  A decision about whether to proceed or not is left to the caller.
-func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.GroupVersionResource]struct{}, error) {
+func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (sets.Set[schema.GroupVersionResource], error) {
 	possibleResources, discoveryErr := discoveryFunc()
 	if discoveryErr != nil && len(possibleResources) == 0 {
 		return nil, fmt.Errorf("failed to discover resources: %v", discoveryErr)

@@ -19,6 +19,7 @@ package resourcequota
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sync"
 	"time"
 
@@ -89,7 +90,7 @@ type QuotaMonitor struct {
 	informerFactory informerfactory.InformerFactory
 
 	// list of resources to ignore
-	ignoredResources map[schema.GroupResource]struct{}
+	ignoredResources sets.Set[schema.GroupResource]
 
 	// The period that should be used to re-sync the monitored resource
 	resyncPeriod controller.ResyncPeriodFunc
@@ -104,7 +105,7 @@ type QuotaMonitor struct {
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
-func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
+func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources sets.Set[schema.GroupResource], resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
 	return &QuotaMonitor{
 		informersStarted:  informersStarted,
 		informerFactory:   informerFactory,
@@ -183,7 +184,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 // instead of immediately exiting on an error. It may be called before or after
 // Run. Monitors are NOT started as part of the sync. To ensure all existing
 // monitors are started, call StartMonitors.
-func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.GroupVersionResource]struct{}) error {
+func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources sets.Set[schema.GroupVersionResource]) error {
 	logger := klog.FromContext(ctx)
 
 	qm.monitorLock.Lock()

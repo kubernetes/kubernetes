@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
@@ -105,7 +106,7 @@ func TestRESTMapperAdmissionPlugin(t *testing.T) {
 
 type doNothingQuotaConfiguration struct{}
 
-func (doNothingQuotaConfiguration) IgnoredResources() map[schema.GroupResource]struct{} { return nil }
+func (doNothingQuotaConfiguration) IgnoredResources() sets.Set[schema.GroupResource] { return nil }
 
 func (doNothingQuotaConfiguration) Evaluators() []quota.Evaluator { return nil }
 

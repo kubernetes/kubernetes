@@ -18,24 +18,25 @@ package generic
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
 // implements a basic configuration
 type simpleConfiguration struct {
 	evaluators       []quota.Evaluator
-	ignoredResources map[schema.GroupResource]struct{}
+	ignoredResources sets.Set[schema.GroupResource]
 }
 
 // NewConfiguration creates a quota configuration
-func NewConfiguration(evaluators []quota.Evaluator, ignoredResources map[schema.GroupResource]struct{}) quota.Configuration {
+func NewConfiguration(evaluators []quota.Evaluator, ignoredResources sets.Set[schema.GroupResource]) quota.Configuration {
 	return &simpleConfiguration{
 		evaluators:       evaluators,
 		ignoredResources: ignoredResources,
 	}
 }
 
-func (c *simpleConfiguration) IgnoredResources() map[schema.GroupResource]struct{} {
+func (c *simpleConfiguration) IgnoredResources() sets.Set[schema.GroupResource] {
 	return c.ignoredResources
 }
 

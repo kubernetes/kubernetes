@@ -19,6 +19,7 @@ package install
 import (
 	eventv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/apis/authentication"
@@ -39,7 +40,7 @@ func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Co
 }
 
 // ignoredResources are ignored by quota by default
-var ignoredResources = map[schema.GroupResource]struct{}{
+var ignoredResources = sets.Set[schema.GroupResource]{
 	// virtual resources that aren't stored and shouldn't be quota-ed
 	{Group: "", Resource: "bindings"}:                                       {},
 	{Group: "", Resource: "componentstatuses"}:                              {},
@@ -57,6 +58,6 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 
 // DefaultIgnoredResources returns the default set of resources that quota system
 // should ignore. This is exposed so downstream integrators can have access to them.
-func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
+func DefaultIgnoredResources() sets.Set[schema.GroupResource] {
 	return ignoredResources
 }
