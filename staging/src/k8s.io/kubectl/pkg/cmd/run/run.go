@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/distribution/v3/reference"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
