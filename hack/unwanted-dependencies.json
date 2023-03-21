@@ -46,12 +46,6 @@
       "github.com/getsentry/raven-go": [
         "go.etcd.io/etcd/raft/v3"
       ],
-      "github.com/go-kit/kit": [
-        "github.com/grpc-ecosystem/go-grpc-middleware"
-      ],
-      "github.com/gogo/googleapis": [
-        "github.com/google/cadvisor"
-      ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/cgroups",

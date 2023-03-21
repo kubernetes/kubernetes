@@ -104,6 +104,27 @@ func convertToMap(modStr string) ([]module, map[module][]module) {
 	return mainModulesList, modMap
 }
 
+func getShortestPath(mod module) (path []string) {
+	modWhyStr, err := runCommand("go", "mod", "why", "-m", mod.name)
+	if err != nil {
+		log.Fatalf("Error running 'go mod why -m %s': %s", mod.name, err)
+	}
+	for _, line := range strings.Split(modWhyStr, "\n") {
+		if len(line) == 0 {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "(") {
+			// Response in brackets means there is no path to this module
+			return
+		}
+		path = append(path, line)
+	}
+	return
+}
+
 // difference returns a-b and b-a as sorted lists
 func difference(a, b []string) ([]string, []string) {
 	aMinusB := map[string]bool{}
@@ -207,23 +228,27 @@ func main() {
 		// visit to find unwanted modules still referenced from the main module
 		visit(func(m module, via []module) {
 			if _, unwanted := configFromFile.Spec.UnwantedModules[m.name]; unwanted {
-				// this is unwanted, store what is referencing it
-				referencer := via[len(via)-1]
-				if !moduleInSlice(referencer, unwantedToReferencers[m.name], false) {
-					// // uncomment to get a detailed tree of the path that referenced the unwanted dependency
-					//
-					// i := 0
-					// for _, v := range via {
-					// 	if v.version != "" && v.version != "v0.0.0" {
-					// 		fmt.Println(strings.Repeat("  ", i), v)
-					// 		i++
-					// 	}
-					// }
-					// if i > 0 {
-					// 	fmt.Println(strings.Repeat("  ", i+1), m)
-					// 	fmt.Println()
-					// }
-					unwantedToReferencers[m.name] = append(unwantedToReferencers[m.name], referencer)
+				// Check it isn't pruned
+				path := getShortestPath(m)
+				if len(path) > 0 {
+					// this is unwanted, store what is referencing it
+					referencer := via[len(via)-1]
+					if !moduleInSlice(referencer, unwantedToReferencers[m.name], false) {
+						// // uncomment to get a detailed tree of the path that referenced the unwanted dependency
+						//
+						// i := 0
+						// for _, v := range via {
+						// 	if v.version != "" && v.version != "v0.0.0" {
+						// 		fmt.Println(strings.Repeat("  ", i), v)
+						// 		i++
+						// 	}
+						// }
+						// if i > 0 {
+						// 	fmt.Println(strings.Repeat("  ", i+1), m)
+						// 	fmt.Println()
+						// }
+						unwantedToReferencers[m.name] = append(unwantedToReferencers[m.name], referencer)
+					}
 				}
 			}
 		}, mainModule, moduleGraph, effectiveVersions)
