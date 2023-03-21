@@ -580,13 +580,13 @@ func TestMatchConditions_validation(t *testing.T) {
 		matchConditions []admissionregistrationv1.MatchCondition
 		expectError     bool
 	}{{
-		// 	name: "valid match condition",
-		// 	matchConditions: []admissionregistrationv1.MatchCondition{{
-		// 		Name:       "true",
-		// 		Expression: "true",
-		// 	}},
-		// 	expectError: false,
-		// }, {
+		name: "valid match condition",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "true",
+			Expression: "true",
+		}},
+		expectError: false,
+	}, {
 		name: "multiple valid match conditions",
 		matchConditions: []admissionregistrationv1.MatchCondition{{
 			Name:       "exclude-leases",
