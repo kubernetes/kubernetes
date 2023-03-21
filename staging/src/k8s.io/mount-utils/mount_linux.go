@@ -395,6 +395,11 @@ func (*Mounter) List() ([]MountPoint, error) {
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // is of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	// Root is always mounted.
+	if file == string(os.PathSeparator) {
+		return false, nil
+	}
+
 	stat, err := os.Stat(file)
 	if err != nil {
 		return true, err
