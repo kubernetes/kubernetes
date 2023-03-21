@@ -97,8 +97,8 @@ func TestAllocateIPAllocator(t *testing.T) {
 		},
 		{
 			name:     "IPv6",
-			cidr:     "2001:db8:1::/116",
-			free:     4095,
+			cidr:     "2001:db8:1::/120",
+			free:     255,
 			released: "2001:db8:1::5",
 			outOfRange: []string{
 				"2001:db8::1",   // not in 2001:db8:1::/48
