@@ -43,6 +43,8 @@ import (
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 
+const maxTimeout = 10 * time.Second
+
 type testClient interface {
 	kubernetes.Interface
 	aggregator.Interface
@@ -143,7 +145,7 @@ func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 	err = wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		1*time.Second,
+		maxTimeout,
 		func(ctx context.Context) (done bool, err error) {
 			_, err = client.ApiregistrationV1().APIServices().Get(ctx, name, metav1.GetOptions{})
 			if err == nil {
@@ -211,7 +213,7 @@ func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 	err = wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		1*time.Second,
+		maxTimeout,
 		func(ctx context.Context) (done bool, err error) {
 			_, err = client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 			if err == nil {
@@ -590,7 +592,7 @@ func WaitForResultWithCondition(ctx context.Context, client testClient, conditio
 	return wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		1*time.Second,
+		maxTimeout,
 		func(ctx context.Context) (done bool, err error) {
 			groupList, err := FetchV2Discovery(ctx, client)
 			if err != nil {
@@ -611,7 +613,7 @@ func WaitForV1GroupsWithCondition(ctx context.Context, client testClient, condit
 	return wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		1*time.Second,
+		maxTimeout,
 		func(ctx context.Context) (done bool, err error) {
 			groupList, err := FetchV1DiscoveryGroups(ctx, client)
 
@@ -633,7 +635,7 @@ func WaitForV1ResourcesWithCondition(ctx context.Context, client testClient, gv 
 	return wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		1*time.Second,
+		maxTimeout,
 		func(ctx context.Context) (done bool, err error) {
 			resourceList, err := FetchV1DiscoveryResource(ctx, client, gv)
 
