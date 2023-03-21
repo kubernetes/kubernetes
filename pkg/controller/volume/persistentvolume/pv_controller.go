@@ -1830,6 +1830,8 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
 			return provisionerName, err
 		}
+		provisionerMsg := fmt.Sprintf("Using %q as external provisioner, please check if present on cluster", provisionerName)
+		logger.V(3).Info("provisionClaimOperationExternal provisioning claim", "PVC", klog.KObj(claim), "msg", provisionerMsg)
 	}
 	// Add provisioner annotation so external provisioners know when to start
 	newClaim, err := ctrl.setClaimProvisioner(ctx, claim, provisionerName)
@@ -1839,7 +1841,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 		return provisionerName, err
 	}
 	claim = newClaim
-	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
+	msg := fmt.Sprintf("Requested external provisioner %q for a volume to be created, or waiting manually created volume by system administrator", provisionerName)
 	// External provisioner has been requested for provisioning the volume
 	// Report an event and wait for external provisioner to finish
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
