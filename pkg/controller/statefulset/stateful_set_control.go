@@ -122,7 +122,7 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 
 	switch {
 	case err != nil && statusErr != nil:
-		klog.ErrorS(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
+		logger.Error(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
 		return currentRevision, updateRevision, currentStatus, err
 	case err != nil:
 		return currentRevision, updateRevision, currentStatus, err
@@ -450,11 +450,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// If the Pod is in pending state then trigger PVC creation to create missing PVCs
 		if isPending(replicas[i]) {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is triggering PVC creation for pending Pod %s",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
+			logger.V(4).Info(
+				"StatefulSet is triggering PVC creation for pending Pod",
+				"statefulset", klog.KObj(set),
+				"pod", replicas[i].Name)
 			if err := ssc.podControl.createMissingPersistentVolumeClaims(ctx, set, replicas[i]); err != nil {
 				return &status, err
 			}

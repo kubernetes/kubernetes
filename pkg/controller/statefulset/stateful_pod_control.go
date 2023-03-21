@@ -219,7 +219,7 @@ func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, s
 		case err != nil:
 			return false, fmt.Errorf("Could not retrieve claim %s for %s when checking PVC deletion policy", claimName, pod.Name)
 		default:
-			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
+			if !claimOwnerMatchesSetAndPod(ctx, claim, set, pod) {
 				return false, nil
 			}
 		}
@@ -241,9 +241,9 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(ctx context.Cont
 		case err != nil:
 			return fmt.Errorf("Could not retrieve claim %s not found for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
-			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
+			if !claimOwnerMatchesSetAndPod(ctx, claim, set, pod) {
 				claim = claim.DeepCopy() // Make a copy so we don't mutate the shared cache.
-				needsUpdate := updateClaimOwnerRefForSetAndPod(claim, set, pod)
+				needsUpdate := updateClaimOwnerRefForSetAndPod(ctx, claim, set, pod)
 				if needsUpdate {
 					err := spc.objectMgr.UpdateClaim(claim)
 					if err != nil {
