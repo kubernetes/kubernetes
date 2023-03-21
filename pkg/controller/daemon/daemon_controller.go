@@ -1371,16 +1371,8 @@ func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
 // Returned pods can't be deleted by PodGCController so they should be deleted by DaemonSetController.
 func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) []string {
 	var results []string
-	isNodeRunning := make(map[string]bool)
 	for _, node := range runningNodesList {
-		isNodeRunning[node.Name] = true
-	}
-
-	for n, pods := range nodeToDaemonPods {
-		if isNodeRunning[n] {
-			continue
-		}
-		for _, pod := range pods {
+		for _, pod := range nodeToDaemonPods[node.Name] {
 			if len(pod.Spec.NodeName) == 0 {
 				results = append(results, pod.Name)
 			}
