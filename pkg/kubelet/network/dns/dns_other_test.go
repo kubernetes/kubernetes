@@ -19,39 +19,8 @@ limitations under the License.
 
 package dns
 
-import (
-	"fmt"
-	"os"
-	"testing"
-)
-
 var (
 	defaultResolvConf = "/etc/resolv.conf"
 	// configurer.getHostDNSConfig is faked on Windows, while it is not faked on Linux.
 	fakeGetHostDNSConfigCustom = getHostDNSConfig
 )
-
-// getResolvConf returns a temporary resolv.conf file containing the testHostNameserver nameserver and
-// testHostDomain search field, and a cleanup function for the temporary file.
-func getResolvConf(t *testing.T) (string, func()) {
-	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
-	tmpfile, err := os.CreateTemp("", "tmpResolvConf")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cleanup := func() {
-		os.Remove(tmpfile.Name())
-	}
-
-	if _, err := tmpfile.Write(resolvConfContent); err != nil {
-		cleanup()
-		t.Fatal(err)
-	}
-	if err := tmpfile.Close(); err != nil {
-		cleanup()
-		t.Fatal(err)
-	}
-
-	return tmpfile.Name(), cleanup
-}
