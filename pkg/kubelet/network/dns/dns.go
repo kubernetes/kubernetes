@@ -281,6 +281,33 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, options, utilerrors.NewAggregate(allErrors)
 }
 
+// Reads a resolv.conf-like file and returns the DNS config options from it.
+// Returns an empty DNSConfig if the given resolverConfigFile is an empty string.
+func getDNSConfig(resolverConfigFile string) (*runtimeapi.DNSConfig, error) {
+	var hostDNS, hostSearch, hostOptions []string
+	// Get host DNS settings
+	if resolverConfigFile != "" {
+		f, err := os.Open(resolverConfigFile)
+		if err != nil {
+			klog.ErrorS(err, "Could not open resolv conf file.")
+			return nil, err
+		}
+		defer f.Close()
+
+		hostDNS, hostSearch, hostOptions, err = parseResolvConf(f)
+		if err != nil {
+			err := fmt.Errorf("Encountered error while parsing resolv conf file. Error: %w", err)
+			klog.ErrorS(err, "Could not parse resolv conf file.")
+			return nil, err
+		}
+	}
+	return &runtimeapi.DNSConfig{
+		Servers:  hostDNS,
+		Searches: hostSearch,
+		Options:  hostOptions,
+	}, nil
+}
+
 func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 	dnsPolicy := pod.Spec.DNSPolicy
 	switch dnsPolicy {
