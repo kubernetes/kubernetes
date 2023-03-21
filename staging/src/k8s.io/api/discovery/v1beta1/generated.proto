@@ -54,7 +54,7 @@ message Endpoint {
   // targetRef is a reference to a Kubernetes object that represents this
   // endpoint.
   // +optional
-  optional k8s.io.api.core.v1.ObjectReference targetRef = 4;
+  optional .k8s.io.api.core.v1.ObjectReference targetRef = 4;
 
   // topology contains arbitrary topology information associated with the
   // endpoint. These key/value pairs must conform with the label format.
@@ -153,7 +153,7 @@ message EndpointPort {
 message EndpointSlice {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // addressType specifies the type of address carried by this EndpointSlice.
   // All addresses in this slice must be the same type. This field is
@@ -183,7 +183,7 @@ message EndpointSlice {
 message EndpointSliceList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of endpoint slices
   repeated EndpointSlice items = 2;
