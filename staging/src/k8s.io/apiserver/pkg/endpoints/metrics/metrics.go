@@ -26,6 +26,7 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful/v3"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -355,6 +356,14 @@ const (
 	// The source that is recording the apiserver_request_post_timeout_total metric.
 	// The "executing" request handler returns after the timeout filter times out the request.
 	PostTimeoutSourceTimeoutHandler = "timeout-handler"
+
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the request was canceled.
+	PostTimeoutSourceCanceledHandler = "canceled-handler"
+
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the request was terminated for an unknown reason.
+	PostTimeoutSourceUnknownHandler = "unknown-handler"
 
 	// The source that is recording the apiserver_request_post_timeout_total metric.
 	// The "executing" request handler returns after the rest layer times out the request.

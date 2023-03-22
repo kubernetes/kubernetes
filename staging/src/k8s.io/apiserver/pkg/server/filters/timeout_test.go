@@ -133,8 +133,8 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Times out
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
 	timeout <- time.Time{}
 	res, err = http.Get(ts.URL)
 	if err != nil {
@@ -372,6 +372,59 @@ func TestTimeoutWithLogging(t *testing.T) {
 		t.Errorf("got status code %d; expected %d", actual, expected)
 	}
 	res.Body.Close()
+}
+
+func TestClientSideCancel(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	postTimeoutCh := make(chan struct{})
+	postTimeoutFn := func() {
+		close(postTimeoutCh)
+	}
+
+	ts := httptest.NewServer(
+		WithHTTPLogging(
+			WithTimeout(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					time.Sleep(30 * time.Second)
+					w.Write([]byte("ok"))
+				}),
+				func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+					return req, false, postTimeoutFn, apierrors.NewTimeoutError("timed out", 0)
+				},
+			),
+		),
+	)
+	defer ts.Close()
+
+	client := &http.Client{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Cancel the request after 1 second.
+	go func() {
+		time.Sleep(time.Second)
+		cancel()
+	}()
+	if _, err := client.Do(req); err == nil {
+		t.Fatalf("expected context canceled error")
+	}
+
+	select {
+	case <-postTimeoutCh:
+		t.Fatalf("postTimeout function should not be called for client-side cancel")
+	case <-time.After(5 * time.Second):
+		t.Logf("postTimeout was not called within 5 seconds of request cancel")
+	}
 }
 
 func TestErrConnKilled(t *testing.T) {

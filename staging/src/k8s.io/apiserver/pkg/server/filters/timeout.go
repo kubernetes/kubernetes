@@ -18,7 +18,9 @@ package filters
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -122,12 +124,17 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case <-timeoutCh:
+		var (
+			reason       = "unknown termination"
+			metricSource = metrics.PostTimeoutSourceUnknownHandler
+			responseErr  *apierrors.StatusError
+		)
 		defer func() {
 			// resultCh needs to have a reader, since the function doing
 			// the work needs to send to it. This is defer'd to ensure it runs
 			// ever if the post timeout work itself panics.
 			go func() {
-				timedOutAt := time.Now()
+				terminatedAt := time.Now()
 				res := <-resultCh
 
 				status := metrics.PostTimeoutHandlerOK
@@ -136,17 +143,32 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					status = metrics.PostTimeoutHandlerPanic
 				}
 
-				metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceTimeoutHandler, status)
-				err := fmt.Errorf("post-timeout activity - time-elapsed: %s, %v %q result: %v",
-					time.Since(timedOutAt), r.Method, r.URL.Path, res)
+				metrics.RecordRequestPostTimeout(metricSource, status)
+				err := fmt.Errorf("post-%s activity - time-elapsed: %s, %v %q result: %v",
+					reason, time.Since(terminatedAt), r.Method, r.URL.Path, res)
 				utilruntime.HandleError(err)
 			}()
 		}()
 		httplog.SetStacktracePredicate(r.Context(), func(status int) bool {
 			return false
 		})
-		defer postTimeoutFn()
-		tw.timeout(err)
+
+		switch r.Context().Err() {
+		case context.DeadlineExceeded:
+			reason = "timeout"
+			metricSource = metrics.PostTimeoutSourceTimeoutHandler
+			responseErr = err
+			defer postTimeoutFn()
+
+		case context.Canceled:
+			reason = "cancel"
+			metricSource = metrics.PostTimeoutSourceCanceledHandler
+			responseErr = apierrors.NewBadRequest("request canceled")
+
+		default:
+			responseErr = apierrors.NewInternalError(errors.New("request terminated for an unknown reason"))
+		}
+		tw.timeout(responseErr)
 	}
 }
 
