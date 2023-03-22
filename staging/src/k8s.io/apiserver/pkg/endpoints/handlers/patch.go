@@ -653,9 +653,6 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
-	if scope.FieldManager != nil {
-		transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
-	}
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)
