@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -247,6 +248,55 @@ func getRV(obj runtime.Object) (string, error) {
 		return "", err
 	}
 	return acc.GetResourceVersion(), nil
+}
+
+func TestNoopChangeCreationTime(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "myconfig",
+			"creationTimestamp": null,
+			"resourceVersion": null
+		},
+		"data": {
+			"key": "value"
+		}
+	}`)
+
+	obj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("configmaps").
+		Name("myconfig").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	require.NoError(t, err)
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	newObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("configmaps").
+		Name("myconfig").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	require.NoError(t, err)
+	require.Equal(t, obj, newObj)
 }
 
 // TestNoSemanticUpdateAppleSameResourceVersion makes sure that APPLY requests which makes no semantic changes
