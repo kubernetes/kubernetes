@@ -106,7 +106,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(controllerInitFuncConstructors, completedConfig, cloud)
 
-			if err := Run(completedConfig, cloud, controllerInitializers, make(map[string]webhookHandler), stopCh); err != nil {
+			if err := Run(completedConfig, cloud, controllerInitializers, make(map[string]WebhookHandler), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
@@ -161,7 +161,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, webhooks map[string]webhookHandler,
+func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, webhooks map[string]WebhookHandler,
 	stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
