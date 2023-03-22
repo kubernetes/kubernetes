@@ -98,7 +98,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	}
 
 	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
-	if err != nil || (result != probe.Success && result != probe.Warning) {
+	if err != nil || (result != probe.Success && result != probe.Warning && result != probe.Unknown) {
 		// Probe failed in one way or another.
 		if err != nil {
 			klog.V(1).ErrorS(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
@@ -112,8 +112,9 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	if result == probe.Warning {
 		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
 		klog.V(3).InfoS("Probe succeeded with a warning", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
-	} else {
-		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+	} else if result == probe.Unknown {
+		klog.V(3).InfoS("Probe resulted in unknown state", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe resulted in unknown state: %s", probeType, output)
 	}
 	return results.Success, nil
 }
