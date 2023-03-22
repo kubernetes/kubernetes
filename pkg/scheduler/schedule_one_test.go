@@ -469,6 +469,9 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	// Run scheduler.
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	if err = sched.WaitForHandlersSync(ctx); err != nil {
+		t.Fatalf("Handlers failed to sync: %v: ", err)
+	}
 	go sched.Run(ctx)
 
 	// Send pods to be scheduled.

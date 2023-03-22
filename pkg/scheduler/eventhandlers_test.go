@@ -448,7 +448,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 
-			addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap)
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap); err != nil {
+				t.Fatalf("Add event handlers failed, error = %v", err)
+			}
 
 			informerFactory.Start(testSched.StopEverything)
 			dynInformerFactory.Start(testSched.StopEverything)
