@@ -72,10 +72,11 @@ KUBERNETES_CI_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL:-${KUBERNETES_RELEASE_URL
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
 KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*))?$"
-KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+#                       v1                .26               .0              -(rc            .0                .)?0              (  +014f      )?
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+\\.(0|[1-9][0-9]*)\\.)?(0|[1-9][0-9]*)(\\+[-0-9a-z]*)?$"
 
 # Sets KUBE_VERSION variable if an explicit version number was provided (e.g. "v1.0.6",
-# "v1.2.0-alpha.1.881+376438b69c7612") or resolves the "published" version
+# "v1.2.0-alpha.1.881+376438b69c7612", or "v1.2.0-881+376438b69c7612") or resolves the "published" version
 # <path>/<version> (e.g. "release/stable",' "ci/latest-1") by reading from GCS.
 #
 # See the docs on getting builds for more information about version
@@ -194,7 +195,7 @@ if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
-    # ie. v1.19.0-beta.0.318+b618411f1edb98
+    # ie. v1.19.0-beta.0.318+b618411f1edb98 and v1.19.0-318+b618411f1edb98
     KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
   else
     echo "Version doesn't match regexp" >&2
