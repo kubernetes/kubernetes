@@ -1887,7 +1887,7 @@ func (kl *Kubelet) SyncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
 		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
-			kl.handlePodResourcesResize(pod)
+			pod = kl.handlePodResourcesResize(pod)
 		}
 	}
 
@@ -2665,9 +2665,9 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	if pod.Status.Phase != v1.PodRunning {
-		return
+		return pod
 	}
 	podResized := false
 	for _, container := range pod.Spec.Containers {
@@ -2689,21 +2689,21 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 		}
 	}
 	if !podResized {
-		return
+		return pod
 	}
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
 	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
 	if updatedPod == nil {
-		return
+		return pod
 	}
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(updatedPod))
-			return
+			return pod
 		}
 	}
 	if resizeStatus != "" {
@@ -2711,13 +2711,13 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 		if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
-			return
+			return pod
 		}
 		updatedPod.Status.Resize = resizeStatus
 	}
 	kl.podManager.UpdatePod(updatedPod)
 	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
-	return
+	return updatedPod
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
