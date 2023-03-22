@@ -8418,6 +8418,23 @@ func TestValidateContainers(t *testing.T) {
 			},
 			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].envFrom[0].configMapRef.name"}},
 		},
+		{
+			"Forbidden resize policy",
+			line(),
+			[]core.Container{
+				{
+					Name:                     "with-resize-policy",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					ResizePolicy: []core.ContainerResizePolicy{
+						{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+						{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+					},
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].resizePolicy"}},
+		},
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
