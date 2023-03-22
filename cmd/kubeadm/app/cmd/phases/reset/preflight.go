@@ -46,7 +46,7 @@ func NewPreflightPhase() workflow.Phase {
 }
 
 // runPreflight executes preflight checks logic.
-func runPreflight(c workflow.RunData) error {
+func runPreflight(c workflow.RunData, phase string) error {
 	r, ok := c.(resetData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")

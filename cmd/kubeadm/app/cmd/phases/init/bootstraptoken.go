@@ -62,10 +62,10 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
-func runBootstrapToken(c workflow.RunData) error {
+func runBootstrapToken(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("bootstrap-token phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	client, err := data.Client()
@@ -76,13 +76,13 @@ func runBootstrapToken(c workflow.RunData) error {
 	if !data.SkipTokenPrint() {
 		tokens := data.Tokens()
 		if len(tokens) == 1 {
-			fmt.Printf("[bootstrap-token] Using token: %s\n", tokens[0])
+			fmt.Printf("[%s] Using token: %s\n", phase, tokens[0])
 		} else if len(tokens) > 1 {
-			fmt.Printf("[bootstrap-token] Using tokens: %v\n", tokens)
+			fmt.Printf("[%s] Using tokens: %v\n", phase, tokens)
 		}
 	}
 
-	fmt.Println("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
+	fmt.Printf("[%s] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles\n", phase)
 	// Create the default node bootstrap token
 	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, data.Cfg().BootstrapTokens); err != nil {
 		return errors.Wrap(err, "error updating or creating token")

@@ -526,22 +526,22 @@ func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
 	if j.tlsBootstrapCfg != nil {
 		return j.tlsBootstrapCfg, nil
 	}
-	klog.V(1).Infoln("[preflight] Discovering cluster-info")
+	klog.V(1).Infoln("Discovering cluster-info")
 	tlsBootstrapCfg, err := discovery.For(j.cfg)
 	j.tlsBootstrapCfg = tlsBootstrapCfg
 	return tlsBootstrapCfg, err
 }
 
 // InitCfg returns the InitConfiguration.
-func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
+func (j *joinData) InitCfg(phase string) (*kubeadmapi.InitConfiguration, error) {
 	if j.initCfg != nil {
 		return j.initCfg, nil
 	}
 	if _, err := j.TLSBootstrapCfg(); err != nil {
 		return nil, err
 	}
-	klog.V(1).Infoln("[preflight] Fetching init configuration")
-	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, j.tlsBootstrapCfg)
+	klog.V(1).Infof("[%s] Fetching init configuration", phase)
+	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, j.tlsBootstrapCfg, phase)
 	j.initCfg = initCfg
 	return initCfg, err
 }
@@ -584,10 +584,10 @@ func (j *joinData) PatchesDir() string {
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
-func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
 	// Retrieves the kubeadm configuration
-	klog.V(1).Infoln("[preflight] Retrieving KubeConfig objects")
-	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
+	klog.V(1).Infof("[%s] Retrieving KubeConfig objects", logPrefix)
+	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg, logPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +609,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 }
 
 // fetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap
-func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
 	// creates a client to access the cluster using the bootstrap token identity
 	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
 	if err != nil {
@@ -617,7 +617,7 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	}
 
 	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, "preflight", true, false)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, logPrefix, true, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

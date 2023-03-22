@@ -127,25 +127,25 @@ func getControlPlanePhaseFlags(name string) []string {
 	return flags
 }
 
-func runControlPlanePhase(c workflow.RunData) error {
+func runControlPlanePhase(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("control-plane phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
-	fmt.Printf("[control-plane] Using manifest folder %q\n", data.ManifestDir())
+	fmt.Printf("[%s] Using manifest folder %q\n", phase, data.ManifestDir())
 	return nil
 }
 
-func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runControlPlaneSubphase(component string) func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(InitData)
 		if !ok {
-			return errors.New("control-plane phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 		cfg := data.Cfg()
 
-		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
+		fmt.Printf("[%s] Creating static Pod manifest for %q\n", phase, component)
 		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.PatchesDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), component)
 	}
 }

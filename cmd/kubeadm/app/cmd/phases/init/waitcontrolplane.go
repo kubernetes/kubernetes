@@ -65,10 +65,10 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	return phase
 }
 
-func runWaitControlPlanePhase(c workflow.RunData) error {
+func runWaitControlPlanePhase(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("wait-control-plane phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// If we're dry-running, print the generated manifests.
@@ -80,7 +80,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
+	klog.V(1).Infof("[%s] Waiting for the API server to be healthy", phase)
 
 	client, err := data.Client()
 	if err != nil {
@@ -93,7 +93,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
+	fmt.Printf("[%s] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", phase, data.ManifestDir(), timeout)
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
 		context := struct {

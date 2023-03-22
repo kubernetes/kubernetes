@@ -55,10 +55,10 @@ func NewKubeletStartPhase() workflow.Phase {
 }
 
 // runKubeletStart executes kubelet start logic.
-func runKubeletStart(c workflow.RunData) error {
+func runKubeletStart(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("kubelet-start phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
@@ -82,7 +82,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		fmt.Println("[kubelet-start] Starting the kubelet")
+		fmt.Printf("[%s] Starting the kubelet\n", phase)
 		kubeletphase.TryStartKubelet()
 	}
 

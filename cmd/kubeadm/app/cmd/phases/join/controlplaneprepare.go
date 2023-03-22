@@ -175,7 +175,7 @@ func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	}
 }
 
-func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
+func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData, phase string) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -186,12 +186,12 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(phase)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("[control-plane] Using manifest folder %q\n", data.ManifestDir())
+	fmt.Printf("%s Using manifest folder %q\n", phase, data.ManifestDir())
 
 	// If we're dry-running, set CertificatesDir to default value to get the right cert path in static pod yaml
 	if data.DryRun() {
@@ -199,7 +199,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	}
 
 	for _, component := range kubeadmconstants.ControlPlaneComponents {
-		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
+		fmt.Printf("%s Creating static Pod manifest for %q\n", phase, component)
 		err := controlplane.CreateStaticPodFiles(
 			data.ManifestDir(),
 			data.PatchesDir(),
@@ -215,18 +215,18 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	return nil
 }
 
-func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData, phase string) error {
 	data, ok := c.(JoinData)
 	if !ok {
-		return errors.New("download-certs phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	if data.Cfg().ControlPlane == nil || len(data.CertificateKey()) == 0 {
-		klog.V(1).Infoln("[download-certs] Skipping certs download")
+		klog.V(1).Infof("%s Skipping certs download", phase)
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(phase)
 	if err != nil {
 		return err
 	}
@@ -247,10 +247,10 @@ func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 	return nil
 }
 
-func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData, phase string) error {
 	data, ok := c.(JoinData)
 	if !ok {
-		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// Skip if this is not a control plane
@@ -258,7 +258,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(phase)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 	return certsphase.CreatePKIAssets(cfg)
 }
 
-func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData, phase string) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -284,7 +284,7 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(phase)
 	if err != nil {
 		return err
 	}

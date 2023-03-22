@@ -42,7 +42,7 @@ func ExamplePhase() {
 	var myPhase1 = Phase{
 		Name:  "myPhase1",
 		Short: "A phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(data RunData, _ string) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {
@@ -59,7 +59,7 @@ func ExamplePhase() {
 	var myPhase2 = Phase{
 		Name:  "myPhase2",
 		Short: "Another phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(data RunData, _ string) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {
@@ -83,7 +83,7 @@ func ExampleRunner_Run() {
 	var myPhase = Phase{
 		Name:  "myPhase",
 		Short: "A phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(data RunData, _ string) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {

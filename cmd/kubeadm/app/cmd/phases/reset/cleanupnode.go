@@ -54,29 +54,29 @@ func NewCleanupNodePhase() workflow.Phase {
 	}
 }
 
-func runCleanupNode(c workflow.RunData) error {
+func runCleanupNode(c workflow.RunData, phase string) error {
 	dirsToClean := []string{filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)}
 	r, ok := c.(resetData)
 	if !ok {
-		return errors.New("cleanup-node phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 	certsDir := r.CertificatesDir()
 
 	// Try to stop the kubelet service
-	klog.V(1).Infoln("[reset] Getting init system")
+	klog.V(1).Infof("[%s] Getting init system", phase)
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+		klog.Warningf(fmt.Sprintf("[%s] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!", phase))
+		klog.Warningf(fmt.Sprintf("[%s] Please ensure kubelet is stopped manually", phase))
 	} else {
 		if !r.DryRun() {
-			fmt.Println("[reset] Stopping the kubelet service")
+			fmt.Printf("[%s] Stopping the kubelet service\n", phase)
 			if err := initSystem.ServiceStop("kubelet"); err != nil {
-				klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
-				klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+				klog.Warningf("[%s] The kubelet service could not be stopped by kubeadm: [%v]", phase, err)
+				klog.Warningf("[%s] Please ensure kubelet is stopped manually", phase)
 			}
 		} else {
-			fmt.Println("[reset] Would stop the kubelet service")
+			fmt.Printf("[%s] Would stop the kubelet service\n", phase)
 		}
 	}
 
@@ -90,21 +90,21 @@ func runCleanupNode(c workflow.RunData) error {
 			dirsToClean = append(dirsToClean, kubeletRunDir)
 		}
 	} else {
-		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+		fmt.Printf("[%s] Would unmount mounted directories in %q\n", phase, kubeadmconstants.KubeletRunDirectory)
 	}
 
 	if !r.DryRun() {
-		klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
+		klog.V(1).Infof("[%s] Removing Kubernetes-managed containers", phase)
 		if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
-			klog.Warningf("[reset] Failed to remove containers: %v\n", err)
+			klog.Warningf("[%s] Failed to remove containers: %v\n", phase, err)
 		}
 	} else {
-		fmt.Println("[reset] Would remove Kubernetes-managed containers")
+		fmt.Printf("[%s] Would remove Kubernetes-managed containers\n", phase)
 	}
 
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
-		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
+		klog.Warningf("[%s] WARNING: Cleaning a non-default certificates directory: %q\n", phase, certsDir)
 	}
 
 	dirsToClean = append(dirsToClean, certsDir)
@@ -116,12 +116,12 @@ func runCleanupNode(c workflow.RunData) error {
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
-			klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+			klog.V(1).Infof("[%s] Removing users and groups created for rootless control-plane", phase)
 			if err := users.RemoveUsersAndGroups(); err != nil {
-				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
+				klog.Warningf("[%s] Failed to remove users and groups: %v\n", phase, err)
 			}
 		} else {
-			fmt.Println("[reset] Would remove users and groups created for rootless control-plane")
+			fmt.Printf("[%s] Would remove users and groups created for rootless control-plane\n", phase)
 		}
 	}
 

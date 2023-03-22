@@ -68,10 +68,10 @@ func NewKubeletFinalizePhase() workflow.Phase {
 // runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
 // and updates the kubelet.conf file to point to a rotatable certificate and key for the
 // Node user.
-func runKubeletFinalizeCertRotation(c workflow.RunData) error {
+func runKubeletFinalizeCertRotation(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("kubelet-finalize phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// Check if the user has added the kubelet --cert-dir flag.
@@ -87,10 +87,10 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	rotate := false
 	pemPath := filepath.Join(pkiPath, "kubelet-client-current.pem")
 	if _, err := os.Stat(pemPath); err == nil {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled: found %q", pemPath)
+		klog.V(1).Infof("[%s] Assuming that kubelet client certificate rotation is enabled: found %q", phase, pemPath)
 		rotate = true
 	} else {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled: %v", err)
+		klog.V(1).Infof("[%s] Assuming that kubelet client certificate rotation is disabled: %v", phase, err)
 	}
 
 	// Exit early if rotation is disabled.
@@ -99,7 +99,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	kubeconfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	fmt.Printf("[kubelet-finalize] Updating %q to point to a rotatable kubelet client certificate and key\n", kubeconfigPath)
+	fmt.Printf("[%s] Updating %q to point to a rotatable kubelet client certificate and key\n", phase, kubeconfigPath)
 
 	// Exit early if dry-running is enabled.
 	if data.DryRun() {
@@ -131,7 +131,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	// Restart the kubelet.
-	klog.V(1).Info("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
+	klog.V(1).Infof("[%s] Restarting the kubelet to enable client certificate rotation", phase)
 	kubeletphase.TryRestartKubelet()
 
 	return nil

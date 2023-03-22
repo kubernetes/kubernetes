@@ -49,15 +49,15 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 	}
 }
 
-func runRemoveETCDMemberPhase(c workflow.RunData) error {
+func runRemoveETCDMemberPhase(c workflow.RunData, phase string) error {
 	r, ok := c.(resetData)
 	if !ok {
-		return errors.New("remove-etcd-member-phase phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase phase invoked with an invalid data struct", phase))
 	}
 	cfg := r.Cfg()
 
 	// Only clear etcd data when using local etcd.
-	klog.V(1).Infoln("[reset] Checking for etcd config")
+	klog.V(1).Infof("[%s] Checking for etcd config\n", phase)
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
@@ -65,17 +65,17 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 			if !r.DryRun() {
 				err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg)
 				if err != nil {
-					klog.Warningf("[reset] Failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", err)
+					klog.Warningf("[%s] Failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", phase, err)
 				} else {
 					if err := CleanDir(etcdDataDir); err != nil {
-						klog.Warningf("[reset] Failed to delete contents of the etcd directory: %q, error: %v", etcdDataDir, err)
+						klog.Warningf("[%s] Failed to delete contents of the etcd directory: %q, error: %v", phase, etcdDataDir, err)
 					} else {
-						fmt.Printf("[reset] Deleted contents of the etcd data directory: %v\n", etcdDataDir)
+						fmt.Printf("[%s] Deleted contents of the etcd data directory: %v\n", phase, etcdDataDir)
 					}
 				}
 			} else {
-				fmt.Println("[reset] Would remove the etcd member on this node from the etcd cluster")
-				fmt.Printf("[reset] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
+				fmt.Printf("[%s] Would remove the etcd member on this node from the etcd cluster\n", phase)
+				fmt.Printf("[%s] Would delete contents of the etcd data directory: %v\n", phase, etcdDataDir)
 			}
 		}
 		// This could happen if the phase `cleanup-node` is run before the `remove-etcd-member`.
@@ -83,14 +83,14 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 		empty, _ := IsDirEmpty(etcdDataDir)
 		if !empty && !r.DryRun() {
 			if err := CleanDir(etcdDataDir); err != nil {
-				klog.Warningf("[reset] Failed to delete contents of the etcd directory: %q, error: %v", etcdDataDir, err)
+				klog.Warningf("[%s] Failed to delete contents of the etcd directory: %q, error: %v", phase, etcdDataDir, err)
 			} else {
-				fmt.Printf("[reset] Deleted contents of the etcd data directory: %v\n", etcdDataDir)
+				fmt.Printf("[%s] Deleted contents of the etcd data directory: %v\n", phase, etcdDataDir)
 			}
 		}
 	} else {
-		fmt.Println("[reset] No etcd config found. Assuming external etcd")
-		fmt.Println("[reset] Please, manually reset etcd to prevent further issues")
+		fmt.Printf("[%s] No etcd config found. Assuming external etcd\n", phase)
+		fmt.Printf("[%s] Please, manually reset etcd to prevent further issues\n", phase)
 	}
 
 	return nil

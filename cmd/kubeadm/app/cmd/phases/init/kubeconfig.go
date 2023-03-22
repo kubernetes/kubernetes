@@ -115,7 +115,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 	return flags
 }
 
-func runKubeConfig(c workflow.RunData) error {
+func runKubeConfig(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubeconfig phase invoked with an invalid data struct")
@@ -126,16 +126,16 @@ func runKubeConfig(c workflow.RunData) error {
 }
 
 // runKubeConfigFile executes kubeconfig creation logic.
-func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData, string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(InitData)
 		if !ok {
-			return errors.New("kubeconfig phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 
 		// if external CA mode, skip certificate authority generation
 		if data.ExternalCA() {
-			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
+			fmt.Printf("[%s] External CA mode: Using user provided %s\n", phase, kubeConfigFileName)
 			// If using an external CA while dryrun, copy kubeconfig files to dryrun dir for later use
 			if data.DryRun() {
 				err := phases.CopyFile(filepath.Join(kubeadmconstants.KubernetesDir, kubeConfigFileName), filepath.Join(data.KubeConfigDir(), kubeConfigFileName))

@@ -256,7 +256,7 @@ func (e *Runner) Run(args []string) error {
 
 		// Runs the phase action (if defined)
 		if p.Run != nil {
-			if err := p.Run(data); err != nil {
+			if err := p.Run(data, p.Phase.Name); err != nil {
 				return errors.Wrapf(err, "error execution phase %s", p.generatedName)
 			}
 		}

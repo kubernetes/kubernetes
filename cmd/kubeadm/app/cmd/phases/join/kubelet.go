@@ -82,13 +82,13 @@ func NewKubeletStartPhase() workflow.Phase {
 	}
 }
 
-func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
+func getKubeletStartJoinData(c workflow.RunData, phase string) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return nil, nil, nil, errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
-	initCfg, err := data.InitCfg()
+	initCfg, err := data.InitCfg(phase)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -102,8 +102,8 @@ func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration,
 // runKubeletStartJoinPhase executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
-	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c)
+func runKubeletStartJoinPhase(c workflow.RunData, phase string) (returnErr error) {
+	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c, phase)
 	if err != nil {
 		return err
 	}

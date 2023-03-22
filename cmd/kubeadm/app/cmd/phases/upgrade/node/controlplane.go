@@ -45,16 +45,16 @@ func NewControlPlane() workflow.Phase {
 	return phase
 }
 
-func runControlPlane() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runControlPlane() func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(Data)
 		if !ok {
-			return errors.New("control-plane phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 
 		// if this is not a control-plane node, this phase should not be executed
 		if !data.IsControlPlaneNode() {
-			fmt.Println("[upgrade] Skipping phase. Not a control plane node.")
+			fmt.Printf("[%s] Skipping phase. Not a control plane node.", phase)
 			return nil
 		}
 
@@ -78,7 +78,7 @@ func runControlPlane() func(c workflow.RunData) error {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 
-		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")
+		fmt.Printf("[%s] The control plane instance for this node was successfully updated!\n", phase)
 
 		return nil
 	}

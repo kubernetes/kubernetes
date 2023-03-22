@@ -17,6 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -51,10 +53,10 @@ func NewMarkControlPlanePhase() workflow.Phase {
 }
 
 // runMarkControlPlane executes mark-control-plane checks logic.
-func runMarkControlPlane(c workflow.RunData) error {
+func runMarkControlPlane(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("mark-control-plane phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	client, err := data.Client()

@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"fmt"
 	"io"
 	"text/template"
 
@@ -78,10 +79,10 @@ func NewShowJoinCommandPhase() workflow.Phase {
 }
 
 // showJoinCommand prints the join command after all the phases in init have finished
-func showJoinCommand(c workflow.RunData) error {
+func showJoinCommand(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("show-join-command phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	adminKubeConfigPath := data.KubeConfigPath()

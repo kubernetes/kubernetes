@@ -77,11 +77,11 @@ func getEtcdPhaseFlags() []string {
 	return flags
 }
 
-func runEtcdPhaseLocal() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runEtcdPhaseLocal() func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(InitData)
 		if !ok {
-			return errors.New("etcd phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 		cfg := data.Cfg()
 
@@ -94,14 +94,14 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 					return err
 				}
 			} else {
-				fmt.Printf("[etcd] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
+				fmt.Printf("[%s] Would ensure that %q directory is present\n", phase, cfg.Etcd.Local.DataDir)
 			}
-			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
+			fmt.Printf("[%s] Creating static Pod manifest for local etcd in %q\n", phase, data.ManifestDir())
 			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun()); err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
-			klog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
+			klog.V(1).Infof("[%s] External etcd mode. Skipping the creation of a manifest for local etcd", phase)
 		}
 		return nil
 	}

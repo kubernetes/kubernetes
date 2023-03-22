@@ -32,7 +32,7 @@ type JoinData interface {
 	CertificateKey() string
 	Cfg() *kubeadmapi.JoinConfiguration
 	TLSBootstrapCfg() (*clientcmdapi.Config, error)
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
+	InitCfg(phase string) (*kubeadmapi.InitConfiguration, error)
 	Client() (clientset.Interface, error)
 	IgnorePreflightErrors() sets.Set[string]
 	OutputWriter() io.Writer

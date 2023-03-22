@@ -102,7 +102,7 @@ func newCertSubPhases() []workflow.Phase {
 	return subPhases
 }
 
-func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData) error) workflow.Phase {
+func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData, phase string) error) workflow.Phase {
 	phase := workflow.Phase{
 		Name:  certSpec.Name,
 		Short: fmt.Sprintf("Generate the %s", certSpec.LongName),
@@ -175,15 +175,15 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	return fmt.Sprintf("\n\nDefault SANs are %s", strings.Join(sans, ", "))
 }
 
-func runCertsSa(c workflow.RunData) error {
+func runCertsSa(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
-		return errors.New("certs phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// if external CA mode, skip service account key generation
 	if data.ExternalCA() {
-		fmt.Printf("[certs] Using existing sa keys\n")
+		fmt.Printf("[%s] Using existing sa keys\n", phase)
 		return nil
 	}
 
@@ -191,26 +191,26 @@ func runCertsSa(c workflow.RunData) error {
 	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
 }
 
-func runCerts(c workflow.RunData) error {
+func runCerts(c workflow.RunData, phase string) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("certs phase invoked with an invalid data struct")
 	}
 
-	fmt.Printf("[certs] Using certificateDir folder %q\n", data.CertificateWriteDir())
+	fmt.Printf("[%s] Using certificateDir folder %q\n", phase, data.CertificateWriteDir())
 	return nil
 }
 
-func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(InitData)
 		if !ok {
-			return errors.New("certs phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 
 		// if using external etcd, skips etcd certificate authority generation
 		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
+			fmt.Printf("[%s] External etcd mode: Skipping %s certificate authority generation\n", phase, ca.BaseName)
 			return nil
 		}
 
@@ -232,10 +232,10 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 						return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CAKeyName, data.CertificateWriteDir())
 					}
 				}
-				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
+				fmt.Printf("[%s] Using existing %s certificate authority\n", phase, ca.BaseName)
 				return nil
 			}
-			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
+			fmt.Printf("[%s] Using existing %s keyless certificate authority\n", phase, ca.BaseName)
 			return nil
 		}
 
@@ -249,16 +249,16 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	}
 }
 
-func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(InitData)
 		if !ok {
-			return errors.New("certs phase invoked with an invalid data struct")
+			return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 		}
 
 		// if using external etcd, skips etcd certificates generation
 		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate generation\n", cert.BaseName)
+			fmt.Printf("[%s] External etcd mode: Skipping %s certificate generation\n", phase, cert.BaseName)
 			return nil
 		}
 
@@ -273,10 +273,10 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			certsphase.CheckCertificatePeriodValidity(caCert.BaseName, caCertData)
 
 			if err := pkiutil.VerifyCertChain(certData, intermediates, caCertData); err != nil {
-				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
+				return errors.Wrapf(err, "[%s] certificate %s not signed by CA certificate %s", phase, cert.BaseName, caCert.BaseName)
 			}
 
-			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
+			fmt.Printf("[%s] Using existing %s certificate and key on disk\n", phase, cert.BaseName)
 			return nil
 		}
 

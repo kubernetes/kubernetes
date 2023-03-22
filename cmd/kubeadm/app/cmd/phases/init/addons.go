@@ -104,7 +104,7 @@ func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.I
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
-func runCoreDNSAddon(c workflow.RunData) error {
+func runCoreDNSAddon(c workflow.RunData, _ string) error {
 	cfg, client, out, err := getInitData(c)
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 }
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
-func runKubeProxyAddon(c workflow.RunData) error {
+func runKubeProxyAddon(c workflow.RunData, _ string) error {
 	cfg, client, out, err := getInitData(c)
 	if err != nil {
 		return err

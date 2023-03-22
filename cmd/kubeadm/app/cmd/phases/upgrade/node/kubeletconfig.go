@@ -49,8 +49,8 @@ func NewKubeletConfigPhase() workflow.Phase {
 	return phase
 }
 
-func runKubeletConfigPhase() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runKubeletConfigPhase() func(c workflow.RunData, phase string) error {
+	return func(c workflow.RunData, phase string) error {
 		data, ok := c.(Data)
 		if !ok {
 			return errors.New("kubelet-config phase invoked with an invalid data struct")
@@ -68,8 +68,8 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return err
 		}
 
-		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
-		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
+		fmt.Printf("[%s] The configuration for this node was successfully updated!\n", phase)
+		fmt.Printf("[%s] Now you should go ahead and upgrade the kubelet package using your package manager.\n", phase)
 		return nil
 	}
 }

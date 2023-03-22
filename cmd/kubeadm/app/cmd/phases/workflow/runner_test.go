@@ -127,8 +127,8 @@ func phaseBuilder1(name string, runIf func(data RunData) (bool, error), phases .
 
 var callstack []string
 
-func runBuilder(name string) func(data RunData) error {
-	return func(data RunData) error {
+func runBuilder(name string) func(data RunData, _ string) error {
+	return func(data RunData, phase string) error {
 		callstack = append(callstack, name)
 		return nil
 	}
@@ -183,7 +183,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 	}
 }
 
-func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func(data RunData) error, phases ...Phase) Phase {
+func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func(data RunData, _ string) error, phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
 		Short:  fmt.Sprintf("long description for %s ...", name),
@@ -193,11 +193,11 @@ func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func
 	}
 }
 
-func runPass(data RunData) error {
+func runPass(data RunData, _ string) error {
 	return nil
 }
 
-func runFails(data RunData) error {
+func runFails(data RunData, _ string) error {
 	return errors.New("run fails")
 }
 

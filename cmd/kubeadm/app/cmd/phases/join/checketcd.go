@@ -35,10 +35,10 @@ func NewCheckEtcdPhase() workflow.Phase {
 	}
 }
 
-func runCheckEtcdPhase(c workflow.RunData) error {
+func runCheckEtcdPhase(c workflow.RunData, phase string) error {
 	data, ok := c.(JoinData)
 	if !ok {
-		return errors.New("check-etcd phase invoked with an invalid data struct")
+		return errors.New(fmt.Sprintf("%s phase invoked with an invalid data struct", phase))
 	}
 
 	// Skip if this is not a control plane
@@ -46,17 +46,17 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(phase)
 	if err != nil {
 		return err
 	}
 
 	if cfg.Etcd.External != nil {
-		fmt.Println("[check-etcd] Skipping etcd check in external mode")
+		fmt.Printf("%s Skipping etcd check in external mode\n", phase)
 		return nil
 	}
 
-	fmt.Println("[check-etcd] Checking that the etcd cluster is healthy")
+	fmt.Printf("%s Checking that the etcd cluster is healthy\n", phase)
 
 	// Checks that the etcd cluster is healthy
 	// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
