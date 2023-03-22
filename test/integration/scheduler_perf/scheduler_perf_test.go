@@ -696,7 +696,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					results := runWorkload(ctx, b, tc, w)
+					results := runWorkload(ctx, b, tc, w, false)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -773,7 +773,7 @@ func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) []DataItem {
+func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, cleanup bool) []DataItem {
 	start := time.Now()
 	b.Cleanup(func() {
 		duration := time.Now().Sub(start)
@@ -809,13 +809,15 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
 
-	b.Cleanup(func() {
-		for namespace := range numPodsScheduledPerNamespace {
-			if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
-				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+	if cleanup {
+		b.Cleanup(func() {
+			for namespace := range numPodsScheduledPerNamespace {
+				if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
+					b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+				}
 			}
-		}
-	})
+		})
+	}
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -836,11 +838,13 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			if err := nodePreparer.PrepareNodes(ctx, nextNodeIndex); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				if err := nodePreparer.CleanupNodes(ctx); err != nil {
-					b.Fatalf("failed to clean up nodes, error: %v", err)
-				}
-			})
+			if cleanup {
+				b.Cleanup(func() {
+					if err := nodePreparer.CleanupNodes(ctx); err != nil {
+						b.Fatalf("failed to clean up nodes, error: %v", err)
+					}
+				})
+			}
 			nextNodeIndex += concreteOp.Count
 
 		case *createNamespacesOp:
