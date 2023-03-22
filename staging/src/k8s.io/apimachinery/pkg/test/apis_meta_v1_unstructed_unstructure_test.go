@@ -171,6 +171,13 @@ func TestUnstructuredGetters(t *testing.T) {
 					"finalizer.2",
 				},
 			},
+			"status": map[string]interface{}{
+				"availableReplicas":    ten,
+				"fullyLabeledReplicas": ten,
+				"observedGeneration":   ten,
+				"readyReplicas":        ten,
+				"replicas":             ten,
+			},
 		},
 	}
 
@@ -192,6 +199,18 @@ func TestUnstructuredGetters(t *testing.T) {
 
 	if got, want := unstruct.GetGenerateName(), "test_generateName"; got != want {
 		t.Errorf("GetGenerateName() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetStatusReplicas(), int64(10); got != want {
+		t.Errorf("GetStatusReplicas() = %d, want %d", got, want)
+	}
+
+	if got, want := unstruct.GetStatusAvailableReplicas(), int64(10); got != want {
+		t.Errorf("GetStatusAvailableReplicas() = %d, want %d", got, want)
+	}
+
+	if got, want := unstruct.GetStatusReadyReplicas(), int64(10); got != want {
+		t.Errorf("GetStatusReadyReplicas() = %d, want %d", got, want)
 	}
 
 	if got, want := unstruct.GetUID(), types.UID("test_uid"); got != want {

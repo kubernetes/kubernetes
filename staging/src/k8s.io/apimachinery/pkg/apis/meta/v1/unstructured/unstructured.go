@@ -234,6 +234,29 @@ func (u *Unstructured) GetNamespace() string {
 	return getNestedString(u.Object, "metadata", "namespace")
 }
 
+func (u *Unstructured) GetStatusReplicas() int64 {
+	val, found, err := unstructured.NestedInt64(u.Object, "status", "replicas")
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
+func (u *Unstructured) GetStatusAvailableReplicas() int64 {
+	val, found, err := unstructured.NestedInt64(u.Object, "status", "availableReplicas")
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+func (u *Unstructured) GetStatusReadyReplicas() int64 {
+	val, found, err := unstructured.NestedInt64(u.Object, "status", "readyReplicas")
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
 func (u *Unstructured) SetNamespace(namespace string) {
 	if len(namespace) == 0 {
 		RemoveNestedField(u.Object, "metadata", "namespace")
