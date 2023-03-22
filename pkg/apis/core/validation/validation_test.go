@@ -7591,192 +7591,214 @@ func TestValidateContainers(t *testing.T) {
 		AllowPrivileged: true,
 	})
 
-	successCase := []core.Container{
-		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-		// backwards compatibility to ensure containers in pod template spec do not check for this
-		{Name: "def", Image: " ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-		{Name: "ghi", Image: " some  ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-		{Name: "123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-		{Name: "abc-123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+	successCases := []struct {
+		title, line string
+		containers  []core.Container
+		opts        PodValidationOptions
+	}{
 		{
-			Name:  "life-123",
-			Image: "image",
-			Lifecycle: &core.Lifecycle{
-				PreStop: &core.LifecycleHandler{
-					Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-test",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					core.ResourceName("my.org/resource"):   resource.MustParse("10"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-test-with-request-and-limit",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-request-limit-simple",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU): resource.MustParse("8"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU): resource.MustParse("10"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-request-limit-edge",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					core.ResourceName("my.org/resource"):   resource.MustParse("10"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					core.ResourceName("my.org/resource"):   resource.MustParse("10"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-request-limit-partials",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("9.5"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):  resource.MustParse("10"),
-					core.ResourceName("my.org/resource"): resource.MustParse("10"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-request",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("9.5"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-resize-policy",
-			Image: "image",
-			ResizePolicy: []core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "same-host-port-different-protocol",
-			Image: "image",
-			Ports: []core.ContainerPort{
-				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
-				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:                     "fallback-to-logs-termination-message",
-			Image:                    "image",
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "FallbackToLogsOnError",
-		},
-		{
-			Name:                     "file-termination-message",
-			Image:                    "image",
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:                     "env-from-source",
-			Image:                    "image",
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-			EnvFrom: []core.EnvFromSource{
+			title: "default",
+			line:  line(),
+			containers: []core.Container{
+				{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				// backwards compatibility to ensure containers in pod template spec do not check for this
+				{Name: "def", Image: " ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				{Name: "ghi", Image: " some  ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				{Name: "123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				{Name: "abc-123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 				{
-					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{
-							Name: "test",
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-test",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+							core.ResourceName("my.org/resource"):   resource.MustParse("10"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-test-with-request-and-limit",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-request-limit-simple",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceCPU): resource.MustParse("8"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceCPU): resource.MustParse("10"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-request-limit-edge",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+							core.ResourceName("my.org/resource"):   resource.MustParse("10"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+							core.ResourceName("my.org/resource"):   resource.MustParse("10"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-request-limit-partials",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("9.5"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):  resource.MustParse("10"),
+							core.ResourceName("my.org/resource"): resource.MustParse("10"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "resources-request",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceCPU):    resource.MustParse("9.5"),
+							core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "same-host-port-different-protocol",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+						{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:                     "fallback-to-logs-termination-message",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "FallbackToLogsOnError",
+				},
+				{
+					Name:                     "file-termination-message",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:                     "env-from-source",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					EnvFrom: []core.EnvFromSource{
+						{
+							ConfigMapRef: &core.ConfigMapEnvSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "test",
+								},
+							},
 						},
 					},
 				},
+				{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+				{
+					Name:  "live-123",
+					Image: "image",
+					LivenessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(80),
+							},
+						},
+						SuccessThreshold: 1,
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+				{
+					Name:  "startup-123",
+					Image: "image",
+					StartupProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(80),
+							},
+						},
+						SuccessThreshold: 1,
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
 			},
 		},
-		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 		{
-			Name:  "live-123",
-			Image: "image",
-			LivenessProbe: &core.Probe{
-				ProbeHandler: core.ProbeHandler{
-					TCPSocket: &core.TCPSocketAction{
-						Port: intstr.FromInt(80),
+			title: "allow resize policy",
+			line:  line(),
+			containers: []core.Container{
+				{
+					Name:  "resources-resize-policy",
+					Image: "image",
+					ResizePolicy: []core.ContainerResizePolicy{
+						{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+						{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				SuccessThreshold: 1,
 			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "startup-123",
-			Image: "image",
-			StartupProbe: &core.Probe{
-				ProbeHandler: core.ProbeHandler{
-					TCPSocket: &core.TCPSocketAction{
-						Port: intstr.FromInt(80),
-					},
-				},
-				SuccessThreshold: 1,
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
+			opts: PodValidationOptions{AllowResizePolicy: true},
 		},
 	}
-	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
+
+	for _, tc := range successCases {
+		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
+			if errs := validateContainers(tc.containers, volumeDevices, nil, field.NewPath("field"), tc.opts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
