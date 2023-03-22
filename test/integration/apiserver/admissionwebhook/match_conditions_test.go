@@ -28,16 +28,16 @@ import (
 	"testing"
 	"time"
 
-	clientset "k8s.io/client-go/kubernetes"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -107,8 +107,10 @@ func newMatchConditionHandler(recorder *admissionRecorder) http.Handler {
 	})
 }
 
-// Test_MatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
-func Test_MatchConditions(t *testing.T) {
+// TestMatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
+func TestMatchConditions(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
 
@@ -117,7 +119,6 @@ func Test_MatchConditions(t *testing.T) {
 		matchConditions []admissionregistrationv1.MatchCondition
 		pods            []*corev1.Pod
 		matchedPods     []*corev1.Pod
-		expectErrorWH   bool
 		expectErrorPod  bool
 		failPolicy      *admissionregistrationv1.FailurePolicyType
 	}{
@@ -136,7 +137,6 @@ func Test_MatchConditions(t *testing.T) {
 			matchedPods: []*corev1.Pod{
 				matchConditionsTestPod("test2", "default"),
 			},
-			expectErrorWH: false,
 		},
 		{
 			name: "matchConditions are ANDed together",
@@ -158,7 +158,6 @@ func Test_MatchConditions(t *testing.T) {
 			matchedPods: []*corev1.Pod{
 				matchConditionsTestPod("test1", "default"),
 			},
-			expectErrorWH: false,
 		},
 		{
 			name: "mix of true, error and false should not match and not call webhook",
@@ -189,7 +188,6 @@ func Test_MatchConditions(t *testing.T) {
 				matchConditionsTestPod("test2", "default"),
 			},
 			matchedPods:    []*corev1.Pod{},
-			expectErrorWH:  false,
 			expectErrorPod: false,
 		},
 		{
@@ -217,7 +215,6 @@ func Test_MatchConditions(t *testing.T) {
 				matchConditionsTestPod("test2", "default"),
 			},
 			matchedPods:    []*corev1.Pod{},
-			expectErrorWH:  false,
 			expectErrorPod: true,
 		},
 		{
@@ -246,7 +243,6 @@ func Test_MatchConditions(t *testing.T) {
 			},
 			matchedPods:    []*corev1.Pod{},
 			failPolicy:     &fail,
-			expectErrorWH:  false,
 			expectErrorPod: true,
 		},
 		{
@@ -273,9 +269,8 @@ func Test_MatchConditions(t *testing.T) {
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods:   []*corev1.Pod{},
-			failPolicy:    &ignore,
-			expectErrorWH: false,
+			matchedPods: []*corev1.Pod{},
+			failPolicy:  &ignore,
 		},
 		{
 			name: "has access to oldObject",
@@ -291,93 +286,6 @@ func Test_MatchConditions(t *testing.T) {
 			matchedPods: []*corev1.Pod{
 				matchConditionsTestPod("test2", "default"),
 			},
-			expectErrorWH: false,
-		},
-		{
-			name: "invalid field should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       "old-object-is-null.kubernetes.io",
-					Expression: "imnotafield == null",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "missing expression should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name: "old-object-is-null.kubernetes.io",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "missing name should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Expression: "oldObject == null",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "empty name should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       "",
-					Expression: "oldObject == null",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "empty expression should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       "test-empty-expression.kubernetes.io",
-					Expression: "",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "duplicate name should error",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       "test1",
-					Expression: "oldObject == null",
-				},
-				{
-					Name:       "test1",
-					Expression: "oldObject == null",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
-		},
-		{
-			name: "name must be qualified name",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       " test1",
-					Expression: "oldObject == null",
-				},
-			},
-			pods:          []*corev1.Pod{},
-			matchedPods:   []*corev1.Pod{},
-			expectErrorWH: true,
 		},
 	}
 
@@ -400,10 +308,13 @@ func Test_MatchConditions(t *testing.T) {
 	webhookServer.StartTLS()
 	defer webhookServer.Close()
 
+	dryRunCreate := metav1.CreateOptions{
+		DryRun: []string{metav1.DryRunAll},
+	}
+
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			upCh := recorder.Reset()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--disable-admission-plugins=ServiceAccount",
@@ -490,14 +401,10 @@ func Test_MatchConditions(t *testing.T) {
 			}
 
 			validatingcfg, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, metav1.CreateOptions{})
-			if testcase.expectErrorWH == false && err != nil {
+			if err != nil {
 				t.Fatal(err)
-			} else if testcase.expectErrorWH == true {
-				if err == nil {
-					t.Fatal("expected error creating ValidatingWebhookConfigurations")
-				}
-				return
 			}
+
 			vhwHasBeenCleanedUp := false
 			defer func() {
 				if !vhwHasBeenCleanedUp {
@@ -523,14 +430,11 @@ func Test_MatchConditions(t *testing.T) {
 			}
 
 			for _, pod := range testcase.pods {
-				_, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				_, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, dryRunCreate)
 				if testcase.expectErrorPod == false && err != nil {
 					t.Fatalf("unexpected error creating test pod: %v", err)
-				} else if testcase.expectErrorWH == true {
-					if err == nil {
-						t.Fatal("expected error creating pods")
-					}
-					return
+				} else if testcase.expectErrorPod == true && err == nil {
+					t.Fatal("expected error creating pods")
 				}
 			}
 
@@ -612,13 +516,8 @@ func Test_MatchConditions(t *testing.T) {
 			}
 
 			mutatingcfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, metav1.CreateOptions{})
-			if testcase.expectErrorWH == false && err != nil {
+			if err != nil {
 				t.Fatal(err)
-			} else if testcase.expectErrorWH == true {
-				if err == nil {
-					t.Fatal("expected error creating MutatingWebhookConfiguration")
-				}
-				return
 			}
 			defer func() {
 				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingcfg.GetName(), metav1.DeleteOptions{})
@@ -642,21 +541,11 @@ func Test_MatchConditions(t *testing.T) {
 			}
 
 			for _, pod := range testcase.pods {
-				if !testcase.expectErrorPod {
-					err := client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-					//TODO: should probably confirm deleted
-					if err != nil {
-						t.Errorf("unexpected error deleting pods %v", err.Error())
-					}
-				}
-				_, err = client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				_, err = client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, dryRunCreate)
 				if testcase.expectErrorPod == false && err != nil {
 					t.Fatalf("unexpected error creating test pod: %v", err)
-				} else if testcase.expectErrorWH == true {
-					if err == nil {
-						t.Fatal("expected error creating pods")
-					}
-					return
+				} else if testcase.expectErrorPod == true && err == nil {
+					t.Fatal("expected error creating pods")
 				}
 			}
 
@@ -671,6 +560,168 @@ func Test_MatchConditions(t *testing.T) {
 				if request.Namespace != testcase.matchedPods[i].Namespace {
 					t.Errorf("unexpected pod namespace %v, expected %v", request.Namespace, testcase.matchedPods[i].Namespace)
 				}
+			}
+		})
+	}
+}
+
+func TestMatchConditions_validation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins=ServiceAccount",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	testcases := []struct {
+		name            string
+		matchConditions []admissionregistrationv1.MatchCondition
+		expectError     bool
+	}{{
+		name: "valid match condition",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "true",
+			Expression: "true",
+		}},
+		expectError: false,
+	}, {
+		name: "multiple valid match conditions",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "exclude-leases",
+			Expression: "!(request.resource.group == 'coordination.k8s.io' && request.resource.resource == 'leases')",
+		}, {
+			Name:       "exclude-kubelet-requests",
+			Expression: "!('system:nodes' in request.userInfo.groups)",
+		}, {
+			Name:       "breakglass",
+			Expression: "!authorizer.group('admissionregistration.k8s.io').resource('validatingwebhookconfigurations').name('my-webhook.example.com').check('breakglass').allowed()",
+		}},
+		expectError: false,
+	}, {
+		name: "invalid field should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "old-object-is-null.kubernetes.io",
+			Expression: "imnotafield == null",
+		}},
+		expectError: true,
+	}, {
+		name: "missing expression should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name: "old-object-is-null.kubernetes.io",
+		}},
+		expectError: true,
+	}, {
+		name: "missing name should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Expression: "oldObject == null",
+		}},
+		expectError: true,
+	}, {
+		name: "empty name should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "",
+			Expression: "oldObject == null",
+		}},
+		expectError: true,
+	}, {
+		name: "empty expression should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "test-empty-expression.kubernetes.io",
+			Expression: "",
+		}},
+		expectError: true,
+	}, {
+		name: "duplicate name should error",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "test1",
+			Expression: "oldObject == null",
+		}, {
+			Name:       "test1",
+			Expression: "oldObject == null",
+		}},
+		expectError: true,
+	}, {
+		name: "name must be qualified name",
+		matchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       " test1",
+			Expression: "oldObject == null",
+		}},
+		expectError: true,
+	}}
+
+	dryRunCreate := metav1.CreateOptions{
+		DryRun: []string{metav1.DryRunAll},
+	}
+	endpoint := "https://localhost:1234/server"
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			rules := []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
+				Rule: admissionregistrationv1.Rule{
+					APIGroups:   []string{""},
+					APIVersions: []string{"v1"},
+					Resources:   []string{"pods"},
+				},
+			}}
+			clientConfig := admissionregistrationv1.WebhookClientConfig{
+				URL:      &endpoint,
+				CABundle: localhostCert,
+			}
+			versions := []string{"v1"}
+			validatingwebhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "admission.integration.test",
+				},
+				Webhooks: []admissionregistrationv1.ValidatingWebhook{
+					{
+						Name:                    "admission.integration.test",
+						Rules:                   rules,
+						ClientConfig:            clientConfig,
+						SideEffects:             &noSideEffects,
+						AdmissionReviewVersions: versions,
+						MatchConditions:         testcase.matchConditions,
+					},
+				},
+			}
+
+			_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validatingwebhook, dryRunCreate)
+			if testcase.expectError {
+				if err == nil {
+					t.Fatalf("Expected error creating ValidatingWebhookConfiguration; got nil")
+				} else if !apierrors.IsInvalid(err) {
+					t.Errorf("Expected Invalid error creating ValidatingWebhookConfiguration; got: %v", err)
+				}
+			} else if !testcase.expectError && err != nil {
+				t.Fatalf("Unexpected error creating ValidatingWebhookConfiguration: %v", err)
+			}
+
+			mutatingwebhook := &admissionregistrationv1.MutatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "admission.integration.test",
+				},
+				Webhooks: []admissionregistrationv1.MutatingWebhook{
+					{
+						Name:                    "admission.integration.test",
+						Rules:                   rules,
+						ClientConfig:            clientConfig,
+						SideEffects:             &noSideEffects,
+						AdmissionReviewVersions: versions,
+						MatchConditions:         testcase.matchConditions,
+					},
+				},
+			}
+
+			_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), mutatingwebhook, dryRunCreate)
+			if testcase.expectError {
+				if err == nil {
+					t.Fatalf("Expected error creating MutatingWebhookConfiguration; got: nil")
+				} else if !apierrors.IsInvalid(err) {
+					t.Errorf("Expected Invalid error creating MutatingWebhookConfiguration; got: %v", err)
+				}
+			} else if !testcase.expectError && err != nil {
+				t.Fatalf("Unexpected error creating MutatingWebhookConfiguration: %v", err)
 			}
 		})
 	}
