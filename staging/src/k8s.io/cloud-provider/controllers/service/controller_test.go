@@ -334,7 +334,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			lbExists:             true,
 			expectOp:             deleteLoadBalancer,
 			expectDeleteAttempt:  true,
-			expectPatchStatus:    true,
+			expectPatchStatus:    false,
 			expectPatchFinalizer: true,
 		},
 		{

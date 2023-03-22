@@ -410,6 +410,13 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		c.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
+	// Don't patch the status if the Service is being deleted.
+	// Per example, if the Service isgarbage collected because the namespace is deleted,
+	// the patch will return an error and will keep retrying.
+	if service.DeletionTimestamp != nil {
+		return op, nil
+	}
+
 	if err := c.patchStatus(service, previousStatus, newStatus); err != nil {
 		// Only retry error that isn't not found:
 		// - Not found error mostly happens when service disappears right after
