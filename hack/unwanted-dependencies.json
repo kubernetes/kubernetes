@@ -43,9 +43,6 @@
   },
   "status": {
     "unwantedReferences": {
-      "github.com/getsentry/raven-go": [
-        "go.etcd.io/etcd/raft/v3"
-      ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/cgroups",

@@ -105,9 +105,9 @@ func convertToMap(modStr string) ([]module, map[module][]module) {
 }
 
 func getShortestPath(mod module) (path []string) {
-	modWhyStr, err := runCommand("go", "mod", "why", "-m", mod.name)
+	modWhyStr, err := runCommand("go", "mod", "why", "-vendor", "-m", mod.name)
 	if err != nil {
-		log.Fatalf("Error running 'go mod why -m %s': %s", mod.name, err)
+		log.Fatalf("Error running 'go mod why -vendor -m %s': %s", mod.name, err)
 	}
 	for _, line := range strings.Split(modWhyStr, "\n") {
 		if len(line) == 0 {
