@@ -2585,8 +2585,10 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
 		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
 		kubelet.handlePodResourcesResize(tt.pod)
-		assert.Equal(t, tt.expectedAllocations, tt.pod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
-		assert.Equal(t, tt.expectedResize, tt.pod.Status.Resize, tt.name)
+		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
+		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
+		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
+		assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
 		testKubelet.fakeKubeClient.ClearActions()
 	}
 }
