@@ -350,6 +350,15 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
 
+	// podWorker may call volume_manager WaitForUnmount() after we processed the pod in findAndRemoveDeletedPods()
+	dswp.ReprocessPod(podName)
+	dswp.findAndRemoveDeletedPods()
+
+	// findAndRemoveDeletedPods() above must detect orphaned pod and delete it from the map
+	if _, ok := dswp.pods.processedPods[podName]; ok {
+		t.Fatalf("Failed to remove orphanded pods from internal map")
+	}
+
 	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if volumeExists {
 		t.Fatalf(
