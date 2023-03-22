@@ -268,6 +268,9 @@ func skipGenerated(data []byte) (n int, err error) {
 					return 0, err
 				}
 				iNdEx = start + next
+				if iNdEx < 0 {
+					return 0, ErrInvalidLengthGenerated
+				}
 			}
 			return iNdEx, nil
 		case 4:
