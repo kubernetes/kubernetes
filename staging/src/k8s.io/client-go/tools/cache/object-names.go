@@ -16,6 +16,10 @@ limitations under the License.
 
 package cache
 
+import (
+	"k8s.io/apimachinery/pkg/types"
+)
+
 // ObjectName is a reference to an object of some implicit kind
 type ObjectName struct {
 	Namespace string
@@ -34,6 +38,7 @@ func (objName ObjectName) Parts() (namespace, name string) {
 
 // String returns the standard string encoding,
 // which is designed to match the historical behavior of MetaNamespaceKeyFunc.
+// Note this behavior is different from the String method of types.NamespacedName.
 func (objName ObjectName) String() string {
 	if len(objName.Namespace) > 0 {
 		return objName.Namespace + "/" + objName.Name
@@ -47,4 +52,14 @@ func ParseObjectName(str string) (ObjectName, error) {
 	var err error
 	objName.Namespace, objName.Name, err = SplitMetaNamespaceKey(str)
 	return objName, err
+}
+
+// NamespacedNameAsObjectName rebrands the given NamespacedName as an ObjectName
+func NamespacedNameAsObjectName(nn types.NamespacedName) ObjectName {
+	return NewObjectName(nn.Namespace, nn.Name)
+}
+
+// AsNamespacedName rebrands as a NamespacedName
+func (objName ObjectName) AsNamespacedName() types.NamespacedName {
+	return types.NamespacedName{Namespace: objName.Namespace, Name: objName.Name}
 }
