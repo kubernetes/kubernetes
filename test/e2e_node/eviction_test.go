@@ -465,7 +465,10 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 	expectedStarvedResource := noStarvedResource
 
 	highPriorityClassName := f.BaseName + "-high-priority"
-	highPriority := int32(999999999)
+	highPriority := int32(999999998)
+
+	highestPriorityClassName := f.BaseName + "-highest-priority"
+	highestPriority := highPriority + 1
 
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -478,9 +481,13 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highestPriorityClassName}, Value: highestPriority}, metav1.CreateOptions{})
+			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			err = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highestPriorityClassName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -497,7 +504,8 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", 12000),
 			},
 		}
-		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+		// make the innocent pod higher priority
+		specs[1].pod.Spec.PriorityClassName = highestPriorityClassName
 		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
