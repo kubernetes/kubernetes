@@ -3334,13 +3334,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		if ctr.StartupProbe != nil && ctr.StartupProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(path.Child("startupProbe", "successThreshold"), ctr.StartupProbe.SuccessThreshold, "must be 1"))
 		}
-		if len(ctr.ResizePolicy) != 0 {
-			if opts.AllowResizePolicy {
-				allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"))...)
-			} else {
-				allErrs = append(allErrs, field.Forbidden(path.Child("resizePolicy"), "must not be set without the InPlacePodVerticalScaling feature"))
-			}
-		}
+		allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"))...)
 	}
 
 	// Port conflicts are checked across all containers
@@ -3700,8 +3694,6 @@ type PodValidationOptions struct {
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
 	AllowMutableNodeSelectorAndNodeAffinity bool
-	// Allow container to have ResizePolicy
-	AllowResizePolicy bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

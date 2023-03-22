@@ -19,7 +19,6 @@ package pod
 import (
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -374,41 +373,6 @@ func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
 	return true
 }
 
-// hasNewOrUpdatedResizdPolicy returns true if the podSpec has new container
-// with ResizePolicy or updates ResizePolicy compared to oldPodSpec
-func hasNewOrUpdatedResizePolicy(podSpec, oldPodSpec *api.PodSpec) bool {
-	if oldPodSpec == nil || podSpec == nil {
-		return false
-	}
-
-	oldResizePolicies := make(map[string][]api.ContainerResizePolicy)
-
-	for _, container := range oldPodSpec.Containers {
-		if len(container.ResizePolicy) == 0 {
-			continue
-		}
-		oldResizePolicies[container.Name] = container.ResizePolicy
-	}
-
-	for _, container := range podSpec.Containers {
-		if len(container.ResizePolicy) == 0 {
-			continue
-		}
-		oldResizePolicy, ok := oldResizePolicies[container.Name]
-		if !ok {
-			// new container with ResizePolicy
-			return true
-		}
-
-		if diff := cmp.Diff(oldResizePolicy, container.ResizePolicy); diff != "" {
-			// updates ResizePolicy
-			return true
-		}
-	}
-
-	return false
-}
-
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
 func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	for _, constraint := range spec.TopologySpreadConstraints {
@@ -432,7 +396,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
-		AllowResizePolicy:                                 utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) || !hasNewOrUpdatedResizePolicy(podSpec, oldPodSpec),
 	}
 
 	if oldPodSpec != nil {
