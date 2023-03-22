@@ -47,11 +47,6 @@ import (
 )
 
 const (
-	// Interval of synchronizing service status from apiserver
-	serviceSyncPeriod = 30 * time.Second
-	// Interval of synchronizing node status from apiserver
-	nodeSyncPeriod = 100 * time.Second
-
 	// How long to wait before retrying the processing of a service change.
 	// If this changes, the sleep in hack/jenkins/e2e.sh before downing a cluster
 	// should be changed appropriately.
@@ -125,7 +120,7 @@ func New(
 		lastSyncedNodes:  []*v1.Node{},
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	serviceInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
 				svc, ok := cur.(*v1.Service)
@@ -145,12 +140,11 @@ func New(
 			// No need to handle deletion event because the deletion would be handled by
 			// the update path when the deletion timestamp is added.
 		},
-		serviceSyncPeriod,
 	)
 	s.serviceLister = serviceInformer.Lister()
 	s.serviceListerSynced = serviceInformer.Informer().HasSynced
 
-	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	nodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
 				s.enqueueNode(cur)
@@ -176,7 +170,6 @@ func New(
 				s.enqueueNode(old)
 			},
 		},
-		nodeSyncPeriod,
 	)
 
 	if err := s.init(); err != nil {
