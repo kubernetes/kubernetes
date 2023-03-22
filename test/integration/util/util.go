@@ -127,7 +127,13 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				// Note that the error can be anything, because components like
+				// apiserver are also shutting down at the same time, but this
+				// check is conservative and only ignores the "context canceled"
+				// error while shutting down.
+				if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				}
 				return
 			}
 
@@ -136,7 +142,10 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
 				if err != nil {
-					klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+						// Shutting down, no need to record this.
+						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					}
 					return
 				}
 			}
