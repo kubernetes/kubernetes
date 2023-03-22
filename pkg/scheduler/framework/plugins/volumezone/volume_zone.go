@@ -107,6 +107,7 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 }
 
 func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	podPVTopologies := make([]pvTopology, 0)
 
 	for i := range pod.Spec.Volumes {
@@ -154,7 +155,7 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 			if value, ok := pv.ObjectMeta.Labels[key]; ok {
 				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
 				if err != nil {
-					klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
 					continue
 				}
 				podPVTopologies = append(podPVTopologies, pvTopology{
@@ -190,6 +191,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
@@ -226,7 +228,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
 		if !ok || !pvTopology.values.Has(v) {
-			klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
