@@ -759,13 +759,6 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 	// numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
-	b.Cleanup(func() {
-		for namespace := range numPodsScheduledPerNamespace {
-			if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
-				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
-			}
-		}
-	})
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -786,20 +779,13 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			if err := nodePreparer.PrepareNodes(ctx, nextNodeIndex); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				if err := nodePreparer.CleanupNodes(ctx); err != nil {
-					b.Fatalf("failed to clean up nodes, error: %v", err)
-				}
-			})
 			nextNodeIndex += concreteOp.Count
-
 		case *createNamespacesOp:
 			nsPreparer, err := newNamespacePreparer(concreteOp, client, b)
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			if err := nsPreparer.prepare(ctx); err != nil {
-				nsPreparer.cleanup(ctx)
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			for _, n := range nsPreparer.namespaces() {
@@ -809,7 +795,6 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 				}
 				numPodsScheduledPerNamespace[n] = 0
 			}
-
 		case *createPodsOp:
 			var namespace string
 			// define Pod's namespace automatically, and create that namespace.
@@ -874,7 +859,6 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 				// will be carried over to next step.
 				legacyregistry.Reset()
 			}
-
 		case *churnOp:
 			var namespace string
 			if concreteOp.Namespace != nil {
@@ -1311,17 +1295,4 @@ func (p *namespacePreparer) prepare(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-// cleanup deletes existing test namespaces.
-func (p *namespacePreparer) cleanup(ctx context.Context) error {
-	var errRet error
-	for i := 0; i < p.count; i++ {
-		n := fmt.Sprintf("%s-%d", p.prefix, i)
-		if err := p.client.CoreV1().Namespaces().Delete(ctx, n, metav1.DeleteOptions{}); err != nil {
-			p.t.Errorf("Deleting Namespace: %v", err)
-			errRet = err
-		}
-	}
-	return errRet
 }
