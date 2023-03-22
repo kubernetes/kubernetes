@@ -31,50 +31,6 @@ readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
-# Validate a ci version
-#
-# Globals:
-#   None
-# Arguments:
-#   version
-# Returns:
-#   If version is a valid ci version
-# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcdef12345678')
-#   VERSION_MAJOR          (e.g. '1')
-#   VERSION_MINOR          (e.g. '2')
-#   VERSION_PATCH          (e.g. '3')
-#   VERSION_PRERELEASE     (e.g. 'alpha')
-#   VERSION_PRERELEASE_REV (e.g. '4')
-#   VERSION_BUILD_INFO     (e.g. '.56+abcdef12345678')
-#   VERSION_COMMITS        (e.g. '56')
-function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
-  local -r version="${1-}"
-  [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
-    return 1
-  }
-
-  # The VERSION variables are used when this file is sourced, hence
-  # the shellcheck SC2034 'appears unused' warning is to be ignored.
-
-  # shellcheck disable=SC2034
-  VERSION_MAJOR="${BASH_REMATCH[1]}"
-  # shellcheck disable=SC2034
-  VERSION_MINOR="${BASH_REMATCH[2]}"
-  # shellcheck disable=SC2034
-  VERSION_PATCH="${BASH_REMATCH[3]}"
-  # shellcheck disable=SC2034
-  VERSION_PRERELEASE="${BASH_REMATCH[4]}"
-  # shellcheck disable=SC2034
-  VERSION_PRERELEASE_REV="${BASH_REMATCH[5]}"
-  # shellcheck disable=SC2034
-  VERSION_BUILD_INFO="${BASH_REMATCH[6]}"
-  # shellcheck disable=SC2034
-  VERSION_COMMITS="${BASH_REMATCH[7]}"
-}
-
 # ---------------------------------------------------------------------------
 # Build final release artifacts
 function kube::release::clean_cruft() {
