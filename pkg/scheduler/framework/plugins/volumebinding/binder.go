@@ -125,7 +125,7 @@ type InTreeToCSITranslator interface {
 //
 // This integrates into the existing scheduler workflow as follows:
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumeClaims() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
 //     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
 //     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
