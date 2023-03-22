@@ -1505,6 +1505,24 @@ func TestHasNewOrUpdatedResizePolicy(t *testing.T) {
 			want: true,
 		},
 		{
+			desc: "both have the containers with the same resize policy",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "foo"},
+					{Name: "bar"},
+					withResizePolicy("baz"),
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "foo"},
+					{Name: "bar"},
+					withResizePolicy("baz"),
+				},
+			},
+			want: false,
+		},
+		{
 			desc: "remove a container with resize policy",
 			podSpec: &api.PodSpec{
 				Containers: []api.Container{
