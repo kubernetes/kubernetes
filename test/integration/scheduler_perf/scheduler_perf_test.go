@@ -802,6 +802,12 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 	// need to start again.
 	podInformer := informerFactory.Core().V1().Pods()
 
+	// Everything else started by this function gets stopped before it returns.
+	ctx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer cancel()
+
 	var mu sync.Mutex
 	var dataItems []DataItem
 	nextNodeIndex := 0
@@ -876,9 +882,14 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 				concreteOp.PodTemplatePath = tc.DefaultPodTemplatePath
 			}
 			var collectors []testDataCollector
+			// This needs a separate context and wait group because
+			// the code below needs to be sure that the goroutines
+			// are stopped.
 			var collectorCtx context.Context
 			var collectorCancel func()
 			var collectorWG sync.WaitGroup
+			defer collectorWG.Wait()
+
 			if concreteOp.CollectMetrics {
 				collectorCtx, collectorCancel = context.WithCancel(ctx)
 				defer collectorCancel()
@@ -987,7 +998,9 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 
 			switch concreteOp.Mode {
 			case Create:
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					count, threshold := 0, concreteOp.Number
 					if threshold == 0 {
 						threshold = math.MaxInt32
@@ -1005,7 +1018,9 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 					}
 				}()
 			case Recreate:
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					retVals := make([][]string, len(churnFns))
 					// For each churn function, instantiate a slice of strings with length "concreteOp.Number".
 					for i := range retVals {
