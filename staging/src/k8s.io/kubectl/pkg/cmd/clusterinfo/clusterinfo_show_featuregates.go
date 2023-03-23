@@ -143,7 +143,6 @@ func (o *ClusterInfoShowFeatureGatesOptions) Complete(restClientGetter genericcl
 // if All is false, filter those feature gates that is in stage ALPHA and disabled, and also filter
 // those feature gates that is in stage BETA and enabled, and filter all feature GA
 func (o *ClusterInfoShowFeatureGatesOptions) Run(f cmdutil.Factory) error {
-
 	restClient, err := f.RESTClient()
 	if err != nil {
 		return err
@@ -158,34 +157,14 @@ func (o *ClusterInfoShowFeatureGatesOptions) Run(f cmdutil.Factory) error {
 	scanner := bufio.NewScanner(out)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "kubernetes_feature_enabled") {
-			fields := strings.Fields(line)
-			if len(fields) == 2 {
-				fgName := strings.TrimPrefix(fields[0], "kubernetes_feature_enabled{name=\"")
-				fgName = strings.Split(fgName, "\",stage=")[0]
-				stageStr := "unknown"
-				if strings.Contains(fields[0], "stage=\"ALPHA\"") {
-					stageStr = "ALPHA"
-				} else if strings.Contains(fields[0], "stage=\"BETA\"") {
-					stageStr = "BETA"
-				} else if strings.Contains(fields[0], "stage=\"\"") {
-					stageStr = "GA"
-				} else {
-					stageStr = ""
-				}
-				status, err := strconv.Atoi(fields[1])
-				if err != nil {
-					return err
-				}
-				if _, ok := fgMap[fgName]; !ok {
-					fgMap[fgName] = fgStatus{
-						name:    fgName,
-						stage:   Stage(stageStr),
-						enabled: status == 1,
-					}
-				}
-
-			}
+		fgName, stageStr, status, err := parseLine(line)
+		if err != nil {
+			continue
+		}
+		fgMap[fgName] = fgStatus{
+			name:    fgName,
+			stage:   Stage(stageStr),
+			enabled: status == 1,
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -221,4 +200,32 @@ type fgStatus struct {
 	name    string
 	stage   Stage
 	enabled bool
+}
+
+func parseLine(line string) (string, Stage, int, error) {
+    if !strings.HasPrefix(line, "kubernetes_feature_enabled") {
+        return "", "", 0, fmt.Errorf("invalid line format: %s", line)
+    }
+    fields := strings.Fields(line)
+    if len(fields) != 2 {
+        return "", "", 0, fmt.Errorf("invalid line format: %s", line)
+    }
+    fgName := strings.TrimPrefix(fields[0], "kubernetes_feature_enabled{name=\"")
+    fgName = strings.Split(fgName, "\",stage=")[0]
+    stageStr := "unknown"
+    switch {
+    case strings.Contains(fields[0], "stage=\"ALPHA\""):
+        stageStr = "ALPHA"
+    case strings.Contains(fields[0], "stage=\"BETA\""):
+        stageStr = "BETA"
+    case strings.Contains(fields[0], "stage=\"\""):
+        stageStr = "GA"
+    }
+
+    status, err := strconv.Atoi(fields[1])
+    if err != nil {
+        return "", "", 0, err
+    }
+
+    return fgName, Stage(stageStr), status, nil
 }
