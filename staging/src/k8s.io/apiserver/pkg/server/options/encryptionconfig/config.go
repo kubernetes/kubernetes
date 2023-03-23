@@ -715,18 +715,35 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 		// initialize state so that Load always works
 		probe.state.Store(&envelopekmsv2.State{})
 
-		runProbeCheckAndLog := func(ctx context.Context) error {
+		runProbeCheckAndLog := func(ctx context.Context, depth int) error {
 			if err := probe.check(ctx); err != nil {
-				klog.VDepth(1, 2).ErrorS(err, "kms plugin failed health check probe", "name", kmsName)
+				klog.VDepth(1+depth, 2).ErrorS(err, "kms plugin failed health check probe", "name", kmsName)
 				return err
 			}
 			return nil
 		}
 
+		blockAndProbeFastUntilSuccess := func(ctx context.Context) {
+			_ = wait.PollUntilWithContext(
+				ctx,
+				kmsv2PluginHealthzNegativeInterval,
+				func(ctx context.Context) (bool, error) {
+					return runProbeCheckAndLog(ctx, 1) == nil, nil
+				},
+			)
+		}
+
 		// on the happy path where the plugin is healthy and available on server start,
 		// prime keyID and DEK by running the check inline once (this also prevents unit tests from flaking)
-		// ignore the error here since we want to support the plugin starting up async with the API server
-		_ = runProbeCheckAndLog(ctx)
+		errPrime := runProbeCheckAndLog(ctx, 0)
+
+		// if our initial attempt to prime failed, start trying to get to a valid state in the background ASAP
+		// this prevents a slow start when the external healthz checker is configured to ignore the KMS healthz endpoint
+		// since we want to support the plugin starting up async with the API server, this error is not fatal
+		if errPrime != nil {
+			go blockAndProbeFastUntilSuccess(ctx) // separate go routine to avoid blocking
+		}
+
 		// make sure that the plugin's key ID is reasonably up-to-date
 		// also, make sure that our DEK is up-to-date to with said key ID (if it expires the server will fail all writes)
 		// if this background loop ever stops running, the server will become unfunctional after kmsv2PluginWriteDEKMaxTTL
@@ -734,25 +751,18 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 			ctx,
 			kmsv2PluginHealthzPositiveInterval,
 			func(ctx context.Context) (bool, error) {
-				if err := runProbeCheckAndLog(ctx); err == nil {
+				if err := runProbeCheckAndLog(ctx, 0); err == nil {
 					return false, nil
 				}
 
 				// TODO add integration test for quicker error poll on failure
 				// if we fail, block the outer polling and start a new quicker poll inline
 				// this limits the chance that our DEK expires during a transient failure
-				_ = wait.PollUntilWithContext(
-					ctx,
-					kmsv2PluginHealthzNegativeInterval,
-					func(ctx context.Context) (bool, error) {
-						return runProbeCheckAndLog(ctx) == nil, nil
-					},
-				)
+				blockAndProbeFastUntilSuccess(ctx)
 
 				return false, nil
 			})
 
-		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := storagevalue.PrefixTransformer{
 			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentState),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
