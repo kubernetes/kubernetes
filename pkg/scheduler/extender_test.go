@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -278,7 +279,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			cache := internalcache.New(time.Duration(0), ctx.Done())
@@ -290,6 +292,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				runtime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
