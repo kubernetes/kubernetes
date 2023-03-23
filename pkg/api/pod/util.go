@@ -19,10 +19,10 @@ package pod
 import (
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -850,7 +850,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 		if c.Resources.Requests == nil {
 			continue
 		}
-		if diff.ObjectDiff(oldPod.Spec.Containers[i].Resources, c.Resources) == "" {
+		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
 			continue
 		}
 		findContainerStatus := func(css []api.ContainerStatus, cName string) (api.ContainerStatus, bool) {
@@ -862,7 +862,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			return api.ContainerStatus{}, false
 		}
 		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
-			if diff.ObjectDiff(c.Resources.Requests, cs.AllocatedResources) != "" {
+			if !cmp.Equal(c.Resources.Requests, cs.AllocatedResources) {
 				newPod.Status.Resize = api.PodResizeStatusProposed
 				break
 			}

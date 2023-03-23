@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2113,7 +2114,7 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
 			output := roundTrip(t, runtime.Object(&testPod))
 			pod2 := output.(*v1.Pod)
-			if diff.ObjectDiff(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) != "" {
+			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
 				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
 			}
 		})
