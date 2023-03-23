@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -293,7 +293,7 @@ func TestPrintEvent(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -394,7 +394,7 @@ func TestPrintNamespace(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -442,7 +442,7 @@ func TestPrintSecret(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -490,7 +490,7 @@ func TestPrintServiceAccount(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -590,7 +590,7 @@ func TestPrintNodeStatus(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -639,7 +639,7 @@ func TestPrintNodeRole(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -691,7 +691,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -743,7 +743,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -795,7 +795,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -832,7 +832,7 @@ func TestPrintNodeName(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -893,7 +893,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -955,7 +955,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -998,7 +998,7 @@ func TestPrintIngress(t *testing.T) {
 	}
 	rows[0].Object.Object = nil
 	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }
 
@@ -1061,7 +1061,7 @@ func TestPrintIngressClass(t *testing.T) {
 				rows[i].Object.Object = nil
 			}
 			if !reflect.DeepEqual(testCase.expected, rows) {
-				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(testCase.expected, rows))
+				t.Errorf("mismatch: %s", cmp.Diff(testCase.expected, rows))
 			}
 		})
 	}
@@ -1171,7 +1171,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -1531,7 +1531,7 @@ func TestPrintPod(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
 		}
 	}
 }
@@ -1655,7 +1655,7 @@ func TestPrintPodwide(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
 		}
 	}
 }
@@ -1737,7 +1737,7 @@ func TestPrintPodConditions(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
 		}
 	}
 }
@@ -1788,7 +1788,7 @@ func TestPrintPodList(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expect, rows))
+			t.Errorf("mismatch: %s", cmp.Diff(test.expect, rows))
 		}
 	}
 }
@@ -1899,7 +1899,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
 		}
 	}
 }
@@ -1981,7 +1981,7 @@ func TestPrintPodTemplate(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -2031,7 +2031,7 @@ func TestPrintPodTemplateList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -2148,7 +2148,7 @@ func TestPrintDeployment(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -2216,7 +2216,7 @@ func TestPrintDaemonSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -2288,7 +2288,7 @@ func TestPrintDaemonSetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -2437,7 +2437,7 @@ func TestPrintJob(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -2518,7 +2518,7 @@ func TestPrintJobList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -3290,7 +3290,7 @@ func TestPrintHPA(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3490,7 +3490,7 @@ func TestPrintService(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3541,7 +3541,7 @@ func TestPrintServiceList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -3598,7 +3598,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3652,7 +3652,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -3729,7 +3729,7 @@ func TestPrintControllerRevision(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3796,7 +3796,7 @@ func TestPrintConfigMap(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3843,7 +3843,7 @@ func TestPrintNetworkPolicy(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3918,7 +3918,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -3993,7 +3993,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4135,7 +4135,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4262,7 +4262,7 @@ func TestPrintReplicationController(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4352,7 +4352,7 @@ func TestPrintReplicaSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4420,7 +4420,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -4507,7 +4507,7 @@ func TestPrintStatefulSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4651,7 +4651,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4774,7 +4774,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4842,7 +4842,7 @@ func TestPrintComponentStatus(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -4980,7 +4980,7 @@ func TestPrintCronJob(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5046,7 +5046,7 @@ func TestPrintCronJobList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
 	}
 }
 
@@ -5144,7 +5144,7 @@ func TestPrintStorageClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5191,7 +5191,7 @@ func TestPrintLease(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5233,7 +5233,7 @@ func TestPrintPriorityClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5274,7 +5274,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5394,7 +5394,7 @@ func TestPrintEndpoint(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 
@@ -5493,7 +5493,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5641,7 +5641,7 @@ func TestPrintFlowSchema(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5718,7 +5718,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5840,7 +5840,7 @@ func TestPrintStorageVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -5877,7 +5877,7 @@ func TestPrintScale(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -6399,7 +6399,7 @@ func TestPrintClusterCIDR(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -6478,7 +6478,7 @@ func TestPrintClusterCIDRList(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
 		}
 	}
 }
@@ -6507,7 +6507,7 @@ func TestPrintIPAddress(t *testing.T) {
 	}
 	rows[0].Object.Object = nil
 	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }
 
@@ -6558,7 +6558,7 @@ func TestPrintIPAddressList(t *testing.T) {
 
 	}
 	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 
 }

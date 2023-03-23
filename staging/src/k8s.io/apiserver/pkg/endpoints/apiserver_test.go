@@ -56,7 +56,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1833,7 +1832,7 @@ func TestGetTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -2062,7 +2061,7 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
 			}
 		})
 	}
@@ -2240,7 +2239,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
 			}
 			body = d
 		} else {

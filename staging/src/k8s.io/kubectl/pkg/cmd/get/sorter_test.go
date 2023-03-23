@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -677,7 +677,7 @@ func TestSortingPrinter(t *testing.T) {
 				t.Fatalf("%s: expected error containing: %q, got none", tt.name, tt.expectedErr)
 			}
 			if !reflect.DeepEqual(table, expectedTable) {
-				t.Errorf("[%s]\nexpected/saw:\n%s", tt.name, diff.ObjectReflectDiff(expectedTable, table))
+				t.Errorf("[%s]\nexpected/saw:\n%s", tt.name, cmp.Diff(expectedTable, table))
 			}
 		})
 		t.Run(tt.name, func(t *testing.T) {

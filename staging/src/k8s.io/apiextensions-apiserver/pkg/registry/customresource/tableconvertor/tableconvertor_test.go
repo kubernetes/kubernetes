@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/util/jsonpath"
 )
 
@@ -434,7 +434,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertor.ConvertToTable() = %s", diff.ObjectReflectDiff(tt.want, got))
+				t.Errorf("convertor.ConvertToTable() = %s", cmp.Diff(tt.want, got))
 			}
 		})
 	}

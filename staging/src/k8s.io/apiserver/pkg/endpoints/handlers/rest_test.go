@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -1280,7 +1279,7 @@ func TestDedupOwnerReferences(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
 			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
-				t.Errorf("diff: %v", diff.ObjectReflectDiff(deduped, tc.expected))
+				t.Errorf("diff: %v", cmp.Diff(deduped, tc.expected))
 			}
 		})
 	}

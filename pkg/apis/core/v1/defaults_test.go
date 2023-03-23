@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -181,7 +180,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
+		t.Logf(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 
@@ -327,7 +326,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
+		t.Logf(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 

@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -2382,14 +2381,14 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasInPlaceVerticalScaling:
 						// new pod shouldn't change if feature enabled or if old pod has ResizePolicy set
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasInPlaceVerticalScaling:
 						// new pod should be changed
@@ -2398,12 +2397,12 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 						}
 						// new pod should not have ResizePolicy
 						if !reflect.DeepEqual(newPod, podWithoutInPlaceVerticalScaling()) {
-							t.Errorf("new pod has ResizePolicy: %v", diff.ObjectReflectDiff(newPod, podWithoutInPlaceVerticalScaling()))
+							t.Errorf("new pod has ResizePolicy: %v", cmp.Diff(newPod, podWithoutInPlaceVerticalScaling()))
 						}
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
