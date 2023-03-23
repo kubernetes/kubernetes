@@ -28,6 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 func TestGetLoadBalancer(t *testing.T) {
@@ -202,6 +206,23 @@ func TestEnsureLoadBalancerMixedProtocols(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
+	fakeClient := gce.client.(*fake.Clientset)
+	fakeClient.PrependReactor("patch", "services", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "status" {
+			return true, &v1.Service{}, fmt.Errorf("unexpected action %s", action)
+		}
+		patch := action.(clienttesting.PatchAction)
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		obj, _, err := decode(patch.GetPatch(), nil, nil)
+		if err != nil {
+			return true, &v1.Service{}, fmt.Errorf("unable to decode patch")
+		}
+		service := obj.(*v1.Service)
+		if hasLoadBalancerPortsError(service) {
+			return true, service, nil
+		}
+		return true, service, fmt.Errorf("unexpected object %v", service)
+	})
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
@@ -221,12 +242,9 @@ func TestEnsureLoadBalancerMixedProtocols(t *testing.T) {
 	if err.Error() != "mixed protocol is not supported for LoadBalancer" {
 		t.Fatalf("unexpected error, got: %s wanted \"mixed protocol is not supported for LoadBalancer\"", err.Error())
 	}
-	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Get(context.TODO(), apiService.Name, metav1.GetOptions{})
+	_, err = gce.client.CoreV1().Services(apiService.Namespace).Get(context.TODO(), apiService.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !hasLoadBalancerPortsError(apiService) {
-		t.Fatalf("Expected condition %v to be True, got %v", v1.LoadBalancerPortsError, apiService.Status.Conditions)
 	}
 }
 
@@ -236,6 +254,23 @@ func TestUpdateLoadBalancerMixedProtocols(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
+	fakeClient := gce.client.(*fake.Clientset)
+	fakeClient.PrependReactor("patch", "services", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "status" {
+			return true, &v1.Service{}, fmt.Errorf("unexpected action %s", action)
+		}
+		patch := action.(clienttesting.PatchAction)
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		obj, _, err := decode(patch.GetPatch(), nil, nil)
+		if err != nil {
+			return true, &v1.Service{}, fmt.Errorf("unable to decode patch")
+		}
+		service := obj.(*v1.Service)
+		if hasLoadBalancerPortsError(service) {
+			return true, service, nil
+		}
+		return true, service, fmt.Errorf("unexpected object %v", service)
+	})
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
@@ -258,13 +293,11 @@ func TestUpdateLoadBalancerMixedProtocols(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Get(context.TODO(), apiService.Name, metav1.GetOptions{})
+	_, err = gce.client.CoreV1().Services(apiService.Namespace).Get(context.TODO(), apiService.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !hasLoadBalancerPortsError(apiService) {
-		t.Fatalf("Expected condition %v to be True, got %v", v1.LoadBalancerPortsError, apiService.Status.Conditions)
-	}
+
 }
 
 func TestCheckMixedProtocol(t *testing.T) {
