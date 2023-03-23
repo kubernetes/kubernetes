@@ -141,14 +141,9 @@ func logPodResources(podIdx int, pr *kubeletpodresourcesv1.PodResources) {
 
 type podResMap map[string]map[string]kubeletpodresourcesv1.ContainerResources
 
-func getPodResourcesValues(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient) (podResMap, error) {
-	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-	if err != nil {
-		return nil, err
-	}
-
+func convertToMap(podsResources []*kubeletpodresourcesv1.PodResources) podResMap {
 	res := make(map[string]map[string]kubeletpodresourcesv1.ContainerResources)
-	for idx, podResource := range resp.GetPodResources() {
+	for idx, podResource := range podsResources {
 		// to make troubleshooting easier
 		logPodResources(idx, podResource)
 
@@ -158,7 +153,15 @@ func getPodResourcesValues(ctx context.Context, cli kubeletpodresourcesv1.PodRes
 		}
 		res[podResource.GetName()] = cnts
 	}
-	return res, nil
+	return res
+}
+
+func getPodResourcesValues(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient) (podResMap, error) {
+	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return convertToMap(resp.GetPodResources()), nil
 }
 
 type testPodData struct {
@@ -568,6 +571,53 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 	}
 }
 
+func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient) {
+	//var err error
+	ginkgo.By("checking the output when no pods are present")
+	expected := []podDesc{}
+	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
+	podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	framework.ExpectError(err, "pod not found")
+	res := convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+
+	tpd := newTestPodData()
+	ginkgo.By("checking the output when only pods which don't require resources are present")
+	expected = []podDesc{
+		{
+			podName: "pod-00",
+			cntName: "cnt-00",
+		},
+	}
+	tpd.createPodsForTest(ctx, f, expected)
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-00", PodNamespace: f.Namespace.Name})
+	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-00")
+	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	res = convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	tpd.deletePodsForTest(ctx, f)
+
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when only pod require CPU")
+	expected = []podDesc{
+		{
+			podName:    "pod-01",
+			cntName:    "cnt-00",
+			cpuRequest: 2000,
+		},
+	}
+	tpd.createPodsForTest(ctx, f, expected)
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
+	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	res = convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	tpd.deletePodsForTest(ctx, f)
+}
+
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
@@ -686,6 +736,10 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					cpus := reservedSystemCPUs.String()
 					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
+					if initialConfig.FeatureGates == nil {
+						initialConfig.FeatureGates = make(map[string]bool)
+					}
+					initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
 				})
 
 				ginkgo.It("should return the expected responses", func(ctx context.Context) {
@@ -701,6 +755,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 					podresourcesListTests(ctx, f, cli, nil)
 					podresourcesGetAllocatableResourcesTests(ctx, cli, nil, onlineCPUs, reservedSystemCPUs)
+					podresourcesGetTests(ctx, f, cli)
 				})
 			})
 		})
@@ -739,6 +794,23 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				ginkgo.By("checking GetAllocatableResources fail if the feature gate is not enabled")
 				allocatableRes, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 				framework.Logf("GetAllocatableResources result: %v, err: %v", allocatableRes, err)
+				framework.ExpectError(err, "With feature gate disabled, the call must fail")
+			})
+		})
+
+		ginkgo.Context("with disabled KubeletPodResourcesGet feature gate", func() {
+
+			ginkgo.It("should return the expected error with the feature gate disabled", func(ctx context.Context) {
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err, "LocalEndpoint() faild err %v", err)
+
+				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
+				defer conn.Close()
+
+				ginkgo.By("checking Get fail if the feature gate is not enabled")
+				getRes, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
+				framework.Logf("Get result: %v, err: %v", getRes, err)
 				framework.ExpectError(err, "With feature gate disabled, the call must fail")
 			})
 		})
@@ -824,6 +896,12 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 	})
 
 	ginkgo.Context("when querying /metrics [NodeConformance]", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
+			initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
+		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			// ensure APIs have been called at least once
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
@@ -838,6 +916,25 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 			_, err = cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 			framework.ExpectNoError(err, "GetAllocatableResources() failed err %v", err)
+
+			desc := podDesc{
+				podName: "pod-01",
+				cntName: "cnt-01",
+			}
+			tpd := newTestPodData()
+			tpd.createPodsForTest(ctx, f, []podDesc{
+				desc,
+			})
+			expectPodResources(ctx, 1, cli, []podDesc{desc})
+
+			expected := []podDesc{}
+			resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
+			framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+			podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+			res := convertToMap(podResourceList)
+			err = matchPodDescWithResources(expected, res)
+			framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+			tpd.deletePodsForTest(ctx, f)
 		})
 
 		ginkgo.It("should report the values for the podresources metrics", func(ctx context.Context) {
@@ -853,6 +950,9 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					"": timelessSampleAtLeast(1),
 				}),
 				"kubelet_pod_resources_endpoint_requests_get_allocatable": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSampleAtLeast(1),
+				}),
+				"kubelet_pod_resources_endpoint_requests_get": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSampleAtLeast(1),
 				}),
 				// not checking errors: the calls don't have non-catastrophic (e.g. out of memory) error conditions yet.
