@@ -81,9 +81,10 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 // testKMSv2EnvelopeService is a mock kmsv2 envelope service which can be used to simulate remote Envelope v2 services
 // for testing of the envelope transformer with other transformers.
 type testKMSv2EnvelopeService struct {
-	err          error
-	keyID        string
-	encryptCalls int
+	err                error
+	keyID              string
+	encryptCalls       int
+	encryptAnnotations map[string][]byte
 }
 
 func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
@@ -99,8 +100,9 @@ func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data
 		return nil, t.err
 	}
 	return &kmsservice.EncryptResponse{
-		Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
-		KeyID:      t.keyID,
+		Ciphertext:  []byte(base64.StdEncoding.EncodeToString(data)),
+		KeyID:       t.keyID,
+		Annotations: t.encryptAnnotations,
 	}, nil
 }
 
@@ -123,17 +125,17 @@ func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelo
 
 // The factory method to create mock envelope kmsv2 service.
 func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint, providerName string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{nil, "1", 0}, nil
+	return &testKMSv2EnvelopeService{nil, "1", 0, nil}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service which always returns error.
 func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{errors.New("test"), "1", 0}, nil
+	return &testKMSv2EnvelopeService{errors.New("test"), "1", 0, nil}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service that always returns invalid keyID.
 func newMockInvalidKeyIDEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration, keyID string) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{nil, keyID, 0}, nil
+	return &testKMSv2EnvelopeService{nil, keyID, 0, nil}, nil
 }
 
 func TestLegacyConfig(t *testing.T) {
@@ -1757,6 +1759,39 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			wantErr: `failed to rotate DEK uid="panda", ` +
 				`errState=<nil>, errGen=failed to encrypt DEK, error: broken, statusKeyID="5", ` +
 				`encryptKeyID="", stateKeyID="4", expirationTimestamp=` + now.Add(7*time.Minute).Format(time.RFC3339),
+		},
+		{
+			name:             "invalid service response, no previous state",
+			service:          &testKMSv2EnvelopeService{keyID: "1", encryptAnnotations: map[string][]byte{"panda": nil}},
+			state:            envelopekmsv2.State{},
+			statusKeyID:      "1",
+			wantState:        envelopekmsv2.State{},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+			},
+			wantErr: `failed to rotate DEK uid="panda", ` +
+				`errState=got unexpected nil transformer, errGen=failed to validate annotations: annotations: Invalid value: "panda": ` +
+				`should be a domain with at least two segments separated by dots, statusKeyID="1", ` +
+				`encryptKeyID="", stateKeyID="", expirationTimestamp=` + (time.Time{}).Format(time.RFC3339),
+		},
+		{
+			name:        "invalid service response, with previous state",
+			service:     &testKMSv2EnvelopeService{keyID: "3", encryptAnnotations: map[string][]byte{"panda": nil}},
+			state:       validState("2", now),
+			statusKeyID: "3",
+			wantState: envelopekmsv2.State{
+				KeyID:               "2",
+				ExpirationTimestamp: now,
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+			},
+			wantErr: `failed to rotate DEK uid="panda", ` +
+				`errState=<nil>, errGen=failed to validate annotations: annotations: Invalid value: "panda": ` +
+				`should be a domain with at least two segments separated by dots, statusKeyID="3", ` +
+				`encryptKeyID="", stateKeyID="2", expirationTimestamp=` + now.Format(time.RFC3339),
 		},
 	}
 	for _, tt := range tests {
