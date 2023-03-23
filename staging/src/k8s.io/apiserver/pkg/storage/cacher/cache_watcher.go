@@ -57,7 +57,7 @@ type cacheWatcher struct {
 	done      chan struct{}
 	filter    filterWithAttrsFunc
 	stopped   bool
-	forget    func(bool)
+	forget    func(bool, bool)
 	versioner storage.Versioner
 	// The watcher will be closed by server after the deadline,
 	// save it here to send bookmark events before that.
@@ -91,7 +91,7 @@ type cacheWatcher struct {
 func newCacheWatcher(
 	chanSize int,
 	filter filterWithAttrsFunc,
-	forget func(bool),
+	forget func(bool, bool),
 	versioner storage.Versioner,
 	deadline time.Time,
 	allowWatchBookmarks bool,
@@ -120,7 +120,7 @@ func (c *cacheWatcher) ResultChan() <-chan watch.Event {
 
 // Implements watch.Interface.
 func (c *cacheWatcher) Stop() {
-	c.forget(false)
+	c.forget(false, false)
 }
 
 // we rely on the fact that stopLocked is actually protected by Cacher.Lock()
@@ -203,7 +203,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 			return c.state == cacheWatcherBookmarkReceived
 		}()
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result), graceful)
-		c.forget(graceful)
+		c.forget(graceful, true)
 	}
 
 	if timer == nil {

@@ -629,16 +629,21 @@ const (
 	// maxWatchChanSizeWithoutIndex is the max size of the channel
 	// used by the watch not using the index.
 	// TODO(wojtek-t): Figure out if the value shouldn't be higher.
-	maxWatchChanSizeWithoutIndex = 100
+	maxWatchChanSizeWithoutIndex = 1000
 )
 
-func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
+func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool, watcherCount int, terminatedWatchCount int) int {
 	// To estimate the channel size we use a heuristic that a channel
 	// should roughly be able to keep one second of history.
 	// We don't have an exact data, but given we store updates from
 	// the last <eventFreshDuration>, we approach it by dividing the
 	// capacity by the length of the history window.
 	chanSize := int(math.Ceil(float64(w.currentCapacity()) / eventFreshDuration.Seconds()))
+
+	// Increase chanSize by 10 for every 100 watchers
+	// Increase chanSize by 10 for every time that a watcher terminated due to unresponsiveness
+	chanSize += int(math.Ceil(float64(watcherCount)/100.0)) * 10
+	chanSize += terminatedWatchCount * 10
 
 	// Finally we adjust the size to avoid ending with too low or
 	// to large values.

@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -51,7 +52,7 @@ import (
 )
 
 var (
-	emptyFunc = func(bool) {}
+	emptyFunc = func(bool, bool) {}
 )
 
 const (
@@ -130,9 +131,14 @@ func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
 type indexedWatchers struct {
 	allWatchers   map[namespacedName]watchersMap
 	valueWatchers map[string]watchersMap
+
+	sync.RWMutex
 }
 
 func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespacedName, value string, supported bool) {
+	i.Lock()
+	defer i.Unlock()
+
 	if supported {
 		if _, ok := i.valueWatchers[value]; !ok {
 			i.valueWatchers[value] = watchersMap{}
@@ -149,6 +155,9 @@ func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespac
 }
 
 func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool, done func(*cacheWatcher)) {
+	i.Lock()
+	defer i.Unlock()
+
 	if supported {
 		i.valueWatchers[value].deleteWatcher(number, done)
 		if len(i.valueWatchers[value]) == 0 {
@@ -163,6 +172,9 @@ func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value 
 }
 
 func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done func(*cacheWatcher)) {
+	i.Lock()
+	defer i.Unlock()
+
 	// note that we don't have to call setDrainInputBufferLocked method on the watchers
 	// because we take advantage of the default value - stop immediately
 	// also watchers that have had already its draining strategy set
@@ -178,6 +190,18 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 	}
 	i.allWatchers = map[namespacedName]watchersMap{}
 	i.valueWatchers = map[string]watchersMap{}
+}
+
+func (i *indexedWatchers) watcherCount() int {
+	i.RLock()
+	defer i.RUnlock()
+
+	count := len(i.allWatchers)
+	for _, watchers := range i.valueWatchers {
+		count += len(watchers)
+	}
+
+	return count
 }
 
 // As we don't need a high precision here, we keep all watchers timeout within a
@@ -331,6 +355,8 @@ type Cacher struct {
 	bookmarkWatchers *watcherBookmarkTimeBuckets
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
+	// terminatedWatchCount is the count of terminated watchers due to unresponsiveness
+	terminatedWatchCount int32
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -558,7 +584,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
+	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported, c.watchers.watcherCount(), int(c.terminatedWatchCount))
 
 	// Determine a function that computes the bookmarkAfterResourceVersion
 	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(ctx, requestedWatchRV, opts)
@@ -1180,8 +1206,8 @@ func (c *Cacher) Stop() {
 	c.stopWg.Wait()
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
-	return func(drainWatcher bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool, bool) {
+	return func(drainWatcher bool, watchTerminated bool) {
 		c.Lock()
 		defer c.Unlock()
 
@@ -1191,6 +1217,10 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported, c.stopWatcherLocked)
+
+		if watchTerminated {
+			atomic.AddInt32(&c.terminatedWatchCount, 1)
+		}
 	}
 }
 
