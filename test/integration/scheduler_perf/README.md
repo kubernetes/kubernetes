@@ -100,3 +100,15 @@ performance.
 
 During interactive debugging sessions it is possible to enable per-test output
 via -use-testing-log.
+
+## Integration tests
+
+To run integration tests, use:
+```
+make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_ARGS=-use-testing-log
+```
+
+Integration testing uses the same `config/performance-config.yaml` as
+benchmarking. By default, workloads labeled as `integration-test` are executed
+as part of integration testing. `-test-scheduling-label-filter` can be used to
+change that.
