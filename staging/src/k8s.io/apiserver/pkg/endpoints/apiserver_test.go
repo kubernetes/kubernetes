@@ -2061,12 +2061,6 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				for i := range test.expected {
-					if i >= len(actual) {
-						break
-					}
-					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
-				}
 				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
 			}
 		})

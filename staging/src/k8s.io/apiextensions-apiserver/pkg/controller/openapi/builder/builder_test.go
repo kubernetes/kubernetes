@@ -21,13 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
@@ -438,7 +438,7 @@ func TestNewBuilder(t *testing.T) {
 
 			gotListSchema := got.listSchema.Properties["items"].Items.Schema
 			if !reflect.DeepEqual(&wantedItemsSchema, gotListSchema) {
-				t.Errorf("unexpected list schema: %s (want/got)", schemaDiff(&wantedItemsSchema, gotListSchema))
+				t.Errorf("unexpected list schema:\n%s", schemaDiff(&wantedItemsSchema, gotListSchema))
 			}
 		})
 	}
@@ -560,15 +560,8 @@ func properties(p map[string]spec.Schema) sets.String {
 }
 
 func schemaDiff(a, b *spec.Schema) string {
-	as, err := json.Marshal(a)
-	if err != nil {
-		panic(err)
-	}
-	bs, err := json.Marshal(b)
-	if err != nil {
-		panic(err)
-	}
-	return diff.StringDiff(string(as), string(bs))
+	// This option construct allows diffing all fields, even unexported ones.
+	return cmp.Diff(a, b, cmp.Exporter(func(reflect.Type) bool { return true }))
 }
 
 func TestBuildOpenAPIV2(t *testing.T) {
