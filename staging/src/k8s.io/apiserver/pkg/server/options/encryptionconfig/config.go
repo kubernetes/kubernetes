@@ -376,13 +376,18 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 			ExpirationTimestamp: expirationTimestamp,
 			CacheKey:            cacheKey,
 		})
-		klog.V(6).InfoS("successfully rotated DEK",
-			"uid", uid,
-			"newKeyID", resp.KeyID,
-			"oldKeyID", state.KeyID,
-			"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
-		)
-		return nil
+
+		// it should be logically impossible for the new state to be invalid but check just in case
+		_, errGen = h.getCurrentState()
+		if errGen == nil {
+			klog.V(6).InfoS("successfully rotated DEK",
+				"uid", uid,
+				"newKeyID", resp.KeyID,
+				"oldKeyID", state.KeyID,
+				"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
+			)
+			return nil
+		}
 	}
 
 	return fmt.Errorf("failed to rotate DEK uid=%q, errState=%v, errGen=%v, statusKeyID=%q, encryptKeyID=%q, stateKeyID=%q, expirationTimestamp=%s",
