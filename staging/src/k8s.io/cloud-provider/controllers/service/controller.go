@@ -60,6 +60,8 @@ const (
 	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion. Defined in
 	// https://github.com/kubernetes/autoscaler/blob/e80ab518340f88f364fe3ef063f8303755125971/cluster-autoscaler/utils/deletetaint/delete.go#L36
 	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
+	// max number of times a service will be requeued before dropping it
+	maxRetries = 15
 )
 
 type cachedService struct {
@@ -288,8 +290,14 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
-	c.serviceQueue.AddRateLimited(key)
+	if c.serviceQueue.NumRequeues(key) < maxRetries {
+		runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
+		c.serviceQueue.AddRateLimited(key)
+		return true
+	}
+	klog.Warningf("Retry budget exceeded, dropping service %q out of the queue: %v", key, err)
+	c.serviceQueue.Forget(key)
+	runtime.HandleError(err)
 	return true
 }
 
