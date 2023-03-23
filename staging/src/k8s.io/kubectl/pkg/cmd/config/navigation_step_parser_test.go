@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -102,7 +102,7 @@ func (test stepParserTest) run(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(test.expectedNavigationSteps, *actualSteps) {
-		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
+		t.Errorf("diff: %v", cmp.Diff(test.expectedNavigationSteps, *actualSteps))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedNavigationSteps, *actualSteps)
 	}
 }

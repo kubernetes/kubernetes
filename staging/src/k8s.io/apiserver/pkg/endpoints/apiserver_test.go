@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -2823,7 +2824,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2863,7 +2864,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2906,7 +2907,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 

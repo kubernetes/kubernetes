@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
@@ -128,7 +129,7 @@ func runTest(t *testing.T, source interface{}) {
 		return
 	}
 	if !semantic.DeepEqual(source, obj3) {
-		t.Errorf("3: %v: diff: %v", name, diff.ObjectDiff(source, obj3))
+		t.Errorf("3: %v: diff: %v", name, cmp.Diff(source, obj3))
 		return
 	}
 }

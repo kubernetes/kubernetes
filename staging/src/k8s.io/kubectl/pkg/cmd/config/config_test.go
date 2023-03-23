@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -896,7 +896,7 @@ func (test configCommandTest) run(t *testing.T) string {
 	testClearLocationOfOrigin(&actualConfig)
 
 	if !apiequality.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
-		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedConfig, actualConfig))
+		t.Errorf("diff: %v", cmp.Diff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
 

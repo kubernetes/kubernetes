@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientset "k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -937,7 +937,7 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	}
 	klog.V(3).InfoS("Pod status is inconsistent with cached status for pod, a reconciliation should be triggered",
 		"pod", klog.KObj(pod),
-		"statusDiff", diff.ObjectDiff(podStatus, &status))
+		"statusDiff", cmp.Diff(podStatus, &status))
 
 	return true
 }
