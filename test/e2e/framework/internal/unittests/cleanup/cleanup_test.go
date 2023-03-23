@@ -173,10 +173,15 @@ func TestCleanup(t *testing.T) {
 	//   skip its own helper functions. That's okay, normally
 	//   ktesting should not be installed as logging backend like this.
 	// - klog.Infof messages are printed with an extra newline.
-	logger, _ := ktesting.NewTestContext(t)
+	//
+	// Once all code supports contextual logging, the klog.SetLogger
+	// call can be removed.
+	logger, ctx := ktesting.NewTestContext(t)
 	klog.SetLogger(logger)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	apiServer := testapiserver.StartAPITestServer(t)
+	apiServer := testapiserver.StartAPITestServer(ctx, t)
 
 	// This simulates how test/e2e uses the framework and how users
 	// invoke test/e2e.

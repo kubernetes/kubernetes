@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -171,5 +172,5 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	return prepared.Run(stopCh)
+	return prepared.Run(context.Background(), stopCh)
 }

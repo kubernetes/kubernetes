@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -60,5 +61,5 @@ func Run(o *options.CustomResourceDefinitionsServerOptions, stopCh <-chan struct
 	if err != nil {
 		return err
 	}
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	return server.GenericAPIServer.PrepareRun().Run(context.Background(), stopCh)
 }

@@ -514,10 +514,7 @@ spec:
 )
 
 func TestFieldValidation(t *testing.T) {
-	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	config := server.ClientConfig
 	defer server.TearDownFn()
 
@@ -2930,10 +2927,7 @@ func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless boo
 
 func BenchmarkFieldValidation(b *testing.B) {
 	flag.Lookup("v").Value.Set("0")
-	server, err := kubeapiservertesting.StartTestServer(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		b.Fatal(err)
-	}
+	server := kubeapiservertesting.StartTestServerOrDie(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	config := server.ClientConfig
 	defer server.TearDownFn()
 

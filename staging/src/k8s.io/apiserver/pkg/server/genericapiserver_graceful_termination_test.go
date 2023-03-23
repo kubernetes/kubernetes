@@ -41,6 +41,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
@@ -172,6 +173,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	             |
 //	         return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, false)
 	connReusingClient := newClient(false)
@@ -203,7 +205,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		s.PrepareRun().Run(ctx, stopCh)
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -395,6 +397,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //     |
 //     return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, true)
 	connReusingClient := newClient(false)
@@ -426,7 +429,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		s.PrepareRun().Run(ctx, stopCh)
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -551,6 +554,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 func TestMuxAndDiscoveryComplete(t *testing.T) {
 	// setup
+	_, ctx := ktesting.NewTestContext(t)
 	testSignal1 := make(chan struct{})
 	testSignal2 := make(chan struct{})
 	s := newGenericAPIServer(t, &fakeAudit{}, true)
@@ -571,7 +575,7 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		s.PrepareRun().Run(ctx, stopCh)
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -612,6 +616,7 @@ func TestPreShutdownHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			s := test.server()
 			doer := setupDoer(t, s.SecureServingInfo)
 
@@ -646,7 +651,7 @@ func TestPreShutdownHooks(t *testing.T) {
 			stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
 			go func() {
 				defer close(runCompletedCh)
-				s.PrepareRun().Run(stopCh)
+				s.PrepareRun().Run(ctx, stopCh)
 			}()
 			waitForAPIServerStarted(t, doer)
 

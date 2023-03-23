@@ -101,10 +101,7 @@ func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 
 func TestAddRemoveGroupVersion(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 

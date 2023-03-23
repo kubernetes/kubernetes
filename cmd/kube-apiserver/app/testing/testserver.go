@@ -25,6 +25,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // This key is for testing purposes only and is not considered secure.
@@ -78,14 +80,6 @@ type TestServer struct {
 	EtcdStoragePrefix string                    // storage prefix in etcd
 }
 
-// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
-type Logger interface {
-	Helper()
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
-}
-
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
@@ -99,7 +93,8 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func StartTestServer(ctx context.Context, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	logger := klog.FromContext(ctx)
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
 	}
@@ -111,13 +106,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	stopCh := make(chan struct{})
 	var errCh chan error
+	ctx, cancel := context.WithCancel(ctx)
 	tearDown := func() {
-		// Closing stopCh is stopping apiserver and cleaning up
-		// after itself, including shutting down its storage layer.
-		close(stopCh)
-
+		// Force an immediate stop of the apiserver.
+		cancel()
 		// If the apiserver was started, let's wait for it to
-		// shutdown clearly.
+		// shutdown.
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
@@ -206,7 +200,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
 
-	pkgPath, err := pkgPath(t)
+	pkgPath, err := pkgPath(logger)
 	if err != nil {
 		return result, err
 	}
@@ -222,11 +216,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
-		t.Fatalf("create temp file failed: %v", err)
+		return TestServer{}, fmt.Errorf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
-		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
+		return TestServer{}, fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
@@ -241,8 +235,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
 	}
 
-	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
-	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
+	logger.Info("Starting kube-apiserver", "port", s.SecureServing.BindPort, "runtimeConfig", completedOptions.APIEnablement.RuntimeConfig)
 	server, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
@@ -257,12 +250,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		prepared, err := server.PrepareRun()
 		if err != nil {
 			errCh <- err
-		} else if err := prepared.Run(stopCh); err != nil {
+		} else if err := prepared.Run(ctx, stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)
 
-	t.Logf("Waiting for /healthz to be ok...")
+	logger.Info("Waiting for /healthz to be ok...")
 
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
@@ -308,7 +301,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
-				t.Logf("Unable to get default namespace: %v", err)
+				logger.Error(err, "Unable to get default namespace")
 			}
 			return false, nil
 		}
@@ -356,13 +349,14 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
-	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
+func StartTestServerOrDie(tb testing.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+	_, ctx := ktesting.NewTestContext(tb)
+	result, err := StartTestServer(ctx, instanceOptions, flags, storageConfig)
 	if err == nil {
 		return &result
 	}
 
-	t.Fatalf("failed to launch server: %v", err)
+	tb.Fatalf("failed to launch server: %v", err)
 	return nil
 }
 
@@ -389,7 +383,7 @@ func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
 //
 // The approach taken here works for both go test and bazel on the assumption
 // that if and only if trimpath is passed, we are running under bazel.
-func pkgPath(t Logger) (string, error) {
+func pkgPath(logger klog.Logger) (string, error) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("failed to get current file")
@@ -400,7 +394,8 @@ func pkgPath(t Logger) (string, error) {
 	// If we find bazel env variables, then -trimpath was passed so we need to
 	// construct the path from the environment.
 	if testSrcdir, testWorkspace := os.Getenv("TEST_SRCDIR"), os.Getenv("TEST_WORKSPACE"); testSrcdir != "" && testWorkspace != "" {
-		t.Logf("Detected bazel env varaiables: TEST_SRCDIR=%q TEST_WORKSPACE=%q", testSrcdir, testWorkspace)
+		//nolint:logcheck
+		logger.Info("Detected bazel env varaiables", "TEST_SRCDIR", testSrcdir, "TEST_WORKSPACE", testWorkspace)
 		pkgPath = filepath.Join(testSrcdir, testWorkspace, pkgPath)
 	}
 
@@ -410,7 +405,7 @@ func pkgPath(t Logger) (string, error) {
 		return "", fmt.Errorf("can't construct an absolute path from %q", pkgPath)
 	}
 
-	t.Logf("Resolved testserver package path to: %q", pkgPath)
+	logger.Info("Resolved testserver package", "path", pkgPath)
 
 	return pkgPath, nil
 }

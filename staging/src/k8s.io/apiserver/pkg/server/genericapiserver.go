@@ -450,7 +450,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{s}
 }
 
-// Run spawns the secure http server. It only returns if stopCh is closed
+// Run spawns the secure http server. It only returns if stopCh is closed (graceful shutdown),
+// the context gets canceled (forced immediate shutdown),
 // or the secure port cannot be listened on initially.
 // This is the diagram of what channels/signals are dependent on each other:
 //
@@ -492,7 +493,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |                       listenerStoppedCh
 // |                               |
 // |      HTTPServerStoppedListening (httpServerStoppedListeningCh)
-func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+func (s preparedGenericAPIServer) Run(ctx context.Context, stopCh <-chan struct{}) error {
+	logger := klog.FromContext(ctx)
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
 
@@ -515,28 +517,33 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 			select {
 			case <-muxAndDiscoveryCompletedSignal:
 				continue
+			case <-ctx.Done():
+				return
 			case <-stopCh:
-				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+				logger.V(1).Info("Haven't completed, stop requested", "signal", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 				return
 			}
 		}
 		s.lifecycleSignals.MuxAndDiscoveryComplete.Signal()
-		klog.V(1).Infof("%s has all endpoints registered and discovery information is complete", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+		logger.V(1).Info("All endpoints registered and discovery information is complete", "signal", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}()
 
 	go func() {
 		defer delayedStopCh.Signal()
 		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", delayedStopCh.Name())
 
-		<-stopCh
+		select {
+		case <-ctx.Done():
+			return
+		case <-stopCh:
+			// As soon as shutdown is initiated, /readyz should start returning failure.
+			// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
+			// and stop sending traffic to this server.
+			shutdownInitiatedCh.Signal()
+			logger.V(1).Info("[graceful-termination] shutdown event", "signal", shutdownInitiatedCh.Name())
 
-		// As soon as shutdown is initiated, /readyz should start returning failure.
-		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
-		// and stop sending traffic to this server.
-		shutdownInitiatedCh.Signal()
-		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", shutdownInitiatedCh.Name())
-
-		time.Sleep(s.ShutdownDelayDuration)
+			time.Sleep(s.ShutdownDelayDuration)
+		}
 	}()
 
 	// close socket after delayed stopCh
@@ -549,7 +556,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
 		shutdownTimeout = 2 * time.Second
-		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "shutdownTimeout", shutdownTimeout)
+		logger.V(1).Info("[graceful-termination] using HTTP Server shutdown timeout", "shutdownTimeout", shutdownTimeout)
 	}
 
 	notAcceptingNewRequestCh := s.lifecycleSignals.NotAcceptingNewRequest
@@ -563,7 +570,10 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 			timeToStopHttpServerCh = drainedCh.Signaled()
 		}
 
-		<-timeToStopHttpServerCh
+		select {
+		case <-ctx.Done():
+		case <-timeToStopHttpServerCh:
+		}
 	}()
 
 	// Start the audit backend before any request comes in. This means we must call Backend.Run
@@ -582,35 +592,47 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
 	go func() {
-		<-listenerStoppedCh
-		httpServerStoppedListeningCh.Signal()
-		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
+		select {
+		case <-ctx.Done():
+		case <-listenerStoppedCh:
+			httpServerStoppedListeningCh.Signal()
+			logger.V(1).Info("[graceful-termination] shutdown event", "signal", httpServerStoppedListeningCh.Name())
+		}
 	}()
 
 	// we don't accept new request as soon as both ShutdownDelayDuration has
 	// elapsed and preshutdown hooks have completed.
 	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
 	go func() {
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", notAcceptingNewRequestCh.Name())
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "signal", notAcceptingNewRequestCh.Name())
 		defer notAcceptingNewRequestCh.Signal()
 
 		// wait for the delayed stopCh before closing the handler chain
-		<-delayedStopCh.Signaled()
+		select {
+		case <-ctx.Done():
+		case <-delayedStopCh.Signaled():
+		}
 
 		// Additionally wait for preshutdown hooks to also be finished, as some of them need
 		// to send API calls to clean up after themselves (e.g. lease reconcilers removing
 		// itself from the active servers).
-		<-preShutdownHooksHasStoppedCh.Signaled()
+		select {
+		case <-ctx.Done():
+		case <-preShutdownHooksHasStoppedCh.Signaled():
+		}
 	}()
 
 	// wait for all in-flight non-long running requests to finish
 	nonLongRunningRequestDrainedCh := make(chan struct{})
 	go func() {
 		defer close(nonLongRunningRequestDrainedCh)
-		defer klog.V(1).Info("[graceful-termination] in-flight non long-running request(s) have drained")
+		defer logger.V(1).Info("[graceful-termination] in-flight non long-running request(s) have drained")
 
 		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
-		<-notAcceptingNewRequestCh.Signaled()
+		select {
+		case <-ctx.Done():
+		case <-notAcceptingNewRequestCh.Signaled():
+		}
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 		// once NonLongRunningRequestWaitGroup.Wait is invoked, the apiserver is
@@ -625,7 +647,8 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// 'Server.Shutdown' will be invoked only after in-flight requests
 		// have been drained.
 		// TODO: can we consolidate these two modes of graceful termination?
-		s.NonLongRunningRequestWaitGroup.Wait()
+		s.NonLongRunningRequestWaitGroup.Wait( /* TODO: ctx */ )
+
 	}()
 
 	// wait for all in-flight watches to finish
@@ -633,9 +656,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	go func() {
 		defer close(activeWatchesDrainedCh)
 
-		<-notAcceptingNewRequestCh.Signaled()
+		select {
+		case <-ctx.Done():
+			return
+		case <-notAcceptingNewRequestCh.Signaled():
+		}
 		if s.ShutdownWatchTerminationGracePeriod <= time.Duration(0) {
-			klog.V(1).InfoS("[graceful-termination] not going to wait for active watch request(s) to drain")
+			logger.V(1).Info("[graceful-termination] not going to wait for active watch request(s) to drain")
 			return
 		}
 
@@ -657,27 +684,36 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 			// in a single Wait call, so setting burst to 1.
 			return rate.NewLimiter(rate.Limit(qps), 1), ctx, cancel
 		})
-		klog.V(1).InfoS("[graceful-termination] active watch request(s) have drained",
+		logger.V(1).Info("[graceful-termination] active watch request(s) have drained",
 			"duration", grace, "activeWatchesBefore", activeBefore, "activeWatchesAfter", activeAfter, "error", err)
 	}()
 
 	go func() {
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "signal", drainedCh.Name())
 		defer drainedCh.Signal()
 
-		<-nonLongRunningRequestDrainedCh
-		<-activeWatchesDrainedCh
+		select {
+		case <-ctx.Done():
+		case <-nonLongRunningRequestDrainedCh:
+		}
+		select {
+		case <-ctx.Done():
+		case <-activeWatchesDrainedCh:
+		}
 	}()
 
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
-	<-stopCh
+	select {
+	case <-ctx.Done():
+	case <-stopCh:
+	}
 
 	// run shutdown hooks directly. This includes deregistering from
 	// the kubernetes endpoint in case of kube-apiserver.
 	func() {
 		defer func() {
 			preShutdownHooksHasStoppedCh.Signal()
-			klog.V(1).InfoS("[graceful-termination] pre-shutdown hooks completed", "name", preShutdownHooksHasStoppedCh.Name())
+			logger.V(1).Info("[graceful-termination] pre-shutdown hooks completed", "signal", preShutdownHooksHasStoppedCh.Name())
 		}()
 		err = s.RunPreShutdownHooks()
 	}()
@@ -686,18 +722,27 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}
 
 	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
-	<-drainedCh.Signaled()
+	select {
+	case <-ctx.Done():
+	case <-drainedCh.Signaled():
+	}
 
 	if s.AuditBackend != nil {
 		s.AuditBackend.Shutdown()
-		klog.V(1).InfoS("[graceful-termination] audit backend shutdown completed")
+		logger.V(1).Info("[graceful-termination] audit backend shutdown completed")
 	}
 
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
-	<-listenerStoppedCh
-	<-stoppedCh
+	select {
+	case <-ctx.Done():
+	case <-listenerStoppedCh:
+	}
+	select {
+	case <-ctx.Done():
+	case <-stoppedCh:
+	}
 
-	klog.V(1).Info("[graceful-termination] apiserver is exiting")
+	logger.V(1).Info("[graceful-termination] apiserver is exiting")
 	return nil
 }
 

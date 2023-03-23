@@ -50,6 +50,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 //lint:ignore U1000 we need to alias only for the sake of embedding
@@ -126,7 +127,8 @@ func init() {
 // Spins up an api server which is cleaned up at the end up the test
 // Returns some kubernetes clients
 func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancelCtx := context.WithCancel(ctx)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)

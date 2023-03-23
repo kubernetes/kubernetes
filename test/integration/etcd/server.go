@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 
 	// install all APIs
@@ -60,8 +61,9 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 /IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END EC PRIVATE KEY-----`
 
-// StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource
+// StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource. When the context gets cancelled, the server stops immediately.
 func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
+	_, ctx := ktesting.NewTestContext(t)
 	certDir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +156,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 			errCh <- err
 			return
 		}
-		if err := prepared.Run(stopCh); err != nil {
+		if err := prepared.Run(ctx, stopCh); err != nil {
 			errCh <- err
 			t.Error(err)
 			return
@@ -163,7 +165,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	lastHealth := ""
 	attempt := 0
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+	if err := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -171,7 +173,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		}
 
 		// wait for the server to be healthy
-		result := kubeClient.RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+		result := kubeClient.RESTClient().Get().AbsPath("/healthz").Do(ctx)
 		content, _ := result.Raw()
 		lastHealth = string(content)
 		if errResult := result.Error(); errResult != nil {

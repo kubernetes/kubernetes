@@ -17,6 +17,7 @@ limitations under the License.
 package services
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -103,7 +104,9 @@ func (a *APIServer) Start() error {
 			return
 		}
 
-		err = apiserver.Run(completedOptions, a.stopCh)
+		// TODO (?): it probably makes sense to wire this up with some context in the caller
+		// to speed up apiserver shutdown when a test is done.
+		err = apiserver.Run(context.TODO(), completedOptions, a.stopCh)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %w", err)
 			return

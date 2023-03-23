@@ -405,12 +405,9 @@ func Test_MatchConditions(t *testing.T) {
 			upCh := recorder.Reset()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
+			server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 				"--disable-admission-plugins=ServiceAccount",
 			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer server.TearDownFn()
 
 			config := server.ClientConfig

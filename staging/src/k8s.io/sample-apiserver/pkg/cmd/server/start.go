@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -176,5 +177,5 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 		return nil
 	})
 
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	return server.GenericAPIServer.PrepareRun().Run(context.Background(), stopCh)
 }

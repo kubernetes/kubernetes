@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -215,6 +216,7 @@ func TestServerRunWithSNI(t *testing.T) {
 		test := tests[title]
 		t.Run(title, func(t *testing.T) {
 			t.Parallel()
+			_, ctx := ktesting.NewTestContext(t)
 			// create server cert
 			certDir := "testdata/" + specToName(test.Cert)
 			serverCertBundleFile := filepath.Join(certDir, "cert")
@@ -316,7 +318,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			preparedServer := s.PrepareRun()
 			preparedServerErrors := make(chan error)
 			go func() {
-				if err := preparedServer.Run(stopCh); err != nil {
+				if err := preparedServer.Run(ctx, stopCh); err != nil {
 					preparedServerErrors <- err
 				}
 			}()

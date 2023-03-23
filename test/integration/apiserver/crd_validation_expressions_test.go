@@ -45,10 +45,7 @@ import (
 func TestCustomResourceValidatorsWithDisabledFeatureGate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, false)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -79,10 +76,7 @@ func TestCustomResourceValidatorsWithDisabledFeatureGate(t *testing.T) {
 func TestCustomResourceValidators(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -455,10 +449,7 @@ func TestCustomResourceValidators(t *testing.T) {
 func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 

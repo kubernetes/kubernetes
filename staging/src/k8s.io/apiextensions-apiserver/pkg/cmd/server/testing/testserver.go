@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -58,6 +59,8 @@ type Logger interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
+	Log(args ...interface{})
+	Helper()
 }
 
 // NewDefaultTestServerOptions Default options for TestServer instances
@@ -72,6 +75,7 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
 func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	_, ctx := ktesting.NewTestContext(t)
 	stopCh := make(chan struct{})
 	var errCh chan error
 	tearDown := func() {
@@ -153,7 +157,7 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	go func(stopCh <-chan struct{}) {
 		defer close(errCh)
 
-		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
+		if err := server.GenericAPIServer.PrepareRun().Run(ctx, stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)

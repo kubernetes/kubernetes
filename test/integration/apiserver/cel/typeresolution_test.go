@@ -53,10 +53,7 @@ import (
 )
 
 func TestTypeResolver(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -308,10 +305,7 @@ func TestTypeResolver(t *testing.T) {
 // resolve Kubernetes built-in types without error.
 func TestBuiltinResolution(t *testing.T) {
 	// before all, setup server and client
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	config := server.ClientConfig

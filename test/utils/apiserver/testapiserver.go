@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"path"
 	"testing"
 
@@ -44,8 +45,9 @@ type TestAPIServer struct {
 
 // StartAPIServer runs etcd and apiserver in the background in the same
 // process. All resources get released automatically when the test
-// completes. If startup fails, the test gets aborted.
-func StartAPITestServer(t *testing.T) TestAPIServer {
+// completes. If startup fails, the test gets aborted. If the context
+// gets cancelled, the server stops running immediately.
+func StartAPITestServer(ctx context.Context, t *testing.T) TestAPIServer {
 	cfg := etcdserver.NewTestConfig(t)
 	etcdClient := etcdserver.RunEtcd(t, cfg)
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)

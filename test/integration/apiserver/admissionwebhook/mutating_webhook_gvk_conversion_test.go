@@ -135,7 +135,6 @@ func newAdmissionTypeCheckerHandler(recorder *admissionTypeChecker) http.Handler
 
 // Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent tests if a equivalent resource is properly converted between mutating webhooks
 func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
-
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		t.Fatal("Failed to append Cert from PEM")
@@ -157,12 +156,9 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 
 	upCh := typeChecker.Reset()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--disable-admission-plugins=ServiceAccount",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())

@@ -44,15 +44,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
 // it will be used to construct the CR schema used by apply.
 func TestApplyCRDStructuralSchema(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -413,6 +411,9 @@ func findCRDCondition(crd *apiextensionsv1.CustomResourceDefinition, conditionTy
 // TestApplyCRDUnhandledSchema tests that when a CRD has a schema that kube-openapi ToProtoModels cannot handle correctly,
 // apply falls back to non-schema behavior
 func TestApplyCRDUnhandledSchema(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	storageConfig := framework.SharedEtcd()
 	tlsInfo := transport.TLSInfo{
 		CertFile:      storageConfig.Transport.CertFile,
@@ -437,10 +438,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	}
 	defer etcdclient.Close()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -498,7 +496,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(string(betaBytes))
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	ctx = genericapirequest.WithNamespace(ctx, metav1.NamespaceNone)
 	key := path.Join("/", storageConfig.Prefix, "apiextensions.k8s.io", "customresourcedefinitions", noxuBetaDefinition.Name)
 	if _, err := etcdclient.Put(ctx, key, string(betaBytes)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -602,10 +600,7 @@ func getManagedFields(rawResponse []byte) ([]metav1.ManagedFieldsEntry, error) {
 }
 
 func TestDefaultMissingKeyCRD(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 

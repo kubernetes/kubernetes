@@ -48,7 +48,6 @@ const (
 
 // TestWebhookLoadBalance ensures that the admission webhook opens multiple connections to backends to satisfy concurrent requests
 func TestWebhookLoadBalance(t *testing.T) {
-
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		t.Fatal("Failed to append Cert from PEM")

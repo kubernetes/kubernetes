@@ -173,7 +173,7 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 	errCh = make(chan error)
 	go func() {
 		defer close(errCh)
-		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(ctx.Done()); err != nil {
+		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(ctx, ctx.Done()); err != nil {
 			errCh <- err
 		}
 	}()
