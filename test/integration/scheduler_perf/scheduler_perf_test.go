@@ -30,6 +30,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +49,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -794,11 +797,11 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg, tc.FeatureGates)
+	informerFactory, client, dynClient := mustSetupCluster(ctx, b, cfg, tc.FeatureGates)
 
 	// Additional informers needed for testing. The pod informer was
 	// already created before (scheduler.NewInformerFactory) and the
-	// factory was started for it (mustSetupScheduler), therefore we don't
+	// factory was started for it (mustSetupCluster), therefore we don't
 	// need to start again.
 	podInformer := informerFactory.Core().V1().Pods()
 
@@ -816,13 +819,8 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 	numPodsScheduledPerNamespace := make(map[string]int)
 
 	if cleanup {
-		b.Cleanup(func() {
-			for namespace := range numPodsScheduledPerNamespace {
-				if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
-					b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
-				}
-			}
-		})
+		// This must run before controllers get shut down.
+		defer cleanupWorkload(ctx, b, tc, client, numPodsScheduledPerNamespace)
 	}
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
@@ -1087,6 +1085,70 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems
+}
+
+// cleanupWorkload ensures that everything is removed from the API server that
+// might have been created by runWorkload. This must be done before starting
+// the next workload because otherwise it might stumble over previously created
+// objects. For example, the namespaces are the same in different workloads, so
+// not deleting them would cause the next one to fail with "cannot create
+// namespace: already exists".
+//
+// Calling cleanupWorkload can be skipped if it is known that the next workload
+// will run with a fresh etcd instance.
+func cleanupWorkload(ctx context.Context, tb testing.TB, tc *testCase, client clientset.Interface, numPodsScheduledPerNamespace map[string]int) {
+	deleteNow := *metav1.NewDeleteOptions(0)
+	for namespace := range numPodsScheduledPerNamespace {
+		// Pods have to be deleted explicitly, with no grace period. Normally
+		// kubelet will set the DeletionGracePeriodSeconds to zero when it's okay
+		// to remove a deleted pod, but we don't run kubelet...
+		if err := client.CoreV1().Pods(namespace).DeleteCollection(ctx, deleteNow, metav1.ListOptions{}); err != nil {
+			tb.Fatalf("failed to delete pods in namespace %q: %v", namespace, err)
+		}
+		if err := client.CoreV1().Namespaces().Delete(ctx, namespace, deleteNow); err != nil {
+			tb.Fatalf("Deleting Namespace %q in numPodsScheduledPerNamespace: %v", namespace, err)
+		}
+	}
+
+	// We need to wait here because even with deletion timestamp set,
+	// actually removing a namespace can take some time (garbage collecting
+	// other generated object like secrets, etc.) and we don't want to
+	// start the next workloads while that cleanup is still going on.
+	gomega.NewGomegaWithT(tb).Eventually(ctx, func(ctx context.Context) ([]interface{}, error) {
+		var objects []interface{}
+		namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		// Collecting several objects of interest (pods, claims) is done to
+		// provide a more informative failure message when a namespace doesn't
+		// disappear quickly enough.
+		for _, namespace := range namespaces.Items {
+			if _, ok := numPodsScheduledPerNamespace[namespace.Name]; !ok {
+				// Not a namespace created by the workload.
+				continue
+			}
+			pods, err := client.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if len(pods.Items) > 0 {
+				// Record one pod per namespace - that's usually enough information.
+				objects = append(objects, pods.Items[0])
+			}
+			if tc.FeatureGates[features.DynamicResourceAllocation] {
+				claims, err := client.ResourceV1alpha2().ResourceClaims(namespace.Name).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				if len(claims.Items) > 0 {
+					objects = append(objects, claims.Items[0])
+				}
+			}
+			objects = append(objects, namespace)
+		}
+		return objects, nil
+	}).WithTimeout(5*time.Minute).Should(gomega.BeEmpty(), "deleting namespaces")
 }
 
 func createNamespaceIfNotPresent(ctx context.Context, b *testing.B, client clientset.Interface, namespace string, podsPerNamespace *map[string]int) {

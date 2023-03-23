@@ -76,11 +76,13 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // mustSetupScheduler starts the following components:
 // - k8s api server
 // - scheduler
+// - some of the kube-controller-manager controllers
+//
 // It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupCluster(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
@@ -126,6 +128,8 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client, informerFactory)
+	runGC := util.CreateGCController(ctx, b, *cfg, informerFactory)
+	runNS := util.CreateNamespaceController(ctx, b, *cfg, informerFactory)
 
 	runResourceClaimController := func() {}
 	if enabledFeatures[features.DynamicResourceAllocation] {
@@ -136,6 +140,8 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	go runGC()
+	go runNS()
 	go runResourceClaimController()
 
 	return informerFactory, client, dynClient

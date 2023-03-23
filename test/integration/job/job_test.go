@@ -41,27 +41,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -1313,7 +1308,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			defer cancel()
 			restConfig.QPS = 200
 			restConfig.Burst = 200
-			runGC := createGC(ctx, t, restConfig, informerSet)
+			runGC := util.CreateGCController(ctx, t, *restConfig, informerSet)
 			informerSet.Start(ctx.Done())
 			go jc.Run(ctx, 1)
 			runGC()
@@ -2090,40 +2085,6 @@ func createJobControllerWithSharedInformers(restConfig *restclient.Config, infor
 	ctx, cancel := context.WithCancel(context.Background())
 	jc := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	return jc, ctx, cancel
-}
-
-func createGC(ctx context.Context, t *testing.T, restConfig *restclient.Config, informerSet informers.SharedInformerFactory) func() {
-	restConfig = restclient.AddUserAgent(restConfig, "gc-controller")
-	clientSet := clientset.NewForConfigOrDie(restConfig)
-	metadataClient, err := metadata.NewForConfig(restConfig)
-	if err != nil {
-		t.Fatalf("Failed to create metadataClient: %v", err)
-	}
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cacheddiscovery.NewMemCacheClient(clientSet.Discovery()))
-	restMapper.Reset()
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
-	alwaysStarted := make(chan struct{})
-	close(alwaysStarted)
-	gc, err := garbagecollector.NewGarbageCollector(
-		clientSet,
-		metadataClient,
-		restMapper,
-		garbagecollector.DefaultIgnoredResources(),
-		informerfactory.NewInformerFactory(informerSet, metadataInformers),
-		alwaysStarted,
-	)
-	if err != nil {
-		t.Fatalf("Failed creating garbage collector")
-	}
-	startGC := func() {
-		syncPeriod := 5 * time.Second
-		go wait.Until(func() {
-			restMapper.Reset()
-		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, 1)
-		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
-	}
-	return startGC
 }
 
 func hasJobTrackingFinalizer(obj metav1.Object) bool {
