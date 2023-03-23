@@ -71,6 +71,7 @@ func NewCmdClusterInfo(restClientGetter genericclioptions.RESTClientGetter, ioSt
 		},
 	}
 	cmd.AddCommand(NewCmdClusterInfoDump(restClientGetter, ioStreams))
+	cmd.AddCommand(NewCmdClusterInfoShowFeatureGates(restClientGetter, ioStreams))
 	return cmd
 }
 
