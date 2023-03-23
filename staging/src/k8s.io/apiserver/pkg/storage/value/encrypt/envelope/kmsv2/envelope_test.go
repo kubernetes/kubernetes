@@ -990,6 +990,86 @@ func TestGenerateCacheKey(t *testing.T) {
 	}
 }
 
+func TestGenerateTransformer(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name            string
+		envelopeService func() kmsservice.Service
+		expectedErr     string
+	}{
+		{
+			name: "encrypt call fails",
+			envelopeService: func() kmsservice.Service {
+				envelopeService := newTestEnvelopeService()
+				envelopeService.SetDisabledStatus(true)
+				return envelopeService
+			},
+			expectedErr: "Envelope service was disabled",
+		},
+		{
+			name: "invalid key ID",
+			envelopeService: func() kmsservice.Service {
+				envelopeService := newTestEnvelopeService()
+				envelopeService.keyVersion = ""
+				return envelopeService
+			},
+			expectedErr: "failed to validate key id: keyID is empty",
+		},
+		{
+			name: "invalid encrypted DEK",
+			envelopeService: func() kmsservice.Service {
+				envelopeService := newTestEnvelopeService()
+				envelopeService.SetCiphertext([]byte{})
+				return envelopeService
+			},
+			expectedErr: "failed to validate encrypted DEK: encrypted DEK is empty",
+		},
+		{
+			name: "invalid annotations",
+			envelopeService: func() kmsservice.Service {
+				envelopeService := newTestEnvelopeService()
+				envelopeService.SetAnnotations(map[string][]byte{"invalid": {}})
+				return envelopeService
+			},
+			expectedErr: "failed to validate annotations: annotations: Invalid value: \"invalid\": should be a domain with at least two segments separated by dots",
+		},
+		{
+			name: "success",
+			envelopeService: func() kmsservice.Service {
+				return newTestEnvelopeService()
+			},
+			expectedErr: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			transformer, encryptResp, cacheKey, err := GenerateTransformer(testContext(t), "panda", tc.envelopeService())
+			if tc.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error, got %q", errString(err))
+				}
+				if transformer == nil {
+					t.Error("expected transformer, got nil")
+				}
+				if encryptResp == nil {
+					t.Error("expected encrypt response, got nil")
+				}
+				if cacheKey == nil {
+					t.Error("expected cache key, got nil")
+				}
+			} else {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("expected error %q, got %q", tc.expectedErr, errString(err))
+				}
+			}
+		})
+	}
+}
+
 func errString(err error) string {
 	if err == nil {
 		return ""
