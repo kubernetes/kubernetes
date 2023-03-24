@@ -30,6 +30,7 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 
 	if image.Spec != nil && len(image.Spec.Annotations) > 0 {
 		annotationKeys := make([]string, 0, len(image.Spec.Annotations))
+		annotations = make([]kubecontainer.Annotation, 0, len(image.Spec.Annotations))
 		for k := range image.Spec.Annotations {
 			annotationKeys = append(annotationKeys, k)
 		}
