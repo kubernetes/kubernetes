@@ -717,8 +717,8 @@ function install-kube-binary-config {
   # are presented to kubelet:
   # --image-credential-provider-config=${path-to-config}
   # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
-  # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
-  # feature gates are set to true for kubelet to use external credential provider. 
+  # Also, it is required that DisableKubeletCloudCredentialProviders
+  # feature gate is set to true for kubelet to use external credential provider.
   if [[ "${ENABLE_AUTH_PROVIDER_GCP:-}" == "true" ]]; then
     # Install out-of-tree auth-provider-gcp binary to enable kubelet to dynamically
     # retrieve credentials for a container image registry.
