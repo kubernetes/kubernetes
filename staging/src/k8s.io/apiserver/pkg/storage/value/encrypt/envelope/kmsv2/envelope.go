@@ -227,7 +227,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 }
 
 // addTransformerForDecryption inserts a new transformer to the Envelope cache of DEKs for future reads.
-func (t *envelopeTransformer) addTransformerForDecryption(cacheKey []byte, key []byte) (decryptTransformer, error) {
+func (t *envelopeTransformer) addTransformerForDecryption(cacheKey []byte, key []byte) (value.Read, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
