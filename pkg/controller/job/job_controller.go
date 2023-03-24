@@ -1425,8 +1425,10 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
+	defaultBackoffTimeInSeconds, maxBackoffTimeInSeconds := getDefaultAndMaxBackOffTimes(job.Spec.PodFailurePolicy)
+
 	if active < wantActive {
-		remainingTime := backoff.getRemainingTime(jm.clock, DefaultJobBackOff, MaxJobBackOff)
+		remainingTime := backoff.getRemainingTime(jm.clock, defaultBackoffTimeInSeconds, maxBackoffTimeInSeconds)
 		if remainingTime > 0 {
 			jm.enqueueControllerDelayed(job, true, remainingTime)
 			return 0, metrics.JobSyncActionPodsCreated, nil
@@ -1520,6 +1522,27 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 	}
 
 	return active, metrics.JobSyncActionTracking, nil
+}
+
+func getDefaultAndMaxBackOffTimes(podFailurePolicy *batch.PodFailurePolicy) (time.Duration, time.Duration) {
+	if podFailurePolicy == nil {
+		return DefaultJobBackOff, MaxJobBackOff
+	}
+
+	var defaultBackoffTimeInSeconds time.Duration
+	if podFailurePolicy.DefaultBackoffTimeInSeconds == nil {
+		defaultBackoffTimeInSeconds = DefaultJobBackOff
+	} else {
+		defaultBackoffTimeInSeconds = time.Duration((*podFailurePolicy.DefaultBackoffTimeInSeconds)) * time.Second
+	}
+
+	var maxBackoffTimeInSeconds time.Duration
+	if podFailurePolicy.MaxBackoffTimeInSeconds == nil {
+		maxBackoffTimeInSeconds = MaxJobBackOff
+	} else {
+		maxBackoffTimeInSeconds = time.Duration((*podFailurePolicy.MaxBackoffTimeInSeconds)) * time.Second
+	}
+	return defaultBackoffTimeInSeconds, maxBackoffTimeInSeconds
 }
 
 // activePodsForRemoval returns Pods that should be removed because there

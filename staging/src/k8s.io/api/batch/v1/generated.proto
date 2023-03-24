@@ -392,6 +392,10 @@ message PodFailurePolicy {
   // the backoffLimit. At most 20 elements are allowed.
   // +listType=atomic
   repeated PodFailurePolicyRule rules = 1;
+
+  optional int32 maxBackoffTimeInSeconds = 2;
+
+  optional int32 defaultBackoffTimeInSeconds = 3;
 }
 
 // PodFailurePolicyOnExitCodesRequirement describes the requirement for handling

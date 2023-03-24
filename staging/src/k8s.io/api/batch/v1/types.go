@@ -214,6 +214,12 @@ type PodFailurePolicy struct {
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
+
+	// +optional
+	MaxBackoffTimeInSeconds     *int32 `json:"maxBackoffTimeInSeconds" protobuf:"bytes,2,opt,name=maxBackoffTimeInSeconds"`
+
+	// +optional
+	DefaultBackoffTimeInSeconds *int32 `json:"defaultBackoffTimeInSeconds" protobuf:"bytes,3,opt,name=defaultBackoffTimeInSeconds"`
 }
 
 // JobSpec describes how the job execution will look like.

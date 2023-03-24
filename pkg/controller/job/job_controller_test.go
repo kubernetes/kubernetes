@@ -4437,6 +4437,81 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 }
 
+func TestPodFailureBackoffTimes(t *testing.T) {
+	var podFailurePolicy *batch.PodFailurePolicy
+
+	testCases := map[string]struct {
+		// setup
+		max                        *int32
+		def                        *int32
+		isPodFailurePolicyDisabled bool
+
+		// expectations
+		expectedMax     *int32
+		expectedDefault *int32
+	}{
+		"default_and_max_defined": {
+			max: pointer.Int32Ptr(31),
+			def: pointer.Int32Ptr(13),
+
+			expectedMax:     pointer.Int32Ptr(31),
+			expectedDefault: pointer.Int32Ptr(13),
+		},
+		"default_and_max_not_defined": {
+			max: nil,
+			def: nil,
+
+			expectedMax:     pointer.Int32Ptr(360),
+			expectedDefault: pointer.Int32Ptr(10),
+		},
+		"only_max_defined": {
+			max: pointer.Int32Ptr(31),
+			def: nil,
+
+			expectedMax:     pointer.Int32Ptr(31),
+			expectedDefault: pointer.Int32Ptr(10),
+		},
+		"only_default_defined": {
+			max: nil,
+			def: pointer.Int32Ptr(13),
+
+			expectedMax:     pointer.Int32Ptr(360),
+			expectedDefault: pointer.Int32Ptr(13),
+		},
+		"podFailurePolicy_not_defined": {
+			isPodFailurePolicyDisabled: true,
+
+			expectedMax:     pointer.Int32Ptr(360),
+			expectedDefault: pointer.Int32Ptr(10),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fmt.Println(tc, name)
+			if tc.isPodFailurePolicyDisabled == true {
+				podFailurePolicy = nil
+			} else {
+				podFailurePolicy = &batch.PodFailurePolicy{
+					MaxBackoffTimeInSeconds:     tc.max,
+					DefaultBackoffTimeInSeconds: tc.def,
+				}
+			}
+
+			defaultBackoffTime, maxBackoffTime := getDefaultAndMaxBackOffTimes(podFailurePolicy)
+
+			if int32(defaultBackoffTime.Seconds()) != *tc.expectedDefault {
+				t.Errorf("defaultBackoffTime %d should be %d", int32(defaultBackoffTime.Seconds()), *tc.expectedDefault)
+			}
+
+			if int32(maxBackoffTime.Seconds()) != *tc.expectedMax {
+				t.Errorf("maxBackoffTime %d should be %d", int32(maxBackoffTime.Seconds()), *tc.expectedMax)
+			}
+
+		})
+	}
+}
+
 func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
 	t.Helper()
 	want := []v1.EnvVar{

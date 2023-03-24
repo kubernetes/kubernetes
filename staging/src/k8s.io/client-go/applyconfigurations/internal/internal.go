@@ -3403,6 +3403,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.batch.v1.PodFailurePolicy
   map:
     fields:
+    - name: defaultBackoffTimeInSeconds
+      type:
+        scalar: numeric
+    - name: maxBackoffTimeInSeconds
+      type:
+        scalar: numeric
     - name: rules
       type:
         list:

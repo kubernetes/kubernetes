@@ -21,7 +21,9 @@ package v1
 // PodFailurePolicyApplyConfiguration represents an declarative configuration of the PodFailurePolicy type for use
 // with apply.
 type PodFailurePolicyApplyConfiguration struct {
-	Rules []PodFailurePolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	Rules                       []PodFailurePolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	MaxBackoffTimeInSeconds     *int32                                   `json:"maxBackoffTimeInSeconds,omitempty"`
+	DefaultBackoffTimeInSeconds *int32                                   `json:"defaultBackoffTimeInSeconds,omitempty"`
 }
 
 // PodFailurePolicyApplyConfiguration constructs an declarative configuration of the PodFailurePolicy type for use with
@@ -40,5 +42,21 @@ func (b *PodFailurePolicyApplyConfiguration) WithRules(values ...*PodFailurePoli
 		}
 		b.Rules = append(b.Rules, *values[i])
 	}
+	return b
+}
+
+// WithMaxBackoffTimeInSeconds sets the MaxBackoffTimeInSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxBackoffTimeInSeconds field is set to the value of the last call.
+func (b *PodFailurePolicyApplyConfiguration) WithMaxBackoffTimeInSeconds(value int32) *PodFailurePolicyApplyConfiguration {
+	b.MaxBackoffTimeInSeconds = &value
+	return b
+}
+
+// WithDefaultBackoffTimeInSeconds sets the DefaultBackoffTimeInSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultBackoffTimeInSeconds field is set to the value of the last call.
+func (b *PodFailurePolicyApplyConfiguration) WithDefaultBackoffTimeInSeconds(value int32) *PodFailurePolicyApplyConfiguration {
+	b.DefaultBackoffTimeInSeconds = &value
 	return b
 }
