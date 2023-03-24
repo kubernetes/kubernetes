@@ -136,7 +136,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if _, err := os.Stat(path); err != nil {
 		return 0, nil
 	}
-	restartCount := int(0)
+	restartCount := 0
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
