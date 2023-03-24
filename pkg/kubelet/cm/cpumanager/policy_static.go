@@ -204,7 +204,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 		allCPUs := p.topology.CPUDetails.CPUs()
 		s.SetDefaultCPUSet(allCPUs)
 		if managed.IsEnabled() {
-			defaultCpus := s.GetDefaultCPUSet().Difference(p.reserved)
+			defaultCpus := s.GetDefaultCPUSet().Difference(p.reservedCPUs)
 			s.SetDefaultCPUSet(defaultCpus)
 		}
 		return nil
