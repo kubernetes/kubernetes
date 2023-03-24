@@ -17,11 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -750,6 +751,229 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+		},
+		{
+			name: "single match condition must have a name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "all match conditions must have a name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+						{
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value, webhooks[0].matchConditions[1].name: Required value, webhooks[1].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "single match condition must have a qualified name",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "-hello",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Invalid value: "-hello": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+		},
+		{
+			name: "all match conditions must have qualified names",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       ".io",
+							Expression: "true",
+						},
+						{
+							Name:       "thing.test.com",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "some name",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `[webhooks[0].matchConditions[0].name: Invalid value: ".io": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'), webhooks[1].matchConditions[0].name: Invalid value: "some name": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')]`,
+		},
+		{
+			name: "expression is required",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name: "webhook.k8s.io",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "expression is required to have some value",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "invalid expression",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "object.x in [1, 2, ",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "object.x in [1, 2,": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>'`,
+		},
+		{
+			name: "unique names same hook",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `matchConditions[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "repeat names allowed across different hooks",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: ``,
+		},
+		{
+			name: "must evaluate to bool",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "6",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "6": must evaluate to bool`,
+		},
+		{
+			name: "max of 64 match conditions",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:            "webhook.k8s.io",
+					ClientConfig:    validClientConfig,
+					SideEffects:     &noSideEffect,
+					MatchConditions: get65MatchConditions(),
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
 		},
 	}
 	for _, test := range tests {
@@ -1650,6 +1874,229 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+		},
+		{
+			name: "single match condition must have a name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "all match conditions must have a name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+						{
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Required value, webhooks[0].matchConditions[1].name: Required value, webhooks[1].matchConditions[0].name: Required value`,
+		},
+		{
+			name: "single match condition must have a qualified name",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "-hello",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].name: Invalid value: "-hello": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+		},
+		{
+			name: "all match conditions must have qualified names",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       ".io",
+							Expression: "true",
+						},
+						{
+							Name:       "thing.test.com",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "some name",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `[webhooks[0].matchConditions[0].name: Invalid value: ".io": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'), webhooks[1].matchConditions[0].name: Invalid value: "some name": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')]`,
+		},
+		{
+			name: "expression is required",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name: "webhook.k8s.io",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "expression is required to have some value",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Required value`,
+		},
+		{
+			name: "invalid expression",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "object.x in [1, 2, ",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "object.x in [1, 2,": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>'`,
+		},
+		{
+			name: "unique names same hook",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: `matchConditions[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "repeat names allowed across different hooks",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+				{
+					Name:         "webhook2.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "true",
+						},
+					},
+				},
+			}, true),
+			expectedError: ``,
+		},
+		{
+			name: "must evaluate to bool",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "webhook.k8s.io",
+							Expression: "6",
+						},
+					},
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions[0].expression: Invalid value: "6": must evaluate to bool`,
+		},
+		{
+			name: "max of 64 match conditions",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:            "webhook.k8s.io",
+					ClientConfig:    validClientConfig,
+					SideEffects:     &noSideEffect,
+					MatchConditions: get65MatchConditions(),
+				},
+			}, true),
+			expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
 		},
 	}
 	for _, test := range tests {
@@ -2564,7 +3011,69 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 					},
 				},
 			},
-			expectedError: `spec.validations[0].expression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>`,
+			expectedError: `spec.validations[0].expression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:20: Syntax error: missing ']' at '<EOF>`,
+		},
+		{
+			name: "invalid messageExpression",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					Validations: []admissionregistration.Validation{
+						{
+							Expression:        "true",
+							MessageExpression: "object.x in [1, 2, ",
+						},
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"CREATE"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"*/*"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: `spec.validations[0].messageExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:20: Syntax error: missing ']' at '<EOF>`,
+		},
+		{
+			name: "messageExpression of wrong type",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					Validations: []admissionregistration.Validation{
+						{
+							Expression:        "true",
+							MessageExpression: "0 == 0",
+						},
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"CREATE"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"*/*"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: `spec.validations[0].messageExpression: Invalid value: "0 == 0": must evaluate to string`,
 		},
 		{
 			name: "invalid auditAnnotations key due to key name",
@@ -2671,6 +3180,131 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 			expectedError: `spec.auditAnnotations[0].valueExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:19: Syntax error: missing ']' at '<EOF>`,
+		},
+		{
+			name: "single match condition must have a name",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Expression: "true",
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `spec.matchConditions[0].name: Required value`,
+		},
+		{
+			name: "match condition with parameters allowed",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					ParamKind: &admissionregistration.ParamKind{
+						Kind:       "Foo",
+						APIVersion: "foobar/v1alpha1",
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "match condition with parameters not allowed if no param kind",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `undeclared reference to 'params'`,
 		},
 	}
 	for _, test := range tests {
@@ -2814,6 +3448,202 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				},
 				Spec: admissionregistration.ValidatingAdmissionPolicySpec{},
 			},
+		},
+		{
+			name: "match conditions re-checked if paramKind changes",
+			oldconfig: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					ParamKind: &admissionregistration.ParamKind{
+						Kind:       "Foo",
+						APIVersion: "foobar/v1alpha1",
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			expectedError: `undeclared reference to 'params'`,
+		},
+		{
+			name: "match conditions not re-checked if no change to paramKind or matchConditions",
+			oldconfig: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Fail")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+				},
+			},
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Operations: []admissionregistration.OperationType{"*"},
+									Rule: admissionregistration.Rule{
+										APIGroups:   []string{"a"},
+										APIVersions: []string{"a"},
+										Resources:   []string{"a"},
+									},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						ObjectSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("Exact")
+							return &r
+						}(),
+					},
+					FailurePolicy: func() *admissionregistration.FailurePolicyType {
+						r := admissionregistration.FailurePolicyType("Ignore")
+						return &r
+					}(),
+					MatchConditions: []admissionregistration.MatchCondition{
+						{
+							Name:       "hasParams",
+							Expression: `params.foo == "okay"`,
+						},
+					},
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 50",
+						},
+					},
+				},
+			},
+			expectedError: "",
 		},
 		// TODO: CustomAuditAnnotations: string valueExpression with {oldObject} is allowed
 	}
@@ -3421,4 +4251,95 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 		})
 
 	}
+}
+
+func TestValidateValidatingAdmissionPolicyStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		status        *admissionregistration.ValidatingAdmissionPolicyStatus
+		expectedError string
+	}{
+		{
+			name:   "empty",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{},
+		},
+		{
+			name: "type checking",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec.validations[0].expression",
+							Warning:  "message",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "type checking bad json path",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec[foo]",
+							Warning:  "message",
+						},
+					},
+				},
+			},
+			expectedError: "invalid JSONPath: invalid array index foo",
+		},
+		{
+			name: "type checking missing warning",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							FieldRef: "spec.validations[0].expression",
+						},
+					},
+				},
+			},
+			expectedError: "Required value",
+		},
+		{
+			name: "type checking missing fieldRef",
+			status: &admissionregistration.ValidatingAdmissionPolicyStatus{
+				TypeChecking: &admissionregistration.TypeChecking{
+					ExpressionWarnings: []admissionregistration.ExpressionWarning{
+						{
+							Warning: "message",
+						},
+					},
+				},
+			},
+			expectedError: "Required value",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateValidatingAdmissionPolicyStatus(tc.status, field.NewPath("status"))
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := tc.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if tc.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", tc.expectedError)
+				}
+			}
+		})
+	}
+}
+
+func get65MatchConditions() []admissionregistration.MatchCondition {
+	result := []admissionregistration.MatchCondition{}
+	for i := 0; i < 65; i++ {
+		result = append(result, admissionregistration.MatchCondition{
+			Name:       fmt.Sprintf("test%v", i),
+			Expression: "true",
+		})
+	}
+	return result
 }

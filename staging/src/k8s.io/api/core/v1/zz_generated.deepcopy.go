@@ -988,8 +988,8 @@ func (in *ContainerStatus) DeepCopyInto(out *ContainerStatus) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.ResourcesAllocated != nil {
-		in, out := &in.ResourcesAllocated, &out.ResourcesAllocated
+	if in.AllocatedResources != nil {
+		in, out := &in.AllocatedResources, &out.AllocatedResources
 		*out = make(ResourceList, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val.DeepCopy()

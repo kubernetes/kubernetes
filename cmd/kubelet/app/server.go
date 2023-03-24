@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -321,6 +322,8 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	options.AddKubeletConfigFlags(fs, kc)
 	// Remember original feature gates, so we can merge with flag gates later
 	original := kc.FeatureGates
+	// avoid duplicate printing the flag deprecation warnings during re-parsing
+	fs.SetOutput(io.Discard)
 	// re-parse flags
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -711,13 +714,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
-				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
-			} else if s.TopologyManagerPolicyOptions != nil {
-				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
-					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
-			}
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+		} else if s.TopologyManagerPolicyOptions != nil {
+			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
+				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
@@ -751,8 +752,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				PodPidsLimit:                             s.PodPidsLimit,
 				EnforceCPULimits:                         s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				TopologyManagerPolicy:                    s.TopologyManagerPolicy,
+				TopologyManagerScope:                     s.TopologyManagerScope,
 				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
@@ -1119,24 +1120,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	var nodeIPs []net.IP
-	if kubeServer.NodeIP != "" {
-		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
-			parsedNodeIP := netutils.ParseIPSloppy(strings.TrimSpace(ip))
-			if parsedNodeIP == nil {
-				klog.InfoS("Could not parse --node-ip ignoring", "IP", ip)
-			} else {
-				nodeIPs = append(nodeIPs, parsedNodeIP)
-			}
-		}
-	}
-
-	if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && netutils.IsIPv6(nodeIPs[0]) == netutils.IsIPv6(nodeIPs[1])) {
-		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
-	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
-		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
-	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
-		return fmt.Errorf("dual-stack --node-ip %q cannot include '0.0.0.0' or '::'", kubeServer.NodeIP)
+	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, utilfeature.DefaultFeatureGate.Enabled(features.CloudDualStackNodeIPs))
+	if err != nil {
+		return fmt.Errorf("bad --node-ip %q: %v", kubeServer.NodeIP, err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -1231,7 +1217,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.MinimumGCAge,
 		kubeServer.MaxPerPodContainerCount,
 		kubeServer.MaxContainerCount,
-		kubeServer.MasterServiceNamespace,
 		kubeServer.RegisterSchedulable,
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
@@ -1280,7 +1265,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	hostname, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine hostname for tracer provider: %v", err)
+		return nil, fmt.Errorf("could not determine hostname for tracer provider: %w", err)
 	}
 	resourceOpts := []otelsdkresource.Option{
 		otelsdkresource.WithAttributes(
@@ -1290,7 +1275,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlptracegrpc.Option{}, resourceOpts)
 	if err != nil {
-		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
+		return nil, fmt.Errorf("could not configure tracer provider: %w", err)
 	}
 	return tp, nil
 }

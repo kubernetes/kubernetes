@@ -51,7 +51,6 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -289,20 +288,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		qosContainerManager: qosContainerManager,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		cm.topologyManager, err = topologymanager.NewManager(
-			machineInfo.Topology,
-			nodeConfig.ExperimentalTopologyManagerPolicy,
-			nodeConfig.ExperimentalTopologyManagerScope,
-			nodeConfig.ExperimentalTopologyManagerPolicyOptions,
-		)
+	cm.topologyManager, err = topologymanager.NewManager(
+		machineInfo.Topology,
+		nodeConfig.TopologyManagerPolicy,
+		nodeConfig.TopologyManagerScope,
+		nodeConfig.ExperimentalTopologyManagerPolicyOptions,
+	)
 
-		if err != nil {
-			return nil, err
-		}
-
-	} else {
-		cm.topologyManager = topologymanager.NewFakeManager()
+	if err != nil {
+		return nil, err
 	}
 
 	klog.InfoS("Creating device plugin manager")
@@ -315,7 +309,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(kubeClient)
+		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
 			return nil, err
 		}
@@ -687,50 +681,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 }
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		return cm.topologyManager
-	}
-	// TODO: we need to think about a better way to do this. This will work for
-	// now so long as we have only the cpuManager and deviceManager relying on
-	// allocations here. However, going forward it is not generalized enough to
-	// work as we add more and more hint providers that the TopologyManager
-	// needs to call Allocate() on (that may not be directly intstantiated
-	// inside this component).
-	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager, cm.draManager}
-}
-
-type resourceAllocator struct {
-	cpuManager    cpumanager.Manager
-	memoryManager memorymanager.Manager
-	deviceManager devicemanager.Manager
-	draManager    dra.Manager
-}
-
-func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	pod := attrs.Pod
-
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := m.deviceManager.Allocate(pod, &container)
-		if err != nil {
-			return admission.GetPodAdmitResult(err)
-		}
-
-		if m.cpuManager != nil {
-			err = m.cpuManager.Allocate(pod, &container)
-			if err != nil {
-				return admission.GetPodAdmitResult(err)
-			}
-		}
-
-		if m.memoryManager != nil {
-			err = m.memoryManager.Allocate(pod, &container)
-			if err != nil {
-				return admission.GetPodAdmitResult(err)
-			}
-		}
-	}
-
-	return admission.GetPodAdmitResult(nil)
+	return cm.topologyManager
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
@@ -759,7 +710,7 @@ func buildContainerMapFromRuntime(ctx context.Context, runtimeService internalap
 	containerList, _ := runtimeService.ListContainers(ctx, nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
-			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
+			klog.InfoS("No PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
 			continue
 		}
 		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)
@@ -1012,6 +963,41 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 	}
 
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
+}
+
+func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		return []*podresourcesapi.DynamicResource{}
+	}
+
+	var containerDynamicResources []*podresourcesapi.DynamicResource
+	containerClaimInfos, err := cm.draManager.GetContainerClaimInfos(pod, container)
+	if err != nil {
+		klog.ErrorS(err, "Unable to get container claim info state")
+		return []*podresourcesapi.DynamicResource{}
+	}
+	for _, containerClaimInfo := range containerClaimInfos {
+		var claimResources []*podresourcesapi.ClaimResource
+		// TODO: Currently  we maintain a list of ClaimResources, each of which contains
+		// a set of CDIDevices from a different kubelet plugin. In the future we may want to
+		// include the name of the kubelet plugin and/or other types of resources that are
+		// not CDIDevices (assuming the DRAmanager supports this).
+		for _, klPluginCdiDevices := range containerClaimInfo.CDIDevices {
+			var cdiDevices []*podresourcesapi.CDIDevice
+			for _, cdiDevice := range klPluginCdiDevices {
+				cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDevice})
+			}
+			claimResources = append(claimResources, &podresourcesapi.ClaimResource{CDIDevices: cdiDevices})
+		}
+		containerDynamicResource := podresourcesapi.DynamicResource{
+			ClassName:      containerClaimInfo.ClassName,
+			ClaimName:      containerClaimInfo.ClaimName,
+			ClaimNamespace: containerClaimInfo.Namespace,
+			ClaimResources: claimResources,
+		}
+		containerDynamicResources = append(containerDynamicResources, &containerDynamicResource)
+	}
+	return containerDynamicResources
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {

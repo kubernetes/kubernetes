@@ -18,6 +18,7 @@ package cache
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -146,6 +147,9 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	r.WatchListPageSize = c.config.WatchListPageSize
 	if c.config.WatchErrorHandler != nil {
 		r.watchErrorHandler = c.config.WatchErrorHandler
+	}
+	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+		r.UseWatchList = true
 	}
 
 	c.reflectorMutex.Lock()
@@ -390,17 +394,6 @@ func NewIndexerInformer(
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, nil)
 }
 
-// TransformFunc allows for transforming an object before it will be processed
-// and put into the controller cache and before the corresponding handlers will
-// be called on it.
-// TransformFunc (similarly to ResourceEventHandler functions) should be able
-// to correctly handle the tombstone of type cache.DeletedFinalStateUnknown
-//
-// The most common usage pattern is to clean-up some parts of the object to
-// reduce component memory usage if a given component doesn't care about them.
-// given controller doesn't care for them
-type TransformFunc func(interface{}) (interface{}, error)
-
 // NewTransformingInformer returns a Store and a controller for populating
 // the store while also providing event notifications. You should only used
 // the returned Store for Get/List operations; Add/Modify/Deletes will cause
@@ -448,20 +441,12 @@ func processDeltas(
 	// Object which receives event notifications from the given deltas
 	handler ResourceEventHandler,
 	clientState Store,
-	transformer TransformFunc,
 	deltas Deltas,
 	isInInitialList bool,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
-		if transformer != nil {
-			var err error
-			obj, err = transformer(obj)
-			if err != nil {
-				return err
-			}
-		}
 
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
@@ -513,6 +498,7 @@ func newInformer(
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          clientState,
 		EmitDeltaTypeReplaced: true,
+		Transformer:           transformer,
 	})
 
 	cfg := &Config{
@@ -524,7 +510,7 @@ func newInformer(
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(h, clientState, transformer, deltas, isInInitialList)
+				return processDeltas(h, clientState, deltas, isInInitialList)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},

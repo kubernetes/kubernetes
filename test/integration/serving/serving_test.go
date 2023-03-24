@@ -165,7 +165,7 @@ users:
 		extraFlags []string
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
 		{"kube-scheduler", kubeSchedulerTester{}, nil},
 	}
 

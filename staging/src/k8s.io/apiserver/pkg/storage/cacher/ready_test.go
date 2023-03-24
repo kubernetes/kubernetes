@@ -52,9 +52,18 @@ func Test_newReadySetIdempotent(t *testing.T) {
 	ready.set(false)
 	ready.set(false)
 	ready.set(false)
+	if generation, ok := ready.checkAndReadGeneration(); generation != 0 || ok {
+		t.Errorf("unexpected state: generation=%v ready=%v", generation, ok)
+	}
+	ready.set(true)
+	if generation, ok := ready.checkAndReadGeneration(); generation != 1 || !ok {
+		t.Errorf("unexpected state: generation=%v ready=%v", generation, ok)
+	}
 	ready.set(true)
 	ready.set(true)
-	ready.set(true)
+	if generation, ok := ready.checkAndReadGeneration(); generation != 1 || !ok {
+		t.Errorf("unexpected state: generation=%v ready=%v", generation, ok)
+	}
 	ready.set(false)
 	// create 10 goroutines waiting for ready and stop
 	for i := 0; i < 10; i++ {
@@ -68,6 +77,9 @@ func Test_newReadySetIdempotent(t *testing.T) {
 		t.Errorf("ready should be blocking")
 	}
 	ready.set(true)
+	if generation, ok := ready.checkAndReadGeneration(); generation != 2 || !ok {
+		t.Errorf("unexpected state: generation=%v ready=%v", generation, ok)
+	}
 	for i := 0; i < 10; i++ {
 		if err := <-errCh; err != nil {
 			t.Errorf("unexpected error on channel %d", i)

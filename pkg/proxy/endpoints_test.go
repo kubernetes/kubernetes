@@ -498,23 +498,23 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpointSlice* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
-		name                      string
-		previousEndpoints         []*discovery.EndpointSlice
-		currentEndpoints          []*discovery.EndpointSlice
-		oldEndpoints              map[ServicePortName][]*BaseEndpointInfo
-		expectedResult            map[ServicePortName][]*BaseEndpointInfo
-		expectedStaleEndpoints    []ServiceEndpoint
-		expectedStaleServiceNames map[ServicePortName]bool
-		expectedHealthchecks      map[types.NamespacedName]int
-		expectedChangedEndpoints  sets.String
+		name                           string
+		previousEndpoints              []*discovery.EndpointSlice
+		currentEndpoints               []*discovery.EndpointSlice
+		oldEndpoints                   map[ServicePortName][]*BaseEndpointInfo
+		expectedResult                 map[ServicePortName][]*BaseEndpointInfo
+		expectedDeletedUDPEndpoints    []ServiceEndpoint
+		expectedNewlyActiveUDPServices map[ServicePortName]bool
+		expectedLocalEndpoints         map[types.NamespacedName]int
+		expectedChangedEndpoints       sets.String
 	}{{
-		name:                      "empty",
-		oldEndpoints:              map[ServicePortName][]*BaseEndpointInfo{},
-		expectedResult:            map[ServicePortName][]*BaseEndpointInfo{},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString(),
+		name:                           "empty",
+		oldEndpoints:                   map[ServicePortName][]*BaseEndpointInfo{},
+		expectedResult:                 map[ServicePortName][]*BaseEndpointInfo{},
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString(),
 	}, {
 		name: "no change, unnamed port",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -533,10 +533,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString(),
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString(),
 	}, {
 		name: "no change, named port, local",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -555,9 +555,9 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString(),
@@ -587,10 +587,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString(),
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString(),
 	}, {
 		name: "no change, multiple slices, multiple ports, local",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -623,9 +623,9 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString(),
@@ -693,9 +693,9 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 2,
 			makeNSN("ns2", "ep2"): 1,
 		},
@@ -714,11 +714,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -736,13 +736,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			},
 		},
 		expectedResult: map[ServicePortName][]*BaseEndpointInfo{},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString("ns1/ep1"),
 	}, {
 		name: "add an IP and port",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -766,11 +766,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -797,7 +797,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.2:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}, {
@@ -807,9 +807,9 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Endpoint:        "1.1.1.2:12",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString("ns1/ep1"),
 	}, {
 		name: "add a slice to an endpoint",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -833,11 +833,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
@@ -864,13 +864,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.2:12",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString("ns1/ep1"),
 	}, {
 		name: "rename a port",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -889,14 +889,14 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks:     map[types.NamespacedName]int{},
+		expectedLocalEndpoints:   map[types.NamespacedName]int{},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
 	}, {
 		name: "renumber a port",
@@ -916,13 +916,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-		expectedChangedEndpoints:  sets.NewString("ns1/ep1"),
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.NewString("ns1/ep1"),
 	}, {
 		name: "complex add and remove",
 		previousEndpoints: []*discovery.EndpointSlice{
@@ -988,7 +988,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
 			Endpoint:        "2.2.2.2:22",
 			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
@@ -1004,12 +1004,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Endpoint:        "4.4.4.6:45",
 			ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
 		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP):  true,
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
 		},
-		expectedHealthchecks: map[types.NamespacedName]int{
+		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
 		},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1", "ns2/ep2", "ns3/ep3", "ns4/ep4"),
@@ -1027,11 +1027,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
-		expectedHealthchecks:     map[types.NamespacedName]int{},
+		expectedLocalEndpoints:   map[types.NamespacedName]int{},
 		expectedChangedEndpoints: sets.NewString("ns1/ep1"),
 	},
 	}
@@ -1079,37 +1079,39 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			result := fp.endpointsMap.Update(fp.endpointsChanges)
 			newMap := fp.endpointsMap
 			compareEndpointsMapsStr(t, newMap, tc.expectedResult)
-			if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
-				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
+			if len(result.DeletedUDPEndpoints) != len(tc.expectedDeletedUDPEndpoints) {
+				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedDeletedUDPEndpoints), len(result.DeletedUDPEndpoints), result.DeletedUDPEndpoints)
 			}
-			for _, x := range tc.expectedStaleEndpoints {
+			for _, x := range tc.expectedDeletedUDPEndpoints {
 				found := false
-				for _, stale := range result.StaleEndpoints {
+				for _, stale := range result.DeletedUDPEndpoints {
 					if stale == x {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+					t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.DeletedUDPEndpoints)
 				}
 			}
-			if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
-				t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
+			if len(result.NewlyActiveUDPServices) != len(tc.expectedNewlyActiveUDPServices) {
+				t.Errorf("[%d] expected %d newlyActiveUDPServices, got %d: %v", tci, len(tc.expectedNewlyActiveUDPServices), len(result.NewlyActiveUDPServices), result.NewlyActiveUDPServices)
 			}
-			for svcName := range tc.expectedStaleServiceNames {
+			for svcName := range tc.expectedNewlyActiveUDPServices {
 				found := false
-				for _, stale := range result.StaleServiceNames {
-					if stale == svcName {
+				for _, newSvcName := range result.NewlyActiveUDPServices {
+					if newSvcName == svcName {
 						found = true
 					}
 				}
 				if !found {
-					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+					t.Errorf("[%d] expected newlyActiveUDPServices[%v], but didn't find it: %v", tci, svcName, result.NewlyActiveUDPServices)
 				}
 			}
-			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+
+			localReadyEndpoints := fp.endpointsMap.LocalReadyEndpoints()
+			if !reflect.DeepEqual(localReadyEndpoints, tc.expectedLocalEndpoints) {
+				t.Errorf("[%d] expected local ready endpoints %v, got %v", tci, tc.expectedLocalEndpoints, localReadyEndpoints)
 			}
 		})
 	}

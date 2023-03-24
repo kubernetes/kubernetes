@@ -40,14 +40,14 @@ const (
 
 // networkCounter contains the counters for network adapters.
 type networkCounter struct {
-	packetsReceivedPerSecondCounter *perfCounter
-	packetsSentPerSecondCounter     *perfCounter
-	bytesReceivedPerSecondCounter   *perfCounter
-	bytesSentPerSecondCounter       *perfCounter
-	packetsReceivedDiscardedCounter *perfCounter
-	packetsReceivedErrorsCounter    *perfCounter
-	packetsOutboundDiscardedCounter *perfCounter
-	packetsOutboundErrorsCounter    *perfCounter
+	packetsReceivedPerSecondCounter perfCounter
+	packetsSentPerSecondCounter     perfCounter
+	bytesReceivedPerSecondCounter   perfCounter
+	bytesSentPerSecondCounter       perfCounter
+	packetsReceivedDiscardedCounter perfCounter
+	packetsReceivedErrorsCounter    perfCounter
+	packetsOutboundDiscardedCounter perfCounter
+	packetsOutboundErrorsCounter    perfCounter
 
 	mu           sync.RWMutex
 	adapterStats map[string]cadvisorapi.InterfaceStats

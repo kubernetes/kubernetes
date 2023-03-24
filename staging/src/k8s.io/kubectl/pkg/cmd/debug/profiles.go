@@ -250,7 +250,9 @@ func useHostNamespaces(p *corev1.Pod) {
 // shareProcessNamespace configures all containers in the pod to share the
 // process namespace.
 func shareProcessNamespace(p *corev1.Pod) {
-	p.Spec.ShareProcessNamespace = pointer.Bool(true)
+	if p.Spec.ShareProcessNamespace == nil {
+		p.Spec.ShareProcessNamespace = pointer.Bool(true)
+	}
 }
 
 // clearSecurityContext clears the security context for the container.

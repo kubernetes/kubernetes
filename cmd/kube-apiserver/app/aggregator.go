@@ -250,6 +250,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
+	{Group: "authentication.k8s.io", Version: "v1beta1"}:         {group: 17700, version: 9},
 	{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {group: 17700, version: 1},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
@@ -260,6 +261,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v1beta1"}:                         {group: 17400, version: 9},
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
+	{Group: "certificates.k8s.io", Version: "v1alpha1"}:          {group: 17300, version: 1},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
 	{Group: "networking.k8s.io", Version: "v1alpha1"}:            {group: 17200, version: 1},
 	{Group: "policy", Version: "v1"}:                             {group: 17100, version: 15},
@@ -283,7 +285,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {group: 16100, version: 12},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {group: 16100, version: 9},
 	{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {group: 16000, version: 9},
-	{Group: "resource.k8s.io", Version: "v1alpha1"}:              {group: 15900, version: 9},
+	{Group: "resource.k8s.io", Version: "v1alpha2"}:              {group: 15900, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

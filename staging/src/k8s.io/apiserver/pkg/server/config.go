@@ -345,6 +345,8 @@ type AuthenticationInfo struct {
 	APIAudiences authenticator.Audiences
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
+
+	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 }
 
 type AuthorizationInfo struct {
@@ -738,10 +740,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
-			manager = discoveryendpoint.NewResourceManager()
+			manager = discoveryendpoint.NewResourceManager("apis")
 		}
 		s.AggregatedDiscoveryGroupManager = manager
-		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager()
+		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
 	}
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
@@ -920,7 +922,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
+	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences, c.Authentication.RequestHeaderConfig)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authentication")
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")

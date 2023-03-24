@@ -299,6 +299,14 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidateResourceClaimName can be used to check whether the given
+// name for a ResourceClaim is valid.
+var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateResourceClaimTemplateName can be used to check whether the given
+// name for a ResourceClaimTemplate is valid.
+var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -2747,11 +2755,11 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	return allErrs
 }
 
-func validatePodResourceClaims(claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.NewString()
 	for i, claim := range claims {
-		allErrs = append(allErrs, validatePodResourceClaim(claim, &podClaimNames, fldPath.Index(i))...)
+		allErrs = append(allErrs, validatePodResourceClaim(podMeta, claim, &podClaimNames, fldPath.Index(i))...)
 	}
 	return allErrs
 }
@@ -2769,14 +2777,22 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.String {
 	return podClaimNames
 }
 
-func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if claim.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
+		nameErrs := ValidateDNS1123Label(claim.Name, fldPath.Child("name"))
+		if len(nameErrs) > 0 {
+			allErrs = append(allErrs, nameErrs...)
+		} else if podMeta != nil && claim.Source.ResourceClaimTemplateName != nil {
+			claimName := podMeta.Name + "-" + claim.Name
+			for _, detail := range ValidateResourceClaimName(claimName, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claimName, "final ResourceClaim name: "+detail))
+			}
+		}
 		podClaimNames.Insert(claim.Name)
 	}
 	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Source, fldPath.Child("source"))...)
@@ -2791,6 +2807,16 @@ func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field
 	}
 	if claimSource.ResourceClaimName == nil && claimSource.ResourceClaimTemplateName == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
+	}
+	if claimSource.ResourceClaimName != nil {
+		for _, detail := range ValidateResourceClaimName(*claimSource.ResourceClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), *claimSource.ResourceClaimName, detail))
+		}
+	}
+	if claimSource.ResourceClaimTemplateName != nil {
+		for _, detail := range ValidateResourceClaimTemplateName(*claimSource.ResourceClaimTemplateName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimTemplateName"), *claimSource.ResourceClaimTemplateName, detail))
+		}
 	}
 	return allErrs
 }
@@ -3016,7 +3042,7 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 }
 
 var supportedResizeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-var supportedResizePolicies = sets.NewString(string(core.RestartNotRequired), string(core.RestartRequired))
+var supportedResizePolicies = sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 
 func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -3035,12 +3061,12 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 		default:
 			allErrors = append(allErrors, field.NotSupported(fldPath, p.ResourceName, supportedResizeResources.List()))
 		}
-		switch p.Policy {
-		case core.RestartNotRequired, core.RestartRequired:
+		switch p.RestartPolicy {
+		case core.NotRequired, core.RestartContainer:
 		case "":
 			allErrors = append(allErrors, field.Required(fldPath, ""))
 		default:
-			allErrors = append(allErrors, field.NotSupported(fldPath, p.Policy, supportedResizePolicies.List()))
+			allErrors = append(allErrors, field.NotSupported(fldPath, p.RestartPolicy, supportedResizePolicies.List()))
 		}
 	}
 	return allErrors
@@ -3665,6 +3691,8 @@ type PodValidationOptions struct {
 	AllowExpandedDNSConfig bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
+	// Allow node selector additions for gated pods.
+	AllowMutableNodeSelectorAndNodeAffinity bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -3757,7 +3785,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
-	allErrs = append(allErrs, validatePodResourceClaims(spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
+	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, fldPath.Child("containers"), opts)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, fldPath.Child("initContainers"), opts)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts)...)
@@ -4671,6 +4699,39 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		mungedPodSpec.TerminationGracePeriodSeconds = oldPod.Spec.TerminationGracePeriodSeconds // +k8s:verify-mutation:reason=clone
 	}
 
+	// Handle validations specific to gated pods.
+	podIsGated := len(oldPod.Spec.SchedulingGates) > 0
+	if opts.AllowMutableNodeSelectorAndNodeAffinity && podIsGated {
+		// Additions to spec.nodeSelector are allowed (no deletions or mutations) for gated pods.
+		if !apiequality.Semantic.DeepEqual(mungedPodSpec.NodeSelector, oldPod.Spec.NodeSelector) {
+			allErrs = append(allErrs, validateNodeSelectorMutation(specPath.Child("nodeSelector"), mungedPodSpec.NodeSelector, oldPod.Spec.NodeSelector)...)
+			mungedPodSpec.NodeSelector = oldPod.Spec.NodeSelector // +k8s:verify-mutation:reason=clone
+		}
+
+		// Validate node affinity mutations.
+		var oldNodeAffinity *core.NodeAffinity
+		if oldPod.Spec.Affinity != nil {
+			oldNodeAffinity = oldPod.Spec.Affinity.NodeAffinity // +k8s:verify-mutation:reason=clone
+		}
+
+		var mungedNodeAffinity *core.NodeAffinity
+		if mungedPodSpec.Affinity != nil {
+			mungedNodeAffinity = mungedPodSpec.Affinity.NodeAffinity // +k8s:verify-mutation:reason=clone
+		}
+
+		if !apiequality.Semantic.DeepEqual(oldNodeAffinity, mungedNodeAffinity) {
+			allErrs = append(allErrs, validateNodeAffinityMutation(specPath.Child("affinity").Child("nodeAffinity"), mungedNodeAffinity, oldNodeAffinity)...)
+			switch {
+			case mungedPodSpec.Affinity == nil && oldNodeAffinity == nil:
+				// already effectively nil, no change needed
+			case mungedPodSpec.Affinity == nil && oldNodeAffinity != nil:
+				mungedPodSpec.Affinity = &core.Affinity{NodeAffinity: oldNodeAffinity} // +k8s:verify-mutation:reason=clone
+			default:
+				mungedPodSpec.Affinity.NodeAffinity = oldNodeAffinity // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
@@ -4681,7 +4742,6 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		}
 		allErrs = append(allErrs, errs)
 	}
-
 	return allErrs
 }
 
@@ -4832,7 +4892,16 @@ var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySi
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service) field.ErrorList {
-	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
+	metaPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
+
+	topologyHintsVal, topologyHintsSet := service.Annotations[core.DeprecatedAnnotationTopologyAwareHints]
+	topologyModeVal, topologyModeSet := service.Annotations[core.AnnotationTopologyMode]
+
+	if topologyModeSet && topologyHintsSet && topologyModeVal != topologyHintsVal {
+		message := fmt.Sprintf("must match annotations[%s] when both are specified", core.DeprecatedAnnotationTopologyAwareHints)
+		allErrs = append(allErrs, field.Invalid(metaPath.Child("annotations").Key(core.AnnotationTopologyMode), topologyModeVal, message))
+	}
 
 	specPath := field.NewPath("spec")
 
@@ -6930,7 +6999,9 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 		return nil
 	}
 
+	var allErrs field.ErrorList
 	labelSelectorKeys := sets.String{}
+
 	if labelSelector != nil {
 		for key := range labelSelector.MatchLabels {
 			labelSelectorKeys.Insert(key)
@@ -6938,9 +7009,10 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 		for _, matchExpression := range labelSelector.MatchExpressions {
 			labelSelectorKeys.Insert(matchExpression.Key)
 		}
+	} else {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must not be specified when labelSelector is not set"))
 	}
 
-	allErrs := field.ErrorList{}
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
@@ -7296,4 +7368,75 @@ func validatePvNodeAffinity(newPvNodeAffinity, oldPvNodeAffinity *core.VolumeNod
 		allErrs = append(allErrs, field.Invalid(fldPath, newPvNodeAffinity, fieldImmutableErrorMsg+", except for updating from beta label to GA"))
 	}
 	return allErrs
+}
+
+func validateNodeSelectorMutation(fldPath *field.Path, newNodeSelector, oldNodeSelector map[string]string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Validate no existing node selectors were deleted or mutated.
+	for k, v1 := range oldNodeSelector {
+		if v2, ok := newNodeSelector[k]; !ok || v1 != v2 {
+			allErrs = append(allErrs, field.Invalid(fldPath, newNodeSelector, "only additions to spec.nodeSelector are allowed (no mutations or deletions)"))
+			return allErrs
+		}
+	}
+	return allErrs
+}
+
+func validateNodeAffinityMutation(nodeAffinityPath *field.Path, newNodeAffinity, oldNodeAffinity *core.NodeAffinity) field.ErrorList {
+	var allErrs field.ErrorList
+	// If old node affinity was nil, anything can be set.
+	if oldNodeAffinity == nil || oldNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return allErrs
+	}
+
+	oldTerms := oldNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	var newTerms []core.NodeSelectorTerm
+	if newNodeAffinity != nil && newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		newTerms = newNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	}
+
+	// If there are no old terms, we can set the new terms to anything.
+	// If there are old terms, we cannot add any new ones.
+	if len(oldTerms) > 0 && len(oldTerms) != len(newTerms) {
+		return append(allErrs, field.Invalid(nodeAffinityPath.Child("requiredDuringSchedulingIgnoredDuringExecution").Child("nodeSelectorTerms"), newTerms, "no additions/deletions to non-empty NodeSelectorTerms list are allowed"))
+	}
+
+	// For requiredDuringSchedulingIgnoredDuringExecution, if old NodeSelectorTerms
+	// was empty, anything can be set. If non-empty, only additions of NodeSelectorRequirements
+	// to matchExpressions or fieldExpressions are allowed.
+	for i := range oldTerms {
+		if !validateNodeSelectorTermHasOnlyAdditions(newTerms[i], oldTerms[i]) {
+			allErrs = append(allErrs, field.Invalid(nodeAffinityPath.Child("requiredDuringSchedulingIgnoredDuringExecution").Child("nodeSelectorTerms").Index(i), newTerms[i], "only additions are allowed (no mutations or deletions)"))
+		}
+	}
+	return allErrs
+}
+
+func validateNodeSelectorTermHasOnlyAdditions(newTerm, oldTerm core.NodeSelectorTerm) bool {
+	if len(oldTerm.MatchExpressions) == 0 && len(oldTerm.MatchFields) == 0 {
+		if len(newTerm.MatchExpressions) > 0 || len(newTerm.MatchFields) > 0 {
+			return false
+		}
+	}
+
+	// Validate MatchExpressions only has additions (no deletions or mutations)
+	if l := len(oldTerm.MatchExpressions); l > 0 {
+		if len(newTerm.MatchExpressions) < l {
+			return false
+		}
+		if !apiequality.Semantic.DeepEqual(newTerm.MatchExpressions[:l], oldTerm.MatchExpressions) {
+			return false
+		}
+	}
+	// Validate MatchFields only has additions (no deletions or mutations)
+	if l := len(oldTerm.MatchFields); l > 0 {
+		if len(newTerm.MatchFields) < l {
+			return false
+		}
+		if !apiequality.Semantic.DeepEqual(newTerm.MatchFields[:l], oldTerm.MatchFields) {
+			return false
+		}
+	}
+	return true
 }

@@ -20,11 +20,12 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestVerifyRunAsNonRoot(t *testing.T) {
@@ -62,6 +63,14 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			desc: "Pass if SecurityContext is not set",
 			sc:   nil,
 			uid:  &rootUser,
+			fail: false,
+		},
+		{
+			desc: "Pass if RunAsUser is non-root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsUser:    &anyUser,
+			},
 			fail: false,
 		},
 		{

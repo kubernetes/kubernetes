@@ -116,6 +116,10 @@ type LatencyTrackers struct {
 	// Validate webhooks are done in parallel, so max function is used.
 	ValidatingWebhookTracker DurationTracker
 
+	// APFQueueWaitTracker tracks the latency incurred by queue wait times
+	// from priority & fairness.
+	APFQueueWaitTracker DurationTracker
+
 	// StorageTracker tracks the latency incurred inside the storage layer,
 	// it accounts for the time it takes to send data to the underlying
 	// storage layer (etcd) and get the complete response back.
@@ -168,6 +172,7 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 	return WithValue(parent, latencyTrackersKey, &LatencyTrackers{
 		MutatingWebhookTracker:   newSumLatencyTracker(c),
 		ValidatingWebhookTracker: newMaxLatencyTracker(c),
+		APFQueueWaitTracker:      newMaxLatencyTracker(c),
 		StorageTracker:           newSumLatencyTracker(c),
 		TransformTracker:         newSumLatencyTracker(c),
 		SerializationTracker:     newSumLatencyTracker(c),
@@ -227,6 +232,14 @@ func TrackSerializeResponseObjectLatency(ctx context.Context, f func()) {
 func TrackResponseWriteLatency(ctx context.Context, d time.Duration) {
 	if tracker, ok := LatencyTrackersFrom(ctx); ok {
 		tracker.ResponseWriteTracker.TrackDuration(d)
+	}
+}
+
+// TrackAPFQueueWaitLatency is used to track latency incurred
+// by priority and fairness queues.
+func TrackAPFQueueWaitLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.APFQueueWaitTracker.TrackDuration(d)
 	}
 }
 

@@ -100,6 +100,6 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
 func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
 	if obj.Port == nil {
-		obj.Port = utilpointer.Int32Ptr(443)
+		obj.Port = utilpointer.Int32(443)
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package populator
 
 import (
+	"k8s.io/klog/v2/ktesting"
 	"testing"
 	"time"
 
@@ -134,7 +135,8 @@ func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
 		VolumeMountState:    operationexecutor.VolumeMounted,
 	}
-	dswp.actualStateOfWorld.MarkVolumeAsAttached(opts.VolumeName, opts.VolumeSpec, "fake-node", "")
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.actualStateOfWorld.MarkVolumeAsAttached(logger, opts.VolumeName, opts.VolumeSpec, "fake-node", "")
 	dswp.actualStateOfWorld.MarkVolumeAsMounted(opts)
 
 	dswp.findAndAddNewPods()
@@ -1393,8 +1395,9 @@ func volumeCapacity(size int) v1.ResourceList {
 }
 
 func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		err := asw.MarkVolumeAsAttached(volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
+		err := asw.MarkVolumeAsAttached(logger, volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}

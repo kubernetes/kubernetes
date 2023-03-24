@@ -22,7 +22,9 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	authenticationv1alpha1client "k8s.io/client-go/kubernetes/typed/authentication/v1alpha1"
+	authenticationv1beta1client "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -71,7 +74,12 @@ func (flags *WhoAmIFlags) ToOptions(ctx context.Context, args []string) (*WhoAmI
 		return nil, err
 	}
 
-	w.authClient, err = authenticationv1alpha1client.NewForConfig(clientConfig)
+	w.authV1alpha1Client, err = authenticationv1alpha1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.authV1beta1Client, err = authenticationv1beta1client.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -92,8 +100,10 @@ func (flags *WhoAmIFlags) ToOptions(ctx context.Context, args []string) (*WhoAmI
 // WhoAmIOptions is the start of the data required to perform the operation. As new fields are added,
 // add them here instead of referencing the cmd.Flags()
 type WhoAmIOptions struct {
-	authClient authenticationv1alpha1client.AuthenticationV1alpha1Interface
-	ctx        context.Context
+	authV1alpha1Client authenticationv1alpha1client.AuthenticationV1alpha1Interface
+	authV1beta1Client  authenticationv1beta1client.AuthenticationV1beta1Interface
+
+	ctx context.Context
 
 	resourcePrinterFunc printers.ResourcePrinterFunc
 
@@ -111,10 +121,10 @@ var (
 
 	whoAmIExample = templates.Examples(`
 		# Get your subject attributes.
-		kubectl alpha auth whoami
+		kubectl auth whoami
 		
 		# Get your subject attributes in JSON format.
-		kubectl alpha auth whoami -o json
+		kubectl auth whoami -o json
 	`)
 )
 
@@ -142,7 +152,7 @@ func NewCmdWhoAmI(restClientGetter genericclioptions.RESTClientGetter, streams g
 var (
 	notEnabledErr = fmt.Errorf(
 		"the selfsubjectreviews API is not enabled in the cluster\n" +
-			"enable APISelfSubjectReview feature gate and authentication.k8s.io/v1alpha1 API")
+			"enable APISelfSubjectReview feature gate and authentication.k8s.io/v1alpha1 or authentication.k8s.io/v1beta1 API")
 
 	forbiddenErr = fmt.Errorf(
 		"the selfsubjectreviews API is not enabled in the cluster or you do not have permission to call it")
@@ -150,8 +160,20 @@ var (
 
 // Run prints all user attributes.
 func (o WhoAmIOptions) Run() error {
-	sar := &authenticationv1alpha1.SelfSubjectReview{}
-	response, err := o.authClient.SelfSubjectReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
+	var (
+		res runtime.Object
+		err error
+	)
+
+	res, err = o.authV1beta1Client.
+		SelfSubjectReviews().
+		Create(context.TODO(), &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		// Fallback to Alpha API if Beta is not enabled
+		res, err = o.authV1alpha1Client.
+			SelfSubjectReviews().
+			Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+	}
 	if err != nil {
 		switch {
 		case errors.IsForbidden(err):
@@ -162,24 +184,33 @@ func (o WhoAmIOptions) Run() error {
 			return err
 		}
 	}
-	return o.resourcePrinterFunc(response, o.Out)
+	return o.resourcePrinterFunc(res, o.Out)
+}
+
+func getUserInfo(obj runtime.Object) (authenticationv1.UserInfo, error) {
+	switch obj.(type) {
+	case *authenticationv1alpha1.SelfSubjectReview:
+		return obj.(*authenticationv1alpha1.SelfSubjectReview).Status.UserInfo, nil
+	case *authenticationv1beta1.SelfSubjectReview:
+		return obj.(*authenticationv1beta1.SelfSubjectReview).Status.UserInfo, nil
+	default:
+		return authenticationv1.UserInfo{}, fmt.Errorf("unexpected response type %T, expected SelfSubjectReview", obj)
+	}
 }
 
 func printTableSelfSubjectAccessReview(obj runtime.Object, out io.Writer) error {
-	ssr, ok := obj.(*authenticationv1alpha1.SelfSubjectReview)
-	if !ok {
-		return fmt.Errorf("object is not SelfSubjectReview")
+	ui, err := getUserInfo(obj)
+	if err != nil {
+		return err
 	}
 
 	w := printers.GetNewTabWriter(out)
 	defer w.Flush()
 
-	_, err := fmt.Fprintf(w, "ATTRIBUTE\tVALUE\n")
+	_, err = fmt.Fprintf(w, "ATTRIBUTE\tVALUE\n")
 	if err != nil {
 		return fmt.Errorf("cannot write a header: %w", err)
 	}
-
-	ui := ssr.Status.UserInfo
 
 	if ui.Username != "" {
 		_, err := fmt.Fprintf(w, "Username\t%s\n", ui.Username)

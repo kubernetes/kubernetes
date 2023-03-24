@@ -36,8 +36,10 @@ import (
 )
 
 type pullerExpects struct {
-	calls []string
-	err   error
+	calls                           []string
+	err                             error
+	shouldRecordStartedPullingTime  bool
+	shouldRecordFinishedPullingTime bool
 }
 
 type pullerTestCase struct {
@@ -62,7 +64,7 @@ func pullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
 			}},
 
 		{ // image present, don't pull
@@ -74,9 +76,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, nil},
-				{[]string{"GetImageRef"}, nil},
-				{[]string{"GetImageRef"}, nil},
+				{[]string{"GetImageRef"}, nil, false, false},
+				{[]string{"GetImageRef"}, nil, false, false},
+				{[]string{"GetImageRef"}, nil, false, false},
 			}},
 		// image present, pull it
 		{containerImage: "present_image",
@@ -87,9 +89,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
 			}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
@@ -100,9 +102,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImageNeverPull},
-				{[]string{"GetImageRef"}, ErrImageNeverPull},
-				{[]string{"GetImageRef"}, ErrImageNeverPull},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
+				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false},
 			}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
@@ -113,9 +115,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImageInspect},
-				{[]string{"GetImageRef"}, ErrImageInspect},
-				{[]string{"GetImageRef"}, ErrImageInspect},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
+				{[]string{"GetImageRef"}, ErrImageInspect, false, false},
 			}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
@@ -126,12 +128,12 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff},
-				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
 			}},
 		// image present, non-zero qps, try to pull
 		{containerImage: "present_image",
@@ -142,9 +144,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        400.0,
 			burst:      600,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
 			}},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
@@ -155,20 +157,39 @@ func pullerTestCases() []pullerTestCase {
 			qps:        2000.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef"}, ErrImagePull},
-				{[]string{"GetImageRef"}, ErrImagePull},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef"}, ErrImagePull, true, false},
+				{[]string{"GetImageRef"}, ErrImagePull, true, false},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
 			}},
 	}
 }
 
-type mockPodPullingTimeRecorder struct{}
+type mockPodPullingTimeRecorder struct {
+	sync.Mutex
+	startedPullingRecorded  bool
+	finishedPullingRecorded bool
+}
 
-func (m *mockPodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID) {}
+func (m *mockPodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID) {
+	m.Lock()
+	defer m.Unlock()
+	m.startedPullingRecorded = true
+}
 
-func (m *mockPodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
+func (m *mockPodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {
+	m.Lock()
+	defer m.Unlock()
+	m.finishedPullingRecorded = true
+}
 
-func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
+func (m *mockPodPullingTimeRecorder) reset() {
+	m.Lock()
+	defer m.Unlock()
+	m.startedPullingRecorded = false
+	m.finishedPullingRecorded = false
+}
+
+func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container, fakePodPullingTimeRecorder *mockPodPullingTimeRecorder) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -186,7 +207,9 @@ func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, &mockPodPullingTimeRecorder{})
+	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
+
+	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 
@@ -203,16 +226,20 @@ func TestParallelPuller(t *testing.T) {
 
 	useSerializedEnv := false
 	for _, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
-
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
+
 				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
+				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
+				assert.Equal(t, expected.shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+				fakePodPullingTimeRecorder.reset()
 			}
 		})
 	}
@@ -231,16 +258,20 @@ func TestSerializedPuller(t *testing.T) {
 
 	useSerializedEnv := true
 	for _, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
-
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
+
 				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
+				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
+				assert.Equal(t, expected.shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+				fakePodPullingTimeRecorder.reset()
 			}
 		})
 	}
@@ -285,20 +316,22 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage"}, nil},
+			{[]string{"GetImageRef", "PullImage"}, nil, true, true},
 		}}
 
 	useSerializedEnv := true
-	puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv, nil)
-	fakeRuntime.CalledFunctions = nil
-	fakeRuntime.ImageList = []Image{}
-	fakeClock.Step(time.Second)
-
 	t.Run(c.testName, func(t *testing.T) {
 		ctx := context.Background()
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+		fakeRuntime.CalledFunctions = nil
+		fakeRuntime.ImageList = []Image{}
+		fakeClock.Step(time.Second)
+
 		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
+		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
 
 		images, _ := fakeRuntime.ListImages(ctx)
 		assert.Equal(t, 1, len(images), "ListImages() count")
@@ -339,7 +372,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	maxParallelImagePulls := 5
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container := pullerTestEnv(*testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container, _ := pullerTestEnv(*testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t

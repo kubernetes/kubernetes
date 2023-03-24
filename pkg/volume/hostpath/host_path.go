@@ -18,6 +18,7 @@ package hostpath
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"os"
 	"regexp"
 
@@ -172,11 +173,11 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
-func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *hostPathPlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return newDeleter(spec, plugin.host)
 }
 
-func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *hostPathPlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	if !plugin.config.ProvisioningEnabled {
 		return nil, fmt.Errorf("provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}

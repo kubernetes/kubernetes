@@ -38,6 +38,7 @@ import (
 	"time"
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
+	"github.com/google/go-cmp/cmp"
 
 	"sigs.k8s.io/yaml"
 
@@ -45,9 +46,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
@@ -842,6 +845,65 @@ metadata:
 			for _, component := range components {
 				ginkgo.By("getting status of " + component)
 				e2ekubectl.RunKubectlOrDie(ns, "get", "componentstatuses", component)
+			}
+		})
+	})
+
+	ginkgo.Describe("Kubectl prune with applyset", func() {
+		ginkgo.It("should apply and prune objects", func(ctx context.Context) {
+			framework.Logf("applying manifest1")
+			manifest1 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+  namespace: {{ns}}
+`
+
+			manifest1 = strings.ReplaceAll(manifest1, "{{ns}}", ns)
+			args := []string{"apply", "--prune", "--applyset=applyset1", "-f", "-"}
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects := mustListObjectsInNamespace(ctx, c, ns)
+			names := mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1", "cm2"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2")
+			manifest2 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+`
+			manifest2 = strings.ReplaceAll(manifest2, "{{ns}}", ns)
+
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2 (again)")
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
 			}
 		})
 	})
@@ -1972,6 +2034,35 @@ metadata:
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")
 		})
 	})
+
+	ginkgo.Describe("kubectl subresource flag", func() {
+		ginkgo.It("should not be used in a bulk GET", func() {
+			ginkgo.By("calling kubectl get nodes --subresource=status")
+			out, err := e2ekubectl.RunKubectl("", "get", "nodes", "--subresource=status")
+			gomega.Expect(err).To(gomega.HaveOccurred(), fmt.Sprintf("Expected kubectl to fail, but it succeeded: %s", out))
+			gomega.Expect(err).To(gomega.ContainSubstring("subresource cannot be used when bulk resources are specified"))
+		})
+		ginkgo.It("GET on status subresource of built-in type (node) returns identical info as GET on the built-in type", func(ctx context.Context) {
+			ginkgo.By("first listing nodes in the cluster, and using first node of the list")
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
+			node := nodes.Items[0]
+			// Avoid comparing values of fields that might end up
+			// changing between the two invocations of kubectl. We
+			// compare the name and version fields.
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s", node.Name))
+			outBuiltIn := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name,
+				"--output=jsonpath='{.metadata.name}{.status.nodeInfo.kubeletVersion}'",
+			)
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s --subresource=status", node.Name))
+			outStatusSubresource := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name,
+				"--output=jsonpath='{.metadata.name}{.status.nodeInfo.kubeletVersion}'",
+				"--subresource=status",
+			)
+			gomega.Expect(outBuiltIn).To(gomega.Equal(outStatusSubresource))
+		})
+	})
 })
 
 // Checks whether the output split by line contains the required elements.
@@ -2348,4 +2439,39 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
+
+// mustListObjectsInNamespace queries all the objects we use for testing in the given namespace.
+// Currently this is just ConfigMaps.
+// We filter our "system" configmaps, like "kube-root-ca.crt".
+func mustListObjectsInNamespace(ctx context.Context, c clientset.Interface, ns string) []runtime.Object {
+	var objects []runtime.Object
+	configMaps, err := c.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		framework.Failf("error listing configmaps: %v", err)
+	}
+	for i := range configMaps.Items {
+		cm := &configMaps.Items[i]
+		if cm.Name == "kube-root-ca.crt" {
+			// Ignore system objects
+			continue
+		}
+		objects = append(objects, cm)
+	}
+	return objects
+}
+
+// mustGetNames returns a slice containing the metadata.name for each object.
+func mustGetNames(objects []runtime.Object) []string {
+	var names []string
+	for _, obj := range objects {
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			framework.Failf("error getting accessor for %T: %v", obj, err)
+		}
+		name := metaAccessor.GetName()
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

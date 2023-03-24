@@ -129,7 +129,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
+		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)(FIELD|RESOURCE):.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
 			framework.Failf("%v", err)
 		}
 

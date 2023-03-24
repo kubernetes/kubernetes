@@ -110,7 +110,7 @@ func (t Token) String() string {
 	case SelfClosingTagToken:
 		return "<" + t.tagString() + "/>"
 	case CommentToken:
-		return "<!--" + EscapeString(t.Data) + "-->"
+		return "<!--" + escapeCommentString(t.Data) + "-->"
 	case DoctypeToken:
 		return "<!DOCTYPE " + EscapeString(t.Data) + ">"
 	}
@@ -598,10 +598,10 @@ scriptDataDoubleEscapeEnd:
 // readComment reads the next comment token starting with "<!--". The opening
 // "<!--" has already been consumed.
 func (z *Tokenizer) readComment() {
-	// When modifying this function, consider manually increasing the suffixLen
-	// constant in func TestComments, from 6 to e.g. 9 or more. That increase
-	// should only be temporary, not committed, as it exponentially affects the
-	// test running time.
+	// When modifying this function, consider manually increasing the
+	// maxSuffixLen constant in func TestComments, from 6 to e.g. 9 or more.
+	// That increase should only be temporary, not committed, as it
+	// exponentially affects the test running time.
 
 	z.data.start = z.raw.end
 	defer func() {

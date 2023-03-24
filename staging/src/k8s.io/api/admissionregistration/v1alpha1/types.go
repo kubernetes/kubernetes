@@ -74,6 +74,49 @@ type ValidatingAdmissionPolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status ValidatingAdmissionPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyStatus struct {
+	// The generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
+	// The results of type checking for each expression.
+	// Presence of this field indicates the completion of the type checking.
+	// +optional
+	TypeChecking *TypeChecking `json:"typeChecking,omitempty" protobuf:"bytes,2,opt,name=typeChecking"`
+	// The conditions represent the latest available observations of a policy's current state.
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
+}
+
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
+type TypeChecking struct {
+	// The type checking warnings for each expression.
+	// +optional
+	// +listType=atomic
+	ExpressionWarnings []ExpressionWarning `json:"expressionWarnings,omitempty" protobuf:"bytes,1,rep,name=expressionWarnings"`
+}
+
+// ExpressionWarning is a warning information that targets a specific expression.
+type ExpressionWarning struct {
+	// The path to the field that refers the expression.
+	// For example, the reference to the expression of the first item of
+	// validations is "spec.validations[0].expression"
+	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
+	// The content of type checking information in a human-readable form.
+	// Each line of the warning contains the type that the expression is checked
+	// against, followed by the type check error from the compiler.
+	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -136,7 +179,31 @@ type ValidatingAdmissionPolicySpec struct {
 	// +listType=atomic
 	// +optional
 	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// If a parameter object is provided, it can be accessed via the `params` handle in the same
+	// manner as validation expressions.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the policy is skipped
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
 }
+
+type MatchCondition v1.MatchCondition
 
 // ParamKind is a tuple of Group Kind and Version.
 // +structType=atomic
@@ -209,6 +276,18 @@ type Validation struct {
 	// If not set, StatusReasonInvalid is used in the response to the client.
 	// +optional
 	Reason *metav1.StatusReason `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+	// Since messageExpression is used as a failure message, it must evaluate to a string.
+	// If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails.
+	// If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced
+	// as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+	// that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and
+	// the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged.
+	// messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'.
+	// Example:
+	// "object.x must be less than max ("+string(params.max)+")"
+	// +optional
+	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,4,opt,name=messageExpression"`
 }
 
 // AuditAnnotation describes how to produce an audit annotation for an API request.

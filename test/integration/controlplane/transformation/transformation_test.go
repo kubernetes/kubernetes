@@ -30,6 +30,8 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -47,6 +49,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -337,6 +340,79 @@ func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigM
 	return cm, nil
 }
 
+// create jobs
+func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+	if _, err := e.restClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("error while creating job: %v", err)
+	}
+
+	return job, nil
+}
+
+// create deployment
+func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deployment, error) {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: pointer.Int32(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "nginx",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.17",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									Protocol:      corev1.ProtocolTCP,
+									ContainerPort: 80,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if _, err := e.restClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("error while creating deployment: %v", err)
+	}
+
+	return deployment, nil
+}
+
 func gvr(group, version, resource string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 }
@@ -376,6 +452,15 @@ func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Int
 		return nil, fmt.Errorf("error while writing pod: %v", err)
 	}
 	return pod, nil
+}
+
+func (e *transformTest) deletePod(namespace string, dynamicInterface dynamic.Interface) error {
+	podGVR := gvr("", "v1", "pods")
+	stubObj, err := getStubObj(podGVR)
+	if err != nil {
+		return err
+	}
+	return dynamicInterface.Resource(podGVR).Namespace(namespace).Delete(context.TODO(), stubObj.GetName(), metav1.DeleteOptions{})
 }
 
 func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
@@ -443,7 +528,7 @@ func (e *transformTest) printMetrics() error {
 func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -464,7 +549,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {

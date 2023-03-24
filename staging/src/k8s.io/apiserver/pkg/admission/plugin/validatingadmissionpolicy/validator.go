@@ -23,28 +23,34 @@ import (
 
 	celtypes "github.com/google/cel-go/common/types"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/klog/v2"
 )
 
 // validator implements the Validator interface
 type validator struct {
+	celMatcher            matchconditions.Matcher
 	validationFilter      cel.Filter
 	auditAnnotationFilter cel.Filter
+	messageFilter         cel.Filter
 	failPolicy            *v1.FailurePolicyType
 	authorizer            authorizer.Authorizer
 }
 
-func NewValidator(validationFilter, auditAnnotationFilter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
 	return &validator{
+		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
 		auditAnnotationFilter: auditAnnotationFilter,
+		messageFilter:         messageFilter,
 		failPolicy:            failPolicy,
 		authorizer:            authorizer,
 	}
@@ -74,8 +80,30 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		f = *v.failPolicy
 	}
 
+	if v.celMatcher != nil {
+		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams)
+		if matchResults.Error != nil {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:     policyDecisionActionForError(f),
+						Evaluation: EvalError,
+						Message:    matchResults.Error.Error(),
+					},
+				},
+			}
+		}
+
+		// if preconditions are not met, then do not return any validations
+		if !matchResults.Matches {
+			return ValidateResult{}
+		}
+	}
+
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}
-	evalResults, err := v.validationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, runtimeCELCostBudget)
+	expressionOptionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams}
+	admissionRequest := cel.CreateAdmissionRequest(versionedAttr.Attributes)
+	evalResults, remainingBudget, err := v.validationFilter.ForInput(ctx, versionedAttr, admissionRequest, optionalVars, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -88,7 +116,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		}
 	}
 	decisions := make([]PolicyDecision, len(evalResults))
-
+	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
 		// TODO: move this to generics
@@ -101,10 +129,23 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 			continue
 		}
 
+		var messageResult *cel.EvaluationResult
+		var messageError *apiservercel.Error
+		if len(messageResults) > i {
+			messageResult = &messageResults[i]
+		}
+		messageError, _ = err.(*apiservercel.Error)
 		if evalResult.Error != nil {
 			decision.Action = policyDecisionActionForError(f)
 			decision.Evaluation = EvalError
 			decision.Message = evalResult.Error.Error()
+		} else if messageError != nil &&
+			(messageError.Type == apiservercel.ErrorTypeInternal ||
+				(messageError.Type == apiservercel.ErrorTypeInvalid &&
+					strings.HasPrefix(messageError.Detail, "validation failed due to running out of cost budget"))) {
+			decision.Action = policyDecisionActionForError(f)
+			decision.Evaluation = EvalError
+			decision.Message = fmt.Sprintf("failed messageExpression: %s", err)
 		} else if evalResult.EvalResult != celtypes.True {
 			decision.Action = ActionDeny
 			if validation.Reason == nil {
@@ -112,11 +153,39 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 			} else {
 				decision.Reason = *validation.Reason
 			}
-			if len(validation.Message) > 0 {
-				decision.Message = strings.TrimSpace(validation.Message)
-			} else {
-				decision.Message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
+			// decide the failure message
+			var message string
+			// attempt to set message with messageExpression result
+			if messageResult != nil && messageResult.Error == nil && messageResult.EvalResult != nil {
+				// also fallback if the eval result is non-string (including null) or
+				// whitespaces.
+				if message, ok = messageResult.EvalResult.Value().(string); ok {
+					message = strings.TrimSpace(message)
+					// deny excessively long message from EvalResult
+					if len(message) > celconfig.MaxEvaluatedMessageExpressionSizeBytes {
+						klog.V(2).InfoS("excessively long message denied", "message", message)
+						message = ""
+					}
+					// deny message that contains newlines
+					if strings.ContainsAny(message, "\n") {
+						klog.V(2).InfoS("multi-line message denied", "message", message)
+						message = ""
+					}
+				}
 			}
+			if messageResult != nil && messageResult.Error != nil {
+				// log any error with messageExpression
+				klog.V(2).ErrorS(messageResult.Error, "error while evaluating messageExpression")
+			}
+			// fallback to set message to the custom message
+			if message == "" && len(validation.Message) > 0 {
+				message = strings.TrimSpace(validation.Message)
+			}
+			// fallback to use the expression to compose a message
+			if message == "" {
+				message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
+			}
+			decision.Message = message
 		} else {
 			decision.Action = ActionAdmit
 			decision.Evaluation = EvalAdmit
@@ -124,7 +193,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 	}
 
 	options := cel.OptionalVariableBindings{VersionedParams: versionedParams}
-	auditAnnotationEvalResults, err := v.auditAnnotationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, runtimeCELCostBudget)
+	auditAnnotationEvalResults, _, err := v.auditAnnotationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -139,6 +208,9 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 
 	auditAnnotationResults := make([]PolicyAuditAnnotation, len(auditAnnotationEvalResults))
 	for i, evalResult := range auditAnnotationEvalResults {
+		if evalResult.ExpressionAccessor == nil {
+			continue
+		}
 		var auditAnnotationResult = &auditAnnotationResults[i]
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*AuditAnnotationCondition)

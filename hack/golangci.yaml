@@ -13,13 +13,13 @@ issues:
         - ineffassign
     # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
     # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
-    - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
-      linters:
-        - gocritic
+    - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*) # not in golangci-strict.yaml
+      linters:                                                                                    # not in golangci-strict.yaml
+        - gocritic                                                                                # not in golangci-strict.yaml
 
 linters:
-  disable-all: true
-  enable: # please keep this alphabetized
+  disable-all: true # not disabled in golangci-strict.yaml
+  enable: # please keep this alphabetized and in sync with golangci-strict.yaml
     - ginkgolinter
     - gocritic
     - govet
@@ -37,16 +37,14 @@ linters-settings: # please keep this alphabetized
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
   gocritic:
-    enabled-checks:
-      - equalFold
-      - boolExprSimplify
+    enabled-checks:             # not limited in golangci-strict.yaml
+      - equalFold               # not limited in golangci-strict.yaml
+      - boolExprSimplify        # not limited in golangci-strict.yaml
   staticcheck:
-    checks: [
-      "all",
-      "-SA1019", # TODO(fix) Using a deprecated function, variable, constant or field
-      "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
-    ]
+    checks:
+      - "all"
+      - "-SA1019"  # TODO(fix) Using a deprecated function, variable, constant or field - enabled in golangci-strict.yaml
+      - "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed - enabled in golangci-strict.yaml
   stylecheck:
-    checks: [
-      "ST1019",  # Importing the same package multiple times.
-    ]
+    checks:        # golangci-strict.yaml uses the default checks.
+      - "ST1019"   # Importing the same package multiple times - enabled in golangci-strict.yaml.

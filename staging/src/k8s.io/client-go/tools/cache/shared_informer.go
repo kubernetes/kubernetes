@@ -205,10 +205,7 @@ type SharedInformer interface {
 	//
 	// Must be set before starting the informer.
 	//
-	// Note: Since the object given to the handler may be already shared with
-	//	other goroutines, it is advisable to copy the object being
-	//  transform before mutating it at all and returning the copy to prevent
-	//	data races.
+	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
 	// IsStopped reports whether the informer has already been stopped.
@@ -465,6 +462,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
+		Transformer:           s.transform,
 	})
 
 	cfg := &Config{
@@ -637,7 +635,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(Deltas); ok {
-		return processDeltas(s, s.indexer, s.transform, deltas, isInInitialList)
+		return processDeltas(s, s.indexer, deltas, isInInitialList)
 	}
 	return errors.New("object given as Process argument is not Deltas")
 }

@@ -682,7 +682,7 @@ type EmptyDirVolumeSource struct {
 	// The maximum usage on memory medium EmptyDir would be the minimum value between
 	// the SizeLimit specified here and the sum of memory limits of all containers in a pod.
 	// The default is nil which means that the limit is undefined.
-	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
 	SizeLimit *resource.Quantity
 }
@@ -1749,9 +1749,10 @@ type CSIPersistentVolumeSource struct {
 	// NodeExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodeExpandVolume call.
-	// This is an alpha field and requires enabling CSINodeExpandSecret feature gate.
+	// This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
 	// This field is optional, may be omitted if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
+	// +featureGate=CSINodeExpandSecret
 	// +optional
 	NodeExpandSecretRef *SecretReference
 }
@@ -2138,31 +2139,31 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// ResourceResizePolicy specifies how Kubernetes should handle resource resize.
-type ResourceResizePolicy string
+// ResourceResizeRestartPolicy specifies how to handle container resource resize.
+type ResourceResizeRestartPolicy string
 
-// These are the valid resource resize policy values:
+// These are the valid resource resize restart policy values:
 const (
-	// RestartNotRequired tells Kubernetes to resize the container in-place
+	// 'NotRequired' means Kubernetes will try to resize the container
 	// without restarting it, if possible. Kubernetes may however choose to
 	// restart the container if it is unable to actuate resize without a
 	// restart. For e.g. the runtime doesn't support restart-free resizing.
-	RestartNotRequired ResourceResizePolicy = "RestartNotRequired"
-	// 'RestartRequired' tells Kubernetes to resize the container in-place
+	NotRequired ResourceResizeRestartPolicy = "NotRequired"
+	// 'RestartContainer' means Kubernetes will resize the container in-place
 	// by stopping and starting the container when new resources are applied.
 	// This is needed for legacy applications. For e.g. java apps using the
 	// -xmxN flag which are unable to use resized memory without restarting.
-	RestartRequired ResourceResizePolicy = "RestartRequired"
+	RestartContainer ResourceResizeRestartPolicy = "RestartContainer"
 )
 
-// ContainerResizePolicy represents resource resize policy for a single container.
+// ContainerResizePolicy represents resource resize policy for the container.
 type ContainerResizePolicy struct {
-	// Name of the resource type to which this resource resize policy applies.
+	// Name of the resource to which this resource resize policy applies.
 	// Supported values: cpu, memory.
 	ResourceName ResourceName
-	// Resource resize policy applicable to the specified resource name.
-	// If not specified, it defaults to RestartNotRequired.
-	Policy ResourceResizePolicy
+	// Restart policy to apply when specified resource is resized.
+	// If not specified, it defaults to NotRequired.
+	RestartPolicy ResourceResizeRestartPolicy
 }
 
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
@@ -2492,12 +2493,12 @@ type ContainerStatus struct {
 	// same as false.
 	// +optional
 	Started *bool
-	// ResourcesAllocated represents the compute resources allocated for this container by the
+	// AllocatedResources represents the compute resources allocated for this container by the
 	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
 	// and after successfully admitting desired pod resize.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
-	ResourcesAllocated ResourceList
+	AllocatedResources ResourceList
 	// Resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
 	// +featureGate=InPlacePodVerticalScaling
@@ -4182,10 +4183,17 @@ type ServicePort struct {
 	Protocol Protocol
 
 	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
+	// Valid values are either:
+	//
+	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
+	//
+	// * Kubernetes-defined prefixed names:
+	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//
+	// * Other protocols should use implementation-defined prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
 	AppProtocol *string
@@ -5972,8 +5980,12 @@ type TopologySpreadConstraint struct {
 	// spreading will be calculated. The keys are used to lookup values from the
 	// incoming pod labels, those key-value labels are ANDed with labelSelector
 	// to select the group of existing pods over which spreading will be calculated
-	// for the incoming pod. Keys that don't exist in the incoming pod labels will
+	// for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+	// MatchLabelKeys cannot be set when LabelSelector isn't set.
+	// Keys that don't exist in the incoming pod labels will
 	// be ignored. A null or empty list means only match against labelSelector.
+	//
+	// This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +listType=atomic
 	// +optional
 	MatchLabelKeys []string

@@ -3093,7 +3093,7 @@ func Convert_core_ContainerPort_To_v1_ContainerPort(in *core.ContainerPort, out 
 
 func autoConvert_v1_ContainerResizePolicy_To_core_ContainerResizePolicy(in *v1.ContainerResizePolicy, out *core.ContainerResizePolicy, s conversion.Scope) error {
 	out.ResourceName = core.ResourceName(in.ResourceName)
-	out.Policy = core.ResourceResizePolicy(in.Policy)
+	out.RestartPolicy = core.ResourceResizeRestartPolicy(in.RestartPolicy)
 	return nil
 }
 
@@ -3104,7 +3104,7 @@ func Convert_v1_ContainerResizePolicy_To_core_ContainerResizePolicy(in *v1.Conta
 
 func autoConvert_core_ContainerResizePolicy_To_v1_ContainerResizePolicy(in *core.ContainerResizePolicy, out *v1.ContainerResizePolicy, s conversion.Scope) error {
 	out.ResourceName = v1.ResourceName(in.ResourceName)
-	out.Policy = v1.ResourceResizePolicy(in.Policy)
+	out.RestartPolicy = v1.ResourceResizeRestartPolicy(in.RestartPolicy)
 	return nil
 }
 
@@ -3225,7 +3225,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *v1.ContainerStat
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
-	out.ResourcesAllocated = *(*core.ResourceList)(unsafe.Pointer(&in.ResourcesAllocated))
+	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }
@@ -3249,7 +3249,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
-	out.ResourcesAllocated = *(*v1.ResourceList)(unsafe.Pointer(&in.ResourcesAllocated))
+	out.AllocatedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*v1.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }

@@ -98,6 +98,22 @@ func (v errorMatcher) String() string {
 	return fmt.Sprintf("has error of type %q containing string %q", v.errorType, v.contains)
 }
 
+type messageExpressionErrorMatcher struct {
+	contains string
+}
+
+func messageExpressionError(contains string) validationMatcher {
+	return messageExpressionErrorMatcher{contains: contains}
+}
+
+func (m messageExpressionErrorMatcher) matches(cr CompilationResult) bool {
+	return cr.MessageExpressionError != nil && cr.MessageExpressionError.Type == cel.ErrorTypeInvalid && strings.Contains(cr.MessageExpressionError.Error(), m.contains)
+}
+
+func (m messageExpressionErrorMatcher) String() string {
+	return fmt.Sprintf("has messageExpression error containing string %q", m.contains)
+}
+
 type noErrorMatcher struct{}
 
 func noError() validationMatcher {
@@ -640,6 +656,63 @@ func TestCelCompilation(t *testing.T) {
 			},
 			expectedResults: []validationMatcher{
 				invalidError("must evaluate to a bool"),
+			},
+		},
+		{
+			name: "messageExpression inclusion",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:              "self.startsWith('s')",
+							MessageExpression: `"scoped field should start with 's'"`,
+						},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
+		},
+		{
+			name: "messageExpression must evaluate to a string",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "integer",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:              "self == 5",
+							MessageExpression: `42`,
+						},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				messageExpressionError("must evaluate to a string"),
+			},
+		},
+		{
+			name: "messageExpression syntax error",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "number",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:              "self < 32.0",
+							MessageExpression: `"abc`,
+						},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				messageExpressionError("messageExpression compilation failed"),
 			},
 		},
 	}

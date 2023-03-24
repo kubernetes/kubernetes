@@ -65,7 +65,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
-					v1.AnnotationTopologyAwareHints: "Auto",
+					v1.AnnotationTopologyMode: "Auto",
 				},
 			},
 			Spec: v1.ServiceSpec{

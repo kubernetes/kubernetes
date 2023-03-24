@@ -38,6 +38,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/openapitest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/restmapper"
@@ -418,6 +420,7 @@ type TestFactory struct {
 
 	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
+	OpenAPIV3ClientFunc              func() (openapiclient.Client, error)
 }
 
 // NewTestFactory returns an initialized TestFactory instance
@@ -531,6 +534,13 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 		return f.OpenAPISchemaFunc()
 	}
 	return openapitesting.EmptyResources{}, nil
+}
+
+func (f *TestFactory) OpenAPIV3Client() (openapiclient.Client, error) {
+	if f.OpenAPIV3ClientFunc != nil {
+		return f.OpenAPIV3ClientFunc()
+	}
+	return openapitest.NewFakeClient(), nil
 }
 
 // NewBuilder returns an initialized resource.Builder instance
@@ -786,6 +796,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "bars", Namespaced: true, Kind: "Bar"},
+					{Name: "applysets", Namespaced: false, Kind: "ApplySet"},
 				},
 			},
 		},

@@ -45,7 +45,7 @@ func TestExplainErrors(t *testing.T) {
 		Version:  "v1",
 		Resource: "doesntmatter",
 	}, false, "unknown-format")
-	require.ErrorContains(t, err, "could not locate schema")
+	require.ErrorContains(t, err, "couldn't find resource for \"test0.example.com/v1, Resource=doesntmatter\"")
 
 	// Validate error when openapi client returns error.
 	fakeClient.ForcedErr = fmt.Errorf("Always fails")

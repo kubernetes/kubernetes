@@ -127,14 +127,13 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 			// then all nodes are eligible because the terms are ORed.
 			return nil, nil
 		}
-		// If the set is empty, it means the terms had affinity to different
-		// sets of nodes, and since they are ANDed, then the pod will not match any node.
-		if len(termNodeNames) == 0 {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
-		}
 		nodeNames = nodeNames.Union(termNodeNames)
 	}
-	if nodeNames != nil {
+	// If nodeNames is not nil, but length is 0, it means each term have conflicting affinity to node.Name;
+	// therefore, pod will not match any node.
+	if nodeNames != nil && len(nodeNames) == 0 {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
+	} else if len(nodeNames) > 0 {
 		return &framework.PreFilterResult{NodeNames: nodeNames}, nil
 	}
 	return nil, nil

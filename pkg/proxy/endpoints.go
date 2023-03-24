@@ -293,12 +293,17 @@ type endpointsChange struct {
 
 // UpdateEndpointMapResult is the updated results after applying endpoints changes.
 type UpdateEndpointMapResult struct {
-	// HCEndpointsLocalIPSize maps an endpoints name to the length of its local IPs.
-	HCEndpointsLocalIPSize map[types.NamespacedName]int
-	// StaleEndpoints identifies if an endpoints service pair is stale.
-	StaleEndpoints []ServiceEndpoint
-	// StaleServiceNames identifies if a service is stale.
-	StaleServiceNames []ServicePortName
+	// DeletedUDPEndpoints identifies UDP endpoints that have just been deleted.
+	// Existing conntrack NAT entries pointing to these endpoints must be deleted to
+	// ensure that no further traffic for the Service gets delivered to them.
+	DeletedUDPEndpoints []ServiceEndpoint
+
+	// NewlyActiveUDPServices identifies UDP Services that have just gone from 0 to
+	// non-0 endpoints. Existing conntrack entries caching the fact that these
+	// services are black holes must be deleted to ensure that traffic can immediately
+	// begin flowing to the new endpoints.
+	NewlyActiveUDPServices []ServicePortName
+
 	// List of the trigger times for all endpoints objects that changed. It's used to export the
 	// network programming latency.
 	// NOTE(oxddr): this can be simplified to []time.Time if memory consumption becomes an issue.
@@ -307,20 +312,11 @@ type UpdateEndpointMapResult struct {
 
 // Update updates endpointsMap base on the given changes.
 func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
-	result.StaleEndpoints = make([]ServiceEndpoint, 0)
-	result.StaleServiceNames = make([]ServicePortName, 0)
+	result.DeletedUDPEndpoints = make([]ServiceEndpoint, 0)
+	result.NewlyActiveUDPServices = make([]ServicePortName, 0)
 	result.LastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 
-	em.apply(
-		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
-
-	// TODO: If this will appear to be computationally expensive, consider
-	// computing this incrementally similarly to endpointsMap.
-	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := em.getLocalReadyEndpointIPs()
-	for nsn, ips := range localIPs {
-		result.HCEndpointsLocalIPSize[nsn] = len(ips)
-	}
+	em.apply(changes, &result.DeletedUDPEndpoints, &result.NewlyActiveUDPServices, &result.LastChangeTriggerTimes)
 
 	return result
 }
@@ -328,14 +324,12 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 
-// apply the changes to EndpointsMap and updates stale endpoints and service-endpoints pair. The `staleEndpoints` argument
-// is passed in to store the stale udp endpoints and `staleServiceNames` argument is passed in to store the stale udp service.
-// The changes map is cleared after applying them.
-// In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
-// that were changed and will result in syncing the proxy rules.
-// apply triggers processEndpointsMapChange on every change.
-func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
-	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+// apply the changes to EndpointsMap, update the passed-in stale-conntrack-entry arrays,
+// and clear the changes map. In addition it returns (via argument) and resets the
+// lastChangeTriggerTimes for all endpoints that were changed and will result in syncing
+// the proxy rules. apply triggers processEndpointsMapChange on every change.
+func (em EndpointsMap) apply(ect *EndpointChangeTracker, deletedUDPEndpoints *[]ServiceEndpoint,
+	newlyActiveUDPServices *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	if ect == nil {
 		return
 	}
@@ -347,7 +341,7 @@ func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]Servi
 		}
 		em.unmerge(change.previous)
 		em.merge(change.current)
-		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
+		detectStaleConntrackEntries(change.previous, change.current, deletedUDPEndpoints, newlyActiveUDPServices)
 	}
 	ect.checkoutTriggerTimes(lastChangeTriggerTimes)
 }
@@ -366,7 +360,7 @@ func (em EndpointsMap) unmerge(other EndpointsMap) {
 	}
 }
 
-// GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
+// getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
 func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
 	for svcPortName, epList := range em {
@@ -389,41 +383,64 @@ func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.
 	return localIPs
 }
 
-// detectStaleConnections modifies <staleEndpoints> and <staleServices> with detected stale connections. <staleServiceNames>
-// is used to store stale udp service in order to clear udp conntrack later.
-func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, staleEndpoints *[]ServiceEndpoint, staleServiceNames *[]ServicePortName) {
-	// Detect stale endpoints: an endpoint can have stale conntrack entries if it was receiving traffic
-	// and then goes unready or changes its IP address.
+// LocalReadyEndpoints returns a map of Service names to the number of local ready
+// endpoints for that service.
+func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
+	// TODO: If this will appear to be computationally expensive, consider
+	// computing this incrementally similarly to endpointsMap.
+
+	// (Note that we need to call getLocalEndpointIPs first to squash the data by IP,
+	// because the EndpointsMap is sorted by IP+port, not just IP, and we want to
+	// consider a Service pointing to 10.0.0.1:80 and 10.0.0.1:443 to have 1 endpoint,
+	// not 2.)
+
+	eps := make(map[types.NamespacedName]int)
+	localIPs := em.getLocalReadyEndpointIPs()
+	for nsn, ips := range localIPs {
+		eps[nsn] = len(ips)
+	}
+	return eps
+}
+
+// detectStaleConntrackEntries detects services that may be associated with stale conntrack entries.
+// (See UpdateEndpointMapResult.DeletedUDPEndpoints and .NewlyActiveUDPServices.)
+func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, deletedUDPEndpoints *[]ServiceEndpoint, newlyActiveUDPServices *[]ServicePortName) {
+	// Find the UDP endpoints that we were sending traffic to in oldEndpointsMap, but
+	// are no longer sending to newEndpointsMap. The proxier should make sure that
+	// conntrack does not accidentally route any new connections to them.
 	for svcPortName, epList := range oldEndpointsMap {
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
 		}
 
 		for _, ep := range epList {
-			// if the old endpoint wasn't ready is not possible to have stale entries
-			// since there was no traffic sent to it.
+			// If the old endpoint wasn't Ready then there can't be stale
+			// conntrack entries since there was no traffic sent to it.
 			if !ep.IsReady() {
 				continue
 			}
-			stale := true
-			// Check if the endpoint has changed, including if it went from ready to not ready.
-			// If it did change stale entries for the old endpoint has to be cleared.
+
+			deleted := true
+			// Check if the endpoint has changed, including if it went from
+			// ready to not ready. If it did change stale entries for the old
+			// endpoint have to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
 				if newEndpointsMap[svcPortName][i].Equal(ep) {
-					stale = false
+					deleted = false
 					break
 				}
 			}
-			if stale {
-				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep)
-				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
+			if deleted {
+				klog.V(4).InfoS("Deleted endpoint may have stale conntrack entries", "portName", svcPortName, "endpoint", ep)
+				*deletedUDPEndpoints = append(*deletedUDPEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}
 	}
 
-	// Detect stale services
-	// For udp service, if its backend changes from 0 to non-0 ready endpoints.
-	// There may exist a conntrack entry that could blackhole traffic to the service.
+	// Detect services that have gone from 0 to non-0 ready endpoints. If there were
+	// previously 0 endpoints, but someone tried to connect to it, then a conntrack
+	// entry may have been created blackholing traffic to that IP, which should be
+	// deleted now.
 	for svcPortName, epList := range newEndpointsMap {
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
@@ -444,7 +461,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 		}
 
 		if epReady > 0 && oldEpReady == 0 {
-			*staleServiceNames = append(*staleServiceNames, svcPortName)
+			*newlyActiveUDPServices = append(*newlyActiveUDPServices, svcPortName)
 		}
 	}
 }

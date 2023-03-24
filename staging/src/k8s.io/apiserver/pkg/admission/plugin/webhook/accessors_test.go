@@ -62,6 +62,7 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 				SideEffects:             accessor.GetSideEffects(),
 				TimeoutSeconds:          accessor.GetTimeoutSeconds(),
 				AdmissionReviewVersions: accessor.GetAdmissionReviewVersions(),
+				MatchConditions:         accessor.GetMatchConditions(),
 			}
 			if !reflect.DeepEqual(orig, copy) {
 				t.Errorf("expected mutatingWebhook to round trip through WebhookAccessor, diff:\n%s", diff.ObjectReflectDiff(orig, copy))
@@ -102,6 +103,7 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 				SideEffects:             accessor.GetSideEffects(),
 				TimeoutSeconds:          accessor.GetTimeoutSeconds(),
 				AdmissionReviewVersions: accessor.GetAdmissionReviewVersions(),
+				MatchConditions:         accessor.GetMatchConditions(),
 			}
 			if !reflect.DeepEqual(orig, copy) {
 				t.Errorf("expected validatingWebhook to round trip through WebhookAccessor, diff:\n%s", diff.ObjectReflectDiff(orig, copy))

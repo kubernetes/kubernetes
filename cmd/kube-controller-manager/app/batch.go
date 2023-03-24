@@ -23,8 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -40,7 +38,6 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 }
 
 func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "cronjob-controller"))
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),

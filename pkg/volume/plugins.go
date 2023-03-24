@@ -213,7 +213,7 @@ type DeletableVolumePlugin interface {
 	// NewDeleter creates a new volume.Deleter which knows how to delete this
 	// resource in accordance with the underlying storage provider after the
 	// volume's release from a claim
-	NewDeleter(spec *Spec) (Deleter, error)
+	NewDeleter(logger klog.Logger, spec *Spec) (Deleter, error)
 }
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
@@ -223,7 +223,7 @@ type ProvisionableVolumePlugin interface {
 	// NewProvisioner creates a new volume.Provisioner which knows how to
 	// create PersistentVolumes in accordance with the plugin's underlying
 	// storage provider
-	NewProvisioner(options VolumeOptions) (Provisioner, error)
+	NewProvisioner(logger klog.Logger, options VolumeOptions) (Provisioner, error)
 }
 
 // AttachableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that require attachment
@@ -334,13 +334,6 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
-	// GetHostIDsForPod if the pod uses user namespaces, takes the uid and
-	// gid inside the container and returns the host UID and GID those are
-	// mapped to on the host. If containerUID/containerGID is nil, then it
-	// returns the host UID/GID for ID 0 inside the container.
-	// If the pod is not using user namespaces, as there is no mapping needed, the
-	// same containerUID and containerGID params are returned.
-	GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use

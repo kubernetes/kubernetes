@@ -95,12 +95,13 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 
 	// validatingadmissionpolicies
 	if resource := "validatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		policyStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		policyStorage, policyStatusStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
 		if err != nil {
 			return storage, err
 		}
 		policyGetter = policyStorage
 		storage[resource] = policyStorage
+		storage[resource+"/status"] = policyStatusStorage
 	}
 
 	// validatingadmissionpolicybindings

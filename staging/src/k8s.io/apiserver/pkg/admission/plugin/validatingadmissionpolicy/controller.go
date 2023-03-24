@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -124,15 +125,21 @@ func NewAdmissionController(
 	informerFactory informers.SharedInformerFactory,
 	client kubernetes.Interface,
 	restMapper meta.RESTMapper,
+	schemaResolver resolver.SchemaResolver,
 	dynamicClient dynamic.Interface,
 	authz authorizer.Authorizer,
 ) CELPolicyEvaluator {
+	var typeChecker *TypeChecker
+	if schemaResolver != nil {
+		typeChecker = &TypeChecker{schemaResolver: schemaResolver, restMapper: restMapper}
+	}
 	return &celAdmissionController{
 		definitions: atomic.Value{},
 		policyController: newPolicyController(
 			restMapper,
 			client,
 			dynamicClient,
+			typeChecker,
 			cel.NewFilterCompiler(),
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](

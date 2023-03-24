@@ -24,6 +24,10 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
+type VersionedAttributeAccessor interface {
+	VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error)
+}
+
 // Source can list dynamic webhook plugins.
 type Source interface {
 	Webhooks() []webhook.WebhookAccessor

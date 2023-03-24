@@ -364,6 +364,11 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				return
 			}
 
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+			if !status.IsSuccess() {
+				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+			}
+
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)

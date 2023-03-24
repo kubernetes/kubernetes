@@ -114,7 +114,9 @@ type DiffOptions struct {
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
-	pruner           *pruner
+
+	pruner  *pruner
+	tracker *tracker
 }
 
 func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
@@ -659,6 +661,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		if err != nil {
 			return err
 		}
+		o.tracker = newTracker()
 		o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
 	}
 
@@ -723,8 +726,8 @@ func (o *DiffOptions) Run() error {
 				IOStreams:       o.Diff.IOStreams,
 			}
 
-			if o.pruner != nil {
-				o.pruner.MarkVisited(info)
+			if o.tracker != nil {
+				o.tracker.MarkVisited(info)
 			}
 
 			err = differ.Diff(obj, printer, o.ShowManagedFields)
@@ -739,7 +742,7 @@ func (o *DiffOptions) Run() error {
 	})
 
 	if o.pruner != nil {
-		prunedObjs, err := o.pruner.pruneAll(o.CmdNamespace != "")
+		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
 		}

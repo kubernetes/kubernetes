@@ -182,6 +182,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/certificates/v1alpha1
+		gvr("certificates.k8s.io", "v1alpha1", "clustertrustbundles"): {
+			Stub:             `{"metadata": {"name": "example.com:signer:abc"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
+			ExpectedEtcdPath: "/registry/clustertrustbundles/example.com:signer:abc",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1
 		gvr("coordination.k8s.io", "v1", "leases"): {
 			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
@@ -239,6 +246,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("networking.k8s.io", "v1alpha1", "clustercidrs"): {
 			Stub:             `{"metadata": {"name": "clustercidr1"}, "spec": {"perNodeHostBits": 8, "ipv4": "192.168.4.0/24", "ipv6": "fd00:1::/120", "nodeSelector": null}}`,
 			ExpectedEtcdPath: "/registry/clustercidrs/clustercidr1",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/networking/v1alpha1
+		gvr("networking.k8s.io", "v1alpha1", "ipaddresses"): {
+			Stub:             `{"metadata": {"name": "192.168.1.2"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath: "/registry/ipaddresses/192.168.1.2",
 		},
 		// --
 
@@ -456,22 +470,22 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/resource/v1alpha1
-		gvr("resource.k8s.io", "v1alpha1", "resourceclasses"): {
+		// k8s.io/kubernetes/pkg/apis/resource/v1alpha2
+		gvr("resource.k8s.io", "v1alpha2", "resourceclasses"): {
 			Stub:             `{"metadata": {"name": "class1name"}, "driverName": "example.com"}`,
 			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
 		},
-		gvr("resource.k8s.io", "v1alpha1", "resourceclaims"): {
+		gvr("resource.k8s.io", "v1alpha2", "resourceclaims"): {
 			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
 			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
 		},
-		gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"): {
+		gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"): {
 			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
 		},
-		gvr("resource.k8s.io", "v1alpha1", "podschedulings"): {
+		gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"): {
 			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
-			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod1name",
+			ExpectedEtcdPath: "/registry/podschedulingcontexts/" + namespace + "/pod1name",
 		},
 		// --
 
@@ -481,6 +495,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/storageversions/sv1.test",
 		},
 		// --
+
 	}
 
 	// add csinodes

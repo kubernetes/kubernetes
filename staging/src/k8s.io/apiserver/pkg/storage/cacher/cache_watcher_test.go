@@ -28,12 +28,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -283,6 +285,63 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 		t.Errorf("timed out waiting for watch to close")
 	}
 
+}
+
+func TestResourceVersionAfterInitEvents(t *testing.T) {
+	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		return nil, nil, nil
+	}
+
+	const numObjects = 10
+	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
+
+	for i := 0; i < numObjects; i++ {
+		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
+		store.Add(elem)
+	}
+
+	wci, err := newCacheIntervalFromStore(numObjects, store, getAttrsFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filter := func(_ string, _ labels.Set, _ fields.Set) bool { return true }
+	forget := func(_ bool) {}
+	deadline := time.Now().Add(time.Minute)
+	w := newCacheWatcher(numObjects+1, filter, forget, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
+
+	// Simulate a situation when the last event will that was already in
+	// the state, wasn't yet processed by cacher and will be delivered
+	// via channel again.
+	event := &watchCacheEvent{
+		Type:            watch.Added,
+		Object:          makeTestPod(fmt.Sprintf("pod-%d", numObjects-1), uint64(numObjects-1)),
+		ResourceVersion: uint64(numObjects - 1),
+	}
+	if !w.add(event, time.NewTimer(time.Second)) {
+		t.Fatalf("failed to add event")
+	}
+	w.stopLocked()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.processInterval(context.Background(), wci, uint64(numObjects-1))
+	}()
+
+	// We expect all init events to be delivered.
+	for i := 0; i < numObjects; i++ {
+		<-w.ResultChan()
+	}
+	// We don't expect any other event to be delivered and thus
+	// the ResultChan to be closed.
+	result, ok := <-w.ResultChan()
+	if ok {
+		t.Errorf("unexpected event: %#v", result)
+	}
+
+	wg.Wait()
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {

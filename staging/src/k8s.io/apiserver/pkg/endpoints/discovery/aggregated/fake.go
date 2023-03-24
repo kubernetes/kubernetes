@@ -169,3 +169,7 @@ func (f *recorderResourceManager) WebService() *restful.WebService {
 func (f *recorderResourceManager) ServeHTTP(http.ResponseWriter, *http.Request) {
 	panic("unimplemented")
 }
+
+func (f *recorderResourceManager) WithSource(source Source) ResourceManager {
+	panic("unimplemented")
+}

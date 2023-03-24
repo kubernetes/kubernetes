@@ -97,8 +97,6 @@
       measurePods: 1000
 
 - name: SchedulingMigratedInTreePVs
-  featureGates:
-    CSIMigrationAWS: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes

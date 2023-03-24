@@ -18,6 +18,7 @@ limitations under the License.
 package kmsv2
 
 import (
+	"context"
 	"crypto/sha256"
 	"hash"
 	"sync"
@@ -28,6 +29,17 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/utils/clock"
 )
+
+// prevent decryptTransformer from drifting from value.Transformer
+var _ decryptTransformer = value.Transformer(nil)
+
+// decryptTransformer is the decryption subset of value.Transformer.
+// this exists purely to statically enforce that transformers placed in the cache are not used for encryption.
+// this is relevant in the context of nonce collision since transformers that are created
+// from encrypted DEKs retrieved from etcd cannot maintain their nonce counter state.
+type decryptTransformer interface {
+	TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error)
+}
 
 type simpleCache struct {
 	cache *utilcache.Expiring
@@ -50,16 +62,16 @@ func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
-func (c *simpleCache) get(key []byte) value.Transformer {
+func (c *simpleCache) get(key []byte) decryptTransformer {
 	record, ok := c.cache.Get(c.keyFunc(key))
 	if !ok {
 		return nil
 	}
-	return record.(value.Transformer)
+	return record.(decryptTransformer)
 }
 
 // set caches the record for the key
-func (c *simpleCache) set(key []byte, transformer value.Transformer) {
+func (c *simpleCache) set(key []byte, transformer decryptTransformer) {
 	if len(key) == 0 {
 		panic("key must not be empty")
 	}
@@ -86,5 +98,11 @@ func (c *simpleCache) keyFunc(s []byte) string {
 
 // toString performs unholy acts to avoid allocations
 func toString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	// unsafe.SliceData relies on cap whereas we want to rely on len
+	if len(b) == 0 {
+		return ""
+	}
+	// Copied from go 1.20.1 strings.Builder.String
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/strings/builder.go#L48
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }

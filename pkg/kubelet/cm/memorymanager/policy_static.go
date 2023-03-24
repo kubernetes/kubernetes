@@ -415,12 +415,12 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	requestedResources := map[v1.ResourceName]uint64{}
 	resources := container.Resources.Requests
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// ResourcesAllocated holds the value of Container.Resources.Requests when the pod was admitted.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			resources = cs.ResourcesAllocated
+			resources = cs.AllocatedResources
 		}
 	}
 	for resourceName, quantity := range resources {

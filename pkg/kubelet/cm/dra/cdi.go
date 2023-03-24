@@ -29,12 +29,34 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/types"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
 	// annotationPrefix is the prefix for CDI container annotation keys.
 	annotationPrefix = "cdi.k8s.io/"
 )
+
+// generate container annotations using CDI UpdateAnnotations API.
+func generateCDIAnnotations(
+	claimUID types.UID,
+	driverName string,
+	cdiDevices []string,
+) ([]kubecontainer.Annotation, error) {
+	annotations, err := updateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
+	if err != nil {
+		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)
+	}
+
+	kubeAnnotations := []kubecontainer.Annotation{}
+	for key, value := range annotations {
+		kubeAnnotations = append(kubeAnnotations, kubecontainer.Annotation{Name: key, Value: value})
+	}
+
+	return kubeAnnotations, nil
+}
 
 // updateAnnotations updates annotations with a plugin-specific CDI device
 // injection request for the given devices. Upon any error a non-nil error

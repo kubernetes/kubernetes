@@ -63,11 +63,13 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
-var kubeletConfigFile string
+var kubeletConfigFile = "./kubeletconfig.yaml"
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate. Deprecated, see: --kubelet-config-file.")
-	flag.StringVar(&kubeletConfigFile, "kubelet-config-file", "./kubeletconfig.yaml", "The base KubeletConfiguration to use when setting up the kubelet. This configuration will then be minimially modified to support requirements from the test suite.")
+	if flag.Lookup("kubelet-config-file") == nil {
+		flag.StringVar(&kubeletConfigFile, "kubelet-config-file", kubeletConfigFile, "The base KubeletConfiguration to use when setting up the kubelet. This configuration will then be minimially modified to support requirements from the test suite.")
+	}
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
@@ -153,10 +155,17 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error) {
 	klog.Info("Starting kubelet")
 
-	// Build kubeconfig
-	kubeconfigPath, err := createKubeconfigCWD()
-	if err != nil {
-		return nil, err
+	framework.Logf("Standalone mode: %v", framework.TestContext.StandaloneMode)
+
+	var kubeconfigPath string
+
+	if !framework.TestContext.StandaloneMode {
+		var err error
+		// Build kubeconfig
+		kubeconfigPath, err = createKubeconfigCWD()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// KubeletConfiguration file path
@@ -176,6 +185,10 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		return nil, err
 	}
 
+	lookup := flag.Lookup("kubelet-config-file")
+	if lookup != nil {
+		kubeletConfigFile = lookup.Value.String()
+	}
 	kc, err := baseKubeConfiguration(kubeletConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load base kubelet configuration: %w", err)
@@ -250,8 +263,14 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 
 		kc.SystemCgroups = "/system"
 	}
+
+	if !framework.TestContext.StandaloneMode {
+		cmdArgs = append(cmdArgs,
+			"--kubeconfig", kubeconfigPath,
+		)
+	}
+
 	cmdArgs = append(cmdArgs,
-		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
 		"--v", LogVerbosityLevel,
 	)

@@ -177,3 +177,50 @@ func (sc *stateCheckpoint) ClearState() error {
 	sc.cache.ClearState()
 	return sc.storeState()
 }
+
+type noopStateCheckpoint struct{}
+
+// NewNoopStateCheckpoint creates a dummy state checkpoint manager
+func NewNoopStateCheckpoint() State {
+	return &noopStateCheckpoint{}
+}
+
+func (sc *noopStateCheckpoint) GetContainerResourceAllocation(_ string, _ string) (v1.ResourceList, bool) {
+	return nil, false
+}
+
+func (sc *noopStateCheckpoint) GetPodResourceAllocation() PodResourceAllocation {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) GetPodResizeStatus(_ string) (v1.PodResizeStatus, bool) {
+	return "", false
+}
+
+func (sc *noopStateCheckpoint) GetResizeStatus() PodResizeStatus {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string, _ v1.ResourceList) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ PodResourceAllocation) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetPodResizeStatus(_ string, _ v1.PodResizeStatus) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetResizeStatus(_ PodResizeStatus) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) Delete(_ string, _ string) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) ClearState() error {
+	return nil
+}

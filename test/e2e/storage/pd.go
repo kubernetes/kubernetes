@@ -25,9 +25,6 @@ import (
 
 	"google.golang.org/api/googleapi"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -523,23 +520,6 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		}
 		return err
 
-	} else if framework.TestContext.Provider == "aws" {
-		awsSession, err := session.NewSession()
-		if err != nil {
-			return fmt.Errorf("error creating session: %w", err)
-		}
-		client := ec2.New(awsSession)
-		tokens := strings.Split(pdName, "/")
-		awsVolumeID := tokens[len(tokens)-1]
-		request := ec2.DetachVolumeInput{
-			VolumeId: aws.String(awsVolumeID),
-		}
-		_, err = client.DetachVolume(&request)
-		if err != nil {
-			return fmt.Errorf("error detaching EBS volume: %w", err)
-		}
-		return nil
-
 	} else {
 		return fmt.Errorf("Provider does not support volume detaching")
 	}
@@ -558,20 +538,6 @@ func attachPD(nodeName types.NodeName, pdName string) error {
 		}
 		return err
 
-	} else if framework.TestContext.Provider == "aws" {
-		awsSession, err := session.NewSession()
-		if err != nil {
-			return fmt.Errorf("error creating session: %w", err)
-		}
-		client := ec2.New(awsSession)
-		tokens := strings.Split(pdName, "/")
-		awsVolumeID := tokens[len(tokens)-1]
-		ebsUtil := utils.NewEBSUtil(client)
-		err = ebsUtil.AttachDisk(awsVolumeID, string(nodeName))
-		if err != nil {
-			return fmt.Errorf("error attaching volume %s to node %s: %w", awsVolumeID, nodeName, err)
-		}
-		return nil
 	} else {
 		return fmt.Errorf("Provider does not support volume attaching")
 	}

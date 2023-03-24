@@ -72,10 +72,14 @@ type globalVolumeInfo struct {
 }
 
 func (rc *reconciler) updateLastSyncTime() {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	rc.timeOfLastSync = time.Now()
 }
 
 func (rc *reconciler) StatesHasBeenSynced() bool {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	return !rc.timeOfLastSync.IsZero()
 }
 
@@ -138,7 +142,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		podDir := filepath.Join(podDir, podName)
 
 		// Find filesystem volume information
-		// ex. filesystem volume: /pods/{podUid}/volume/{escapeQualifiedPluginName}/{volumeName}
+		// ex. filesystem volume: /pods/{podUid}/volumes/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
 			v1.PersistentVolumeFilesystem: filepath.Join(podDir, config.DefaultKubeletVolumesDirName),
 		}

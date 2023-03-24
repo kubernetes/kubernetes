@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 

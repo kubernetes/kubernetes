@@ -138,12 +138,13 @@ var (
 	// admissionExemptResources lists objects which are exempt from admission validation/mutation,
 	// only resources exempted from admission processing by API server should be listed here.
 	admissionExemptResources = map[schema.GroupVersionResource]bool{
-		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):      true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"):    true,
-		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):           true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):         true,
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):       true,
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):       true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"):     true,
+		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):            true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):          true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):        true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies/status"): true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"):  true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -156,6 +157,7 @@ var (
 		gvr("authentication.k8s.io", "v1", "tokenreviews"):                  `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
 		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):             `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
 		gvr("authentication.k8s.io", "v1alpha1", "selfsubjectreviews"):      `{"metadata": {"name": "SelfSubjectReview"},"status":{"userInfo":{}}}`,
+		gvr("authentication.k8s.io", "v1beta1", "selfsubjectreviews"):       `{"metadata": {"name": "SelfSubjectReview"},"status":{"userInfo":{}}}`,
 		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
 		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):           `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
 		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):       `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,

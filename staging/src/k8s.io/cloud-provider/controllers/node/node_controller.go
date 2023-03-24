@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,8 +44,8 @@ import (
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -385,19 +385,12 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 		}
 	}
 	// If kubelet provided a node IP, prefer it in the node address list
-	nodeIP, err := getNodeProvidedIP(node)
+	nodeAddresses, err := updateNodeAddressesFromNodeIP(node, nodeAddresses)
 	if err != nil {
-		klog.Errorf("Failed to get preferred node IP for node %q: %v", node.Name, err)
+		klog.Errorf("Failed to update node addresses for node %q: %v", node.Name, err)
 		return
 	}
 
-	if nodeIP != nil {
-		nodeAddresses, err = cloudnodeutil.PreferNodeIP(nodeIP, nodeAddresses)
-		if err != nil {
-			klog.Errorf("Failed to update node addresses for node %q: %v", node.Name, err)
-			return
-		}
-	}
 	if !nodeAddressesChangeDetected(node.Status.Addresses, nodeAddresses) {
 		return
 	}
@@ -534,16 +527,9 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	// If kubelet annotated the node with a node IP, ensure that it is valid
 	// and can be applied to the discovered node addresses before removing
 	// the taint on the node.
-	nodeIP, err := getNodeProvidedIP(node)
+	_, err := updateNodeAddressesFromNodeIP(node, instanceMeta.NodeAddresses)
 	if err != nil {
-		return nil, err
-	}
-
-	if nodeIP != nil {
-		_, err := cloudnodeutil.PreferNodeIP(nodeIP, instanceMeta.NodeAddresses)
-		if err != nil {
-			return nil, fmt.Errorf("provided node ip for node %q is not valid: %w", node.Name, err)
-		}
+		return nil, fmt.Errorf("provided node ip for node %q is not valid: %w", node.Name, err)
 	}
 
 	if instanceMeta.InstanceType != "" {
@@ -750,18 +736,15 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 	return false
 }
 
-func getNodeProvidedIP(node *v1.Node) (net.IP, error) {
-	providedIP, ok := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]
-	if !ok {
-		return nil, nil
+func updateNodeAddressesFromNodeIP(node *v1.Node, nodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+	var err error
+
+	providedNodeIP, exists := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]
+	if exists {
+		nodeAddresses, err = cloudnodeutil.GetNodeAddressesFromNodeIP(providedNodeIP, nodeAddresses, utilfeature.DefaultFeatureGate.Enabled(features.CloudDualStackNodeIPs))
 	}
 
-	nodeIP := netutils.ParseIPSloppy(providedIP)
-	if nodeIP == nil {
-		return nil, fmt.Errorf("failed to parse node IP %q for node %q", providedIP, node.Name)
-	}
-
-	return nodeIP, nil
+	return nodeAddresses, err
 }
 
 // getInstanceTypeByProviderIDOrName will attempt to get the instance type of node using its providerID

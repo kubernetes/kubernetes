@@ -1011,9 +1011,13 @@ runTests() {
   ####################
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_debug_pod_tests
+    record_command run_kubectl_debug_general_tests
+    record_command run_kubectl_debug_baseline_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
+    record_command run_kubectl_debug_general_node_tests
+    record_command run_kubectl_debug_baseline_node_tests
   fi
 
   cleanup_tests

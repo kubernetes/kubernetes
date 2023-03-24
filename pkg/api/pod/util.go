@@ -395,6 +395,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
+		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 	}
 
 	if oldPodSpec != nil {
@@ -552,10 +553,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
-		// Drop Resize, ResourcesAllocated, and Resources fields
+		// Drop Resize, AllocatedResources, and Resources fields
 		dropResourcesFields := func(csl []api.ContainerStatus) {
 			for i := range csl {
-				csl[i].ResourcesAllocated = nil
+				csl[i].AllocatedResources = nil
 				csl[i].Resources = nil
 			}
 		}
@@ -861,7 +862,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			return api.ContainerStatus{}, false
 		}
 		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
-			if diff.ObjectDiff(c.Resources.Requests, cs.ResourcesAllocated) != "" {
+			if diff.ObjectDiff(c.Resources.Requests, cs.AllocatedResources) != "" {
 				newPod.Status.Resize = api.PodResizeStatusProposed
 				break
 			}

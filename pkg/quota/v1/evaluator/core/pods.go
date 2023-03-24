@@ -31,13 +31,14 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/utils/clock"
+
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/clock"
 )
 
 // the name used for object count quota
@@ -358,30 +359,11 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		return result, nil
 	}
 
-	requests := corev1.ResourceList{}
-	limits := corev1.ResourceList{}
-	// TODO: ideally, we have pod level requests and limits in the future.
-	for i := range pod.Spec.Containers {
-		containerRequests := pod.Spec.Containers[i].Resources.Requests
-		if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, pod.Spec.Containers[i].Name)
-			if ok && cs.ResourcesAllocated != nil {
-				containerRequests = quota.Max(containerRequests, cs.ResourcesAllocated)
-			}
-		}
-		requests = quota.Add(requests, containerRequests)
-		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+	opts := resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 	}
-	// InitContainers are run sequentially before other containers start, so the highest
-	// init container resource is compared against the sum of app containers to determine
-	// the effective usage for both requests and limits.
-	for i := range pod.Spec.InitContainers {
-		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
-		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
-	}
-
-	requests = quota.Add(requests, pod.Spec.Overhead)
-	limits = quota.Add(limits, pod.Spec.Overhead)
+	requests := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
 
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil

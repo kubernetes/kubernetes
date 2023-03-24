@@ -725,6 +725,14 @@ func ioctl(fd int, req uint, arg uintptr) (err error) {
 	return
 }
 
+func ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) {
+	_, _, e1 := syscall_syscall(libc_ioctl_trampoline_addr, uintptr(fd), uintptr(req), uintptr(arg))
+	if e1 != 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 var libc_ioctl_trampoline_addr uintptr
 
 //go:cgo_import_dynamic libc_ioctl ioctl "/usr/lib/libSystem.B.dylib"
@@ -2496,6 +2504,14 @@ var libc_lstat64_trampoline_addr uintptr
 
 func ptrace1(request int, pid int, addr uintptr, data uintptr) (err error) {
 	_, _, e1 := syscall_syscall6(libc_ptrace_trampoline_addr, uintptr(request), uintptr(pid), uintptr(addr), uintptr(data), 0, 0)
+	if e1 != 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func ptrace1Ptr(request int, pid int, addr uintptr, data unsafe.Pointer) (err error) {
+	_, _, e1 := syscall_syscall6(libc_ptrace_trampoline_addr, uintptr(request), uintptr(pid), addr, uintptr(data), 0, 0)
 	if e1 != 0 {
 		err = errnoErr(e1)
 	}

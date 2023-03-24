@@ -87,16 +87,23 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 
 	// These tests are stateful and order dependent.
 	tests := []struct {
-		name      string
-		addrs     []v1.NodeAddress
-		err       error
-		wantAddrs []v1.NodeAddress
-		wantErr   bool
+		name                   string
+		addrs                  []v1.NodeAddress
+		err                    error
+		wantAddrs              []v1.NodeAddress
+		wantErr                bool
+		shouldDisableInstances bool
 	}{
 		{
 			name:    "first sync loop encounters an error",
 			err:     errors.New("bad"),
 			wantErr: true,
+		},
+		{
+			name:                   "failed to get instances from cloud provider",
+			err:                    errors.New("failed to get instances from cloud provider"),
+			wantErr:                true,
+			shouldDisableInstances: true,
 		},
 		{
 			name:      "subsequent sync loop succeeds",
@@ -119,6 +126,13 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			cloud.Addresses = test.addrs
 			cloud.Err = test.err
+
+			if test.shouldDisableInstances {
+				cloud.DisableInstances = true
+				defer func() {
+					cloud.DisableInstances = false
+				}()
+			}
 
 			manager.syncNodeAddresses()
 			nodeAddresses, err := manager.NodeAddresses()

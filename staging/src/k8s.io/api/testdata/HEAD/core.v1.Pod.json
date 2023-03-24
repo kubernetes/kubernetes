@@ -496,7 +496,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [
@@ -779,7 +779,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [
@@ -1062,7 +1062,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [
@@ -1691,8 +1691,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -1754,8 +1754,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -1818,8 +1818,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {

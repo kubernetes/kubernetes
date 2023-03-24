@@ -85,7 +85,7 @@ func render1(w writer, n *Node) error {
 		if _, err := w.WriteString("<!--"); err != nil {
 			return err
 		}
-		if err := escape(w, n.Data); err != nil {
+		if err := escapeComment(w, n.Data); err != nil {
 			return err
 		}
 		if _, err := w.WriteString("-->"); err != nil {

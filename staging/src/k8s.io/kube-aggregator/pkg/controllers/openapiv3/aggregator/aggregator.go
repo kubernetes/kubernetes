@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/klog/v2"
@@ -93,10 +94,7 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		i++
 	}
 
-	handler, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return s, err
-	}
+	handler := handler3.NewOpenAPIService()
 	s.openAPIV2ConverterHandler = handler
 	openAPIV2ConverterMux := mux.NewPathRecorderMux(openAPIV2Converter)
 	s.openAPIV2ConverterHandler.RegisterOpenAPIV3VersionedService("/openapi/v3", openAPIV2ConverterMux)
@@ -271,6 +269,24 @@ func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request)
 
 // Register registers the OpenAPI V3 Discovery and GroupVersion handlers
 func (s *specProxier) register(handler common.PathHandlerByGroupVersion) {
-	handler.Handle("/openapi/v3", http.HandlerFunc(s.handleDiscovery))
-	handler.HandlePrefix("/openapi/v3/", http.HandlerFunc(s.handleGroupVersion))
+	handler.Handle("/openapi/v3", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v3",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		http.HandlerFunc(s.handleDiscovery)))
+	handler.HandlePrefix("/openapi/v3/", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v3/",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		http.HandlerFunc(s.handleGroupVersion)))
 }

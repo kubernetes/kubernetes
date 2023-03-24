@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient"
 	"k8s.io/legacy-cloud-providers/azure/mockvmsets"
@@ -226,7 +227,7 @@ func TestCreateRoute(t *testing.T) {
 			name:           "CreateRoute should report error if error occurs when invoke GetIPByNodeName",
 			routeTableName: "rt7",
 			getIPError:     fmt.Errorf("getIP error"),
-			expectedErrMsg: fmt.Errorf("timed out waiting for the condition"),
+			expectedErrMsg: wait.ErrWaitTimeout,
 		},
 		{
 			name:               "CreateRoute should add route to cloud.RouteCIDRs if node is unmanaged",

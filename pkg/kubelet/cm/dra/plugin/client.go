@@ -22,14 +22,17 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 )
+
+const PluginClientTimeout = 10 * time.Second
 
 type Client interface {
 	NodePrepareResource(
@@ -45,7 +48,7 @@ type Client interface {
 		namespace string,
 		claimUID types.UID,
 		claimName string,
-		cdiDevice []string,
+		resourceHandle string,
 	) (*drapbv1.NodeUnprepareResourceResponse, error)
 }
 
@@ -131,6 +134,9 @@ func (r *draPluginClient) NodePrepareResource(
 		ResourceHandle: resourceHandle,
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	defer cancel()
+
 	return nodeClient.NodePrepareResource(ctx, req)
 }
 
@@ -139,14 +145,14 @@ func (r *draPluginClient) NodeUnprepareResource(
 	namespace string,
 	claimUID types.UID,
 	claimName string,
-	cdiDevices []string,
+	resourceHandle string,
 ) (*drapbv1.NodeUnprepareResourceResponse, error) {
 	klog.V(4).InfoS(
 		log("calling NodeUnprepareResource rpc"),
 		"namespace", namespace,
 		"claimUID", claimUID,
 		"claimname", claimName,
-		"cdiDevices", cdiDevices)
+		"resourceHandle", resourceHandle)
 
 	if r.nodeV1ClientCreator == nil {
 		return nil, errors.New("nodeV1ClientCreate is nil")
@@ -159,11 +165,14 @@ func (r *draPluginClient) NodeUnprepareResource(
 	defer closer.Close()
 
 	req := &drapbv1.NodeUnprepareResourceRequest{
-		Namespace:  namespace,
-		ClaimUid:   string(claimUID),
-		ClaimName:  claimName,
-		CdiDevices: cdiDevices,
+		Namespace:      namespace,
+		ClaimUid:       string(claimUID),
+		ClaimName:      claimName,
+		ResourceHandle: resourceHandle,
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	defer cancel()
 
 	return nodeClient.NodeUnprepareResource(ctx, req)
 }

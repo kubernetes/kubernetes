@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -79,5 +80,12 @@ type WantsDynamicClient interface {
 // WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
 type WantsRESTMapper interface {
 	SetRESTMapper(meta.RESTMapper)
+	admission.InitializationValidator
+}
+
+// WantsSchemaResolver defines a function which sets the SchemaResolver for
+// an admission plugin that needs it.
+type WantsSchemaResolver interface {
+	SetSchemaResolver(resolver resolver.SchemaResolver)
 	admission.InitializationValidator
 }

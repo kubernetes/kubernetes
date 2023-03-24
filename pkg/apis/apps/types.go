@@ -230,7 +230,7 @@ type StatefulSetSpec struct {
 
 	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
 	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
 
@@ -238,7 +238,7 @@ type StatefulSetSpec struct {
 	// default ordinals behavior assigns a "0" index to the first replica and
 	// increments the index by one for each additional replica requested. Using
 	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-	// enabled, which is alpha.
+	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals
 }

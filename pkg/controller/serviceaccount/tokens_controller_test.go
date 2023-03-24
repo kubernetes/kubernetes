@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testGenerator struct {
@@ -438,6 +439,8 @@ func TestTokenCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// Re-seed to reset name generation
 			utilrand.Seed(1)
 
@@ -497,10 +500,10 @@ func TestTokenCreation(t *testing.T) {
 
 			for {
 				if controller.syncServiceAccountQueue.Len() > 0 {
-					controller.syncServiceAccount()
+					controller.syncServiceAccount(ctx)
 				}
 				if controller.syncSecretQueue.Len() > 0 {
-					controller.syncSecret()
+					controller.syncSecret(ctx)
 				}
 
 				// The queues still have things to work on

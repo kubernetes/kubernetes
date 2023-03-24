@@ -26,14 +26,34 @@ import (
 )
 
 const (
-	// SchedulerSubsystem - subsystem name used by scheduler
+	// SchedulerSubsystem - subsystem name used by scheduler.
 	SchedulerSubsystem = "scheduler"
-	// Below are possible values for the work label.
+)
 
-	// PrioritizingExtender - prioritizing extender work label value
+// Below are possible values for the work and operation label.
+const (
+	// PrioritizingExtender - prioritizing extender work/operation label value.
 	PrioritizingExtender = "prioritizing_extender"
-	// Binding - binding work label value
+	// Binding - binding work/operation label value.
 	Binding = "binding"
+)
+
+// Below are possible values for the extension_point label.
+const (
+	PreFilter                   = "PreFilter"
+	Filter                      = "Filter"
+	PreFilterExtensionAddPod    = "PreFilterExtensionAddPod"
+	PreFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
+	PostFilter                  = "PostFilter"
+	PreScore                    = "PreScore"
+	Score                       = "Score"
+	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
+	PreBind                     = "PreBind"
+	Bind                        = "Bind"
+	PostBind                    = "PostBind"
+	Reserve                     = "Reserve"
+	Unreserve                   = "Unreserve"
+	Permit                      = "Permit"
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
@@ -46,15 +66,6 @@ var (
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 
-	e2eSchedulingLatency = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "e2e_scheduling_duration_seconds",
-			DeprecatedVersion: "1.23.0",
-			Help:              "E2e scheduling latency in seconds (scheduling algorithm + binding). This metric is replaced by scheduling_attempt_duration_seconds.",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-		}, []string{"result", "profile"})
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -199,7 +210,6 @@ var (
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
-		e2eSchedulingLatency,
 		schedulingLatency,
 		SchedulingAlgorithmLatency,
 		PreemptionVictims,

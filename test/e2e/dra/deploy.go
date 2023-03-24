@@ -48,8 +48,8 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod   = "/v1alpha1.Node/NodePrepareResource"
-	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
+	NodePrepareResourceMethod   = "/v1alpha2.Node/NodePrepareResource"
+	NodeUnprepareResourceMethod = "/v1alpha2.Node/NodeUnprepareResource"
 )
 
 type Nodes struct {

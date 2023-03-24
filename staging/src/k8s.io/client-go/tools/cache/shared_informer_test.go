@@ -406,9 +406,8 @@ func TestSharedInformerTransformer(t *testing.T) {
 			name := pod.GetName()
 
 			if upper := strings.ToUpper(name); upper != name {
-				copied := pod.DeepCopyObject().(*v1.Pod)
-				copied.SetName(upper)
-				return copied, nil
+				pod.SetName(upper)
+				return pod, nil
 			}
 		}
 		return obj, nil

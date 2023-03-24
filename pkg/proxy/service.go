@@ -176,7 +176,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		externalPolicyLocal:   externalPolicyLocal,
 		internalPolicyLocal:   internalPolicyLocal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
-		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
+	}
+
+	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
+	var ok bool
+	info.hintsAnnotation, ok = service.Annotations[v1.DeprecatedAnnotationTopologyAwareHints]
+	if !ok {
+		info.hintsAnnotation, _ = service.Annotations[v1.AnnotationTopologyMode]
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
@@ -337,29 +343,31 @@ func (sct *ServiceChangeTracker) PendingChanges() sets.String {
 
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
-	// HCServiceNodePorts is a map of Service names to node port numbers which indicate the health of that Service on this Node.
-	// The value(uint16) of HCServices map is the service health check node port.
-	HCServiceNodePorts map[types.NamespacedName]uint16
-	// UDPStaleClusterIP holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
-	// Callers can use this to abort timeout-waits or clear connection-tracking information.
-	UDPStaleClusterIP sets.String
+	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
+	// that had UDP ports. Callers can use this to abort timeout-waits or clear
+	// connection-tracking information.
+	DeletedUDPClusterIPs sets.String
 }
 
 // Update updates ServicePortMap base on the given changes.
 func (sm ServicePortMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
-	result.UDPStaleClusterIP = sets.NewString()
-	sm.apply(changes, result.UDPStaleClusterIP)
+	result.DeletedUDPClusterIPs = sets.NewString()
+	sm.apply(changes, result.DeletedUDPClusterIPs)
+	return result
+}
 
+// HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
+// for all Services in sm with non-zero HealthCheckNodePort.
+func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to svcPortMap.
-	result.HCServiceNodePorts = make(map[types.NamespacedName]uint16)
+	ports := make(map[types.NamespacedName]uint16)
 	for svcPortName, info := range sm {
 		if info.HealthCheckNodePort() != 0 {
-			result.HCServiceNodePorts[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
+			ports[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
 		}
 	}
-
-	return result
+	return ports
 }
 
 // ServicePortMap maps a service to its ServicePort.
@@ -397,10 +405,9 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	return svcPortMap
 }
 
-// apply the changes to ServicePortMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
-// udp protocol service cluster ip when service is deleted from the ServicePortMap.
+// apply the changes to ServicePortMap and update the deleted UDP cluster IP set.
 // apply triggers processServiceMapChange on every change.
-func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
+func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPClusterIPs sets.String) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
@@ -411,7 +418,7 @@ func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP
 		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
 		// skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous, UDPStaleClusterIP)
+		sm.unmerge(change.previous, deletedUDPClusterIPs)
 	}
 	// clear changes after applying them to ServicePortMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
@@ -466,15 +473,15 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 	}
 }
 
-// unmerge deletes all other ServicePortMap's elements from current ServicePortMap.  We pass in the UDPStaleClusterIP strings sets
-// for storing the stale udp service cluster IPs. We will clear stale udp connection base on UDPStaleClusterIP later
-func (sm *ServicePortMap) unmerge(other ServicePortMap, UDPStaleClusterIP sets.String) {
+// unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
+// updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
+func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
 			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
 			if info.Protocol() == v1.ProtocolUDP {
-				UDPStaleClusterIP.Insert(info.ClusterIP().String())
+				deletedUDPClusterIPs.Insert(info.ClusterIP().String())
 			}
 			delete(*sm, svcPortName)
 		} else {

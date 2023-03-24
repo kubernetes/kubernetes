@@ -134,7 +134,11 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
 			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
 
-			server := NewV1alpha1PodResourcesServer(mockPodsProvider, mockDevicesProvider)
+			providers := PodResourcesProviders{
+				Pods:    mockPodsProvider,
+				Devices: mockDevicesProvider,
+			}
+			server := NewV1alpha1PodResourcesServer(providers)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

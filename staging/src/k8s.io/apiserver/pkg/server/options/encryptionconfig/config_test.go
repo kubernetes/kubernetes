@@ -21,6 +21,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +33,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -40,7 +44,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/pkg/service"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -75,8 +81,9 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 // testKMSv2EnvelopeService is a mock kmsv2 envelope service which can be used to simulate remote Envelope v2 services
 // for testing of the envelope transformer with other transformers.
 type testKMSv2EnvelopeService struct {
-	err   error
-	keyID string
+	err          error
+	keyID        string
+	encryptCalls int
 }
 
 func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
@@ -87,6 +94,7 @@ func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req 
 }
 
 func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*kmsservice.EncryptResponse, error) {
+	t.encryptCalls++
 	if t.err != nil {
 		return nil, t.err
 	}
@@ -100,7 +108,7 @@ func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*kmsservice.Stat
 	if t.err != nil {
 		return nil, t.err
 	}
-	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: t.keyID, Version: "v2alpha1"}, nil
+	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: t.keyID, Version: "v2beta1"}, nil
 }
 
 // The factory method to create mock envelope service.
@@ -115,17 +123,17 @@ func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelo
 
 // The factory method to create mock envelope kmsv2 service.
 func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint, providerName string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{nil, "1"}, nil
+	return &testKMSv2EnvelopeService{nil, "1", 0}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service which always returns error.
 func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{errors.New("test"), "1"}, nil
+	return &testKMSv2EnvelopeService{errors.New("test"), "1", 0}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service that always returns invalid keyID.
 func newMockInvalidKeyIDEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration, keyID string) (kmsservice.Service, error) {
-	return &testKMSv2EnvelopeService{nil, keyID}, nil
+	return &testKMSv2EnvelopeService{nil, keyID, 0}, nil
 }
 
 func TestLegacyConfig(t *testing.T) {
@@ -272,7 +280,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
 	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
 
-	dataCtx := value.DefaultContext([]byte(sampleContextText))
+	dataCtx := value.DefaultContext(sampleContextText)
 	originalText := []byte(sampleText)
 
 	transformers := []struct {
@@ -564,7 +572,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 		ttl:  3 * time.Second,
 	}
 	keyID := "1"
-	kmsv2Probe.keyID.Store(&keyID)
+	kmsv2Probe.state.Store(&envelopekmsv2.State{KeyID: keyID})
 
 	testCases := []struct {
 		desc    string
@@ -678,7 +686,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 					p.service = nil
 					p.l = nil
 					p.lastResponse = nil
-					p.keyID.Store(kmsv2Probe.keyID.Load())
+					p.state.Store(kmsv2Probe.state.Load())
 				default:
 					t.Fatalf("unexpected probe type %T", p)
 				}
@@ -700,6 +708,584 @@ func TestKMSPluginHealthz(t *testing.T) {
 				}),
 			); d != "" {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// tests for masking rules
+func TestWildcardMasking(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		config        *apiserverconfig.EncryptionConfiguration
+		expectedError string
+	}{
+		{
+			desc: "resources masked by *. group",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "*. masked by *. group",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "*.foo masked by *.foo",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.foo",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.foo",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.foo\" is masked by earlier rule \"*.foo\"",
+		},
+		{
+			desc: "*.* masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms2",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.*\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources masked by *. group in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.\"",
+		},
+		{
+			desc: "resources masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources masked by *.* in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"secrets\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources *. masked by *.*",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources *. masked by *.* in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "resource \"*.\" is masked by earlier rule \"*.*\"",
+		},
+		{
+			desc: "resources not masked by any rule",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"secrets",
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "resources not masked by any rule in multiple configurations",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/another-testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			_, _, _, err := getTransformerOverridesAndKMSPluginProbes(ctx, tc.config)
+			if errString(err) != tc.expectedError {
+				t.Errorf("expected error %s but got %s", tc.expectedError, errString(err))
+			}
+		})
+	}
+}
+
+func TestWildcardStructure(t *testing.T) {
+	testCases := []struct {
+		desc                         string
+		expectedResourceTransformers map[string]string
+		config                       *apiserverconfig.EncryptionConfiguration
+		errorValue                   string
+	}{
+		{
+			desc: "should not result in error",
+			expectedResourceTransformers: map[string]string{
+				"configmaps":       "k8s:enc:kms:v1:kms:",
+				"secrets":          "k8s:enc:kms:v1:another-kms:",
+				"events":           "k8s:enc:kms:v1:fancy:",
+				"deployments.apps": "k8s:enc:kms:v1:kms:",
+				"pods":             "k8s:enc:kms:v1:fancy:",
+				"pandas":           "k8s:enc:kms:v1:fancy:",
+				"pandas.bears":     "k8s:enc:kms:v1:yet-another-provider:",
+				"jobs.apps":        "k8s:enc:kms:v1:kms:",
+			},
+
+			errorValue: "",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.apps",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+							{
+								Identity: &apiserverconfig.IdentityConfiguration{},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "fancy",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "yet-another-provider",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:       "should result in error",
+			errorValue: "resource \"secrets\" is masked by earlier rule \"*.\"",
+			config: &apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{
+							"configmaps",
+							"*.",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{
+							"*.*",
+							"secrets",
+						},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									Endpoint:   "unix:///tmp/testprovider.sock",
+									CacheSize:  pointer.Int32(10),
+								},
+							},
+							{
+								Identity: &apiserverconfig.IdentityConfiguration{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			transformers, _, _, err := getTransformerOverridesAndKMSPluginProbes(ctx, tc.config)
+			if errString(err) != tc.errorValue {
+				t.Errorf("expected error %s but got %s", tc.errorValue, errString(err))
+			}
+
+			if len(tc.errorValue) > 0 {
+				return
+			}
+
+			// check if expectedResourceTransformers are present
+			for resource, expectedTransformerName := range tc.expectedResourceTransformers {
+				transformer := transformerFromOverrides(transformers, schema.ParseGroupResource(resource))
+				transformerName := string(
+					reflect.ValueOf(transformer).Elem().FieldByName("transformers").Index(0).FieldByName("Prefix").Bytes(),
+				)
+
+				if transformerName != expectedTransformerName {
+					t.Errorf("resource %s: expected same transformer name but got %v", resource, cmp.Diff(transformerName, expectedTransformerName))
+				}
 			}
 		})
 	}
@@ -787,6 +1373,7 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
+			tt.probe.state.Store(&envelopekmsv2.State{})
 			_ = tt.probe.check(ctx)
 			if tt.probe.ttl != tt.wantTTL {
 				t.Fatalf("want ttl %v, got ttl %v", tt.wantTTL, tt.probe.ttl)
@@ -865,6 +1452,7 @@ func TestKMSv2InvalidKeyID(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
+			tt.probe.state.Store(&envelopekmsv2.State{})
 			_ = tt.probe.check(ctx)
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
 				t.Fatal(err)
@@ -897,7 +1485,7 @@ func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstP
 	p := getTransformerFromEncryptionConfig(t, firstEncryptionConfig)
 
 	ctx := testContext(t)
-	dataCtx := value.DefaultContext([]byte("authenticated_data"))
+	dataCtx := value.DefaultContext("authenticated_data")
 
 	out, err := p.TransformToStorage(ctx, []byte("firstvalue"), dataCtx)
 	if err != nil {
@@ -915,7 +1503,7 @@ func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstP
 	}
 
 	// verify changing the context fails storage
-	_, _, err = p.TransformFromStorage(ctx, out, value.DefaultContext([]byte("incorrect_context")))
+	_, _, err = p.TransformFromStorage(ctx, out, value.DefaultContext("incorrect_context"))
 	if err != nil {
 		t.Fatalf("CBC mode does not support authentication: %v", err)
 	}
@@ -964,9 +1552,12 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 }
 
 func TestIsKMSv2ProviderHealthyError(t *testing.T) {
+	probe := &kmsv2PluginProbe{name: "testplugin"}
+
 	testCases := []struct {
 		desc           string
 		expectedErr    string
+		wantMetrics    string
 		statusResponse *kmsservice.StatusResponse
 	}{
 		{
@@ -974,39 +1565,65 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "unhealthy",
 			},
-			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2alpha1, got , expected KMSv2 KeyID to be set, got ",
+			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2beta1, got , got invalid KMSv2 KeyID ",
+			wantMetrics: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="empty",provider_name="testplugin"} 1
+			`,
 		},
 		{
-			desc: "version is not v2alpha1",
+			desc: "version is not v2beta1",
 			statusResponse: &kmsservice.StatusResponse{
 				Version: "v1beta1",
 			},
-			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2alpha1, got v1beta1, expected KMSv2 KeyID to be set, got ",
+			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2beta1, got v1beta1, got invalid KMSv2 KeyID ",
+			wantMetrics: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="empty",provider_name="testplugin"} 1
+			`,
 		},
 		{
 			desc: "missing keyID",
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
-				Version: "v2alpha1",
+				Version: "v2beta1",
 			},
-			expectedErr: "expected KMSv2 KeyID to be set, got ",
+			expectedErr: "got invalid KMSv2 KeyID ",
+			wantMetrics: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="empty",provider_name="testplugin"} 1
+			`,
 		},
 		{
 			desc: "invalid long keyID",
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
-				Version: "v2alpha1",
+				Version: "v2beta1",
 				KeyID:   sampleInvalidKeyID,
 			},
-			expectedErr: "expected KMSv2 KeyID to be set, got ",
+			expectedErr: "got invalid KMSv2 KeyID ",
+			wantMetrics: `
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+			apiserver_envelope_encryption_invalid_key_id_from_status_total{error="too_long",provider_name="testplugin"} 1
+			`,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			err := isKMSv2ProviderHealthy("testplugin", tt.statusResponse)
+			metrics.InvalidKeyIDFromStatusTotal.Reset()
+			err := probe.isKMSv2ProviderHealthyAndMaybeRotateDEK(testContext(t), tt.statusResponse)
 			if !strings.Contains(errString(err), tt.expectedErr) {
 				t.Errorf("expected err %q, got %q", tt.expectedErr, errString(err))
+			}
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetrics),
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
@@ -1035,35 +1652,172 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 	}
 }
 
-func TestGetCurrentKeyID(t *testing.T) {
-	ctx := testContext(t)
-	kmsv2Probe := &kmsv2PluginProbe{
-		name: "foo",
-		ttl:  3 * time.Second,
+func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
+	origNowFunc := envelopekmsv2.NowFunc
+	now := origNowFunc() // freeze time
+	t.Cleanup(func() { envelopekmsv2.NowFunc = origNowFunc })
+	envelopekmsv2.NowFunc = func() time.Time { return now }
+
+	klog.LogToStderr(false)
+	var level klog.Level
+	if err := level.Set("6"); err != nil {
+		t.Fatal(err)
 	}
-	testCases := []struct {
-		desc        string
-		keyID       string
-		expectedErr string
+	t.Cleanup(func() {
+		klog.LogToStderr(true)
+		if err := level.Set("0"); err != nil {
+			t.Fatal(err)
+		}
+		klog.SetOutput(io.Discard)
+	})
+
+	tests := []struct {
+		name             string
+		service          *testKMSv2EnvelopeService
+		state            envelopekmsv2.State
+		statusKeyID      string
+		wantState        envelopekmsv2.State
+		wantEncryptCalls int
+		wantLogs         []string
+		wantErr          string
 	}{
 		{
-			desc:        "empty keyID",
-			keyID:       "",
-			expectedErr: "got unexpected empty keyID",
+			name:        "happy path, no previous state",
+			service:     &testKMSv2EnvelopeService{keyID: "1"},
+			state:       envelopekmsv2.State{},
+			statusKeyID: "1",
+			wantState: envelopekmsv2.State{
+				KeyID:               "1",
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyID="1" oldKeyID="" expirationTimestamp="%s"`,
+					now.Add(3*time.Minute).Format(time.RFC3339)),
+			},
+			wantErr: "",
 		},
 		{
-			desc:        "valid keyID",
-			keyID:       "1",
-			expectedErr: "",
+			name:        "happy path, with previous state",
+			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")}, // not called
+			state:       validState("2", now),
+			statusKeyID: "2",
+			wantState: envelopekmsv2.State{
+				KeyID:               "2",
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 0,
+			wantLogs:         nil,
+			wantErr:          "",
+		},
+		{
+			name:        "previous state expired but key ID matches",
+			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")}, // not called
+			state:       validState("3", now.Add(-time.Hour)),
+			statusKeyID: "3",
+			wantState: envelopekmsv2.State{
+				KeyID:               "3",
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 0,
+			wantLogs:         nil,
+			wantErr:          "",
+		},
+		{
+			name:        "previous state expired but key ID does not match",
+			service:     &testKMSv2EnvelopeService{keyID: "4"},
+			state:       validState("3", now.Add(-time.Hour)),
+			statusKeyID: "4",
+			wantState: envelopekmsv2.State{
+				KeyID:               "4",
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyID="4" oldKeyID="3" expirationTimestamp="%s"`,
+					now.Add(3*time.Minute).Format(time.RFC3339)),
+			},
+			wantErr: "",
+		},
+		{
+			name:        "service down but key ID does not match",
+			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")},
+			state:       validState("4", now.Add(7*time.Minute)),
+			statusKeyID: "5",
+			wantState: envelopekmsv2.State{
+				KeyID:               "4",
+				ExpirationTimestamp: now.Add(7 * time.Minute),
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+			},
+			wantErr: `failed to rotate DEK uid="panda", ` +
+				`errState=<nil>, errGen=failed to encrypt DEK, error: broken, statusKeyID="5", ` +
+				`encryptKeyID="", stateKeyID="4", expirationTimestamp=` + now.Add(7*time.Minute).Format(time.RFC3339),
 		},
 	}
-	for _, tt := range testCases {
-		t.Run(tt.desc, func(t *testing.T) {
-			kmsv2Probe.keyID.Store(&tt.keyID)
-			_, err := kmsv2Probe.getCurrentKeyID(ctx)
-			if errString(err) != tt.expectedErr {
-				t.Errorf("expected err %q, got %q", tt.expectedErr, errString(err))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			klog.SetOutput(&buf)
+
+			ctx := testContext(t)
+
+			h := &kmsv2PluginProbe{
+				name:    "panda",
+				service: tt.service,
+			}
+			h.state.Store(&tt.state)
+
+			err := h.rotateDEKOnKeyIDChange(ctx, tt.statusKeyID, "panda")
+
+			klog.Flush()
+			klog.SetOutput(io.Discard) // prevent further writes into buf
+
+			if diff := cmp.Diff(tt.wantLogs, logLines(buf.String())); len(diff) > 0 {
+				t.Errorf("log mismatch (-want +got):\n%s", diff)
+			}
+
+			ignoredFields := sets.NewString("Transformer", "EncryptedDEK", "UID", "CacheKey")
+
+			if diff := cmp.Diff(tt.wantState, *h.state.Load(),
+				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()),
+			); len(diff) > 0 {
+				t.Errorf("state mismatch (-want +got):\n%s", diff)
+			}
+
+			if tt.wantEncryptCalls != tt.service.encryptCalls {
+				t.Errorf("want %d encryptCalls, got %d", tt.wantEncryptCalls, tt.service.encryptCalls)
+			}
+
+			if errString(err) != tt.wantErr {
+				t.Errorf("rotateDEKOnKeyIDChange() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
+}
+
+func validState(keyID string, exp time.Time) envelopekmsv2.State {
+	return envelopekmsv2.State{
+		Transformer:         &resourceTransformer{},
+		EncryptedDEK:        []byte{1},
+		KeyID:               keyID,
+		ExpirationTimestamp: exp,
+		CacheKey:            []byte{1},
+	}
+}
+
+func logLines(logs string) []string {
+	if len(logs) == 0 {
+		return nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(logs), "\n")
+	for i, line := range lines {
+		lines[i] = strings.SplitN(line, "] ", 2)[1]
+	}
+	return lines
 }

@@ -83,3 +83,4 @@ spec:
   - expression: expressionValue
     message: messageValue
     reason: reasonValue
+status: {}

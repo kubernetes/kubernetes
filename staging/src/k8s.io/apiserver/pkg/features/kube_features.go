@@ -35,8 +35,16 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @ivelichkovich, @tallclair
+	// alpha: v1.27
+	// kep: https://kep.k8s.io/3716
+	//
+	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
+	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
+
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
@@ -125,6 +133,7 @@ const (
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Enables KMS v2 API for encryption at rest.
 	KMSv2 featuregate.Feature = "KMSv2"
@@ -142,6 +151,7 @@ const (
 	// kep: https://kep.k8s.io/2896
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables kubernetes to publish OpenAPI v3
 	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
@@ -222,7 +232,10 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
+
+	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
+
+	AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
@@ -244,11 +257,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	KMSv2: {Default: false, PreRelease: featuregate.Alpha},
+	KMSv2: {Default: true, PreRelease: featuregate.Beta},
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
-	OpenAPIV3: {Default: true, PreRelease: featuregate.Beta},
+	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
 

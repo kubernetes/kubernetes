@@ -24,6 +24,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2/ktesting"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
@@ -32,6 +33,7 @@ import (
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestRecycleSync(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	runningPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "runningPod",
@@ -139,7 +141,7 @@ func TestRecycleSync(t *testing.T) {
 			expectedClaims:  noclaims,
 			expectedEvents:  noevents,
 			errors:          noerrors,
-			test: wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Delete the volume before recycle operation starts
 				reactor.DeleteVolume("volume6-6")
 			}),
@@ -155,7 +157,7 @@ func TestRecycleSync(t *testing.T) {
 			expectedClaims:  noclaims,
 			expectedEvents:  noevents,
 			errors:          noerrors,
-			test: wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.MarkVolumeAvailable("volume6-7")
 			}),
@@ -172,7 +174,7 @@ func TestRecycleSync(t *testing.T) {
 			expectedClaims:  noclaims,
 			expectedEvents:  noevents,
 			errors:          noerrors,
-			test: wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.MarkVolumeAvailable("volume6-8")
 			}),
@@ -249,7 +251,7 @@ func TestRecycleSync(t *testing.T) {
 			test:            wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
 		},
 	}
-	runSyncTests(t, tests, []*storage.StorageClass{}, pods)
+	runSyncTests(t, ctx, tests, []*storage.StorageClass{}, pods)
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -268,6 +270,7 @@ func TestRecycleSync(t *testing.T) {
 //
 // Some limit of calls in enforced to prevent endless loops.
 func TestRecycleMultiSync(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// recycle failure - recycle returns error. The controller should
@@ -282,5 +285,5 @@ func TestRecycleMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, tests, []*storage.StorageClass{}, "")
+	runMultisyncTests(t, ctx, tests, []*storage.StorageClass{}, "")
 }

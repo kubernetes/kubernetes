@@ -12,6 +12,7 @@ package gcimporter
 import (
 	"go/token"
 	"go/types"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/internal/pkgbits"
@@ -120,6 +121,16 @@ func readUnifiedPackage(fset *token.FileSet, ctxt *types.Context, imports map[st
 	for _, iface := range pr.ifaces {
 		iface.Complete()
 	}
+
+	// Imports() of pkg are all of the transitive packages that were loaded.
+	var imps []*types.Package
+	for _, imp := range pr.pkgs {
+		if imp != nil && imp != pkg {
+			imps = append(imps, imp)
+		}
+	}
+	sort.Sort(byPath(imps))
+	pkg.SetImports(imps)
 
 	pkg.MarkComplete()
 	return pkg
@@ -260,37 +271,7 @@ func (r *reader) doPkg() *types.Package {
 	pkg := types.NewPackage(path, name)
 	r.p.imports[path] = pkg
 
-	imports := make([]*types.Package, r.Len())
-	for i := range imports {
-		imports[i] = r.pkg()
-	}
-	pkg.SetImports(flattenImports(imports))
-
 	return pkg
-}
-
-// flattenImports returns the transitive closure of all imported
-// packages rooted from pkgs.
-func flattenImports(pkgs []*types.Package) []*types.Package {
-	var res []*types.Package
-	seen := make(map[*types.Package]struct{})
-	for _, pkg := range pkgs {
-		if _, ok := seen[pkg]; ok {
-			continue
-		}
-		seen[pkg] = struct{}{}
-		res = append(res, pkg)
-
-		// pkg.Imports() is already flattened.
-		for _, pkg := range pkg.Imports() {
-			if _, ok := seen[pkg]; ok {
-				continue
-			}
-			seen[pkg] = struct{}{}
-			res = append(res, pkg)
-		}
-	}
-	return res
 }
 
 // @@@ Types
@@ -559,18 +540,7 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 
 			named.SetTypeParams(r.typeParamNames())
 
-			rhs := r.typ()
-			pk := r.p
-			pk.laterFor(named, func() {
-				// First be sure that the rhs is initialized, if it needs to be initialized.
-				delete(pk.laterFors, named) // prevent cycles
-				if i, ok := pk.laterFors[rhs]; ok {
-					f := pk.laterFns[i]
-					pk.laterFns[i] = func() {} // function is running now, so replace it with a no-op
-					f()                        // initialize RHS
-				}
-				underlying := rhs.Underlying()
-
+			setUnderlying := func(underlying types.Type) {
 				// If the underlying type is an interface, we need to
 				// duplicate its methods so we can replace the receiver
 				// parameter's type (#49906).
@@ -595,7 +565,31 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 				}
 
 				named.SetUnderlying(underlying)
-			})
+			}
+
+			// Since go.dev/cl/455279, we can assume rhs.Underlying() will
+			// always be non-nil. However, to temporarily support users of
+			// older snapshot releases, we continue to fallback to the old
+			// behavior for now.
+			//
+			// TODO(mdempsky): Remove fallback code and simplify after
+			// allowing time for snapshot users to upgrade.
+			rhs := r.typ()
+			if underlying := rhs.Underlying(); underlying != nil {
+				setUnderlying(underlying)
+			} else {
+				pk := r.p
+				pk.laterFor(named, func() {
+					// First be sure that the rhs is initialized, if it needs to be initialized.
+					delete(pk.laterFors, named) // prevent cycles
+					if i, ok := pk.laterFors[rhs]; ok {
+						f := pk.laterFns[i]
+						pk.laterFns[i] = func() {} // function is running now, so replace it with a no-op
+						f()                        // initialize RHS
+					}
+					setUnderlying(rhs.Underlying())
+				})
+			}
 
 			for i, n := 0, r.Len(); i < n; i++ {
 				named.AddMethod(r.method())

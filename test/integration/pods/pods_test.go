@@ -25,9 +25,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -672,5 +675,187 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 		}
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+func TestMutablePodSchedulingDirectives(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "mutable-pod-scheduling-directives", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	cases := []struct {
+		name                  string
+		create                *v1.Pod
+		update                *v1.Pod
+		enableSchedulingGates bool
+		err                   string
+	}{
+		{
+			name: "node selector is immutable when AllowMutableNodeSelector is false",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			err: "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+		},
+		{
+			name: "adding node selector is allowed for gated pods",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			enableSchedulingGates: true,
+		},
+		{
+			name: "addition to nodeAffinity is allowed for gated pods",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			enableSchedulingGates: true,
+		},
+	}
+	for _, tc := range cases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tc.enableSchedulingGates)()
+
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), tc.create, metav1.CreateOptions{}); err != nil {
+			t.Errorf("Failed to create pod: %v", err)
+		}
+
+		_, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), tc.update, metav1.UpdateOptions{})
+		if (tc.err == "" && err != nil) || (tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err)) {
+			t.Errorf("Unexpected error: got %q, want %q", err.Error(), err)
+		}
+		integration.DeletePodOrErrorf(t, client, ns.Name, tc.update.Name)
 	}
 }
