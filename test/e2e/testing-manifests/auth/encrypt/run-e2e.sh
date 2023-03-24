@@ -88,36 +88,46 @@ connect_registry(){
 create_cluster_and_run_test() {
     CLUSTER_CREATE_ATTEMPTED=true
 
+    TEST_ARGS=""
+    if [ "${SKIP_RUN_TESTS:-}" != "true" ]; then
+        # (--use-built-binaries) use the kubectl, e2e.test, and ginkgo binaries built during --build as opposed to from a GCS release tarball
+        TEST_ARGS="--test=ginkgo -- --v=5 --focus-regex=\[Conformance\] --skip-regex=\[Serial\] --parallel 20 --use-built-binaries"
+    else
+        echo "Skipping running tests"
+    fi
+
+    # shellcheck disable=SC2086
     kubetest2 kind -v 5 \
     --build \
     --up \
     --rundir-in-artifacts \
     --config test/e2e/testing-manifests/auth/encrypt/kind.yaml \
-    --cluster-name "${cluster_name}" \
-    --test=ginkgo \
-    -- \
-    --v=5 \
-    --focus-regex='\[Conformance\]' \
-    --skip-regex='\[Serial\]' \
-    --parallel 20 \
-    --use-built-binaries # use the kubectl, e2e.test, and ginkgo binaries built during --build as opposed to from a GCS release tarball
+    --cluster-name "${cluster_name}" ${TEST_ARGS}
 }
 
 cleanup() {
     # CLUSTER_CREATE_ATTEMPTED is true once we run kubetest2 kind --up
     if [ "${CLUSTER_CREATE_ATTEMPTED:-}" = true ]; then
-        # collect logs and metrics
-        echo "Collecting logs"
-        mkdir -p "${ARTIFACTS}/logs"
-        kind "export" logs "${ARTIFACTS}/logs" --name "${cluster_name}"
+        if [ "${SKIP_COLLECT_LOGS:-}" != "true" ]; then
+            # collect logs and metrics
+            echo "Collecting logs"
+            mkdir -p "${ARTIFACTS}/logs"
+            kind "export" logs "${ARTIFACTS}/logs" --name "${cluster_name}"
 
-        echo "Collecting metrics"
-        mkdir -p "${ARTIFACTS}/metrics"
-        kubectl get --raw /metrics > "${ARTIFACTS}/metrics/kube-apiserver-metrics.txt"
+            echo "Collecting metrics"
+            mkdir -p "${ARTIFACTS}/metrics"
+            kubectl get --raw /metrics > "${ARTIFACTS}/metrics/kube-apiserver-metrics.txt"
+        else
+            echo "Skipping collecting logs and metrics"
+        fi
 
-        echo "Deleting kind cluster"
-        # delete cluster
-        kind delete cluster --name "${cluster_name}"
+        if [ "${SKIP_DELETE_CLUSTER:-}" != "true" ]; then
+            echo "Deleting kind cluster"
+            # delete cluster
+            kind delete cluster --name "${cluster_name}"
+        else
+            echo "Skipping deleting kind cluster"
+        fi
     fi
 }
 
