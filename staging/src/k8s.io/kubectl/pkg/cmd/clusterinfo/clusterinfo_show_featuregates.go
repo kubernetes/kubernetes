@@ -17,20 +17,20 @@ limitations under the License.
 package clusterinfo
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/rawhttp"
@@ -132,6 +132,14 @@ func (o *ClusterInfoShowFeatureGatesOptions) Complete(restClientGetter genericcl
 	return nil
 }
 
+type Stage string
+
+type fgStatus struct {
+	name    string
+	stage   Stage
+	enabled bool
+}
+
 // feature gates status can be got from the apiserver metrics
 // 1. use `kubectl get --raw /metrics` to get the metrics.
 // 2. filter kubernetes_feature_enabled metrics and save it into a map, and the map key is
@@ -153,79 +161,85 @@ func (o *ClusterInfoShowFeatureGatesOptions) Run(f cmdutil.Factory) error {
 		return err
 	}
 
-	fgMap := map[string]fgStatus{}
-	scanner := bufio.NewScanner(out)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fgName, stageStr, status, err := parseLine(line)
-		if err != nil {
-			continue
-		}
-		fgMap[fgName] = fgStatus{
-			name:    fgName,
-			stage:   Stage(stageStr),
-			enabled: status == 1,
-		}
-	}
-	if err := scanner.Err(); err != nil {
+	fgMap, err := readAllFGs(out)
+	if err != nil {
 		return err
 	}
 
-	// Output map
+	o.print(fgMap)
+	return nil
+}
+
+func readAllFGs(out *bytes.Buffer) (map[string]fgStatus, error) {
+	fgMap := map[string]fgStatus{}
+	p := expfmt.TextParser{}
+	metricFamilies, err := p.TextToMetricFamilies(out)
+	if err != nil {
+		return nil, err
+	}
+	featureEnabled := metricFamilies["kubernetes_feature_enabled"]
+	for _, metric := range featureEnabled.Metric {
+		fgMetric := parseFGMetric(metric)
+		if fgMetric != nil {
+			fgMap[fgMetric.name] = *fgMetric
+		}
+	}
+	klog.V(5).Infof("parsed %d feature gates successfully", len(fgMap))
+	return fgMap, nil
+}
+
+func parseFGMetric(metric *dto.Metric) *fgStatus {
+	var fgName, stageStr string
+	labels := metric.Label
+	for _, label := range labels {
+		switch *label.Name {
+		case "name":
+			fgName = *label.Value
+		case "stage":
+			switch *label.Value {
+			case "ALPHA", "BETA", "DEPRECATED":
+				stageStr = *label.Value
+			case "":
+				stageStr = "GA"
+			default:
+				stageStr = ""
+			}
+		}
+	}
+	if len(fgName) == 0 {
+		return nil
+	}
+	return &fgStatus{
+		name:    fgName,
+		stage:   Stage(stageStr),
+		enabled: int(*metric.GetGauge().Value) == 1,
+	}
+}
+
+// Generally, feature gate is disabled in ALPHA stage by default, and is enabled if it is BETA or GA.
+// More details can refer to https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#feature-stages
+func (fgs *fgStatus) isGeneral() bool {
+	return (fgs.stage == "ALPHA" && !fgs.enabled) ||
+		(fgs.stage == "BETA" && fgs.enabled) ||
+		(fgs.stage == "GA" && fgs.enabled)
+}
+
+func (o *ClusterInfoShowFeatureGatesOptions) print(fgMap map[string]fgStatus) {
 	if o.All {
 		for _, fg := range fgMap {
 			o.printGateStatus(fg)
 		}
 	} else {
+		klog.V(5).Infof("parsed %d feature gates successfully", len(fgMap))
 		for _, fg := range fgMap {
-			if fg.stage == "GA" ||
-				(fg.stage == "ALPHA" && !fg.enabled) ||
-				(fg.stage == "BETA" && fg.enabled) {
+			if fg.isGeneral() {
 				continue
 			}
 			o.printGateStatus(fg)
 		}
 	}
-
-	return nil
 }
 
 func (o *ClusterInfoShowFeatureGatesOptions) printGateStatus(fg fgStatus) {
 	fmt.Fprintf(o.Out, "%s=%v (%s)\n", fg.name, fg.enabled, fg.stage)
-}
-
-type Stage string
-
-type fgStatus struct {
-	name    string
-	stage   Stage
-	enabled bool
-}
-
-func parseLine(line string) (string, Stage, int, error) {
-    if !strings.HasPrefix(line, "kubernetes_feature_enabled") {
-        return "", "", 0, fmt.Errorf("invalid line format: %s", line)
-    }
-    fields := strings.Fields(line)
-    if len(fields) != 2 {
-        return "", "", 0, fmt.Errorf("invalid line format: %s", line)
-    }
-    fgName := strings.TrimPrefix(fields[0], "kubernetes_feature_enabled{name=\"")
-    fgName = strings.Split(fgName, "\",stage=")[0]
-    stageStr := "unknown"
-    switch {
-    case strings.Contains(fields[0], "stage=\"ALPHA\""):
-        stageStr = "ALPHA"
-    case strings.Contains(fields[0], "stage=\"BETA\""):
-        stageStr = "BETA"
-    case strings.Contains(fields[0], "stage=\"\""):
-        stageStr = "GA"
-    }
-
-    status, err := strconv.Atoi(fields[1])
-    if err != nil {
-        return "", "", 0, err
-    }
-
-    return fgName, Stage(stageStr), status, nil
 }
