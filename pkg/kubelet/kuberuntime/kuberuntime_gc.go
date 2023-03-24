@@ -301,13 +301,8 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 			createTime: time.Unix(0, sandbox.CreatedAt),
 		}
 
-		// Set ready sandboxes to be active.
-		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			sandboxInfo.active = true
-		}
-
-		// Set sandboxes that still have containers to be active.
-		if sandboxIDs.Has(sandbox.Id) {
+		// Set ready sandboxes to be active, and set sandboxes that still have containers to be active.
+		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY || sandboxIDs.Has(sandbox.Id) {
 			sandboxInfo.active = true
 		}
 
