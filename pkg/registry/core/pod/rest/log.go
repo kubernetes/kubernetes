@@ -118,12 +118,7 @@ func countSkipTLSMetric(insecureSkipTLSVerifyBackend bool) {
 	}
 	counter.Inc()
 
-	deprecatedCounter, err := deprecatedPodLogsUsage.GetMetricWithLabelValues(usageType)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	deprecatedCounter.Inc()
+	deprecatedPodLogsUsage.WithLabelValues(usageType).Inc()
 }
 
 // NewGetOptions creates a new options object
