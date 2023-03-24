@@ -42,6 +42,14 @@ func TestAdmissionNilAttribute(t *testing.T) {
 	}
 }
 
+func TestAdmissionNilAttribute1(t *testing.T) {
+	handler := NewAlwaysAdmit()
+	err := handler.(*alwaysAdmit).Admit(context.TODO(), nil, nil)
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+}
+
 func TestHandles(t *testing.T) {
 	handler := NewAlwaysAdmit()
 	tests := []admission.Operation{admission.Create, admission.Connect, admission.Update, admission.Delete}
