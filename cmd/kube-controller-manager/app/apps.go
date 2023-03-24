@@ -35,6 +35,7 @@ import (
 
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	dsc, err := daemon.NewNodeSelectorAwareDaemonSetsController(
+		ctx,
 		controllerContext.OpenShiftContext.OpenShiftDefaultProjectNodeSelector,
 		controllerContext.OpenShiftContext.KubeDefaultProjectNodeSelector,
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
