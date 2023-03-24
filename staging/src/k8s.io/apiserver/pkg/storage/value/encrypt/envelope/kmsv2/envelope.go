@@ -278,6 +278,15 @@ func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsser
 		return nil, nil, nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
 	}
 
+	if err := validateEncryptedObject(&kmstypes.EncryptedObject{
+		KeyID:         resp.KeyID,
+		EncryptedDEK:  resp.Ciphertext,
+		EncryptedData: []byte{0}, // any non-empty value to pass validation
+		Annotations:   resp.Annotations,
+	}); err != nil {
+		return nil, nil, nil, err
+	}
+
 	cacheKey, err := generateCacheKey(resp.Ciphertext, resp.KeyID, resp.Annotations)
 	if err != nil {
 		return nil, nil, nil, err
