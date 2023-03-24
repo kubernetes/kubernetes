@@ -248,8 +248,6 @@ kube::golang::setup_platforms() {
   fi
 }
 
-kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
-kube::log::status "         support for linux/arm will be removed in a subsequent release."
 kube::golang::setup_platforms
 
 # The set of client targets that we are building for all platforms
@@ -263,11 +261,6 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 # The set of test targets that we are building for all platforms
 kube::golang::test_targets() {
   local targets=(
-    cmd/gendocs
-    cmd/genkubedocs
-    cmd/genman
-    cmd/genyaml
-    cmd/genswaggertypedocs
     ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
@@ -885,6 +878,9 @@ kube::golang::build_binaries() {
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
+    else
+      kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
+      kube::log::status "         support for linux/arm will be removed in a subsequent release."
     fi
 
     local -a binaries

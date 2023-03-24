@@ -20,8 +20,6 @@ limitations under the License.
 package dns
 
 import (
-	"testing"
-
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -34,9 +32,4 @@ func fakeGetHostDNSConfigCustom(resolverConfig string) (*runtimeapi.DNSConfig, e
 		Servers:  []string{testHostNameserver},
 		Searches: []string{testHostDomain},
 	}, nil
-}
-
-// getResolvConf returns the hostResolvConf string, which will be used to get the Host's DNS configuration.
-func getResolvConf(t *testing.T) (string, func()) {
-	return hostResolvConf, func() {}
 }

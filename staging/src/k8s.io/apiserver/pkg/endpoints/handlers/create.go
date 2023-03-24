@@ -162,8 +162,13 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		userInfo, _ := request.UserFrom(ctx)
 
 		if objectMeta, err := meta.Accessor(obj); err == nil {
-			// Wipe fields which cannot take user-provided values
-			rest.WipeObjectMetaSystemFields(objectMeta)
+			preserveObjectMetaSystemFields := false
+			if c, ok := r.(rest.SubresourceObjectMetaPreserver); ok && len(scope.Subresource) > 0 {
+				preserveObjectMetaSystemFields = c.PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate()
+			}
+			if !preserveObjectMetaSystemFields {
+				rest.WipeObjectMetaSystemFields(objectMeta)
+			}
 
 			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {

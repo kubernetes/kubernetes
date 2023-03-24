@@ -18,6 +18,7 @@ package aggregated_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -363,6 +364,91 @@ func TestUpdateService(t *testing.T) {
 	_, _, secondDocument := fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, secondDocument, &newapis, "should have returned expected document")
 	assert.NotEqual(t, secondDocument, initialDocument, "should have returned expected document")
+}
+
+func TestMultipleSources(t *testing.T) {
+	type pair struct {
+		manager discoveryendpoint.ResourceManager
+		apis    apidiscoveryv2beta1.APIGroupDiscoveryList
+	}
+
+	pairs := []pair{}
+
+	defaultManager := discoveryendpoint.NewResourceManager("apis")
+	for i := 0; i < 10; i++ {
+		name := discoveryendpoint.Source(100 * i)
+		manager := defaultManager.WithSource(name)
+		apis := fuzzAPIGroups(1, 3, int64(15+i))
+
+		// Give the groups deterministic names
+		for i := range apis.Items {
+			apis.Items[i].Name = fmt.Sprintf("%v.%v.com", i, name)
+		}
+
+		pairs = append(pairs, pair{manager, apis})
+	}
+
+	expectedResult := []apidiscoveryv2beta1.APIGroupDiscovery{}
+
+	groupCounter := 0
+	for _, p := range pairs {
+		for gi, g := range p.apis.Items {
+			for vi, v := range g.Versions {
+				p.manager.AddGroupVersion(g.Name, v)
+
+				// Use index for priority so we dont have to do any sorting
+				// Use negative index since it is sorted descending
+				p.manager.SetGroupVersionPriority(metav1.GroupVersion{Group: g.Name, Version: v.Version}, -gi-groupCounter, -vi)
+			}
+
+			expectedResult = append(expectedResult, g)
+		}
+
+		groupCounter += len(p.apis.Items)
+	}
+
+	// Show discovery document is what we expect
+	_, _, initialDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
+
+	require.Len(t, initialDocument.Items, len(expectedResult))
+	require.Equal(t, initialDocument.Items, expectedResult)
+}
+
+// Shows that if you have multiple sources including Default source using
+// with the same group name the groups added by the "Default" source are used
+func TestSourcePrecedence(t *testing.T) {
+	defaultManager := discoveryendpoint.NewResourceManager("apis")
+	otherManager := defaultManager.WithSource(500)
+	apis := fuzzAPIGroups(1, 3, int64(15))
+	for _, g := range apis.Items {
+		for i, v := range g.Versions {
+			v.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessCurrent
+			g.Versions[i] = v
+			otherManager.AddGroupVersion(g.Name, v)
+		}
+	}
+
+	_, _, initialDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
+	require.Equal(t, apis.Items, initialDocument.Items)
+
+	// Add the first groupversion under default.
+	// No versions should appear in discovery document except this one
+	overrideVersion := initialDocument.Items[0].Versions[0]
+	overrideVersion.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessStale
+	defaultManager.AddGroupVersion(initialDocument.Items[0].Name, overrideVersion)
+
+	_, _, maskedDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
+	masked := initialDocument.DeepCopy()
+	masked.Items[0].Versions[0].Freshness = apidiscoveryv2beta1.DiscoveryFreshnessStale
+
+	require.Equal(t, masked.Items, maskedDocument.Items)
+
+	// Wipe out default group. The other versions from the other group should now
+	// appear since the group is not being overridden by defaults ource
+	defaultManager.RemoveGroup(apis.Items[0].Name)
+
+	_, _, resetDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
+	require.Equal(t, resetDocument.Items, initialDocument.Items)
 }
 
 // Show the discovery manager is capable of serving requests to multiple users
