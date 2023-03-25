@@ -67,7 +67,7 @@ func TestKeyFunc(t *testing.T) {
 	cache := newSimpleCache(fakeClock, time.Second)
 
 	t.Run("AllocsPerRun test", func(t *testing.T) {
-		key, err := generateKey(encryptedDEKMaxSize) // simulate worst case EDEK
+		key, err := generateKey(encryptedDEKSourceMaxSize) // simulate worst case EDEK
 		if err != nil {
 			t.Fatal(err)
 		}

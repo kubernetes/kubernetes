@@ -60,7 +60,7 @@ type Base64Plugin struct {
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
-func NewBase64Plugin(t *testing.T, socketPath string) *Base64Plugin {
+func NewBase64Plugin(t testing.TB, socketPath string) *Base64Plugin {
 	server := grpc.NewServer()
 	result := &Base64Plugin{
 		grpcServer: server,

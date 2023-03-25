@@ -28,9 +28,24 @@ message EncryptedObject {
   // KeyID is the KMS key ID used for encryption operations.
   string keyID = 2;
 
-  // EncryptedDEK is the encrypted DEK.
-  bytes encryptedDEK = 3;
+  // EncryptedDEKSource is the ciphertext of the source of the DEK used to encrypt the data stored in encryptedData.
+  // encryptedDEKSourceType defines the process of using the plaintext of this field to determine the aforementioned DEK.
+  bytes encryptedDEKSource = 3;
 
   // Annotations is additional metadata that was provided by the KMS plugin.
   map<string, bytes> annotations = 4;
+
+  // encryptedDEKSourceType defines the process of using the plaintext of encryptedDEKSource to determine the DEK.
+  EncryptedDEKSourceType encryptedDEKSourceType = 5;
+}
+
+enum EncryptedDEKSourceType {
+  // AES_GCM_KEY means that the plaintext of encryptedDEKSource is the DEK itself, with AES-GCM as the encryption algorithm.
+  AES_GCM_KEY = 0;
+
+  // HKDF_SHA256_XNONCE_AES_GCM_SEED means that the plaintext of encryptedDEKSource is the pseudo random key
+  // (referred to as the seed throughout the code) that is fed into HKDF expand.  SHA256 is the hash algorithm
+  // and first 32 bytes of encryptedData are the info param.  The first 32 bytes from the HKDF stream are used
+  // as the DEK with AES-GCM as the encryption algorithm.
+  HKDF_SHA256_XNONCE_AES_GCM_SEED = 1;
 }
