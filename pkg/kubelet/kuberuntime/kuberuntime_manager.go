@@ -444,6 +444,7 @@ const (
 	reasonStartupProbe        containerKillReason = "StartupProbe"
 	reasonLivenessProbe       containerKillReason = "LivenessProbe"
 	reasonFailedPostStartHook containerKillReason = "FailedPostStartHook"
+	reasonComplete            containerKillReason = "Complete"
 	reasonUnknown             containerKillReason = "Unknown"
 )
 
@@ -850,7 +851,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 		// We should not create a sandbox for a Pod if initialization is done and there is no container to start.
 		if len(containersToStart) == 0 {
-			_, hasInitialized := m.findInitContainersToRun(pod, podStatus)
+			hasInitialized := m.computeInitContainersAction(pod, podStatus, false, &changes)
 			if hasInitialized {
 				changes.CreateSandbox = false
 				return changes
@@ -863,45 +864,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			return changes
 		}
 		changes.ContainersToStart = containersToStart
-		return changes
-	}
-
-	// Ephemeral containers may be started even if initialization is not yet complete.
-	for i := range pod.Spec.EphemeralContainers {
-		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
-
-		// Ephemeral Containers are never restarted
-		if podStatus.FindContainerStatusByName(c.Name) == nil {
-			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
-		}
-	}
-
-	// Check initialization progress and find init containers including sidecar
-	// containers that need to run even after initialization is finished.
-	initContainersToRun, hasInitialized := m.findInitContainersToRun(pod, podStatus)
-	for _, idx := range initContainersToRun {
-		container := &pod.Spec.InitContainers[idx]
-		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-		initFailed := containerStatus != nil && isInitContainerFailed(containerStatus)
-		if initFailed && !shouldRestartOnFailure(pod) && !types.IsSidecarContainer(container) {
-			changes.KillPod = true
-			return changes
-		}
-		// Always try to stop containers in unknown state first.
-		if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
-			changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
-				name:      container.Name,
-				container: container,
-				message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
-					containerStatus.State),
-				reason: reasonUnknown,
-			}
-		}
-		changes.InitContainersToStart = append(changes.InitContainersToStart, idx)
-	}
-	if !hasInitialized {
-		// Initialization failed or still in progress. Skip inspecting non-init
-		// containers.
 		return changes
 	}
 
@@ -996,8 +958,29 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
 
+	killPod := false
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
-		changes.KillPod = true
+		// All containers are completed and no new containers to start.
+		// Kill the pod after all containers including sidecar containers are
+		// terminated.
+		killPod = true
+	}
+
+	// Ephemeral containers may be started even if initialization is not yet complete.
+	for i := range pod.Spec.EphemeralContainers {
+		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
+
+		// Ephemeral Containers are never restarted
+		if podStatus.FindContainerStatusByName(c.Name) == nil {
+			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
+		}
+	}
+
+	hasInitialized := m.computeInitContainersAction(pod, podStatus, killPod, &changes)
+	if !hasInitialized {
+		// Initialization failed or still in progress. Don't take any action to the
+		// regular containers
+		changes.ContainersToStart = []int{}
 	}
 
 	return changes

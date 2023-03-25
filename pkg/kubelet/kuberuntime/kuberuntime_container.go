@@ -847,12 +847,23 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// findInitContainersToRun returns the indexes of sidecar containers to run and
-// next init container to run, and the flag whether the pod has been
-// initialized.
-func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) ([]int, bool) {
+// computeInitContainersAction computes the actions need to take for init
+// containers and returns hasInitialized
+//
+// - The first init container that has not completed successfully will be
+// started unless the pod already has initialized.
+// - All sidecar containers that have started but are not running will be restarted.
+// - Kill all sidecar containers if killPod is set.
+//
+// If killPod is set, this function computes all sidecar containers to kill. If
+// there are no remaining sidecar containers to kill, this sets changes.KillPod
+// to true.
+func (m *kubeGenericRuntimeManager) computeInitContainersAction(pod *v1.Pod, podStatus *kubecontainer.PodStatus, killPod bool, changes *podActions) bool {
 	if len(pod.Spec.InitContainers) == 0 {
-		return nil, true
+		if killPod {
+			changes.KillPod = true
+		}
+		return true
 	}
 
 	podHasInitialized := false
@@ -869,9 +880,26 @@ func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStat
 		}
 	}
 
-	containersToRun := make([]int, 0, len(pod.Spec.InitContainers))
+	// If any init container has failed and the pod's RestartPolicy is Never, we
+	// should kill the pod.
+	if !killPod && pod.Spec.RestartPolicy == v1.RestartPolicyNever {
+		for i := range pod.Spec.InitContainers {
+			container := &pod.Spec.InitContainers[i]
+			if types.IsSidecarContainer(container) {
+				continue
+			}
+			status := podStatus.FindContainerStatusByName(container.Name)
+			if status != nil && isInitContainerFailed(status) {
+				killPod = true
+				break
+			}
+		}
+	}
+
+	terminatingCount := 0 // number of init containers that should terminate
 	lastContainerInitialized := true
-	for i := range pod.Spec.InitContainers {
+	i := 0
+	for ; i < len(pod.Spec.InitContainers); i++ {
 		container := &pod.Spec.InitContainers[i]
 		if podHasInitialized && !types.IsSidecarContainer(container) {
 			// after initialization, only sidecar containers need to be kept running
@@ -882,50 +910,130 @@ func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStat
 		// If the container is not found, it means it has not been started yet.
 		if status == nil {
 			if podHasInitialized || lastContainerInitialized {
-				containersToRun = append(containersToRun, i)
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			}
 			// There is an init container that has not been started yet.
 			// We should not start any other containers.
-			return containersToRun, podHasInitialized
+			lastContainerInitialized = false
+			break
 		}
 
 		lastContainerInitialized = false
 		switch status.State {
 		case kubecontainer.ContainerStateCreated:
-			continue
+			switch {
+			case types.IsSidecarContainer(container):
+				if killPod {
+					// wait for the container to run and then kill it
+					terminatingCount++
+				}
+				continue
+
+			default: // init container
+				break
+			}
 
 		case kubecontainer.ContainerStateRunning:
 			switch {
 			case types.IsSidecarContainer(container):
-				if startup, found := m.startupManager.Get(status.ID); !found || startup == proberesults.Success {
-					lastContainerInitialized = true
+				if killPod {
+					// If killPod is set, we should kill the sidecar container.
+					terminatingCount++
+					changes.ContainersToKill[status.ID] = containerToKillInfo{
+						name:      status.Name,
+						container: container,
+						message:   fmt.Sprintf("Init container %s is running, but killPod is set", container.Name),
+						reason:    reasonComplete,
+					}
+					continue
 				}
-			default:
-				return containersToRun, podHasInitialized
+				if startup, found := m.startupManager.Get(status.ID); found && startup == proberesults.Failure {
+					// If the sidecar container failed the startup probe, we should restart it
+					terminatingCount++
+					changes.ContainersToKill[status.ID] = containerToKillInfo{
+						name:      status.Name,
+						container: container,
+						message:   fmt.Sprintf("Container %s failed startup probe, will be restarted", container.Name),
+						reason:    reasonStartupProbe,
+					}
+					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+					continue
+				}
+				lastContainerInitialized = true
+
+			default: // init container
+				break
 			}
 
 		case kubecontainer.ContainerStateExited:
 			switch {
 			case types.IsSidecarContainer(container):
-				containersToRun = append(containersToRun, i)
-			default:
-				if status.ExitCode != 0 {
-					containersToRun = append(containersToRun, i)
-					return containersToRun, podHasInitialized
+				if killPod {
+					continue
+				}
+				// Restart the sidecar container
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+			default: // init container
+				if isInitContainerFailed(status) {
+					if !shouldRestartOnFailure(pod) {
+						// the initialization failed
+						break
+					}
+					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+					break
 				}
 				lastContainerInitialized = true
 			}
 
-		default:
-			containersToRun = append(containersToRun, i)
+		default: // kubecontainer.ContainerStateUnknown or other unknown states
+			switch {
+			case types.IsSidecarContainer(container):
+				// Always try to stop containers in unknown state first.
+				terminatingCount++
+				changes.ContainersToKill[status.ID] = containerToKillInfo{
+					name:      status.Name,
+					container: container,
+					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
+						status.State),
+					reason: reasonUnknown,
+				}
+				if killPod {
+					continue
+				}
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+			default: // init container
+				if !isInitContainerFailed(status) {
+					klog.V(4).InfoS("This should not happen, init container is in unknown state but not failed", "pod", klog.KObj(pod), "containerStatus", status)
+				}
+
+				if !shouldRestartOnFailure(pod) {
+					// the initialization failed
+					break
+				}
+				// Always try to stop containers in unknown state first.
+				terminatingCount++
+				changes.ContainersToKill[status.ID] = containerToKillInfo{
+					name:      status.Name,
+					container: container,
+					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
+						status.State),
+					reason: reasonUnknown,
+				}
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+				break
+			}
 		}
 	}
 
-	if lastContainerInitialized {
+	if i >= len(pod.Spec.InitContainers)-1 && lastContainerInitialized {
 		podHasInitialized = true
 	}
 
-	return containersToRun, podHasInitialized
+	if killPod && terminatingCount == 0 {
+		changes.KillPod = true
+	}
+
+	return podHasInitialized
 }
 
 // GetContainerLogs returns logs of a specific container.
