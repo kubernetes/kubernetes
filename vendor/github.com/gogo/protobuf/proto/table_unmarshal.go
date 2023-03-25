@@ -134,8 +134,6 @@ func getUnmarshalInfo(t reflect.Type) *unmarshalInfo {
 // b is a byte stream to unmarshal into m.
 // This is top routine used when recursively unmarshaling submessages.
 func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
-	u.lock.RLock()
-	defer u.lock.RUnlock()
 	if atomic.LoadInt32(&u.initialized) == 0 {
 		u.computeUnmarshalInfo()
 	}
@@ -259,6 +257,8 @@ func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
 	}
 	if reqMask != u.reqMask && errLater == nil {
 		// A required field of this message is missing.
+		u.lock.RLock()
+		defer u.lock.RUnlock()
 		for _, n := range u.reqFields {
 			if reqMask&1 == 0 {
 				errLater = &RequiredNotSetError{n}
