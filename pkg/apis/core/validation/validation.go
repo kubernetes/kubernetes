@@ -3186,14 +3186,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 
 		// Apply the validation specific to init containers
 		if ctr.RestartPolicy != nil {
-			if opts.AllowSidecarContainers {
-				allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
-			} else {
-				// You should not disable the SidecarContainers feature until deleting
-				// all pods with this field set, as the kubelet may never start the
-				// pods.
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child("restartPolicy"), "may not be set for init containers without the SidecarContainers feature"))
-			}
+			allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
 		}
 
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
@@ -3725,8 +3718,6 @@ type PodValidationOptions struct {
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
 	AllowMutableNodeSelectorAndNodeAffinity bool
-	// Allow sidecar containers
-	AllowSidecarContainers bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
