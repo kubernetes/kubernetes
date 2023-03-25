@@ -1500,7 +1500,9 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 			// TODO(#116484): Also assign terminal phase to static pods.
 			if !kubetypes.IsStaticPod(pod) {
 				// All containers are terminated in success
-				if stopped == succeeded {
+				// We don't have to take the exit status of the sidecar container into
+				// account.
+				if stopped == succeeded+terminatedSidecar+crashedSidecar {
 					return v1.PodSucceeded
 				}
 				// There is at least one failure
@@ -1514,7 +1516,8 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 		}
 		// When regular containers are all complete,
 		// if a sidecar container is still running -> it will be terminated.
-		// else if a sidecar container is waiting to restart -> it will be stopped in waiting state.
+		// else if a sidecar container is waiting to restart -> it will be stopped
+		// in waiting state.
 		if stopped == succeeded+terminatedSidecar+crashedSidecar {
 			// RestartPolicy is not Always, and all
 			// containers are terminated in success
