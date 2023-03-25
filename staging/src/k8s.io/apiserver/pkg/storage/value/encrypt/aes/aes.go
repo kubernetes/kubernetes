@@ -23,12 +23,15 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/crypto/hkdf"
 
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/klog/v2"
@@ -87,6 +90,14 @@ func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 		return nil, nil, err
 	}
 
+	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, newNonceGenerator())
+	if err != nil {
+		return nil, nil, err
+	}
+	return transformer, key, nil
+}
+
+func newNonceGenerator() *nonceGenerator {
 	nonceGen := &nonceGenerator{
 		// we start the nonce counter at one billion so that we are
 		// guaranteed to detect rollover across different go routines
@@ -94,12 +105,7 @@ func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 		fatal: die,
 	}
 	nonceGen.nonce.Add(nonceGen.zero)
-
-	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, nonceGen)
-	if err != nil {
-		return nil, nil, err
-	}
-	return transformer, key, nil
+	return nonceGen
 }
 
 func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGenerator) (value.Transformer, error) {
@@ -175,6 +181,65 @@ func generateKey(length int) (key []byte, err error) {
 	}
 
 	return key, nil
+}
+
+// TODO comment
+func NewExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
+	key, err := generateKey(32)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &extendedNonceGCM{
+		key:      key,
+		nonceGen: newNonceGenerator(),
+	}, key, nil
+}
+
+type extendedNonceGCM struct {
+	key      []byte
+	nonceGen *nonceGenerator
+}
+
+func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	salt := make([]byte, 32)
+	if err := randomNonce(salt); err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	// TODO come up with a way to pre-compute this
+	kdf := hkdf.New(sha256.New, e.key, salt, dataCtx.AuthenticatedData())
+
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, err // TODO fmt.Err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, e.nonceGen)
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	transformedData, err := transformer.TransformToStorage(ctx, data, dataCtx)
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	// TODO come up with a way to pre-allocate this
+	out := make([]byte, 0, len(salt)+len(transformedData))
+	out = append(out, salt...)
+	out = append(out, transformedData...)
+
+	return out, nil
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
