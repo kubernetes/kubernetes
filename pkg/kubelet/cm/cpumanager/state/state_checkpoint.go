@@ -147,7 +147,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	assignments := sc.cache.GetCPUAssignments()
 	for pod := range assignments {
-		checkpoint.Entries[pod] = make(map[string]string)
+		checkpoint.Entries[pod] = make(map[string]string, len(assignments[pod]))
 		for container, cset := range assignments[pod] {
 			checkpoint.Entries[pod][container] = cset.String()
 		}
