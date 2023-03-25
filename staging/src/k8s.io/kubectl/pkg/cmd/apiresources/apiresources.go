@@ -109,7 +109,7 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 	}
 
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, `Output format. One of: (wide, name).`)
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, `Output format. One of: (wide, name, json).`)
 
 	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
@@ -122,7 +122,7 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 
 // Validate checks to the APIResourceOptions to see if there is sufficient information run the command
 func (o *APIResourceOptions) Validate() error {
-	supportedOutputTypes := sets.NewString("", "wide", "name")
+	supportedOutputTypes := sets.NewString("", "wide", "name", "json")
 	if !supportedOutputTypes.Has(o.Output) {
 		return fmt.Errorf("--output %v is not available", o.Output)
 	}
@@ -207,13 +207,16 @@ func (o *APIResourceOptions) RunAPIResources() error {
 		}
 	}
 
-	if o.NoHeaders == false && o.Output != "name" {
+	if o.NoHeaders == false && o.Output != "name" && o.Output != "json" {
 		if err = printContextHeaders(w, o.Output); err != nil {
 			return err
 		}
 	}
 
 	sort.Stable(sortableResource{resources, o.SortBy})
+	if o.Output == "json" {
+		fmt.Fprintf(w, "{\n")
+	}
 	for _, r := range resources {
 		switch o.Output {
 		case "name":
@@ -235,6 +238,15 @@ func (o *APIResourceOptions) RunAPIResources() error {
 				strings.Join(r.APIResource.Categories, ",")); err != nil {
 				errs = append(errs, err)
 			}
+		case "json":
+			if _, err := fmt.Fprintf(w, "\t{\n\t\t'NAME': '%s', \n\t\t'SHORTNAMES': '%s', \n\t\t'APIVERSION': '%s', \n\t\t'NAMESPACED': '%v', \n\t\t'KIND': '%s'\n\t},\n",
+				r.APIResource.Name,
+				strings.Join(r.APIResource.ShortNames, ","),
+				r.APIGroupVersion,
+				r.APIResource.Namespaced,
+				r.APIResource.Kind); err != nil {
+				errs = append(errs, err)
+			}
 		case "":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
 				r.APIResource.Name,
@@ -245,6 +257,9 @@ func (o *APIResourceOptions) RunAPIResources() error {
 				errs = append(errs, err)
 			}
 		}
+	}
+	if o.Output == "json" {
+		fmt.Fprintf(w, "}\n")
 	}
 
 	if len(errs) > 0 {
