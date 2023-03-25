@@ -1496,11 +1496,11 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			preparePod(podSpec)
 			var results containerOutputList
 
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */
+			ginkgo.It("should continuously run Pod keeping it Pending", func() {
 				client := e2epod.NewPodClient(f)
 				podSpec = client.Create(context.TODO(), podSpec)
 
-				e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 5 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
+				err := e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 3 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
 					if pod.Status.Phase != v1.PodPending {
 						return false, fmt.Errorf("pod should be in pending phase")
 					}
@@ -1508,8 +1508,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						return false, nil
 					}
 					containerStatus := pod.Status.InitContainerStatuses[0]
-					return containerStatus.RestartCount > 5, nil
+					return containerStatus.RestartCount >= 3, nil
 				})
+				framework.ExpectNoError(err)
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -1570,11 +1571,11 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			preparePod(podSpec)
 			var results containerOutputList
 
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */
+			ginkgo.It("should continuously run Pod keeping it Pending", func() {
 				client := e2epod.NewPodClient(f)
 				podSpec = client.Create(context.TODO(), podSpec)
 
-				e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 5 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
+				err := e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 3 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
 					if pod.Status.Phase != v1.PodPending {
 						return false, fmt.Errorf("pod should be in pending phase")
 					}
@@ -1582,8 +1583,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						return false, nil
 					}
 					containerStatus := pod.Status.InitContainerStatuses[0]
-					return containerStatus.RestartCount > 5, nil
+					return containerStatus.RestartCount >= 3, nil
 				})
+				framework.ExpectNoError(err)
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -1910,11 +1912,11 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			preparePod(podSpec)
 			var results containerOutputList
 
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */
+			ginkgo.It("should continuously run Pod keeping it Pending", func() {
 				client := e2epod.NewPodClient(f)
 				podSpec = client.Create(context.TODO(), podSpec)
 
-				e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 5 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
+				err := e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 3 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
 					if pod.Status.Phase != v1.PodPending {
 						return false, fmt.Errorf("pod should be in pending phase")
 					}
@@ -1922,8 +1924,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						return false, nil
 					}
 					containerStatus := pod.Status.InitContainerStatuses[0]
-					return containerStatus.RestartCount > 5, nil
+					return containerStatus.RestartCount >= 3, nil
 				})
+				framework.ExpectNoError(err)
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -1984,11 +1987,11 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			preparePod(podSpec)
 			var results containerOutputList
 
-			ginkgo.It("should continuously run Pod keeping it Pending", func() { /* check the restartCount > 5 */
+			ginkgo.It("should continuously run Pod keeping it Pending", func() {
 				client := e2epod.NewPodClient(f)
 				podSpec = client.Create(context.TODO(), podSpec)
 
-				e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 5 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
+				err := e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "pending and restarting 3 times", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
 					if pod.Status.Phase != v1.PodPending {
 						return false, fmt.Errorf("pod should be in pending phase")
 					}
@@ -1996,8 +1999,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						return false, nil
 					}
 					containerStatus := pod.Status.InitContainerStatuses[0]
-					return containerStatus.RestartCount > 5, nil
+					return containerStatus.RestartCount >= 3, nil
 				})
+				framework.ExpectNoError(err)
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
