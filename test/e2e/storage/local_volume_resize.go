@@ -79,7 +79,11 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 
 			setupExpandableLocalStorageClass(ctx, config, &testMode)
 			testVols := setupLocalVolumesPVCsPVs(ctx, config, testVolType, config.randomNode, 1, testMode)
-			testVol = testVols[0]
+			if len(testVols) > 0 {
+				testVol = testVols[0]
+			} else {
+				framework.Failf("Failed to get a test volume")
+			}
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
