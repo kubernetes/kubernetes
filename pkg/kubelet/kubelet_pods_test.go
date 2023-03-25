@@ -2410,11 +2410,12 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod    *v1.Pod
-		status v1.PodPhase
-		test   string
+		pod           *v1.Pod
+		podIsTerminal bool
+		status        v1.PodPhase
+		test          string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, false, v1.PodPending, "empty, waiting"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -2424,6 +2425,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container running",
 		},
@@ -2436,6 +2438,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container stopped",
 		},
@@ -2448,6 +2451,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container waiting, terminated zero",
 		},
@@ -2460,6 +2464,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container waiting, terminated non-zero",
 		},
@@ -2472,6 +2477,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container waiting, not terminated",
 		},
@@ -2487,6 +2493,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"sidecar container started, one main container running",
 		},
@@ -2503,6 +2510,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"sidecar container started, main containers running",
 		},
@@ -2519,6 +2527,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"sidecar container running, main containers running",
 		},
@@ -2535,6 +2544,7 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"sidecar stopped, main containers running",
 		},
@@ -2551,14 +2561,49 @@ func TestPodPhaseWithRestartAlwaysSidecarContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"backoff crashloop sidecar container, main containers running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						failedState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			true,
+			v1.PodSucceeded,
+			"all main containers succeeded and sidecar container failed with restart always, but the pod is terminal",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			true,
+			v1.PodSucceeded,
+			"all main containers succeeded and sidecar container succeeded with restart always, but the pod is terminal",
 		},
 	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo, test.podIsTerminal)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2960,7 +3005,7 @@ func TestPodPhaseWithRestartNeverSidecarContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
