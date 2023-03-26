@@ -37,6 +37,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// TODO comment
+const commonSize = 32
+
 type gcm struct {
 	aead      cipher.AEAD
 	nonceFunc func([]byte) error
@@ -81,7 +84,7 @@ func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
 // it can be passed to NewGCMTransformer(aes.NewCipher(key)) to construct a transformer capable
 // of decrypting values encrypted by this transformer (that transformer must not be used for encryption).
 func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
-	key, err := generateKey(32)
+	key, err := generateKey(commonSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -183,9 +186,15 @@ func generateKey(length int) (key []byte, err error) {
 	return key, nil
 }
 
+type pseudoRandomFunction func(secret, salt, info []byte) ([]byte, error)
+
 // TODO comment
-func NewExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
-	key, err := generateKey(32)
+func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(sha256KDF)
+}
+
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(prf pseudoRandomFunction) (value.Transformer, []byte, error) {
+	key, err := generateKey(commonSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,38 +202,39 @@ func NewExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []b
 	return &extendedNonceGCM{
 		key:      key,
 		nonceGen: newNonceGenerator(),
+		prf:      prf,
 	}, key, nil
 }
 
 type extendedNonceGCM struct {
 	key      []byte
 	nonceGen *nonceGenerator
+	prf      pseudoRandomFunction
 }
 
 func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	// TODO implement me
-	panic("implement me")
+	if len(data) < commonSize {
+		return nil, false, errors.New("the stored data was shorter than the required size")
+	}
+
+	salt := data[:commonSize]
+	transformedData := data[commonSize:]
+
+	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
+	if err != nil {
+		return nil, false, err // TODO fmt.Err
+	}
+
+	return transformer.TransformFromStorage(ctx, transformedData, dataCtx)
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	salt := make([]byte, 32)
+	salt := make([]byte, commonSize)
 	if err := randomNonce(salt); err != nil {
 		return nil, err // TODO fmt.Err
 	}
 
-	// TODO come up with a way to pre-compute this
-	kdf := hkdf.New(sha256.New, e.key, salt, dataCtx.AuthenticatedData())
-
-	key := make([]byte, 32)
-	if _, err := io.ReadFull(kdf, key); err != nil {
-		return nil, err // TODO fmt.Err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err // TODO fmt.Err
-	}
-
-	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, e.nonceGen)
+	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -240,6 +250,37 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 	out = append(out, transformedData...)
 
 	return out, nil
+}
+
+func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
+	key, err := e.prf(e.key, salt, dataCtx.AuthenticatedData())
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, e.nonceGen)
+	if err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	return transformer, nil
+}
+
+func sha256KDF(secret, salt, info []byte) ([]byte, error) {
+	// TODO come up with a way to pre-compute this
+	kdf := hkdf.New(sha256.New, secret, salt, info)
+
+	derivedKey := make([]byte, commonSize)
+	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	return derivedKey, nil
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
