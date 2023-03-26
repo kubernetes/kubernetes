@@ -643,13 +643,13 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
 
-					m := make(map[framework.ClusterEvent]sets.String)
+					m := make(map[framework.ClusterEvent]sets.Set[string])
 					// - All plugins registered for events[0], which is NodeAdd.
 					// - 1/2 of plugins registered for events[1]
 					// - 1/3 of plugins registered for events[2]
 					// - ...
 					for j := 0; j < len(events); j++ {
-						m[events[j]] = sets.NewString()
+						m[events[j]] = sets.New[string]()
 						for k := 0; k < len(plugins); k++ {
 							if (k+1)%(j+1) == 0 {
 								m[events[j]].Insert(plugins[k])
@@ -702,8 +702,8 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{
-		{Resource: framework.Node, ActionType: framework.Add}: sets.NewString("fooPlugin"),
+	m := map[framework.ClusterEvent]sets.Set[string]{
+		{Resource: framework.Node, ActionType: framework.Add}: sets.New("fooPlugin"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -764,7 +764,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	labelPod := st.MakePod().Name("lbp").Namespace(affinityPod.Namespace).Label("service", "securityscan").Node("node1").Obj()
 
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{AssignedPodAdd: sets.NewString("fakePlugin")}
+	m := map[framework.ClusterEvent]sets.Set[string]{AssignedPodAdd: sets.New("fakePlugin")}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
@@ -1034,35 +1034,35 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
@@ -1071,17 +1071,17 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
 			},
 		},
 	}
@@ -1305,8 +1305,8 @@ func TestHighPriorityBackoff(t *testing.T) {
 // activeQ after one minutes if it is in unschedulablePods.
 func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{
-		NodeAdd: sets.NewString("fakePlugin"),
+	m := map[framework.ClusterEvent]sets.Set[string]{
+		NodeAdd: sets.New("fakePlugin"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2091,15 +2091,15 @@ func TestPodMatchesEvent(t *testing.T) {
 		name            string
 		podInfo         *framework.QueuedPodInfo
 		event           framework.ClusterEvent
-		clusterEventMap map[framework.ClusterEvent]sets.String
+		clusterEventMap map[framework.ClusterEvent]sets.Set[string]
 		want            bool
 	}{
 		{
 			name:    "event not registered",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj()),
 			event:   EmptyEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent: sets.NewString("foo"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent: sets.New("foo"),
 			},
 			want: false,
 		},
@@ -2107,8 +2107,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin matches but event does not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   AssignedPodAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent: sets.NewString("foo", "bar"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent: sets.New("foo", "bar"),
 			},
 			want: false,
 		},
@@ -2116,8 +2116,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "wildcard event wins regardless of event matching",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   WildCardEvent,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent: sets.NewString("foo"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent: sets.New("foo"),
 			},
 			want: true,
 		},
@@ -2125,8 +2125,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin and event both match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent: sets.NewString("foo", "bar"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent: sets.New("foo", "bar"),
 			},
 			want: true,
 		},
@@ -2134,9 +2134,9 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "pod's failed plugin registers fine-grained event",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "bar"),
 			event:   NodeTaintChange,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent:    sets.NewString("foo"),
-				NodeTaintChange: sets.NewString("bar"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent:    sets.New("foo"),
+				NodeTaintChange: sets.New("bar"),
 			},
 			want: true,
 		},
@@ -2144,8 +2144,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "if pod failed by multiple plugins, a single match gets a final match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo", "bar"),
 			event:   NodeAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				NodeAllEvent: sets.NewString("bar"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				NodeAllEvent: sets.New("bar"),
 			},
 			want: true,
 		},
@@ -2153,8 +2153,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent and plugin name matches",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				WildCardEvent: sets.NewString("foo"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				WildCardEvent: sets.New("foo"),
 			},
 			want: true,
 		},
@@ -2162,8 +2162,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			name:    "plugin returns WildCardEvent but plugin name not match",
 			podInfo: newQueuedPodInfoForLookup(st.MakePod().Name("p").Obj(), "foo"),
 			event:   PvAdd,
-			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				WildCardEvent: sets.NewString("bar"),
+			clusterEventMap: map[framework.ClusterEvent]sets.Set[string]{
+				WildCardEvent: sets.New("bar"),
 			},
 			want: false,
 		},
@@ -2266,7 +2266,7 @@ func makeQueuedPodInfos(num int, namePrefix, label string, timestamp time.Time) 
 			PodInfo: mustNewPodInfo(
 				st.MakePod().Name(fmt.Sprintf("%v-%d", namePrefix, i)).Namespace(fmt.Sprintf("ns%d", i)).Label(label, "").UID(fmt.Sprintf("tp-%d", i)).Obj()),
 			Timestamp:            timestamp,
-			UnschedulablePlugins: sets.NewString(),
+			UnschedulablePlugins: sets.New[string](),
 		}
 		pInfos = append(pInfos, p)
 	}

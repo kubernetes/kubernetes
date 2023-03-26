@@ -641,7 +641,7 @@ type Handle interface {
 type PreFilterResult struct {
 	// The set of nodes that should be considered downstream; if nil then
 	// all nodes are eligible.
-	NodeNames sets.String
+	NodeNames sets.Set[string]
 }
 
 func (p *PreFilterResult) AllNodes() bool {
