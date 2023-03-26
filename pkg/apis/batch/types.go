@@ -223,6 +223,12 @@ type PodFailurePolicy struct {
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
 	Rules []PodFailurePolicyRule
+
+	// +optional
+	MaxBackoffTimeInSeconds *int32
+
+	// +optional
+	DefaultBackoffTimeInSeconds *int32
 }
 
 // JobSpec describes how the job execution will look like.

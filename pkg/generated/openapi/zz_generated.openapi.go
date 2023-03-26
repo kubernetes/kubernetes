@@ -14751,8 +14751,20 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 							},
 						},
 					},
+					"maxBackoffTimeInSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"defaultBackoffTimeInSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
 				},
-				Required: []string{"rules"},
+				Required: []string{"rules", "maxBackoffTimeInSeconds", "defaultBackoffTimeInSeconds"},
 			},
 		},
 		Dependencies: []string{
