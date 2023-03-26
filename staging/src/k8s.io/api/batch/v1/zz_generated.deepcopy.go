@@ -375,6 +375,16 @@ func (in *PodFailurePolicy) DeepCopyInto(out *PodFailurePolicy) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.MaxBackoffTimeInSeconds != nil {
+		in, out := &in.MaxBackoffTimeInSeconds, &out.MaxBackoffTimeInSeconds
+		*out = new(int32)
+		**out = **in
+	}
+	if in.DefaultBackoffTimeInSeconds != nil {
+		in, out := &in.DefaultBackoffTimeInSeconds, &out.DefaultBackoffTimeInSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
