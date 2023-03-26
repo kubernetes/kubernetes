@@ -186,6 +186,28 @@ func generateKey(length int) (key []byte, err error) {
 	return key, nil
 }
 
+func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
+	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF)
+}
+
+func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction) value.Read {
+	return &readOnlyExtendedNonceGCM{
+		e: &extendedNonceGCM{
+			key: key,
+			prf: prf,
+		},
+	}
+}
+
+// readOnlyExtendedNonceGCM is just a wrapper that prevents callers from accessing extendedNonceGCM's write method
+type readOnlyExtendedNonceGCM struct {
+	e *extendedNonceGCM
+}
+
+func (r *readOnlyExtendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	return r.e.TransformFromStorage(ctx, data, dataCtx)
+}
+
 type pseudoRandomFunction func(secret, salt, info []byte) ([]byte, error)
 
 // TODO comment
