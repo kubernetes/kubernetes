@@ -55,17 +55,22 @@ import (
 
 const region = "us-central"
 
-func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{
+type serviceTweak func(s *v1.Service)
+
+func newService(name string, serviceType v1.ServiceType, tweaks ...serviceTweak) *v1.Service {
+	s := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
-			UID:       uid,
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
 		},
 	}
+	for _, tw := range tweaks {
+		tw(s)
+	}
+	return s
 }
 
 func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
@@ -84,7 +89,7 @@ func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
 
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
-	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
+	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
 }
 
 func alwaysReady() bool { return true }
@@ -146,15 +151,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 	}{
 		{
 			desc: "service doesn't want LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-			},
+			service: newService("no-external-balancer", v1.ServiceTypeClusterIP),
 			expectOp:          deleteLoadBalancer,
 			expectPatchStatus: false,
 		},
@@ -490,8 +487,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			desc: "Services do not have external load balancers: no calls should be made.",
 			services: []*v1.Service{
-				newService("s0", "111", v1.ServiceTypeClusterIP),
-				newService("s1", "222", v1.ServiceTypeNodePort),
+				newService("s0", v1.ServiceTypeClusterIP),
+				newService("s1", v1.ServiceTypeNodePort),
 			},
 			expectedUpdateCalls: nil,
 			workers:             2,
@@ -499,65 +496,65 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			desc: "Services does have an external load balancer: one call should be made.",
 			services: []*v1.Service{
-				newService("s0", "333", v1.ServiceTypeLoadBalancer),
+				newService("s0", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 			workers: 3,
 		},
 		{
 			desc: "Three services have an external load balancer: three calls.",
 			services: []*v1.Service{
-				newService("s0", "444", v1.ServiceTypeLoadBalancer),
-				newService("s1", "555", v1.ServiceTypeLoadBalancer),
-				newService("s2", "666", v1.ServiceTypeLoadBalancer),
+				newService("s0", v1.ServiceTypeLoadBalancer),
+				newService("s1", v1.ServiceTypeLoadBalancer),
+				newService("s2", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "444", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s2", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 			workers: 4,
 		},
 		{
 			desc: "Two services have an external load balancer and two don't: two calls.",
 			services: []*v1.Service{
-				newService("s0", "777", v1.ServiceTypeNodePort),
-				newService("s1", "888", v1.ServiceTypeLoadBalancer),
-				newService("s3", "999", v1.ServiceTypeLoadBalancer),
-				newService("s4", "123", v1.ServiceTypeClusterIP),
+				newService("s0", v1.ServiceTypeNodePort),
+				newService("s1", v1.ServiceTypeLoadBalancer),
+				newService("s3", v1.ServiceTypeLoadBalancer),
+				newService("s4", v1.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 			workers: 5,
 		},
 		{
 			desc: "One service has an external load balancer and one is nil: one call.",
 			services: []*v1.Service{
-				newService("s0", "234", v1.ServiceTypeLoadBalancer),
+				newService("s0", v1.ServiceTypeLoadBalancer),
 				nil,
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 			workers: 6,
 		},
 		{
 			desc: "Four services have external load balancer with only 2 workers",
 			services: []*v1.Service{
-				newService("s0", "777", v1.ServiceTypeLoadBalancer),
-				newService("s1", "888", v1.ServiceTypeLoadBalancer),
-				newService("s3", "999", v1.ServiceTypeLoadBalancer),
-				newService("s4", "123", v1.ServiceTypeLoadBalancer),
+				newService("s0", v1.ServiceTypeLoadBalancer),
+				newService("s1", v1.ServiceTypeLoadBalancer),
+				newService("s3", v1.ServiceTypeLoadBalancer),
+				newService("s4", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 			workers: 2,
 		},
@@ -939,10 +936,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 	node4 := makeNode(tweakName("node4"))
 
 	services := []*v1.Service{
-		newService("s0", "777", v1.ServiceTypeLoadBalancer),
-		newService("s1", "888", v1.ServiceTypeLoadBalancer),
-		newService("s3", "999", v1.ServiceTypeLoadBalancer),
-		newService("s4", "123", v1.ServiceTypeLoadBalancer),
+		newService("s0", v1.ServiceTypeLoadBalancer),
+		newService("s1", v1.ServiceTypeLoadBalancer),
+		newService("s3", v1.ServiceTypeLoadBalancer),
+		newService("s4", v1.ServiceTypeLoadBalancer),
 	}
 
 	serviceNames := sets.NewString()
@@ -963,10 +960,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			desc:  "only 1 node",
 			nodes: []*v1.Node{node1},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
 			},
 			worker:                3,
 			nodeListerErr:         nil,
@@ -976,10 +973,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			desc:  "2 nodes",
 			nodes: []*v1.Node{node1, node2},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
 			},
 			worker:                1,
 			nodeListerErr:         nil,
@@ -989,10 +986,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			desc:  "4 nodes",
 			nodes: []*v1.Node{node1, node2, node3, node4},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
 			},
 			worker:                3,
 			nodeListerErr:         nil,
@@ -1082,7 +1079,7 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 		{
 			testName: "If Updating Loadbalancer IP",
 			key:      "default/sync-test-name",
-			svc:      newService("sync-test-name", types.UID("sync-test-uid"), v1.ServiceTypeLoadBalancer),
+			svc:      newService("sync-test-name", v1.ServiceTypeLoadBalancer),
 			updateFn: func(svc *v1.Service) *v1.Service {
 
 				svc.Spec.LoadBalancerIP = oldLBIP
@@ -1170,7 +1167,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
+			svc := newService(svcName, v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
 			controller, _, client := newController()
