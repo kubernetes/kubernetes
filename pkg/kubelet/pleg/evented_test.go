@@ -18,12 +18,14 @@ package pleg
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -129,5 +131,103 @@ func testMetric(t *testing.T, expectedMetric string, metricName string) {
 	err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(expectedMetric), metricName)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEventedPLEG_getPodIPs(t *testing.T) {
+	cache := kubecontainer.NewCache()
+	type args struct {
+		pid    types.UID
+		status *kubecontainer.PodStatus
+	}
+	tests := []struct {
+		name      string
+		args      args
+		oldstatus *kubecontainer.PodStatus
+		expected  []string
+	}{
+		{
+			name: "status ips is not empty",
+			args: args{
+				pid: "62212",
+				status: &kubecontainer.PodStatus{
+					IPs: []string{"10.0.0.10", "10.23.0.1"},
+				},
+			},
+			oldstatus: &kubecontainer.PodStatus{
+				IPs: []string{"192.168.0.10", "192.168.0.1"},
+			},
+			expected: []string{"10.0.0.10", "10.23.0.1"},
+		},
+		{
+			name: "status ips is empty and SandboxStatuses has PodSandboxState_SANDBOX_READY state",
+			args: args{
+				pid: "62212",
+				status: &kubecontainer.PodStatus{
+					SandboxStatuses: []*v1.PodSandboxStatus{
+						{
+							Id:       "sandboxID2",
+							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
+							State:    v1.PodSandboxState_SANDBOX_READY,
+						},
+						{
+							Id:       "sandboxID1",
+							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
+							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
+						},
+					},
+				},
+			},
+			oldstatus: &kubecontainer.PodStatus{
+				IPs: []string{"192.168.0.10", "192.168.0.1"},
+			},
+			expected: nil,
+		},
+		{
+			name: "status and cache ips are empty",
+			args: args{
+				pid:    "62212",
+				status: &kubecontainer.PodStatus{},
+			},
+			oldstatus: &kubecontainer.PodStatus{
+				IPs: []string{},
+			},
+			expected: nil,
+		},
+		{
+			name: "sandbox state is no PodSandboxState_SANDBOX_READY",
+			args: args{
+				pid: "62212",
+				status: &kubecontainer.PodStatus{
+					SandboxStatuses: []*v1.PodSandboxStatus{
+						{
+							Id:       "sandboxID2",
+							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
+							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
+						},
+						{
+							Id:       "sandboxID1",
+							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
+							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
+						},
+					},
+				},
+			},
+			oldstatus: &kubecontainer.PodStatus{
+				IPs: []string{"192.168.0.10", "192.168.0.1"},
+			},
+			expected: []string{"192.168.0.10", "192.168.0.1"},
+		},
+	}
+	for _, test := range tests {
+		cache.Set(test.args.pid, test.oldstatus, nil, time.Time{})
+		e := &EventedPLEG{
+			cache: cache,
+		}
+		t.Run(test.name, func(t *testing.T) {
+			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
+				t.Errorf("EventedPLEG.getPodIPs() = %v, expected %v", got, test.expected)
+			}
+		})
 	}
 }
