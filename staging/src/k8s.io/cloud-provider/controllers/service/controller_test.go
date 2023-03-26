@@ -99,6 +99,12 @@ func tweakAddPorts(protocol v1.Protocol, targetPort int) serviceTweak {
 	}
 }
 
+func tweakAddLBClass(loadBalancerClass *string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.LoadBalancerClass = loadBalancerClass
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -201,16 +207,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service specifies loadBalancerClass",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "with-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type:              v1.ServiceTypeLoadBalancer,
-					LoadBalancerClass: utilpointer.StringPtr("custom-loadbalancer"),
-				},
-			},
+			service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(utilpointer.String("custom-loadbalancer"))),
 			expectOp:             deleteLoadBalancer,
 			expectCreateAttempt:  false,
 			expectPatchStatus:    false,
@@ -218,20 +215,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service doesn't specify loadBalancerClass",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "with-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolSCTP,
-					}},
-					Type:              v1.ServiceTypeLoadBalancer,
-					LoadBalancerClass: nil,
-				},
-			},
+			service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(nil), tweakAddPorts(v1.ProtocolSCTP, 0)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
