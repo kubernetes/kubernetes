@@ -21,6 +21,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"encoding/json"
 
 	"github.com/spf13/cobra"
 
@@ -82,6 +83,14 @@ type groupResource struct {
 	APIGroup        string
 	APIGroupVersion string
 	APIResource     metav1.APIResource
+}
+
+type jsonResource struct {
+	Name            string `json:"NAME,omitempty"`
+	ShortNames      string `json:"SHORTNAMES,omitempty"`
+	APIGroupVersion string `json:"APIVERSION,omitempty"`
+	Namespaced      bool   `json:"NAMESPACED,omitempty"`
+	Kind            string `json:"KIND,omitempty"`
 }
 
 // NewAPIResourceOptions creates the options for APIResource
@@ -214,9 +223,26 @@ func (o *APIResourceOptions) RunAPIResources() error {
 	}
 
 	sort.Stable(sortableResource{resources, o.SortBy})
+
 	if o.Output == "json" {
-		fmt.Fprintf(w, "{\n")
+		jsonInfos := []jsonResource{}
+		for _, r := range resources {
+			jsonInfo := jsonResource{
+				r.APIResource.Name,
+				strings.Join(r.APIResource.ShortNames, ","),
+				r.APIGroupVersion,
+				r.APIResource.Namespaced,
+				r.APIResource.Kind,
+			}
+			jsonInfos = append(jsonInfos, jsonInfo)
+		}
+		marshalled, err := json.MarshalIndent(&jsonInfos, "", "  ")
+		if err != nil {
+			errs = append(errs, err)
+		}
+		fmt.Fprintln(w, string(marshalled))
 	}
+
 	for _, r := range resources {
 		switch o.Output {
 		case "name":
@@ -239,14 +265,7 @@ func (o *APIResourceOptions) RunAPIResources() error {
 				errs = append(errs, err)
 			}
 		case "json":
-			if _, err := fmt.Fprintf(w, "\t{\n\t\t'NAME': '%s', \n\t\t'SHORTNAMES': '%s', \n\t\t'APIVERSION': '%s', \n\t\t'NAMESPACED': '%v', \n\t\t'KIND': '%s'\n\t},\n",
-				r.APIResource.Name,
-				strings.Join(r.APIResource.ShortNames, ","),
-				r.APIGroupVersion,
-				r.APIResource.Namespaced,
-				r.APIResource.Kind); err != nil {
-				errs = append(errs, err)
-			}
+			break
 		case "":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
 				r.APIResource.Name,
@@ -257,9 +276,6 @@ func (o *APIResourceOptions) RunAPIResources() error {
 				errs = append(errs, err)
 			}
 		}
-	}
-	if o.Output == "json" {
-		fmt.Fprintf(w, "}\n")
 	}
 
 	if len(errs) > 0 {
