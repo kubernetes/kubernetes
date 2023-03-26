@@ -105,6 +105,12 @@ func tweakAddLBClass(loadBalancerClass *string) serviceTweak {
 	}
 }
 
+func tweakAddFinalizers(finalizers ...string) serviceTweak {
+	return func(s *v1.Service) {
+		s.ObjectMeta.Finalizers = finalizers
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -224,23 +230,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		// Finalizer test cases below.
 		{
 			desc: "service with finalizer that no longer wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "no-external-balancer",
-					Namespace:  "default",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
+			service:              newService("no-external-balancer", v1.ServiceTypeClusterIP, tweakAddLBIngress("8.8.8.8"), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
 			lbExists:             true,
 			expectOp:             deleteLoadBalancer,
 			expectDeleteAttempt:  true,
@@ -289,20 +279,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service with finalizer that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "basic-service1",
-					Namespace:  "default",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
+			service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
