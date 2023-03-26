@@ -85,6 +85,20 @@ func tweakAddLBIngress(ip string) serviceTweak {
 	}
 }
 
+func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
+	sp := v1.ServicePort{Port: 80, Protocol: protocol}
+	if targetPort > 0 {
+		sp.TargetPort = intstr.FromInt(targetPort)
+	}
+	return []v1.ServicePort{sp}
+}
+
+func tweakAddPorts(protocol v1.Protocol, targetPort int) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.Ports = makeServicePort(protocol, targetPort)
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -163,19 +177,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "udp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "udp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolUDP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
+			service:              newService("udp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolUDP, 0)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
@@ -183,19 +185,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "tcp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
+			service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
@@ -203,19 +193,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "sctp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "sctp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolSCTP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
+			service:              newService("sctp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolSCTP, 0)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
@@ -319,19 +297,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service without finalizer that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
+			service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
 			expectOp:             ensureLoadBalancer,
 			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
@@ -1518,20 +1484,7 @@ func TestNeedsUpdate(t *testing.T) {
 		{
 			testName: "If TargetGroup is different 1",
 			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("20"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
+				oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 20))
 				newSvc = oldSvc.DeepCopy()
 				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
 			},
@@ -1540,20 +1493,7 @@ func TestNeedsUpdate(t *testing.T) {
 		{
 			testName: "If TargetGroup is different 2",
 			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
+				oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 				newSvc = oldSvc.DeepCopy()
 				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
 			},
@@ -1562,20 +1502,7 @@ func TestNeedsUpdate(t *testing.T) {
 		{
 			testName: "If appProtocol is the same",
 			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
+				oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 				newSvc = oldSvc.DeepCopy()
 			},
 			expectedNeedsUpdate: false,
@@ -1583,20 +1510,7 @@ func TestNeedsUpdate(t *testing.T) {
 		{
 			testName: "If appProtocol is set when previously unset",
 			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
+				oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 				newSvc = oldSvc.DeepCopy()
 				protocol := "http"
 				newSvc.Spec.Ports[0].AppProtocol = &protocol
@@ -1607,21 +1521,8 @@ func TestNeedsUpdate(t *testing.T) {
 			testName: "If appProtocol is set to a different value",
 			updateFn: func() {
 				protocol := "http"
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:        80,
-							Protocol:    v1.ProtocolTCP,
-							TargetPort:  intstr.Parse("22"),
-							AppProtocol: &protocol,
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
+				oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
+				oldSvc.Spec.Ports[0].AppProtocol = &protocol
 				newSvc = oldSvc.DeepCopy()
 				newProtocol := "tcp"
 				newSvc.Spec.Ports[0].AppProtocol = &newProtocol
