@@ -79,6 +79,12 @@ func tweakAddETP(etpType v1.ServiceExternalTrafficPolicyType) serviceTweak {
 	}
 }
 
+func tweakAddLBIngress(ip string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: ip}}
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -149,22 +155,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service no longer wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
+			service: newService("no-external-balancer", v1.ServiceTypeClusterIP, tweakAddLBIngress("8.8.8.8")),
 			lbExists:            true,
 			expectOp:            deleteLoadBalancer,
 			expectDeleteAttempt: true,
