@@ -73,17 +73,9 @@ func newService(name string, serviceType v1.ServiceType, tweaks ...serviceTweak)
 	return s
 }
 
-func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "default",
-			UID:       "777",
-		},
-		Spec: v1.ServiceSpec{
-			Type:                  serviceType,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
-		},
+func tweakAddETP(etpType v1.ServiceExternalTrafficPolicyType) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.ExternalTrafficPolicy = etpType
 	}
 }
 
@@ -588,8 +580,8 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 		syncCallErr bool
 	}
 
-	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
-	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	etpLocalservice1 := newService("s0", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
+	etpLocalservice2 := newService("s1", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
 	service3 := defaultExternalService()
 
 	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
@@ -761,8 +753,8 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 		syncCallErr bool
 	}
 
-	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
-	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	etpLocalservice1 := newService("s0", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
+	etpLocalservice2 := newService("s1", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
 	service3 := defaultExternalService()
 
 	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
