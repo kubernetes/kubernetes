@@ -286,6 +286,7 @@ func (r *multiCIDRRangeAllocator) runCIDRWorker(ctx context.Context) {
 // processNextWorkItem will read a single work item off the cidrQueue and
 // attempt to process it, by calling the syncHandler.
 func (r *multiCIDRRangeAllocator) processNextCIDRWorkItem(ctx context.Context) bool {
+	logger := klog.FromContext(ctx)
 	obj, shutdown := r.cidrQueue.Get()
 	if shutdown {
 		return false
@@ -325,7 +326,7 @@ func (r *multiCIDRRangeAllocator) processNextCIDRWorkItem(ctx context.Context) b
 		// Finally, if no error occurs we Forget this item so it does not
 		// get cidrQueued again until another change happens.
 		r.cidrQueue.Forget(obj)
-		klog.Infof("Successfully synced '%s'", key)
+		logger.Info("Successfully synced", "key", key)
 		return nil
 	}(ctx, obj)
 
@@ -384,7 +385,7 @@ func (r *multiCIDRRangeAllocator) processNextNodeWorkItem(ctx context.Context) b
 		// Finally, if no error occurs we Forget this item so it does not
 		// get nodeQueue again until another change happens.
 		r.nodeQueue.Forget(obj)
-		klog.Infof("Successfully synced '%s'", key)
+		logger.Info("Successfully synced", "key", key)
 		return nil
 	}(klog.FromContext(ctx), obj)
 
@@ -399,12 +400,12 @@ func (r *multiCIDRRangeAllocator) processNextNodeWorkItem(ctx context.Context) b
 func (r *multiCIDRRangeAllocator) syncNode(logger klog.Logger, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing Node request %q (%v)", key, time.Since(startTime))
+		logger.V(4).Info("Finished syncing Node request", "node", key, "elapsed", time.Since(startTime))
 	}()
 
 	node, err := r.nodeLister.Get(key)
 	if apierrors.IsNotFound(err) {
-		klog.V(3).Infof("node has been deleted: %v", key)
+		logger.V(3).Info("node has been deleted", "node", key)
 		// TODO: obtain the node object information to call ReleaseCIDR from here
 		// and retry if there is an error.
 		return nil
@@ -414,7 +415,7 @@ func (r *multiCIDRRangeAllocator) syncNode(logger klog.Logger, key string) error
 	}
 	// Check the DeletionTimestamp to determine if object is under deletion.
 	if !node.DeletionTimestamp.IsZero() {
-		klog.V(3).Infof("node is being deleted: %v", key)
+		logger.V(3).Info("node is being deleted", "node", key)
 		return r.ReleaseCIDR(logger, node)
 	}
 	return r.AllocateOrOccupyCIDR(logger, node)
@@ -557,12 +558,12 @@ func (r *multiCIDRRangeAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node 
 
 	cidrs, clusterCIDR, err := r.prioritizedCIDRs(logger, node)
 	if err != nil {
-		controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidrs for node %s", node.Name)
 	}
 
 	if len(cidrs) == 0 {
-		controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("no cidrSets with matching labels found for node %s", node.Name)
 	}
 
@@ -696,7 +697,7 @@ func (r *multiCIDRRangeAllocator) updateCIDRsAllocation(logger klog.Logger, data
 		}
 		// failed release back to the pool.
 		logger.Error(err, "Failed to update node PodCIDR after attempts", "node", klog.KObj(node), "podCIDR", cidrsString, "retries", cidrUpdateRetries)
-		controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
+		controllerutil.RecordNodeStatusChange(logger, r.recorder, node, "CIDRAssignmentFailed")
 		// We accept the fact that we may leak CIDRs here. This is safer than releasing
 		// them in case when we don't know if request went through.
 		// NodeController restart will return all falsely allocated CIDRs to the pool.
@@ -1151,7 +1152,7 @@ func (r *multiCIDRRangeAllocator) reconcileDelete(ctx context.Context, clusterCI
 	if slice.ContainsString(clusterCIDR.GetFinalizers(), clusterCIDRFinalizer, nil) {
 		logger.V(2).Info("Releasing ClusterCIDR", "clusterCIDR", clusterCIDR.Name)
 		if err := r.deleteClusterCIDR(logger, clusterCIDR); err != nil {
-			klog.V(2).Info("Error while deleting ClusterCIDR", "err", err)
+			logger.V(2).Info("Error while deleting ClusterCIDR", "err", err)
 			return err
 		}
 		// Remove the finalizer as delete is successful.

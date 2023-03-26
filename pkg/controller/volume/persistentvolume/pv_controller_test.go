@@ -37,7 +37,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
@@ -311,7 +310,7 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 	}
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	doit := func(test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
@@ -372,7 +371,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
-		klog.V(4).Infof("controller synced, starting test")
+		logger.V(4).Info("controller synced, starting test")
 
 		// Call the tested function
 		err = test.test(ctrl, reactor.VolumeReactor, test)

@@ -169,9 +169,8 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 
 	defer e.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting endpoint controller")
-	defer logger.Info("Shutting down endpoint controller")
+	klog.Infof("Starting endpoint controller")
+	defer klog.Infof("Shutting down endpoint controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
@@ -323,39 +322,37 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer e.queue.Done(eKey)
 
 	err := e.syncService(ctx, eKey.(string))
-	e.handleErr(ctx, err, eKey)
+	e.handleErr(err, eKey)
 
 	return true
 }
 
-func (e *Controller) handleErr(ctx context.Context, err error, key interface{}) {
+func (e *Controller) handleErr(err error, key interface{}) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
 	}
 
-	logger := klog.FromContext(ctx)
 	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
 	if keyErr != nil {
-		logger.Error(err, "Failed to split meta namespace cache key", "key", key)
+		klog.ErrorS(err, "Failed to split meta namespace cache key", "key", key)
 	}
 
 	if e.queue.NumRequeues(key) < maxRetries {
-		logger.V(2).Info("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
+		klog.V(2).InfoS("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
 		e.queue.AddRateLimited(key)
 		return
 	}
 
-	logger.Info("Dropping service out of the queue", "service", key, "queue", err)
+	klog.Warningf("Dropping service %q out of the queue: %v", key, err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
 
 func (e *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
-	logger := klog.FromContext(ctx)
 	defer func() {
-		logger.V(4).Info("Finished syncing service endpoints", "service", key, "startTime", time.Since(startTime))
+		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -393,7 +390,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		return nil
 	}
 
-	logger.V(5).Info("About to update endpoints for service", "service", key)
+	klog.V(5).Infof("About to update endpoints for service %q", key)
 	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
@@ -413,7 +410,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 
 	for _, pod := range pods {
 		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
-			logger.V(5).Info("Pod is not included on endpoints for Service", "pod", klog.KObj(pod), "service", klog.KObj(service))
+			klog.V(5).Infof("Pod %s/%s is not included on endpoints for Service %s/%s", pod.Namespace, pod.Name, service.Namespace, service.Name)
 			continue
 		}
 
@@ -421,7 +418,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		if err != nil {
 			// this will happen, if the cluster runs with some nodes configured as dual stack and some as not
 			// such as the case of an upgrade..
-			logger.V(2).Info("Failed to find endpoint for service with ClusterIP on pod with error", "service", service.Name, "clusterIP", service.Spec.ClusterIP, "pod", klog.KObj(pod), "error", err)
+			klog.V(2).Infof("Failed to find endpoint for service:%s with ClusterIP:%s on pod:%s with error:%v", service.Name, service.Spec.ClusterIP, klog.KObj(pod), err)
 			continue
 		}
 
@@ -433,7 +430,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		// Allow headless service not to have ports.
 		if len(service.Spec.Ports) == 0 {
 			if service.Spec.ClusterIP == api.ClusterIPNone {
-				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(ctx, subsets, pod, epa, nil, service.Spec.PublishNotReadyAddresses)
+				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, nil, service.Spec.PublishNotReadyAddresses)
 				// No need to repack subsets for headless service without ports.
 			}
 		} else {
@@ -441,13 +438,13 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 				servicePort := &service.Spec.Ports[i]
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
-					logger.V(4).Info("Failed to find port for service", "service", klog.KObj(service), "error", err)
+					klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 					continue
 				}
 				epp := endpointPortFromServicePort(servicePort, portNum)
 
 				var readyEps, notReadyEps int
-				subsets, readyEps, notReadyEps = addEndpointSubset(ctx, subsets, pod, epa, epp, service.Spec.PublishNotReadyAddresses)
+				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, service.Spec.PublishNotReadyAddresses)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
 			}
@@ -486,7 +483,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		endpointutil.EndpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
 		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
-		logger.V(5).Info("endpoints are equal, skipping update", "service", klog.KObj(service))
+		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
 	newEndpoints := currentEndpoints.DeepCopy()
@@ -519,7 +516,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
 
-	logger.V(4).Info("Update endpoints", "service", klog.KObj(service), "readyEndpoints", totalReadyEps, "notreadyEndpoints", totalNotReadyEps)
+	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(ctx, newEndpoints, metav1.CreateOptions{})
@@ -533,7 +530,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 			// 1. namespace is terminating, endpoint creation is not allowed by default.
 			// 2. policy is misconfigured, in which case no service would function anywhere.
 			// Given the frequency of 1, we log at a lower level.
-			logger.V(5).Info("Forbidden from creating endpoints", "error", err)
+			klog.V(5).Infof("Forbidden from creating endpoints: %v", err)
 
 			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 			if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -586,12 +583,11 @@ func (e *Controller) checkLeftoverEndpoints() {
 // The addresses are added to the corresponding field, ready or not ready, depending
 // on the pod status and the Service PublishNotReadyAddresses field value.
 // The pod passed to this function must have already been filtered through ShouldPodBeInEndpoints.
-func addEndpointSubset(ctx context.Context, subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
+func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int
 	var notReadyEps int
 	ports := []v1.EndpointPort{}
-	logger := klog.FromContext(ctx)
 	if epp != nil {
 		ports = append(ports, *epp)
 	}
@@ -602,7 +598,7 @@ func addEndpointSubset(ctx context.Context, subsets []v1.EndpointSubset, pod *v1
 		})
 		readyEps++
 	} else { // if it is not a ready address it has to be not ready
-		logger.V(5).Info("Pod is out of service", "pod", klog.KObj(pod))
+		klog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
 			Ports:             ports,

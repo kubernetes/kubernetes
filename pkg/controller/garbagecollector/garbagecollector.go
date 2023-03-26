@@ -187,7 +187,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		logger := klog.FromContext(ctx)
 
 		// Get the current resource list from discovery.
-		newResources := GetDeletableResources(ctx, discoveryClient)
+		newResources := GetDeletableResources(logger, discoveryClient)
 
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
@@ -214,7 +214,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 
 			// On a reattempt, check if available resources have changed
 			if attempt > 1 {
-				newResources = GetDeletableResources(ctx, discoveryClient)
+				newResources = GetDeletableResources(logger, discoveryClient)
 				if len(newResources) == 0 {
 					logger.V(2).Info("no resources reported by discovery", "attempt", attempt)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
@@ -809,8 +809,7 @@ func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
 // All discovery errors are considered temporary. Upon encountering any error,
 // GetDeletableResources will log and return any discovered resources it was
 // able to process (which may be none).
-func GetDeletableResources(ctx context.Context, discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
-	logger := klog.FromContext(ctx)
+func GetDeletableResources(logger klog.Logger, discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discovery.IsGroupDiscoveryFailedError(err) {
