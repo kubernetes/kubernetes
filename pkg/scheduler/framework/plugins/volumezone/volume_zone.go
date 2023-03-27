@@ -60,7 +60,7 @@ const (
 type pvTopology struct {
 	pvName string
 	key    string
-	values sets.String
+	values sets.Set[string]
 }
 
 // the state is initialized in PreFilter phase. because we save the pointer in
@@ -160,7 +160,7 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 				podPVTopologies = append(podPVTopologies, pvTopology{
 					pvName: pv.Name,
 					key:    key,
-					values: volumeVSet,
+					values: sets.Set[string](volumeVSet),
 				})
 			}
 		}

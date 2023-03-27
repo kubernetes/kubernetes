@@ -132,7 +132,7 @@ type frameworkOptions struct {
 	podNominator           framework.PodNominator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
-	clusterEventMap        map[framework.ClusterEvent]sets.String
+	clusterEventMap        map[framework.ClusterEvent]sets.Set[string]
 	parallelizer           parallelize.Parallelizer
 }
 
@@ -216,7 +216,7 @@ func WithCaptureProfile(c CaptureProfile) Option {
 }
 
 // WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+func WithClusterEventMap(m map[framework.ClusterEvent]sets.Set[string]) Option {
 	return func(o *frameworkOptions) {
 		o.clusterEventMap = m
 	}
@@ -233,7 +233,7 @@ func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
-		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
+		clusterEventMap: make(map[framework.ClusterEvent]sets.Set[string]),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
 }
@@ -441,7 +441,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 			enabledSet.insert(plugin.Name)
 		}
 
-		disabledSet := sets.NewString()
+		disabledSet := sets.New[string]()
 		for _, disabledPlugin := range e.plugins.Disabled {
 			disabledSet.Insert(disabledPlugin.Name)
 		}
@@ -516,7 +516,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 	return nil
 }
 
-func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.Set[string]) {
 	ext, ok := p.(framework.EnqueueExtensions)
 	if !ok {
 		// If interface EnqueueExtensions is not implemented, register the default events
@@ -537,10 +537,10 @@ func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.Clust
 	registerClusterEvents(p.Name(), eventToPlugins, events)
 }
 
-func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.String, evts []framework.ClusterEvent) {
+func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.Set[string], evts []framework.ClusterEvent) {
 	for _, evt := range evts {
 		if eventToPlugins[evt] == nil {
-			eventToPlugins[evt] = sets.NewString(name)
+			eventToPlugins[evt] = sets.New(name)
 		} else {
 			eventToPlugins[evt].Insert(name)
 		}
@@ -550,7 +550,7 @@ func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEven
 func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {
 	plugins := reflect.ValueOf(pluginList).Elem()
 	pluginType := plugins.Type().Elem()
-	set := sets.NewString()
+	set := sets.New[string]()
 	for _, ep := range pluginSet.Enabled {
 		pg, ok := pluginsMap[ep.Name]
 		if !ok {
@@ -1362,8 +1362,8 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 	return f.informerFactory
 }
 
-func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
-	pgSet := sets.String{}
+func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {
+	pgSet := sets.Set[string]{}
 
 	if plugins == nil {
 		return pgSet

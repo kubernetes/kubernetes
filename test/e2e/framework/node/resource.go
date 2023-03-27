@@ -536,7 +536,7 @@ func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, e
 }
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
-func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.Set[string], error) {
 	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
 	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
@@ -544,7 +544,7 @@ func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (set
 	}
 
 	// collect values of zone label from all nodes
-	zones := sets.NewString()
+	zones := sets.New[string]()
 	for _, node := range nodes.Items {
 		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)

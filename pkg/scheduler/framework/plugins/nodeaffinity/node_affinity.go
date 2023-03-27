@@ -107,14 +107,14 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 
 	// Check if there is affinity to a specific node and return it.
 	terms := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-	var nodeNames sets.String
+	var nodeNames sets.Set[string]
 	for _, t := range terms {
-		var termNodeNames sets.String
+		var termNodeNames sets.Set[string]
 		for _, r := range t.MatchFields {
 			if r.Key == metav1.ObjectNameField && r.Operator == v1.NodeSelectorOpIn {
 				// The requirements represent ANDed constraints, and so we need to
 				// find the intersection of nodes.
-				s := sets.NewString(r.Values...)
+				s := sets.New(r.Values...)
 				if termNodeNames == nil {
 					termNodeNames = s
 				} else {

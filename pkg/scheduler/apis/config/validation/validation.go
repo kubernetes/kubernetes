@@ -227,7 +227,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		}
 	}
 
-	seenPluginConfig := make(sets.String)
+	seenPluginConfig := sets.New[string]()
 
 	for i := range profile.PluginConfig {
 		pluginConfigPath := path.Child("pluginConfig").Index(i)
@@ -298,7 +298,7 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error {
 	var errs []error
 	binders := 0
-	extenderManagedResources := sets.NewString()
+	extenderManagedResources := sets.New[string]()
 	for i, extender := range extenders {
 		path := fldPath.Index(i)
 		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
