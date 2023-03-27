@@ -28,6 +28,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -287,7 +288,7 @@ func TestGCMNonce(t *testing.T) {
 	})
 }
 
-func testGCMNonce(t *testing.T, f func(t testingT, block cipher.Block) value.Transformer, check func(int, []byte)) {
+func testGCMNonce(t *testing.T, f transformerFunc, check func(int, []byte)) {
 	block, err := aes.NewCipher([]byte("abcdefghijklmnop"))
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +329,7 @@ func TestGCMKeyRotation(t *testing.T) {
 	})
 }
 
-func testGCMKeyRotation(t *testing.T, f func(t testingT, block cipher.Block) value.Transformer) {
+func testGCMKeyRotation(t *testing.T, f transformerFunc) {
 	testErr := fmt.Errorf("test error")
 	block1, err := aes.NewCipher([]byte("abcdefghijklmnop"))
 	if err != nil {
@@ -448,7 +449,15 @@ func BenchmarkGCMRead(b *testing.B) {
 	for _, t := range tests {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength/%vExpectStale", t.keyLength, t.valueLength, t.expectStale)
 		b.Run(name, func(b *testing.B) {
-			benchmarkGCMRead(b, t.keyLength, t.valueLength, t.expectStale)
+			for i, f := range []transformerFunc{
+				newGCMTransformer,
+				newGCMTransformerWithUniqueKeyUnsafeTest,
+			} {
+				f := f
+				b.Run(strconv.Itoa(i), func(b *testing.B) {
+					benchmarkGCMRead(b, f, t.keyLength, t.valueLength, t.expectStale)
+				})
+			}
 		})
 	}
 }
@@ -465,12 +474,20 @@ func BenchmarkGCMWrite(b *testing.B) {
 	for _, t := range tests {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength", t.keyLength, t.valueLength)
 		b.Run(name, func(b *testing.B) {
-			benchmarkGCMWrite(b, t.keyLength, t.valueLength)
+			for i, f := range []transformerFunc{
+				newGCMTransformer,
+				newGCMTransformerWithUniqueKeyUnsafeTest,
+			} {
+				f := f
+				b.Run(strconv.Itoa(i), func(b *testing.B) {
+					benchmarkGCMWrite(b, f, t.keyLength, t.valueLength)
+				})
+			}
 		})
 	}
 }
 
-func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, expectStale bool) {
+func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLength int, expectStale bool) {
 	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
 	if err != nil {
 		b.Fatal(err)
@@ -480,8 +497,8 @@ func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, expectStale 
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: newGCMTransformer(b, block1)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: newGCMTransformer(b, block2)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
 	)
 
 	ctx := context.Background()
@@ -495,8 +512,8 @@ func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, expectStale 
 	// reverse the key order if expecting stale
 	if expectStale {
 		p = value.NewPrefixTransformers(nil,
-			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: newGCMTransformer(b, block2)},
-			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: newGCMTransformer(b, block1)},
+			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
+			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
 		)
 	}
 
@@ -513,7 +530,7 @@ func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, expectStale 
 	b.StopTimer()
 }
 
-func benchmarkGCMWrite(b *testing.B, keyLength int, valueLength int) {
+func benchmarkGCMWrite(b *testing.B, f transformerFunc, keyLength int, valueLength int) {
 	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
 	if err != nil {
 		b.Fatal(err)
@@ -523,8 +540,8 @@ func benchmarkGCMWrite(b *testing.B, keyLength int, valueLength int) {
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: newGCMTransformer(b, block1)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: newGCMTransformer(b, block2)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
 	)
 
 	ctx := context.Background()
@@ -722,6 +739,8 @@ type testingT interface {
 	Helper()
 	Fatal(...any)
 }
+
+type transformerFunc func(t testingT, block cipher.Block) value.Transformer
 
 func newGCMTransformer(t testingT, block cipher.Block) value.Transformer {
 	t.Helper()
