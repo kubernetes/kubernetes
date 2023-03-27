@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -31,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/hkdf"
 
 	"k8s.io/apiserver/pkg/storage/value"
@@ -302,6 +304,23 @@ func sha256KDF(secret, salt, info []byte) ([]byte, error) {
 	}
 
 	return derivedKey, nil
+}
+
+func sha256HMACNoInfo(secret, salt, _ []byte) ([]byte, error) {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write(salt)
+	return mac.Sum(nil), nil
+}
+
+func sha256HMAC(secret, salt, info []byte) ([]byte, error) {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write(salt)
+	mac.Write(info) // note that this is only okay because we control salt generation
+	return mac.Sum(nil), nil
+}
+
+func hchacha20NoInfo(secret, salt, _ []byte) ([]byte, error) { // I am not really sure how to adapt this to use info
+	return chacha20.HChaCha20(secret, salt[:16]) // hchacha requires 16 byte salt
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
