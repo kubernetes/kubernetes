@@ -319,20 +319,20 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 		nodes            []v1.Node
 		nodeNameToDelete string
 		injectErr        error
-		expectNodeNames  sets.String
+		expectNodeNames  sets.Set[string]
 	}{
 		{
 			name:             "node is deleted during a scheduling cycle",
 			nodes:            []v1.Node{*nodeFoo, *nodeBar},
 			nodeNameToDelete: "foo",
 			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames:  sets.NewString("bar"),
+			expectNodeNames:  sets.New("bar"),
 		},
 		{
 			name:            "node is not deleted but NodeNotFound is received incorrectly",
 			nodes:           []v1.Node{*nodeFoo, *nodeBar},
 			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames: sets.NewString("foo", "bar"),
+			expectNodeNames: sets.New("foo", "bar"),
 		},
 	}
 
@@ -368,7 +368,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
 
 			gotNodes := schedulerCache.Dump().Nodes
-			gotNodeNames := sets.NewString()
+			gotNodeNames := sets.New[string]()
 			for _, nodeInfo := range gotNodes {
 				gotNodeNames.Insert(nodeInfo.Node().Name)
 			}

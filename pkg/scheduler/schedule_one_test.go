@@ -737,7 +737,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				NodeToStatusMap: framework.NodeToStatusMap{
 					node.Name: framework.NewStatus(framework.Unschedulable, nodeports.ErrReason).WithFailedPlugin(nodeports.Name),
 				},
-				UnschedulablePlugins: sets.NewString(nodeports.Name),
+				UnschedulablePlugins: sets.New(nodeports.Name),
 			},
 		}
 		if !reflect.DeepEqual(expectErr, err) {
@@ -843,7 +843,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			NumAllNodes: len(nodes),
 			Diagnosis: framework.Diagnosis{
 				NodeToStatusMap:      failedNodeStatues,
-				UnschedulablePlugins: sets.NewString(noderesources.Name),
+				UnschedulablePlugins: sets.New(noderesources.Name),
 			},
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {
@@ -1272,7 +1272,7 @@ func TestSelectHost(t *testing.T) {
 	tests := []struct {
 		name          string
 		list          []framework.NodePluginScores
-		possibleHosts sets.String
+		possibleHosts sets.Set[string]
 		expectsErr    bool
 	}{
 		{
@@ -1281,7 +1281,7 @@ func TestSelectHost(t *testing.T) {
 				{Name: "node1.1", TotalScore: 1},
 				{Name: "node2.1", TotalScore: 2},
 			},
-			possibleHosts: sets.NewString("node2.1"),
+			possibleHosts: sets.New("node2.1"),
 			expectsErr:    false,
 		},
 		{
@@ -1292,7 +1292,7 @@ func TestSelectHost(t *testing.T) {
 				{Name: "node1.3", TotalScore: 2},
 				{Name: "node2.1", TotalScore: 2},
 			},
-			possibleHosts: sets.NewString("node1.2", "node1.3", "node2.1"),
+			possibleHosts: sets.New("node1.2", "node1.3", "node2.1"),
 			expectsErr:    false,
 		},
 		{
@@ -1304,13 +1304,13 @@ func TestSelectHost(t *testing.T) {
 				{Name: "node3.1", TotalScore: 1},
 				{Name: "node1.3", TotalScore: 3},
 			},
-			possibleHosts: sets.NewString("node1.1", "node1.2", "node1.3"),
+			possibleHosts: sets.New("node1.1", "node1.2", "node1.3"),
 			expectsErr:    false,
 		},
 		{
 			name:          "empty priority list",
 			list:          []framework.NodePluginScores{},
-			possibleHosts: sets.NewString(),
+			possibleHosts: sets.New[string](),
 			expectsErr:    true,
 		},
 	}
@@ -1525,7 +1525,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 		pvcs               []v1.PersistentVolumeClaim
 		pod                *v1.Pod
 		pods               []*v1.Pod
-		wantNodes          sets.String
+		wantNodes          sets.Set[string]
 		wantEvaluatedNodes *int32
 		wErr               error
 	}{
@@ -1546,7 +1546,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
 						"node2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
 					},
-					UnschedulablePlugins: sets.NewString("FalseFilter"),
+					UnschedulablePlugins: sets.New("FalseFilter"),
 				},
 			},
 		},
@@ -1558,7 +1558,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"node1", "node2"},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
-			wantNodes: sets.NewString("node1", "node2"),
+			wantNodes: sets.New("node1", "node2"),
 			name:      "test 2",
 			wErr:      nil,
 		},
@@ -1571,7 +1571,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"node1", "node2"},
 			pod:       st.MakePod().Name("node2").UID("node2").Obj(),
-			wantNodes: sets.NewString("node2"),
+			wantNodes: sets.New("node2"),
 			name:      "test 3",
 			wErr:      nil,
 		},
@@ -1584,7 +1584,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"3", "2", "1"},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
-			wantNodes: sets.NewString("3"),
+			wantNodes: sets.New("3"),
 			name:      "test 4",
 			wErr:      nil,
 		},
@@ -1597,7 +1597,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"3", "2", "1"},
 			pod:       st.MakePod().Name("2").UID("2").Obj(),
-			wantNodes: sets.NewString("2"),
+			wantNodes: sets.New("2"),
 			name:      "test 5",
 			wErr:      nil,
 		},
@@ -1611,7 +1611,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"3", "2", "1"},
 			pod:       st.MakePod().Name("2").UID("2").Obj(),
-			wantNodes: sets.NewString("1"),
+			wantNodes: sets.New("1"),
 			name:      "test 6",
 			wErr:      nil,
 		},
@@ -1635,7 +1635,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
 						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
 					},
-					UnschedulablePlugins: sets.NewString("FalseFilter"),
+					UnschedulablePlugins: sets.New("FalseFilter"),
 				},
 			},
 		},
@@ -1661,7 +1661,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
 						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("NoPodsFilter"),
 					},
-					UnschedulablePlugins: sets.NewString("MatchFilter", "NoPodsFilter"),
+					UnschedulablePlugins: sets.New("MatchFilter", "NoPodsFilter"),
 				},
 			},
 		},
@@ -1681,7 +1681,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				},
 			},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
-			wantNodes: sets.NewString("node1", "node2"),
+			wantNodes: sets.New("node1", "node2"),
 			name:      "existing PVC",
 			wErr:      nil,
 		},
@@ -1702,7 +1702,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         `persistentvolumeclaim "unknownPVC" not found`,
-					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+					UnschedulablePlugins: sets.New(volumebinding.Name),
 				},
 			},
 		},
@@ -1724,7 +1724,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         `persistentvolumeclaim "existingPVC" is being deleted`,
-					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+					UnschedulablePlugins: sets.New(volumebinding.Name),
 				},
 			},
 		},
@@ -1765,7 +1765,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").UID("pod1").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 			},
-			wantNodes: sets.NewString("node2"),
+			wantNodes: sets.New("node2"),
 			wErr:      nil,
 		},
 		{
@@ -1794,7 +1794,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.MakePod().Name("pod1b").UID("pod1b").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 				st.MakePod().Name("pod2").UID("pod2").Label("foo", "").Node("node2").Phase(v1.PodRunning).Obj(),
 			},
-			wantNodes: sets.NewString("node2", "node3"),
+			wantNodes: sets.New("node2", "node3"),
 			wErr:      nil,
 		},
 		{
@@ -1818,7 +1818,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					NodeToStatusMap: framework.NodeToStatusMap{
 						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
 					},
-					UnschedulablePlugins: sets.NewString("FakeFilter"),
+					UnschedulablePlugins: sets.New("FakeFilter"),
 				},
 			},
 		},
@@ -1843,7 +1843,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					NodeToStatusMap: framework.NodeToStatusMap{
 						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
 					},
-					UnschedulablePlugins: sets.NewString("FakeFilter"),
+					UnschedulablePlugins: sets.New("FakeFilter"),
 				},
 			},
 		},
@@ -1882,7 +1882,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         "injected unschedulable status",
-					UnschedulablePlugins: sets.NewString("FakePreFilter"),
+					UnschedulablePlugins: sets.New("FakePreFilter"),
 				},
 			},
 		},
@@ -1911,17 +1911,17 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString("node2")}, nil),
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New("node2")}, nil),
 				),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter3",
-					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")}, nil),
+					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
-			wantNodes:          sets.NewString("node2"),
+			wantNodes:          sets.New("node2"),
 			wantEvaluatedNodes: pointer.Int32(1),
 		},
 		{
@@ -1934,11 +1934,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString("node2")}, nil),
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New("node2")}, nil),
 				),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter3",
-					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.NewString("node1")}, nil),
+					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.New("node1")}, nil),
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -1949,7 +1949,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
-					UnschedulablePlugins: sets.String{},
+					UnschedulablePlugins: sets.Set[string]{},
 					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
 				},
 			},
@@ -1964,7 +1964,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString()}, nil),
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New[string]()}, nil),
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -1975,7 +1975,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
-					UnschedulablePlugins: sets.String{},
+					UnschedulablePlugins: sets.Set[string]{},
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
 				},
 			},
@@ -2013,7 +2013,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
-			wantNodes:          sets.NewString("node2", "node3"),
+			wantNodes:          sets.New("node2", "node3"),
 			wantEvaluatedNodes: pointer.Int32(3),
 		},
 		{
@@ -2029,7 +2029,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 			nodes:     []string{"node1", "node2"},
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
-			wantNodes: sets.NewString("node1", "node2"),
+			wantNodes: sets.New("node1", "node2"),
 		},
 	}
 	for _, test := range tests {
@@ -2138,7 +2138,7 @@ func TestFindFitAllError(t *testing.T) {
 			"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
 			"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
 		},
-		UnschedulablePlugins: sets.NewString("MatchFilter"),
+		UnschedulablePlugins: sets.New("MatchFilter"),
 	}
 	if diff := cmp.Diff(diagnosis, expected); diff != "" {
 		t.Errorf("Unexpected diagnosis: (-want, +got): %s", diff)
@@ -2177,7 +2177,7 @@ func TestFindFitSomeError(t *testing.T) {
 		t.Errorf("unexpected failed status map: %v", diagnosis.NodeToStatusMap)
 	}
 
-	if diff := cmp.Diff(sets.NewString("MatchFilter"), diagnosis.UnschedulablePlugins); diff != "" {
+	if diff := cmp.Diff(sets.New("MatchFilter"), diagnosis.UnschedulablePlugins); diff != "" {
 		t.Errorf("Unexpected unschedulablePlugins: (-want, +got): %s", diagnosis.UnschedulablePlugins)
 	}
 
