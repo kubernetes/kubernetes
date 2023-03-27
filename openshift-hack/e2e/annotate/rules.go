@@ -15,7 +15,6 @@ var (
 			`\[Feature:UserNamespacesStatelessPodsSupport\]`,
 			`\[Feature:ReadWriteOncePod\]`,
 			`\[Feature:SELinuxMountReadWriteOncePod\]`,
-			`\[Feature:add node log viewer\]`,
 			`\[Feature:PodSchedulingReadiness\]`,
 		},
 		// tests for features that are not implemented in openshift
