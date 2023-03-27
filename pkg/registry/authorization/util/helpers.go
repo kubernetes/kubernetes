@@ -29,7 +29,7 @@ func ResourceAttributesFrom(user user.Info, in authorizationapi.ResourceAttribut
 		Verb:            in.Verb,
 		Namespace:       in.Namespace,
 		APIGroup:        in.Group,
-		APIVersion:      in.Version,
+		APIVersion:      MatchAllVersionIfEmpty(in.Version),
 		Resource:        in.Resource,
 		Subresource:     in.Subresource,
 		Name:            in.Name,
@@ -76,4 +76,14 @@ func AuthorizationAttributesFrom(spec authorizationapi.SubjectAccessReviewSpec) 
 	}
 
 	return authorizationAttributes
+}
+
+const AllVersion = "*"
+
+// MatchAllVersionIfEmpty returns a "*" if the version is unspecified
+func MatchAllVersionIfEmpty(version string) string {
+	if len(version) == 0 {
+		return AllVersion
+	}
+	return version
 }

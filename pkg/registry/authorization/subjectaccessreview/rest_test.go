@@ -19,6 +19,7 @@ package subjectaccessreview
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -181,6 +182,7 @@ func TestCreate(t *testing.T) {
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				ResourceRequest: true,
+				APIVersion:      "*",
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed: false,
@@ -209,6 +211,7 @@ func TestCreate(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(auth.attrs, tc.expectedAttrs) {
+			fmt.Println(k)
 			t.Errorf("%s: expected\n%#v\ngot\n%#v", k, tc.expectedAttrs, auth.attrs)
 		}
 		status := result.(*authorizationapi.SubjectAccessReview).Status
