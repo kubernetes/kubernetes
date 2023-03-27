@@ -137,7 +137,8 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		cancel()
 	}()
 
-	if err := setUpPreferredHostForOpenShift(opts); err != nil {
+	logger := klog.FromContext(ctx)
+	if err := setUpPreferredHostForOpenShift(logger, opts); err != nil {
 		return err
 	}
 

@@ -31,7 +31,7 @@ func SetUpCustomRoundTrippersForOpenShift(controllerManagerOptions *options.Kube
 		return nil
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags(controllerManagerOptions.Master, controllerManagerOptions.Kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags(controllerManagerOptions.Master, controllerManagerOptions.Generic.ClientConnection.Kubeconfig)
 	if err != nil {
 		return err
 	}

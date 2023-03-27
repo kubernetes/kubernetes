@@ -3,6 +3,8 @@ package app
 import (
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -12,7 +14,7 @@ import (
 	"github.com/openshift/library-go/pkg/monitor/health"
 )
 
-func setUpPreferredHostForOpenShift(kubeSchedulerOptions *options.Options) error {
+func setUpPreferredHostForOpenShift(logger klog.Logger, kubeSchedulerOptions *options.Options) error {
 	if !kubeSchedulerOptions.OpenShiftContext.UnsupportedKubeAPIOverPreferredHost {
 		return nil
 	}
@@ -24,7 +26,7 @@ func setUpPreferredHostForOpenShift(kubeSchedulerOptions *options.Options) error
 	// if there was no kubeconfig specified we won't be able to get cluster info.
 	// in that case try to load the configuration and read kubeconfig directly from it if it was provided.
 	if len(kubeSchedulerOptions.ConfigFile) > 0 {
-		cfg, err := options.LoadKubeSchedulerConfiguration(kubeSchedulerOptions.ConfigFile)
+		cfg, err := options.LoadKubeSchedulerConfiguration(logger, kubeSchedulerOptions.ConfigFile)
 		if err != nil {
 			return err
 		}
