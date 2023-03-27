@@ -73,7 +73,7 @@ authenticated with the registry you're pushing to.
 
 ### Additional configuration
 
-The `powershell-helper` image uses `mcr.microsoft.com/windows/nanoserver:1809` as a base image.
+The `powershell-helper` image uses `mcr.microsoft.com/windows/nanoserver:ltsc2019` as a base image.
 Note that `docker buildx` has an issue pulling cross-registry images when building images, and in
 order to circumvent this issue, the make target `all-push-as-linux` will push a Linux cache image
 which will contain only the necessary bits, and this cache image can then be used in the regular

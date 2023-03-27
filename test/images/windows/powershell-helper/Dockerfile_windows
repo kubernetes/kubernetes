@@ -22,7 +22,7 @@ RUN cd C:\PowerShell &\
     del powershell.zip &\
     mklink powershell.exe pwsh.exe
 
-FROM mcr.microsoft.com/windows/nanoserver:1809
+FROM mcr.microsoft.com/windows/nanoserver:ltsc2019
 
 COPY --from=prep /PowerShell /PowerShell
 

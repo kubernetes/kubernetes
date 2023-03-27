@@ -1,3 +1,6 @@
+# 3.10
+* Support both Windows 1809 and ltsc2019. 1809 will be deprecated soon. ([#116935](https://github.com/kubernetes/kubernetes/pull/116935), [@lzhecheng](https://github.com/lzhecheng))
+
 # 3.9
 
 * Unsupported Windows Semi-Annual Channel container images removed (OS Versions removed: 20H2). ([#112924](https://github.com/kubernetes/kubernetes/pull/112924), [@marosset](https://github.com/marosset))
