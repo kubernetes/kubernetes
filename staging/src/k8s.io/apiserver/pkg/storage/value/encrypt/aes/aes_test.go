@@ -153,7 +153,7 @@ func TestGCMUnsafeCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	transformerDecrypt := newGCMTransformer(t, block)
+	transformerDecrypt := newGCMTransformer(t, block, nil)
 
 	ctx := context.Background()
 	dataCtx := value.DefaultContext("authenticated_data")
@@ -185,7 +185,7 @@ func TestGCMLegacyDataCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	transformerDecrypt := newGCMTransformer(t, block)
+	transformerDecrypt := newGCMTransformer(t, block, nil)
 
 	// recorded output from NewGCMTransformer at commit 3b1fc60d8010dd8b53e97ba80e4710dbb430beee
 	const legacyCiphertext = "\x9f'\xc8\xfc\xea\x8aX\xc4g\xd8\xe47\xdb\xf2\xd8YU\xf9\xb4\xbd\x91/N\xf9g\u05c8\xa0\xcb\ay}\xac\n?\n\bE`\\\xa8Z\xc8V+J\xe1"
@@ -210,7 +210,7 @@ func TestGCMUnsafeNonceGen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	transformer := newGCMTransformerWithUniqueKeyUnsafeTest(t, block)
+	transformer := newGCMTransformerWithUniqueKeyUnsafeTest(t, block, nil)
 
 	ctx := context.Background()
 	dataCtx := value.DefaultContext("authenticated_data")
@@ -293,7 +293,7 @@ func testGCMNonce(t *testing.T, f transformerFunc, check func(int, []byte)) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	transformer := f(t, block)
+	transformer := f(t, block, nil)
 
 	ctx := context.Background()
 	dataCtx := value.DefaultContext("authenticated_data")
@@ -344,8 +344,8 @@ func testGCMKeyRotation(t *testing.T, f transformerFunc) {
 	dataCtx := value.DefaultContext("authenticated_data")
 
 	p := value.NewPrefixTransformers(testErr,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(t, block1)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(t, block2)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(t, block1, nil)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(t, block2, nil)},
 	)
 	out, err := p.TransformToStorage(ctx, []byte("firstvalue"), dataCtx)
 	if err != nil {
@@ -370,8 +370,8 @@ func testGCMKeyRotation(t *testing.T, f transformerFunc) {
 
 	// reverse the order, use the second key
 	p = value.NewPrefixTransformers(testErr,
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(t, block2)},
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(t, block1)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(t, block2, nil)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(t, block1, nil)},
 	)
 	from, stale, err = p.TransformFromStorage(ctx, out, dataCtx)
 	if err != nil {
@@ -497,8 +497,8 @@ func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLengt
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
 	)
 
 	ctx := context.Background()
@@ -512,8 +512,8 @@ func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLengt
 	// reverse the key order if expecting stale
 	if expectStale {
 		p = value.NewPrefixTransformers(nil,
-			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
-			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
+			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
+			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
 		)
 	}
 
@@ -540,8 +540,8 @@ func benchmarkGCMWrite(b *testing.B, f transformerFunc, keyLength int, valueLeng
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
 	)
 
 	ctx := context.Background()
@@ -685,12 +685,12 @@ func TestRoundTrip(t *testing.T) {
 		dataCtx value.Context
 		t       value.Transformer
 	}{
-		{name: "GCM 16 byte key", t: newGCMTransformer(t, aes16block)},
-		{name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block)},
-		{name: "GCM 32 byte key", t: newGCMTransformer(t, aes32block)},
-		{name: "GCM 16 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes16block)},
-		{name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block)},
-		{name: "GCM 32 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes32block)},
+		{name: "GCM 16 byte key", t: newGCMTransformer(t, aes16block, nil)},
+		{name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block, nil)},
+		{name: "GCM 32 byte key", t: newGCMTransformer(t, aes32block, nil)},
+		{name: "GCM 16 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes16block, nil)},
+		{name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block, nil)},
+		{name: "GCM 32 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes32block, nil)},
 		{name: "CBC 32 byte key", t: NewCBCTransformer(aes32block)},
 	}
 	for _, tt := range tests {
@@ -740,9 +740,9 @@ type testingT interface {
 	Fatal(...any)
 }
 
-type transformerFunc func(t testingT, block cipher.Block) value.Transformer
+type transformerFunc func(t testingT, block cipher.Block, key []byte) value.Transformer
 
-func newGCMTransformer(t testingT, block cipher.Block) value.Transformer {
+func newGCMTransformer(t testingT, block cipher.Block, _ []byte) value.Transformer {
 	t.Helper()
 
 	transformer, err := NewGCMTransformer(block)
@@ -753,7 +753,7 @@ func newGCMTransformer(t testingT, block cipher.Block) value.Transformer {
 	return transformer
 }
 
-func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block) value.Transformer {
+func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block, _ []byte) value.Transformer {
 	t.Helper()
 
 	nonceGen := &nonceGenerator{fatal: die}
