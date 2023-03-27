@@ -149,7 +149,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 }
 
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
-// The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. Serve does not block.
+// The actual server loop (stoppable by closing stopCh) runs in a goroutine, i.e. Serve does not block.
 // It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
 // It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
 func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {

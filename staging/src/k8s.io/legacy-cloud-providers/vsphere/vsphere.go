@@ -1126,7 +1126,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 // DisksAreAttached returns if disks are attached to the VM using controllers supported by the plugin.
 // 1. Converts volPaths into canonical form so that it can be compared with the VM device path.
 // 2. Segregates nodes by vCenter and Datacenter they are present in. This reduces calls to VC.
-// 3. Creates go routines per VC-DC to find whether disks are attached to the nodes.
+// 3. Creates goroutines per VC-DC to find whether disks are attached to the nodes.
 // 4. If the some of the VMs are not found or migrated then they are added to a list.
 // 5. After successful execution of goroutines,
 // 5a. If there are any VMs which needs to be retried, they are rediscovered and the whole operation is initiated again for only rediscovered VMs.
@@ -1138,7 +1138,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		// disksAreAttach checks whether disks are attached to the nodes.
 		// Returns nodes that need to be retried if retry is true
 		// Segregates nodes per VC and DC
-		// Creates go routines per VC-DC to find whether disks are attached to the nodes.
+		// Creates goroutines per VC-DC to find whether disks are attached to the nodes.
 		disksAreAttach := func(ctx context.Context, nodeVolumes map[k8stypes.NodeName][]string, attached map[string]map[string]bool, retry bool) ([]k8stypes.NodeName, error) {
 
 			var wg sync.WaitGroup
@@ -1164,7 +1164,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			for _, nodeNames := range dcNodes {
 				localAttachedMap := make(map[string]map[string]bool)
 				localAttachedMaps = append(localAttachedMaps, localAttachedMap)
-				// Start go routines per VC-DC to check disks are attached
+				// Start goroutines per VC-DC to check disks are attached
 				go func(nodes []k8stypes.NodeName) {
 					nodesToRetryLocal, err := vs.checkDiskAttached(ctx, nodes, nodeVolumes, localAttachedMap, retry)
 					if err != nil {

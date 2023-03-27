@@ -226,7 +226,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 			if len(rcInstance.volumesFailedReconstruction) != 0 {
 				t.Errorf("Expected volumesFailedReconstruction to be empty, got %+v", rcInstance.volumesFailedReconstruction)
 			}
-			// Unmount runs in a go routine, wait for its finish
+			// Unmount runs in a goroutine, wait for its finish
 			var lastErr error
 			err = retryWithExponentialBackOff(testOperationBackOffDuration, func() (bool, error) {
 				if err := verifyTearDownCalls(fakePlugin, tc.expectedUnmounts); err != nil {

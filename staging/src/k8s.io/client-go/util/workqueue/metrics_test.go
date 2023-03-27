@@ -43,7 +43,7 @@ func TestMetricShutdown(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 	q := newQueue(c, m, time.Millisecond)
 	for !c.HasWaiters() {
-		// Wait for the go routine to call NewTicker()
+		// Wait for the goroutine to call NewTicker()
 		time.Sleep(time.Millisecond)
 	}
 
@@ -179,7 +179,7 @@ func TestMetrics(t *testing.T) {
 	q := newQueueWithConfig(config, time.Millisecond)
 	defer q.ShutDown()
 	for !c.HasWaiters() {
-		// Wait for the go routine to call NewTicker()
+		// Wait for the goroutine to call NewTicker()
 		time.Sleep(time.Millisecond)
 	}
 

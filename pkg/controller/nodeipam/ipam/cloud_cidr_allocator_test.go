@@ -42,7 +42,7 @@ func hasNodeInProcessing(ca *cloudCIDRAllocator, name string) bool {
 
 func TestBoundedRetries(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
-	updateChan := make(chan string, 1) // need to buffer as we are using only on go routine
+	updateChan := make(chan string, 1) // need to buffer as we are using only on goroutine
 	sharedInfomer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ca := &cloudCIDRAllocator{
 		client:            clientSet,

@@ -19,11 +19,12 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -557,7 +558,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 				ginkgo.By(fmt.Sprintf("Cloning volume nr. %d", i))
-				// Each go routine must have its own pod prefix
+				// Each goroutine must have its own pod prefix
 				myTestConfig := testConfig
 				myTestConfig.Prefix = fmt.Sprintf("%s-%d", myTestConfig.Prefix, i)
 

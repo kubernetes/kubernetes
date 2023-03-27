@@ -726,7 +726,7 @@ func prioritizeNodes(
 				}
 			}(i)
 		}
-		// wait for all go routines to finish
+		// wait for all goroutines to finish
 		wg.Wait()
 		for i := range nodesScores {
 			if score, ok := allNodeExtendersScores[nodes[i].Name]; ok {

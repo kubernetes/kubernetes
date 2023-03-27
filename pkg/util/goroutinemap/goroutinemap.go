@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 /*
-Package goroutinemap implements a data structure for managing go routines
-by name. It prevents the creation of new go routines if an existing go routine
+Package goroutinemap implements a data structure for managing goroutines
+by name. It prevents the creation of new goroutines if an existing goroutine
 with the same name exists.
 */
 package goroutinemap
@@ -36,10 +36,10 @@ import (
 // has elapsed after the last goroutine with that name finished.
 type GoRoutineMap interface {
 	// Run adds operation name to the list of running operations and spawns a
-	// new go routine to execute the operation.
+	// new goroutine to execute the operation.
 	// If an operation with the same operation name already exists, an
 	// AlreadyExists or ExponentialBackoff error is returned.
-	// Once the operation is complete, the go routine is terminated and the
+	// Once the operation is complete, the goroutine is terminated and the
 	// operation name is removed from the list of executing operations allowing
 	// a new operation to be started with the same operation name without error.
 	Run(operationName string, operationFunc func() error) error

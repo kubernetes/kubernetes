@@ -469,7 +469,7 @@ func (nc *Controller) Run(ctx context.Context) {
 		})
 	defer nc.broadcaster.Shutdown()
 
-	// Close node update queue to cleanup go routine.
+	// Close node update queue to cleanup goroutine.
 	defer nc.nodeUpdateQueue.ShutDown()
 	defer nc.podUpdateQueue.ShutDown()
 

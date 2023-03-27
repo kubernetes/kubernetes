@@ -169,7 +169,7 @@ func TestDecorateResponseWriterChannel(t *testing.T) {
 	}
 
 	<-done
-	t.Log("Seen the go routine finished")
+	t.Log("Seen the goroutine finished")
 
 	// write again
 	_, err = actual.Write([]byte("foo"))

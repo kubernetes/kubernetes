@@ -32,7 +32,7 @@ type Sink interface {
 type Backend interface {
 	Sink
 
-	// Run will initialize the backend. It must not block, but may run go routines in the background. If
+	// Run will initialize the backend. It must not block, but may run goroutines in the background. If
 	// stopCh is closed, it is supposed to stop them. Run will be called before the first call to ProcessEvents.
 	Run(stopCh <-chan struct{}) error
 

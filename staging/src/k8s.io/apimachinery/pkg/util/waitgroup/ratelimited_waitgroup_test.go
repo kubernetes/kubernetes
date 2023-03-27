@@ -254,7 +254,7 @@ func TestRateLimitedSafeWaitGroupWithBurstOfOne(t *testing.T) {
 	took := time.Since(now)
 	t.Logf("Wait finished, count(before): %d, count(after): %d, took: %s, err: %v", activeAt, activeNow, took, err)
 
-	// in CPU starved environment, the go routines may not finish in time
+	// in CPU starved environment, the goroutines may not finish in time
 	if took > 2*grace {
 		t.Errorf("expected Wait to take: %s, but it took: %s", grace, took)
 	}

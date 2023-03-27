@@ -141,7 +141,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	stopCh := make(chan struct{})
 	errCh := make(chan error)
 	go func() {
-		// Catch panics that occur in this go routine so we get a comprehensible failure
+		// Catch panics that occur in this goroutine so we get a comprehensible failure
 		defer func() {
 			if err := recover(); err != nil {
 				t.Errorf("Unexpected panic trying to start API server: %#v", err)

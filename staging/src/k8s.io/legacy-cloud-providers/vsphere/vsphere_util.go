@@ -637,7 +637,7 @@ func (vs *VSphere) BuildMissingVolumeNodeMap(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for _, nodeNames := range dcNodes {
-		// Start go routines per VC-DC to check disks are attached
+		// Start goroutines per VC-DC to check disks are attached
 		wg.Add(1)
 		go func(nodes []k8stypes.NodeName) {
 			err := vs.checkNodeDisks(ctx, nodes)

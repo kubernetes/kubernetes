@@ -92,7 +92,7 @@ func TestRunUntil(t *testing.T) {
 	}
 	go r.Run(stopCh)
 	// Synchronously add a dummy pod into the watch channel so we
-	// know the RunUntil go routine is in the watch handler.
+	// know the RunUntil goroutine is in the watch handler.
 	fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})
 	close(stopCh)
 	select {
@@ -227,7 +227,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 			}
 			expectedRVs = expectedRVs[1:]
 			// channel is not buffered because the for loop below needs to block. But
-			// we don't want to block here, so report the new fake via a go routine.
+			// we don't want to block here, so report the new fake via a goroutine.
 			go func() { createdFakes <- fw }()
 			return fw, nil
 		},

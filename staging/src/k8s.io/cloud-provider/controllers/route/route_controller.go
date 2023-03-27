@@ -208,7 +208,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 		// for every node, for every cidr
 		for _, podCIDR := range node.Spec.PodCIDRs {
 			// we add it to our nodeCIDRs map here because if we don't consider Node addresses change,
-			// add and delete go routines run simultaneously.
+			// add and delete goroutines run simultaneously.
 			l.Lock()
 			action := getRouteAction(rn.routes, podCIDR, nodeName, node.Status.Addresses)
 			(*routeMap[nodeName].cidrWithActions)[podCIDR] = action

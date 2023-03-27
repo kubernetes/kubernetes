@@ -211,7 +211,7 @@ func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatora
 	}
 	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
 	if err != nil {
-		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
+		// we don't need special handling for innerStopCh because the aggregator server doesn't create any goroutines
 		return nil, err
 	}
 

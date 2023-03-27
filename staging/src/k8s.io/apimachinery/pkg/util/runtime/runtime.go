@@ -42,7 +42,7 @@ var PanicHandlers = []func(interface{}){logPanic}
 // called in case of panic.  HandleCrash actually crashes, after calling the
 // handlers and logging the panic message.
 //
-// E.g., you can provide one or more additional handlers for something like shutting down go routines gracefully.
+// E.g., you can provide one or more additional handlers for something like shutting down goroutines gracefully.
 func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {

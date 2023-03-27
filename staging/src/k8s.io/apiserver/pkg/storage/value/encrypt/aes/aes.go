@@ -89,7 +89,7 @@ func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 
 	nonceGen := &nonceGenerator{
 		// we start the nonce counter at one billion so that we are
-		// guaranteed to detect rollover across different go routines
+		// guaranteed to detect rollover across different goroutines
 		zero:  1_000_000_000,
 		fatal: die,
 	}

@@ -48,7 +48,7 @@ func TestHeapBasic(t *testing.T) {
 	wg.Add(2)
 	const amount = 500
 	var i, u int
-	// Insert items in the heap in opposite orders in two go routines.
+	// Insert items in the heap in opposite orders in two goroutines.
 	go func() {
 		for i = amount; i > 0; i-- {
 			h.Add(mkHeapObj(string([]rune{'a', rune(i)}), i))
@@ -61,7 +61,7 @@ func TestHeapBasic(t *testing.T) {
 		}
 		wg.Done()
 	}()
-	// Wait for the two go routines to finish.
+	// Wait for the two goroutines to finish.
 	wg.Wait()
 	// Make sure that the numbers are popped in ascending order.
 	prevNum := 0
@@ -110,7 +110,7 @@ func TestHeap_Add(t *testing.T) {
 func TestHeap_BulkAdd(t *testing.T) {
 	h := NewHeap(testHeapObjectKeyFunc, compareInts)
 	const amount = 500
-	// Insert items in the heap in opposite orders in a go routine.
+	// Insert items in the heap in opposite orders in a goroutine.
 	go func() {
 		l := []interface{}{}
 		for i := amount; i > 0; i-- {

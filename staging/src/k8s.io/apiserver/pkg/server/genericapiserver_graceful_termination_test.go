@@ -124,7 +124,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	 This test exercises the graceful termination scenario
 //	 described in the following diagram
 //	   - every vertical line is an independent timeline
-//	   - the leftmost vertical line represents the go routine that
+//	   - the leftmost vertical line represents the goroutine that
 //	     is executing GenericAPIServer.Run method
 //	   - (signal name) indicates that the given lifecycle signal has been fired
 //
@@ -351,7 +351,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //
 //   - every vertical line is an independent timeline
 //
-//   - the leftmost vertical line represents the go routine that
+//   - the leftmost vertical line represents the goroutine that
 //     is executing GenericAPIServer.Run method
 //
 //   - (signal) indicates that the given lifecycle signal has been fired

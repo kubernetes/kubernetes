@@ -44,7 +44,7 @@ The following actions will be performed as part of this test.
 2. Read VCP_SCALE_VOLUME_COUNT, VCP_SCALE_INSTANCES, VCP_SCALE_VOLUMES_PER_POD, VSPHERE_SPBM_POLICY_NAME, VSPHERE_DATASTORE from System Environment.
 3. Launch VCP_SCALE_INSTANCES goroutine for creating VCP_SCALE_VOLUME_COUNT volumes. Each goroutine is responsible for create/attach of VCP_SCALE_VOLUME_COUNT/VCP_SCALE_INSTANCES volumes.
 4. Read VCP_SCALE_VOLUMES_PER_POD from System Environment. Each pod will be have VCP_SCALE_VOLUMES_PER_POD attached to it.
-5. Once all the go routines are completed, we delete all the pods and volumes.
+5. Once all the goroutines are completed, we delete all the pods and volumes.
 */
 const (
 	NodeLabelKey = "vsphere_e2e_label"
@@ -151,7 +151,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			go VolumeCreateAndAttach(ctx, client, f.Timeouts, namespace, scArrays, volumeCountPerInstance, volumesPerPod, nodeSelectorList, nodeVolumeMapChan)
 		}
 
-		// Get the list of all volumes attached to each node from the go routines by reading the data from the channel
+		// Get the list of all volumes attached to each node from the goroutines by reading the data from the channel
 		for instanceCount := 0; instanceCount < numberOfInstances; instanceCount++ {
 			for node, volumeList := range <-nodeVolumeMapChan {
 				nodeVolumeMap[node] = append(nodeVolumeMap[node], volumeList...)

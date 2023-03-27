@@ -16,9 +16,9 @@ limitations under the License.
 
 /*
 Package nestedpendingoperations is a modified implementation of
-pkg/util/goroutinemap. It implements a data structure for managing go routines
-by volume/pod name. It prevents the creation of new go routines if an existing
-go routine for the volume already exists. It also allows multiple operations to
+pkg/util/goroutinemap. It implements a data structure for managing goroutines
+by volume/pod name. It prevents the creation of new goroutines if an existing
+goroutine for the volume already exists. It also allows multiple operations to
 execute in parallel for the same volume as long as they are operating on
 different pods.
 */
@@ -51,7 +51,7 @@ const (
 type NestedPendingOperations interface {
 
 	// Run adds the concatenation of volumeName, podName, and nodeName to the list
-	// of running operations and spawns a new go routine to run
+	// of running operations and spawns a new goroutine to run
 	// generatedOperations.
 
 	// volumeName, podName, and nodeName collectively form the operation key.
@@ -84,7 +84,7 @@ type NestedPendingOperations interface {
 	// - Otherwise, exponential backoff is reset and operation is allowed to
 	//   proceed.
 
-	// Once the operation is complete, the go routine is terminated. If the
+	// Once the operation is complete, the goroutine is terminated. If the
 	// operation succeeded, its corresponding key is removed from the list of
 	// executing operations, allowing a new operation to be started with the key
 	// without error. If it failed, the key remains and the exponential

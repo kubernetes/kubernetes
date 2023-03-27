@@ -133,7 +133,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 })
 
 // PerformVolumeLifeCycleInParallel performs volume lifecycle operations
-// Called as a go routine to perform operations in parallel
+// Called as a goroutine to perform operations in parallel
 func PerformVolumeLifeCycleInParallel(ctx context.Context, f *framework.Framework, client clientset.Interface, namespace string, instanceID string, sc *storagev1.StorageClass, iterations int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer ginkgo.GinkgoRecover()

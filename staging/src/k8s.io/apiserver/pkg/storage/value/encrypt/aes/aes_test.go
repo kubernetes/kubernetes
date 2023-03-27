@@ -218,7 +218,7 @@ func TestGCMUnsafeNonceGen(t *testing.T) {
 
 	counters := make([]uint64, count)
 
-	// run a bunch of go routines to make sure we are go routine safe
+	// run a bunch of goroutines to make sure we are goroutine safe
 	// on both the nonce generation and the actual encryption/decryption
 	var wg sync.WaitGroup
 	for i := 0; i < count; i++ {
