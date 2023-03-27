@@ -28,7 +28,6 @@ import (
 	"io"
 	"math"
 	"reflect"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -449,15 +448,15 @@ func BenchmarkGCMRead(b *testing.B) {
 	for _, t := range tests {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength/%vExpectStale", t.keyLength, t.valueLength, t.expectStale)
 		b.Run(name, func(b *testing.B) {
-			for i, f := range []transformerFunc{
-				newGCMTransformer,
-				newGCMTransformerWithUniqueKeyUnsafeTest,
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest,
+			for _, n := range []namedTransformerFunc{
+				{name: "gcm-random-nonce", f: newGCMTransformer},
+				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hkdf", sha256KDF),
 			} {
-				f := f
-				b.Run(strconv.Itoa(i), func(b *testing.B) {
+				n := n
+				b.Run(n.name, func(b *testing.B) {
 					b.ReportAllocs()
-					benchmarkGCMRead(b, f, t.keyLength, t.valueLength, t.expectStale)
+					benchmarkGCMRead(b, n.f, t.keyLength, t.valueLength, t.expectStale)
 				})
 			}
 		})
@@ -476,15 +475,15 @@ func BenchmarkGCMWrite(b *testing.B) {
 	for _, t := range tests {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength", t.keyLength, t.valueLength)
 		b.Run(name, func(b *testing.B) {
-			for i, f := range []transformerFunc{
-				newGCMTransformer,
-				newGCMTransformerWithUniqueKeyUnsafeTest,
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest,
+			for _, n := range []namedTransformerFunc{
+				{name: "gcm-random-nonce", f: newGCMTransformer},
+				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hkdf", sha256KDF),
 			} {
-				f := f
-				b.Run(strconv.Itoa(i), func(b *testing.B) {
+				n := n
+				b.Run(n.name, func(b *testing.B) {
 					b.ReportAllocs()
-					benchmarkGCMWrite(b, f, t.keyLength, t.valueLength)
+					benchmarkGCMWrite(b, n.f, t.keyLength, t.valueLength)
 				})
 			}
 		})
@@ -750,6 +749,11 @@ type testingT interface {
 	Fatal(...any)
 }
 
+type namedTransformerFunc struct {
+	name string
+	f    transformerFunc
+}
+
 type transformerFunc func(t testingT, block cipher.Block, key []byte) value.Transformer
 
 func newGCMTransformer(t testingT, block cipher.Block, _ []byte) value.Transformer {
@@ -775,8 +779,13 @@ func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block, _ 
 	return transformer
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest(t testingT, _ cipher.Block, key []byte) value.Transformer {
-	t.Helper()
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseudoRandomFunction) namedTransformerFunc {
+	return namedTransformerFunc{
+		name: name,
+		f: func(t testingT, _ cipher.Block, key []byte) value.Transformer {
+			t.Helper()
 
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF)
+			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf)
+		},
+	}
 }
