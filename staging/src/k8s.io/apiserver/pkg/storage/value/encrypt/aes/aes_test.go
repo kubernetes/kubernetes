@@ -451,9 +451,15 @@ func BenchmarkGCMRead(b *testing.B) {
 			for _, n := range []namedTransformerFunc{
 				{name: "gcm-random-nonce", f: newGCMTransformer},
 				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hkdf", sha256KDF),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo),
 			} {
 				n := n
+				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
+					continue // HChaCha20 requires 32 byte keys
+				}
 				b.Run(n.name, func(b *testing.B) {
 					b.ReportAllocs()
 					benchmarkGCMRead(b, n.f, t.keyLength, t.valueLength, t.expectStale)
@@ -478,9 +484,15 @@ func BenchmarkGCMWrite(b *testing.B) {
 			for _, n := range []namedTransformerFunc{
 				{name: "gcm-random-nonce", f: newGCMTransformer},
 				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hkdf", sha256KDF),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo),
 			} {
 				n := n
+				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
+					continue // HChaCha20 requires 32 byte keys
+				}
 				b.Run(n.name, func(b *testing.B) {
 					b.ReportAllocs()
 					benchmarkGCMWrite(b, n.f, t.keyLength, t.valueLength)
