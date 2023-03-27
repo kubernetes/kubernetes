@@ -212,20 +212,19 @@ type pseudoRandomFunction func(secret, salt, info []byte) ([]byte, error)
 
 // TODO comment
 func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(sha256KDF)
-}
-
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(prf pseudoRandomFunction) (value.Transformer, []byte, error) {
 	key, err := generateKey(commonSize)
 	if err != nil {
 		return nil, nil, err
 	}
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF), key, nil
+}
 
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction) value.Transformer {
 	return &extendedNonceGCM{
 		key:      key,
 		nonceGen: newNonceGenerator(),
 		prf:      prf,
-	}, key, nil
+	}
 }
 
 type extendedNonceGCM struct {
