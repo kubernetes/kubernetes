@@ -15,6 +15,6 @@
 ARG BASE
 FROM ${BASE}
 ARG ARCH
-ADD bin/pause-linux-${ARCH} /pause
 USER 65535:65535
-ENTRYPOINT ["/pause"]
+COPY --chown=65535:65535 --chmod=555 bin/pause-linux-${ARCH} /pause
+ENTRYPOINT [ "/pause" ]
