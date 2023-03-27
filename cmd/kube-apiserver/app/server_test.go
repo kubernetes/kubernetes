@@ -28,6 +28,7 @@ func TestGetServiceIPAndRanges(t *testing.T) {
 		secondaryServiceIPRange string
 		expectedError           bool
 	}{
+		// Single stack IPv4
 		{"", "10.0.0.1", "10.0.0.0/24", "<nil>", false},
 		{"192.0.2.1/24", "192.0.2.1", "192.0.2.0/24", "<nil>", false},
 		{"192.0.2.1/24,192.168.128.0/17", "192.0.2.1", "192.0.2.0/24", "192.168.128.0/17", false},
@@ -36,6 +37,7 @@ func TestGetServiceIPAndRanges(t *testing.T) {
 		// Dual stack IPv6/IPv4
 		{"2001:db2:1:3:4::1/112,192.0.2.1/24", "2001:db2:1:3:4::1", "2001:db2:1:3:4::/112", "192.0.2.0/24", false},
 
+		{"", "10.0.0.1", "<nil>", "<nil>", true},
 		{"192.0.2.1/30,192.168.128.0/17", "<nil>", "<nil>", "<nil>", true},
 		// Invalid ip range[0] IPv4 mask
 		{"192.0.2.1/33,192.168.128.0/17", "<nil>", "<nil>", "<nil>", true},
@@ -57,6 +59,8 @@ func TestGetServiceIPAndRanges(t *testing.T) {
 		{"bad.ip.range,192.168.0.2/24", "<nil>", "<nil>", "<nil>", true},
 		// Invalid ip range[1] IP address format
 		{"192.168.0.2/24,bad.ip.range", "<nil>", "<nil>", "<nil>", true},
+		// Missing IPv4 mask and invalid ip range[1] IPv6 mask
+		{"192.168.0.2,2001:db2:1:3:4::1/129", "<nil>", "<nil>", "<nil>", true},
 	}
 
 	for _, test := range tests {
