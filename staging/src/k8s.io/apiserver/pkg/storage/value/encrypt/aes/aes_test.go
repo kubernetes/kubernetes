@@ -456,6 +456,7 @@ func BenchmarkGCMRead(b *testing.B) {
 			} {
 				f := f
 				b.Run(strconv.Itoa(i), func(b *testing.B) {
+					b.ReportAllocs()
 					benchmarkGCMRead(b, f, t.keyLength, t.valueLength, t.expectStale)
 				})
 			}
@@ -482,6 +483,7 @@ func BenchmarkGCMWrite(b *testing.B) {
 			} {
 				f := f
 				b.Run(strconv.Itoa(i), func(b *testing.B) {
+					b.ReportAllocs()
 					benchmarkGCMWrite(b, f, t.keyLength, t.valueLength)
 				})
 			}
