@@ -550,7 +550,7 @@ func (s *podSyncStatus) mergeLastUpdate(other UpdatePodOptions) {
 // in the pod status change).
 type podWorkers struct {
 	// Protects all per worker fields.
-	podLock sync.Mutex
+	podLock sync.RWMutex
 	// podsSynced is true once the pod worker has been synced at least once,
 	// which means that all working pods have been started via UpdatePod().
 	podsSynced bool
@@ -620,8 +620,8 @@ func newPodWorkers(
 }
 
 func (p *podWorkers) IsPodKnownTerminated(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		return status.IsTerminated()
 	}
@@ -630,8 +630,8 @@ func (p *podWorkers) IsPodKnownTerminated(uid types.UID) bool {
 }
 
 func (p *podWorkers) CouldHaveRunningContainers(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		return !status.IsTerminated()
 	}
@@ -640,8 +640,8 @@ func (p *podWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 }
 
 func (p *podWorkers) ShouldPodBeFinished(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		return status.IsFinished()
 	}
@@ -651,8 +651,8 @@ func (p *podWorkers) ShouldPodBeFinished(uid types.UID) bool {
 }
 
 func (p *podWorkers) IsPodTerminationRequested(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		// the pod may still be setting up at this point.
 		return status.IsTerminationRequested()
@@ -663,8 +663,8 @@ func (p *podWorkers) IsPodTerminationRequested(uid types.UID) bool {
 }
 
 func (p *podWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		// we wait until the pod worker goroutine observes the termination, which means syncPod will not
 		// be executed again, which means no new containers can be started
@@ -676,8 +676,8 @@ func (p *podWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
 }
 
 func (p *podWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		return status.IsTerminated()
 	}
@@ -687,8 +687,8 @@ func (p *podWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
 }
 
 func (p *podWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		return status.IsEvicted() || (status.IsDeleted() && status.IsTerminated())
 	}
@@ -698,8 +698,8 @@ func (p *podWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 }
 
 func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) bool {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
+	p.podLock.RLock()
+	defer p.podLock.RUnlock()
 	uid, started := p.startedStaticPodsByFullname[podFullName]
 	if !started {
 		return false
