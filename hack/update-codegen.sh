@@ -52,13 +52,15 @@ function git_find() {
     # Similar to find but faster and easier to understand.  We want to include
     # modified and untracked files because this might be running against code
     # which is not tracked by git yet.
-    git ls-files -cmo --exclude-standard "$@"
+    git ls-files -cmo --exclude-standard ':!:vendor/*' "$@"
 }
 
 function git_grep() {
     # We want to include modified and untracked files because this might be
     # running against code which is not tracked by git yet.
-    git grep --untracked "$@"
+    # We need vendor exclusion added at the end since it has to be part of
+    # the pathspecs which are specified last.
+    git grep --untracked "$@" ':!:vendor/*'
 }
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
@@ -77,7 +79,6 @@ kube::util::read-array ALL_K8S_TAG_FILES < <(
     git_grep -l \
         -e '^// *+k8s:'                `# match +k8s: tags` \
         -- \
-        ':!:vendor/*'                  `# not under vendor` \
         ':!:*/testdata/*'              `# not under any testdata` \
         ':(glob)**/*.go'               `# in any *.go file` \
         | sed 's|^staging/src|vendor|' `# see comments above` \
