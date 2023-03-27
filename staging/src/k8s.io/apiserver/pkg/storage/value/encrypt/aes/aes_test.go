@@ -452,6 +452,7 @@ func BenchmarkGCMRead(b *testing.B) {
 			for i, f := range []transformerFunc{
 				newGCMTransformer,
 				newGCMTransformerWithUniqueKeyUnsafeTest,
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest,
 			} {
 				f := f
 				b.Run(strconv.Itoa(i), func(b *testing.B) {
@@ -477,6 +478,7 @@ func BenchmarkGCMWrite(b *testing.B) {
 			for i, f := range []transformerFunc{
 				newGCMTransformer,
 				newGCMTransformerWithUniqueKeyUnsafeTest,
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest,
 			} {
 				f := f
 				b.Run(strconv.Itoa(i), func(b *testing.B) {
@@ -488,17 +490,20 @@ func BenchmarkGCMWrite(b *testing.B) {
 }
 
 func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLength int, expectStale bool) {
-	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
+	key1 := bytes.Repeat([]byte("a"), keyLength)
+	key2 := bytes.Repeat([]byte("b"), keyLength)
+
+	block1, err := aes.NewCipher(key1)
 	if err != nil {
 		b.Fatal(err)
 	}
-	block2, err := aes.NewCipher(bytes.Repeat([]byte("b"), keyLength))
+	block2, err := aes.NewCipher(key2)
 	if err != nil {
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, key1)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, key2)},
 	)
 
 	ctx := context.Background()
@@ -512,8 +517,8 @@ func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLengt
 	// reverse the key order if expecting stale
 	if expectStale {
 		p = value.NewPrefixTransformers(nil,
-			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
-			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
+			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, key2)},
+			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, key1)},
 		)
 	}
 
@@ -531,17 +536,20 @@ func benchmarkGCMRead(b *testing.B, f transformerFunc, keyLength int, valueLengt
 }
 
 func benchmarkGCMWrite(b *testing.B, f transformerFunc, keyLength int, valueLength int) {
-	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
+	key1 := bytes.Repeat([]byte("a"), keyLength)
+	key2 := bytes.Repeat([]byte("b"), keyLength)
+
+	block1, err := aes.NewCipher(key1)
 	if err != nil {
 		b.Fatal(err)
 	}
-	block2, err := aes.NewCipher(bytes.Repeat([]byte("b"), keyLength))
+	block2, err := aes.NewCipher(key2)
 	if err != nil {
 		b.Fatal(err)
 	}
 	p := value.NewPrefixTransformers(nil,
-		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, nil)},
-		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, nil)},
+		value.PrefixTransformer{Prefix: []byte("first:"), Transformer: f(b, block1, key1)},
+		value.PrefixTransformer{Prefix: []byte("second:"), Transformer: f(b, block2, key2)},
 	)
 
 	ctx := context.Background()
@@ -763,4 +771,10 @@ func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block, _ 
 	}
 
 	return transformer
+}
+
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeSHA256KDFTest(t testingT, _ cipher.Block, key []byte) value.Transformer {
+	t.Helper()
+
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF)
 }
