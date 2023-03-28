@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/utils/clock"
 )
 
@@ -192,8 +193,10 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
+		metrics.ProxyHealthz503Total.Inc()
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
+		metrics.ProxyHealthz200Total.Inc()
 		resp.WriteHeader(http.StatusOK)
 		// In older releases, the returned "lastUpdated" time indicated the last
 		// time the proxier sync loop ran, even if nothing had changed. To
@@ -214,8 +217,10 @@ func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
+		metrics.ProxyLivez503Total.Inc()
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
+		metrics.ProxyLivez200Total.Inc()
 		resp.WriteHeader(http.StatusOK)
 		// In older releases, the returned "lastUpdated" time indicated the last
 		// time the proxier sync loop ran, even if nothing had changed. To
