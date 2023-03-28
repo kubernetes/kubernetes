@@ -150,7 +150,7 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := openapitest.NewFileClient(t)
+			client := openapitest.NewEmbeddedFileClient()
 			root := NewRoot(client)
 			gvSpec, err := root.GVSpec(test.gv)
 			if test.err != nil {
@@ -209,8 +209,7 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := openapitest.NewFileClient(t)
-			root := NewRoot(client)
+			root := NewRoot(openapitest.NewEmbeddedFileClient())
 			gvSpecAsMap, err := root.GVSpecAsMap(test.gv)
 			if test.err != nil {
 				assert.True(t, reflect.DeepEqual(test.err, err))
