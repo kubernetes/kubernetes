@@ -589,7 +589,10 @@ func parseOutput(pod *v1.Pod) containerOutputList {
 	statuses = append(statuses, pod.Status.ContainerStatuses...)
 	var buf bytes.Buffer
 	for _, cs := range statuses {
-		if cs.State.Terminated != nil {
+		// If the container is terminated but the reason is ContainerStatusUnknown,
+		// it means that the kubelet has overwritten the termination message. Read
+		// the LastTerminationState instead.
+		if cs.State.Terminated != nil && cs.State.Terminated.Reason != "ContainerStatusUnknown" {
 			buf.WriteString(cs.State.Terminated.Message)
 		} else if cs.LastTerminationState.Terminated != nil {
 			buf.WriteString(cs.LastTerminationState.Terminated.Message)
