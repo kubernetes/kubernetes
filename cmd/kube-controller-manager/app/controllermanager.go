@@ -197,7 +197,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.
 func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}) error {
 	logger := klog.FromContext(ctx)
-	stopCh := ctx.Done()
+	stopCh := mergeCh(ctx.Done(), stopCh2)
 
 	// To help debugging, immediately log version
 	logger.Info("Starting", "version", version.Get())
@@ -220,12 +220,8 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 		hmCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		go func() {
-			select {
-			case <-stopCh:
-				cancel()
-			case <-stopCh2:
-				cancel()
-			}
+			<-stopCh
+			cancel()
 		}()
 		go c.OpenShiftContext.PreferredHostHealthMonitor.Run(hmCtx)
 	}
@@ -333,10 +329,6 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 					// We were asked to terminate. Exit 0.
 					klog.Info("Requested to terminate. Exiting.")
 					os.Exit(0)
-				case <-stopCh2:
-					// We were asked to terminate. Exit 0.
-					klog.Info("Requested to terminate. Exiting.")
-					os.Exit(0)
 				default:
 					// We lost the lock.
 					logger.Error(nil, "leaderelection lost")
@@ -366,10 +358,6 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 				OnStoppedLeading: func() {
 					select {
 					case <-stopCh:
-						// We were asked to terminate. Exit 0.
-						klog.Info("Requested to terminate. Exiting.")
-						os.Exit(0)
-					case <-stopCh2:
 						// We were asked to terminate. Exit 0.
 						klog.Info("Requested to terminate. Exiting.")
 						os.Exit(0)
