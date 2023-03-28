@@ -289,6 +289,10 @@ func randomSalt() ([]byte, error) {
 	return salt, randomNonce(salt)
 }
 
+func noSalt() ([]byte, error) {
+	return nil, nil
+}
+
 func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
 	key, err := e.prf(e.key, salt, dataCtx.AuthenticatedData())
 	if err != nil {
@@ -311,6 +315,18 @@ func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Cont
 func sha256KDF(secret, salt, info []byte) ([]byte, error) {
 	// TODO come up with a way to pre-compute this
 	kdf := hkdf.New(sha256.New, secret, salt, info)
+
+	derivedKey := make([]byte, commonSize)
+	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
+		return nil, err // TODO fmt.Err
+	}
+
+	return derivedKey, nil
+}
+
+func sha256KDFExpandOnly(secret, _, info []byte) ([]byte, error) {
+	// TODO come up with a way to pre-compute this
+	kdf := hkdf.Expand(sha256.New, secret, info)
 
 	derivedKey := make([]byte, commonSize)
 	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
