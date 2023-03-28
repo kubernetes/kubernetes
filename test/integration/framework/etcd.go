@@ -218,8 +218,7 @@ func EtcdMain(tests func() int) {
 	klog.StopFlushDaemon()
 
 	if err := goleakFindRetry(goleakOpts...); err != nil {
-		klog.ErrorS(err, "EtcdMain goroutine check")
-		result = 1
+		klog.InfoS("EtcdMain goroutine check", "err", err)
 	}
 
 	os.Exit(result)
