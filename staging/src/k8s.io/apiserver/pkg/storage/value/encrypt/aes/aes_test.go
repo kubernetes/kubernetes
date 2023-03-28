@@ -31,8 +31,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/utils/clock"
 )
 
 func TestGCMDataStable(t *testing.T) {
@@ -437,11 +439,18 @@ func TestCBCKeyRotation(t *testing.T) {
 var benchmarks = []namedTransformerFunc{
 	{name: "gcm-random-nonce", f: newGCMTransformer},
 	{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
-	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF, randomSalt),
-	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly", sha256KDFExpandOnly, noSalt),
-	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo, randomSalt),
-	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC, randomSalt),
-	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo, randomSalt),
+
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF, randomSalt, nil),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly", sha256KDFExpandOnly, noSalt, nil),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo, randomSalt, nil),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC, randomSalt, nil),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo, randomSalt, nil),
+
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-cache", sha256KDF, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly-cache", sha256KDFExpandOnly, noSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo-cache", sha256HMACNoInfo, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC-cache", sha256HMAC, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo-cache", hchacha20NoInfo, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 }
 
 func BenchmarkGCMRead(b *testing.B) {
@@ -787,7 +796,7 @@ func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block, _ 
 	return transformer
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseudoRandomFunction, salt func() ([]byte, error)) namedTransformerFunc {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseudoRandomFunction, salt func() ([]byte, error), cache *simpleCache) namedTransformerFunc {
 	s, err := salt()
 	if err != nil {
 		panic(err)
@@ -797,7 +806,7 @@ func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseu
 		f: func(t testingT, _ cipher.Block, key []byte) value.Transformer {
 			t.Helper()
 
-			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf, salt, len(s), nil)
+			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf, salt, len(s), cache)
 		},
 	}
 }
