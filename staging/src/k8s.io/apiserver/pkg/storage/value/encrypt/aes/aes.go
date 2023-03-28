@@ -219,16 +219,16 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF), key, nil
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomSalt, commonSize), key, nil
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction) value.Transformer {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func() ([]byte, error), saltLen int) value.Transformer {
 	return &extendedNonceGCM{
 		key:      key,
 		nonceGen: newNonceGenerator(),
 		prf:      prf,
-		salt:     randomSalt,
-		saltLen:  commonSize,
+		salt:     salt,
+		saltLen:  saltLen,
 	}
 }
 

@@ -451,10 +451,10 @@ func BenchmarkGCMRead(b *testing.B) {
 			for _, n := range []namedTransformerFunc{
 				{name: "gcm-random-nonce", f: newGCMTransformer},
 				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256KDF", sha256KDF, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256HMACNoInfo", sha256HMACNoInfo, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256HMAC", sha256HMAC, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "hchacha20NoInfo", hchacha20NoInfo, randomSalt),
 			} {
 				n := n
 				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
@@ -484,10 +484,10 @@ func BenchmarkGCMWrite(b *testing.B) {
 			for _, n := range []namedTransformerFunc{
 				{name: "gcm-random-nonce", f: newGCMTransformer},
 				{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC),
-				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256KDF", sha256KDF, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256HMACNoInfo", sha256HMACNoInfo, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "sha256HMAC", sha256HMAC, randomSalt),
+				newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(b, "hchacha20NoInfo", hchacha20NoInfo, randomSalt),
 			} {
 				n := n
 				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
@@ -791,13 +791,17 @@ func newGCMTransformerWithUniqueKeyUnsafeTest(t testingT, block cipher.Block, _ 
 	return transformer
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseudoRandomFunction) namedTransformerFunc {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(t testingT, name string, prf pseudoRandomFunction, salt func() ([]byte, error)) namedTransformerFunc {
+	s, err := salt()
+	if err != nil {
+		t.Fatal(err)
+	}
 	return namedTransformerFunc{
 		name: name,
 		f: func(t testingT, _ cipher.Block, key []byte) value.Transformer {
 			t.Helper()
 
-			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf)
+			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf, salt, len(s))
 		},
 	}
 }
