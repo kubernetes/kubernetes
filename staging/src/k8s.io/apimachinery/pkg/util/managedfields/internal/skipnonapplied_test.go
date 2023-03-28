@@ -33,7 +33,7 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
 		return internal.NewSkipNonAppliedManager(
 			m,
-			internaltesting.NewFakeObjectCreater(),
+			&internaltesting.FakeObjectCreater{},
 			schema.FromAPIVersionAndKind("v1", "Pod"),
 		)
 	})
@@ -73,7 +73,7 @@ func TestUpdateBeforeFirstApply(t *testing.T) {
 	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
 		return internal.NewSkipNonAppliedManager(
 			m,
-			internaltesting.NewFakeObjectCreater(),
+			&internaltesting.FakeObjectCreater{},
 			schema.FromAPIVersionAndKind("v1", "Pod"),
 		)
 	})
