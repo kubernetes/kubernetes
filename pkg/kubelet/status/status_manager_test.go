@@ -18,8 +18,8 @@ package status
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -90,7 +90,7 @@ func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager.AddPod(getTestPod())
 	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
 	testRootDir := ""
-	if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 		return nil
 	} else {
 		testRootDir = tempDir

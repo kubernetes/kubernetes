@@ -18,7 +18,6 @@ package fc
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,7 +47,34 @@ const (
 )
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	dirEntries, err := os.ReadDir(dirname)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fileInfos := make([]os.FileInfo, len(dirEntries))
+	iserror := false
+	var goterror error
+
+	for index, dirEntry := range dirEntries {
+		fileInfo, err := dirEntry.Info()
+		if err != nil {
+			iserror = true
+			goterror = err
+			break
+		} else {
+			fileInfos[index] = fileInfo
+		}
+	}
+
+	if iserror {
+		// TODO: what to do on error ?
+		return nil, fmt.Errorf("Unable to get file info: %v", goterror.Error())
+	}
+
+	// no error
+	return fileInfos, nil
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
@@ -57,7 +83,7 @@ func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 // given a wwn and lun, find the device and associated devicemapper parent
@@ -215,7 +241,7 @@ func searchDisk(b fcDiskMounter) (string, error) {
 	// two-phase search:
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
-	for true {
+	for {
 		for _, diskID := range diskIDs {
 			if len(wwns) != 0 {
 				disk, dm = findDisk(diskID, lun, io, b.deviceUtil)
@@ -258,7 +284,7 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	if exists && err == nil {
 		return devicePath, nil
 	}
-	if exists == false {
+	if !exists {
 		return "", fmt.Errorf("device %s does not exist", devicePath)
 	} else {
 		return "", err
@@ -347,7 +373,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if strings.Contains(volumeInfo, "-lun-") {
 		searchPath = byPath
 	}
-	fis, err := ioutil.ReadDir(searchPath)
+	fis, err := os.ReadDir(searchPath)
 	if err != nil {
 		return err
 	}

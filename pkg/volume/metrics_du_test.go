@@ -17,7 +17,6 @@ limitations under the License.
 package volume_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +59,12 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	}
 
 	// Write a file and expect Used to increase
-	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
+	err = os.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
+
+	if err != nil {
+		t.Errorf("Unexpected error when writing into file: %v", err)
+	}
+
 	actual, err = metrics.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
@@ -73,11 +77,11 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	previousInodes := actual.InodesUsed.Value()
 	err = os.Link(filepath.Join(tmpDir, "f1"), filepath.Join(tmpDir, "f2"))
 	if err != nil {
-		t.Errorf("Unexpected error when creating hard link %v", err)
+		t.Errorf("Unexpected error when creating hard link: %v", err)
 	}
 	actual, err = metrics.GetMetrics()
 	if err != nil {
-		t.Errorf("Unexpected error when calling GetMetrics %v", err)
+		t.Errorf("Unexpected error when calling GetMetrics: %v", err)
 	}
 	if e, a := previousInodes, actual.InodesUsed.Value(); e != a {
 		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)

@@ -30,7 +30,6 @@ type fakeManager struct {
 
 func (m *fakeManager) Start() {
 	klog.InfoS("Start()")
-	return
 }
 
 func (m *fakeManager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -40,27 +39,22 @@ func (m *fakeManager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 
 func (m *fakeManager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	klog.InfoS("SetPodStatus()")
-	return
 }
 
 func (m *fakeManager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	klog.InfoS("SetContainerReadiness()")
-	return
 }
 
 func (m *fakeManager) SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
 	klog.InfoS("SetContainerStartup()")
-	return
 }
 
 func (m *fakeManager) TerminatePod(pod *v1.Pod) {
 	klog.InfoS("TerminatePod()")
-	return
 }
 
 func (m *fakeManager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	klog.InfoS("RemoveOrphanedStatuses()")
-	return
 }
 
 func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
