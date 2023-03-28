@@ -462,7 +462,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return nil, errors.NewServiceUnavailable(err.Error())
+	}
 
 	triggerValue, triggerSupported := "", false
 	if c.indexedTrigger != nil {
@@ -559,7 +561,9 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
 	if err != nil {
@@ -645,7 +649,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	c.ready.wait()
+	if err := c.ready.wait(ctx); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 	trace.Step("Ready")
 
 	// List elements with at least 'listRV' from cache.
@@ -1012,6 +1018,7 @@ func (c *Cacher) Stop() {
 		return
 	}
 	c.stopped = true
+	c.ready.stop()
 	c.stopLock.Unlock()
 	close(c.stopCh)
 	c.stopWg.Wait()
@@ -1041,7 +1048,9 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
-	c.ready.wait()
+	if err := c.ready.wait(context.Background()); err != nil {
+		return 0, errors.NewServiceUnavailable(err.Error())
+	}
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
@@ -1426,37 +1435,4 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 			return
 		}
 	}
-}
-
-type ready struct {
-	ok bool
-	c  *sync.Cond
-}
-
-func newReady() *ready {
-	return &ready{c: sync.NewCond(&sync.RWMutex{})}
-}
-
-func (r *ready) wait() {
-	r.c.L.Lock()
-	for !r.ok {
-		r.c.Wait()
-	}
-	r.c.L.Unlock()
-}
-
-// TODO: Make check() function more sophisticated, in particular
-// allow it to behave as "waitWithTimeout".
-func (r *ready) check() bool {
-	rwMutex := r.c.L.(*sync.RWMutex)
-	rwMutex.RLock()
-	defer rwMutex.RUnlock()
-	return r.ok
-}
-
-func (r *ready) set(ok bool) {
-	r.c.L.Lock()
-	defer r.c.L.Unlock()
-	r.ok = ok
-	r.c.Broadcast()
 }
