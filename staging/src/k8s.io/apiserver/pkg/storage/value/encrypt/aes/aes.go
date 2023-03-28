@@ -189,15 +189,16 @@ func generateKey(length int) (key []byte, err error) {
 }
 
 func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
-	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF, commonSize)
+	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF, commonSize, nil)
 }
 
-func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, saltLen int) value.Read {
+func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, saltLen int, cache *simpleCache) value.Read {
 	return &readOnlyExtendedNonceGCM{
 		e: &extendedNonceGCM{
 			key:     key,
 			prf:     prf,
 			saltLen: saltLen,
+			cache:   cache,
 		},
 	}
 }
@@ -219,16 +220,17 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomSalt, commonSize), key, nil
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomSalt, commonSize, nil), key, nil
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func() ([]byte, error), saltLen int) value.Transformer {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func() ([]byte, error), saltLen int, cache *simpleCache) value.Transformer {
 	return &extendedNonceGCM{
 		key:      key,
 		nonceGen: newNonceGenerator(),
 		prf:      prf,
 		salt:     salt,
 		saltLen:  saltLen,
+		cache:    cache,
 	}
 }
 
@@ -238,6 +240,7 @@ type extendedNonceGCM struct {
 	prf      pseudoRandomFunction
 	salt     func() ([]byte, error)
 	saltLen  int
+	cache    *simpleCache
 }
 
 func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
@@ -294,6 +297,21 @@ func noSalt() ([]byte, error) {
 }
 
 func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
+	var cacheKey []byte
+	if e.cache != nil {
+		if saltLen := len(salt); saltLen == 0 {
+			cacheKey = dataCtx.AuthenticatedData()
+		} else {
+			// normally we would use the cryptobyte package but this is okay since we control the salt
+			cacheKey = make([]byte, 0, saltLen+len(dataCtx.AuthenticatedData()))
+			cacheKey = append(cacheKey, salt...)
+			cacheKey = append(cacheKey, dataCtx.AuthenticatedData()...)
+		}
+		if transformer := e.cache.get(cacheKey); transformer != nil {
+			return transformer, nil
+		}
+	}
+
 	key, err := e.prf(e.key, salt, dataCtx.AuthenticatedData())
 	if err != nil {
 		return nil, err // TODO fmt.Err
@@ -307,6 +325,10 @@ func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Cont
 	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, e.nonceGen)
 	if err != nil {
 		return nil, err // TODO fmt.Err
+	}
+
+	if e.cache != nil {
+		e.cache.set(cacheKey, transformer)
 	}
 
 	return transformer, nil

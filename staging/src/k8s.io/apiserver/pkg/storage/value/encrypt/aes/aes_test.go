@@ -797,7 +797,7 @@ func newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest(name string, prf pseu
 		f: func(t testingT, _ cipher.Block, key []byte) value.Transformer {
 			t.Helper()
 
-			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf, salt, len(s))
+			return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, prf, salt, len(s), nil)
 		},
 	}
 }
