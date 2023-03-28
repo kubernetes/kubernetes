@@ -189,14 +189,15 @@ func generateKey(length int) (key []byte, err error) {
 }
 
 func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
-	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF)
+	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF, commonSize)
 }
 
-func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction) value.Read {
+func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, saltLen int) value.Read {
 	return &readOnlyExtendedNonceGCM{
 		e: &extendedNonceGCM{
-			key: key,
-			prf: prf,
+			key:     key,
+			prf:     prf,
+			saltLen: saltLen,
 		},
 	}
 }
@@ -226,6 +227,8 @@ func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRan
 		key:      key,
 		nonceGen: newNonceGenerator(),
 		prf:      prf,
+		salt:     randomSalt,
+		saltLen:  commonSize,
 	}
 }
 
@@ -233,15 +236,17 @@ type extendedNonceGCM struct {
 	key      []byte
 	nonceGen *nonceGenerator
 	prf      pseudoRandomFunction
+	salt     func() ([]byte, error)
+	saltLen  int
 }
 
 func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	if len(data) < commonSize {
+	if len(data) < e.saltLen {
 		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
 
-	salt := data[:commonSize]
-	transformedData := data[commonSize:]
+	salt := data[:e.saltLen]
+	transformedData := data[e.saltLen:]
 
 	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
 	if err != nil {
@@ -252,8 +257,8 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	salt := make([]byte, commonSize)
-	if err := randomNonce(salt); err != nil {
+	salt, err := e.salt()
+	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
 
@@ -267,12 +272,21 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return nil, err // TODO fmt.Err
 	}
 
+	if e.saltLen == 0 {
+		return transformedData, nil
+	}
+
 	// TODO come up with a way to pre-allocate this
 	out := make([]byte, 0, len(salt)+len(transformedData))
 	out = append(out, salt...)
 	out = append(out, transformedData...)
 
 	return out, nil
+}
+
+func randomSalt() ([]byte, error) {
+	salt := make([]byte, commonSize)
+	return salt, randomNonce(salt)
 }
 
 func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
