@@ -61,7 +61,7 @@ fi
 
 # ensure_require_replace_directives_for_all_dependencies:
 # - ensures all existing 'require' directives have an associated 'replace' directive pinning a version
-# - adds explicit 'require' directives for all transitive dependencies
+# - adds explicit 'require' directives for all transitive dependencies (root + staging modules)
 # - adds explicit 'replace' directives for all require directives (existing 'replace' directives take precedence)
 function ensure_require_replace_directives_for_all_dependencies() {
   local local_tmp_dir
@@ -72,28 +72,54 @@ function ensure_require_replace_directives_for_all_dependencies() {
   # collect 'replace' directives that unconditionally pin versions (old=new@version)
   local replace_filter='(.Old.Version == null) and (.New.Version != null)'
 
-  # Capture local require/replace directives before running any go commands that can modify the go.mod file
+  # Capture local require/replace directives from root and staging modules
+  # before running any go commands that can modify the go.mod file
   local require_json="${local_tmp_dir}/require.json"
   local replace_json="${local_tmp_dir}/replace.json"
-  go mod edit -json \
-      | jq -r ".Require // [] | sort | .[] | select(${require_filter})" \
-      > "${require_json}"
-  go mod edit -json \
-      | jq -r ".Replace // [] | sort | .[] | select(${replace_filter})" \
-      > "${replace_json}"
 
-  # Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
+  collect_require_replace_directives "${require_json}" "${replace_json}"
   for repo in $(kube::util::list_staging_repos); do
     pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-      jq -r '"-require \(.Path)@\(.Version)"' < "${require_json}" \
-          | xargs -L 100 go mod edit -fmt
-      jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
-          | xargs -L 100 go mod edit -fmt
+    collect_require_replace_directives "${require_json}" "${replace_json}"
     popd >/dev/null 2>&1
   done
 
-  # tidy to ensure require directives are added for indirect dependencies
-  go mod tidy
+  # Propagate all replace/require directives into root and staging modules.
+  # On downgrades, this does not bumpt the root required version back up
+  add_require_replace_directives "${require_json}" "${replace_json}"
+  for repo in $(kube::util::list_staging_repos); do
+    pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    add_require_replace_directives "${require_json}" "${replace_json}"
+    popd >/dev/null 2>&1
+  done
+}
+
+function collect_require_replace_directives() {
+  local require_json="$1"
+  local replace_json="$2"
+
+  go mod edit -json \
+      | jq -r ".Require // [] | sort | .[] | select(${require_filter})" \
+      >> "${require_json}"
+    go mod edit -json \
+      | jq -r ".Replace // [] | sort | .[] | select(${replace_filter})" \
+      >> "${replace_json}"
+
+  require_tmp=$(mktemp)
+  jq -s 'unique_by(.Path)[]' "${require_json}" > "${require_tmp}" && mv "${require_tmp}" "${require_json}"
+
+  replace_tmp=$(mktemp)
+  jq -s 'unique_by(.Path)[]' "${replace_json}" > "${replace_tmp}" && mv "${replace_tmp}" "${replace_json}"
+}
+
+function add_require_replace_directives() {
+  local require_json="$1"
+  local replace_json="$2"
+
+  jq -r '"-require \(.Path)@\(.Version)"' < "${require_json}" \
+      | xargs -L 100 go mod edit -fmt
+  jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
+      | xargs -L 100 go mod edit -fmt
 }
 
 function print_go_mod_section() {
@@ -216,10 +242,6 @@ kube::util::list_staging_repos \
 
 # pin referenced versions
 ensure_require_replace_directives_for_all_dependencies
-# resolves/expands references in the root go.mod (if needed)
-go mod tidy >>"${LOG_FILE}" 2>&1
-# pin expanded versions
-ensure_require_replace_directives_for_all_dependencies
 # group require/replace directives
 group_directives
 
@@ -244,8 +266,11 @@ for repo in $(kube::util::list_staging_repos); do
   popd >/dev/null 2>&1
 done
 
+# Phase 5a: tidy root go.mod
 
-# Phase 5: sort and tidy staging components
+go mod tidy >>"${LOG_FILE}" 2>&1
+
+# Phase 5b: sort and tidy staging components
 
 kube::log::status "go.mod: sorting staging modules"
 # tidy staging repos in reverse dependency order.
