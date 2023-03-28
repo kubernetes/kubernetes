@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -70,12 +69,6 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 	}
 	setupDev := needsSetupDev(config)
 	for i, m := range config.Mounts {
-		for _, precmd := range m.PremountCmds {
-			if err := mountCmd(precmd); err != nil {
-				return fmt.Errorf("error running premount command: %w", err)
-			}
-		}
-
 		// Just before the loop we checked that if not empty, len(mountFds) == len(config.Mounts).
 		// Therefore, we can access mountFds[i] without any concerns.
 		if mountFds != nil && mountFds[i] != -1 {
@@ -86,12 +79,6 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 
 		if err := mountToRootfs(m, mountConfig); err != nil {
 			return fmt.Errorf("error mounting %q to rootfs at %q: %w", m.Source, m.Destination, err)
-		}
-
-		for _, postcmd := range m.PostmountCmds {
-			if err := mountCmd(postcmd); err != nil {
-				return fmt.Errorf("error running postmount command: %w", err)
-			}
 		}
 	}
 
@@ -212,16 +199,6 @@ func prepareTmp(topTmpDir string) (string, error) {
 func cleanupTmp(tmpdir string) {
 	_ = unix.Unmount(tmpdir, 0)
 	_ = os.RemoveAll(tmpdir)
-}
-
-func mountCmd(cmd configs.Command) error {
-	command := exec.Command(cmd.Path, cmd.Args[:]...)
-	command.Env = cmd.Env
-	command.Dir = cmd.Dir
-	if out, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("%#v failed: %s: %w", cmd, string(out), err)
-	}
-	return nil
 }
 
 func prepareBindMount(m *configs.Mount, rootfs string, mountFd *int) error {

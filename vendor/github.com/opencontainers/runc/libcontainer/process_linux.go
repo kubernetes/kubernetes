@@ -188,7 +188,7 @@ func (p *setnsProcess) start() (retErr error) {
 				Metadata: p.config.Config.Seccomp.ListenerMetadata,
 				State: specs.State{
 					Version:     specs.Version,
-					ID:          p.config.ContainerId,
+					ID:          p.config.ContainerID,
 					Status:      specs.StateRunning,
 					Pid:         p.initProcessPid,
 					Bundle:      bundle,
@@ -299,8 +299,8 @@ type initProcess struct {
 	logFilePair     filePair
 	config          *initConfig
 	manager         cgroups.Manager
-	intelRdtManager intelrdt.Manager
-	container       *linuxContainer
+	intelRdtManager *intelrdt.Manager
+	container       *Container
 	fds             []string
 	process         *Process
 	bootstrapData   io.Reader
@@ -548,7 +548,7 @@ func (p *initProcess) start() (retErr error) {
 			// procRun sync.
 			state, uerr := p.container.updateState(p)
 			if uerr != nil {
-				return fmt.Errorf("unable to store init state: %w", err)
+				return fmt.Errorf("unable to store init state: %w", uerr)
 			}
 			p.container.initProcessStartTime = state.InitProcessStartTime
 

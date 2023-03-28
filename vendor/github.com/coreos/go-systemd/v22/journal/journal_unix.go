@@ -69,6 +69,58 @@ func Enabled() bool {
 	return true
 }
 
+// StderrIsJournalStream returns whether the process stderr is connected
+// to the Journal's stream transport.
+//
+// This can be used for automatic protocol upgrading described in [Journal Native Protocol].
+//
+// Returns true if JOURNAL_STREAM environment variable is present,
+// and stderr's device and inode numbers match it.
+//
+// Error is returned if unexpected error occurs: e.g. if JOURNAL_STREAM environment variable
+// is present, but malformed, fstat syscall fails, etc.
+//
+// [Journal Native Protocol]: https://systemd.io/JOURNAL_NATIVE_PROTOCOL/#automatic-protocol-upgrading
+func StderrIsJournalStream() (bool, error) {
+	return fdIsJournalStream(syscall.Stderr)
+}
+
+// StdoutIsJournalStream returns whether the process stdout is connected
+// to the Journal's stream transport.
+//
+// Returns true if JOURNAL_STREAM environment variable is present,
+// and stdout's device and inode numbers match it.
+//
+// Error is returned if unexpected error occurs: e.g. if JOURNAL_STREAM environment variable
+// is present, but malformed, fstat syscall fails, etc.
+//
+// Most users should probably use [StderrIsJournalStream].
+func StdoutIsJournalStream() (bool, error) {
+	return fdIsJournalStream(syscall.Stdout)
+}
+
+func fdIsJournalStream(fd int) (bool, error) {
+	journalStream := os.Getenv("JOURNAL_STREAM")
+	if journalStream == "" {
+		return false, nil
+	}
+
+	var expectedStat syscall.Stat_t
+	_, err := fmt.Sscanf(journalStream, "%d:%d", &expectedStat.Dev, &expectedStat.Ino)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %v", journalStream, err)
+	}
+
+	var stat syscall.Stat_t
+	err = syscall.Fstat(fd, &stat)
+	if err != nil {
+		return false, err
+	}
+
+	match := stat.Dev == expectedStat.Dev && stat.Ino == expectedStat.Ino
+	return match, nil
+}
+
 // Send a message to the local systemd journal. vars is a map of journald
 // fields to values.  Fields must be composed of uppercase letters, numbers,
 // and underscores, but must not start with an underscore. Within these

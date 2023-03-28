@@ -1,6 +1,7 @@
 package ebpf
 
 import (
+	"github.com/cilium/ebpf/internal/sys"
 	"github.com/cilium/ebpf/internal/unix"
 )
 
@@ -9,11 +10,6 @@ import (
 // MapType indicates the type map structure
 // that will be initialized in the kernel.
 type MapType uint32
-
-// Max returns the latest supported MapType.
-func (_ MapType) Max() MapType {
-	return maxMapType - 1
-}
 
 // All the various map types that can be created
 const (
@@ -99,15 +95,7 @@ const (
 	InodeStorage
 	// TaskStorage - Specialized local storage map for task_struct.
 	TaskStorage
-	// maxMapType - Bound enum of MapTypes, has to be last in enum.
-	maxMapType
 )
-
-// Deprecated: StructOpts was a typo, use StructOpsMap instead.
-//
-// Declared as a variable to prevent stringer from picking it up
-// as an enum value.
-var StructOpts MapType = StructOpsMap
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
@@ -128,11 +116,6 @@ func (mt MapType) canStoreProgram() bool {
 
 // ProgramType of the eBPF program
 type ProgramType uint32
-
-// Max return the latest supported ProgramType.
-func (_ ProgramType) Max() ProgramType {
-	return maxProgramType - 1
-}
 
 // eBPF program types
 const (
@@ -167,7 +150,7 @@ const (
 	Extension
 	LSM
 	SkLookup
-	maxProgramType
+	Syscall
 )
 
 // AttachType of the eBPF program, needed to differentiate allowed context accesses in
@@ -223,6 +206,7 @@ const (
 	AttachSkReuseportSelect
 	AttachSkReuseportSelectOrMigrate
 	AttachPerfEvent
+	AttachTraceKprobeMulti
 )
 
 // AttachFlags of the eBPF program used in BPF_PROG_ATTACH command
@@ -276,3 +260,20 @@ type BatchOptions struct {
 	ElemFlags uint64
 	Flags     uint64
 }
+
+// LogLevel controls the verbosity of the kernel's eBPF program verifier.
+// These constants can be used for the ProgramOptions.LogLevel field.
+type LogLevel = sys.LogLevel
+
+const (
+	// Print verifier state at branch points.
+	LogLevelBranch = sys.BPF_LOG_LEVEL1
+
+	// Print verifier state for every instruction.
+	// Available since Linux v5.2.
+	LogLevelInstruction = sys.BPF_LOG_LEVEL2
+
+	// Print verifier errors and stats at the end of the verification process.
+	// Available since Linux v5.2.
+	LogLevelStats = sys.BPF_LOG_STATS
+)

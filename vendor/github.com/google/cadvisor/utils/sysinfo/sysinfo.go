@@ -104,7 +104,7 @@ func GetNetworkDevices(sysfs sysfs.SysFs) ([]info.NetInfo, error) {
 	for _, dev := range devs {
 		name := dev.Name()
 		// Ignore docker, loopback, and veth devices.
-		ignoredDevices := []string{"lo", "veth", "docker"}
+		ignoredDevices := []string{"lo", "veth", "docker", "nerdctl"}
 		ignored := false
 		for _, prefix := range ignoredDevices {
 			if strings.HasPrefix(name, prefix) {

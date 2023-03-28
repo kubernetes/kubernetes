@@ -2,6 +2,7 @@ package ebpf
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,9 +11,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/internal"
-	"github.com/cilium/ebpf/internal/btf"
+	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // MapInfo describes a map.
@@ -23,12 +28,13 @@ type MapInfo struct {
 	ValueSize  uint32
 	MaxEntries uint32
 	Flags      uint32
-	// Name as supplied by user space at load time.
+	// Name as supplied by user space at load time. Available from 4.15.
 	Name string
 }
 
-func newMapInfoFromFd(fd *internal.FD) (*MapInfo, error) {
-	info, err := bpfGetMapInfoByFD(fd)
+func newMapInfoFromFd(fd *sys.FD) (*MapInfo, error) {
+	var info sys.MapInfo
+	err := sys.ObjInfo(fd, &info)
 	if errors.Is(err, syscall.EINVAL) {
 		return newMapInfoFromProc(fd)
 	}
@@ -37,18 +43,17 @@ func newMapInfoFromFd(fd *internal.FD) (*MapInfo, error) {
 	}
 
 	return &MapInfo{
-		MapType(info.map_type),
-		MapID(info.id),
-		info.key_size,
-		info.value_size,
-		info.max_entries,
-		info.map_flags,
-		// name is available from 4.15.
-		internal.CString(info.name[:]),
+		MapType(info.Type),
+		MapID(info.Id),
+		info.KeySize,
+		info.ValueSize,
+		info.MaxEntries,
+		uint32(info.MapFlags),
+		unix.ByteSliceToString(info.Name[:]),
 	}, nil
 }
 
-func newMapInfoFromProc(fd *internal.FD) (*MapInfo, error) {
+func newMapInfoFromProc(fd *sys.FD) (*MapInfo, error) {
 	var mi MapInfo
 	err := scanFdInfo(fd, map[string]interface{}{
 		"map_type":    &mi.Type,
@@ -84,20 +89,21 @@ type programStats struct {
 type ProgramInfo struct {
 	Type ProgramType
 	id   ProgramID
-	// Truncated hash of the BPF bytecode.
+	// Truncated hash of the BPF bytecode. Available from 4.13.
 	Tag string
-	// Name as supplied by user space at load time.
+	// Name as supplied by user space at load time. Available from 4.15.
 	Name string
-	// BTF for the program.
-	btf btf.ID
-	// IDS map ids related to program.
-	ids []MapID
 
+	btf   btf.ID
 	stats *programStats
+
+	maps  []MapID
+	insns []byte
 }
 
-func newProgramInfoFromFd(fd *internal.FD) (*ProgramInfo, error) {
-	info, err := bpfGetProgInfoByFD(fd, nil)
+func newProgramInfoFromFd(fd *sys.FD) (*ProgramInfo, error) {
+	var info sys.ProgInfo
+	err := sys.ObjInfo(fd, &info)
 	if errors.Is(err, syscall.EINVAL) {
 		return newProgramInfoFromProc(fd)
 	}
@@ -105,32 +111,43 @@ func newProgramInfoFromFd(fd *internal.FD) (*ProgramInfo, error) {
 		return nil, err
 	}
 
-	var mapIDs []MapID
-	if info.nr_map_ids > 0 {
-		mapIDs = make([]MapID, info.nr_map_ids)
-		info, err = bpfGetProgInfoByFD(fd, mapIDs)
-		if err != nil {
+	pi := ProgramInfo{
+		Type: ProgramType(info.Type),
+		id:   ProgramID(info.Id),
+		Tag:  hex.EncodeToString(info.Tag[:]),
+		Name: unix.ByteSliceToString(info.Name[:]),
+		btf:  btf.ID(info.BtfId),
+		stats: &programStats{
+			runtime:  time.Duration(info.RunTimeNs),
+			runCount: info.RunCnt,
+		},
+	}
+
+	// Start with a clean struct for the second call, otherwise we may get EFAULT.
+	var info2 sys.ProgInfo
+
+	if info.NrMapIds > 0 {
+		pi.maps = make([]MapID, info.NrMapIds)
+		info2.NrMapIds = info.NrMapIds
+		info2.MapIds = sys.NewPointer(unsafe.Pointer(&pi.maps[0]))
+	}
+
+	if info.XlatedProgLen > 0 {
+		pi.insns = make([]byte, info.XlatedProgLen)
+		info2.XlatedProgLen = info.XlatedProgLen
+		info2.XlatedProgInsns = sys.NewSlicePointer(pi.insns)
+	}
+
+	if info.NrMapIds > 0 || info.XlatedProgLen > 0 {
+		if err := sys.ObjInfo(fd, &info2); err != nil {
 			return nil, err
 		}
 	}
 
-	return &ProgramInfo{
-		Type: ProgramType(info.prog_type),
-		id:   ProgramID(info.id),
-		// tag is available if the kernel supports BPF_PROG_GET_INFO_BY_FD.
-		Tag: hex.EncodeToString(info.tag[:]),
-		// name is available from 4.15.
-		Name: internal.CString(info.name[:]),
-		btf:  btf.ID(info.btf_id),
-		ids:  mapIDs,
-		stats: &programStats{
-			runtime:  time.Duration(info.run_time_ns),
-			runCount: info.run_cnt,
-		},
-	}, nil
+	return &pi, nil
 }
 
-func newProgramInfoFromProc(fd *internal.FD) (*ProgramInfo, error) {
+func newProgramInfoFromProc(fd *sys.FD) (*ProgramInfo, error) {
 	var info ProgramInfo
 	err := scanFdInfo(fd, map[string]interface{}{
 		"prog_type": &info.Type,
@@ -160,6 +177,7 @@ func (pi *ProgramInfo) ID() (ProgramID, bool) {
 
 // BTFID returns the BTF ID associated with the program.
 //
+// The ID is only valid as long as the associated program is kept alive.
 // Available from 5.0.
 //
 // The bool return value indicates whether this optional field is available and
@@ -191,20 +209,50 @@ func (pi *ProgramInfo) Runtime() (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
+// Instructions returns the 'xlated' instruction stream of the program
+// after it has been verified and rewritten by the kernel. These instructions
+// cannot be loaded back into the kernel as-is, this is mainly used for
+// inspecting loaded programs for troubleshooting, dumping, etc.
+//
+// For example, map accesses are made to reference their kernel map IDs,
+// not the FDs they had when the program was inserted. Note that before
+// the introduction of bpf_insn_prepare_dump in kernel 4.16, xlated
+// instructions were not sanitized, making the output even less reusable
+// and less likely to round-trip or evaluate to the same program Tag.
+//
+// The first instruction is marked as a symbol using the Program's name.
+//
+// Available from 4.13. Requires CAP_BPF or equivalent.
+func (pi *ProgramInfo) Instructions() (asm.Instructions, error) {
+	// If the calling process is not BPF-capable or if the kernel doesn't
+	// support getting xlated instructions, the field will be zero.
+	if len(pi.insns) == 0 {
+		return nil, fmt.Errorf("insufficient permissions or unsupported kernel: %w", ErrNotSupported)
+	}
+
+	r := bytes.NewReader(pi.insns)
+	var insns asm.Instructions
+	if err := insns.Unmarshal(r, internal.NativeEndian); err != nil {
+		return nil, fmt.Errorf("unmarshaling instructions: %w", err)
+	}
+
+	// Tag the first instruction with the name of the program, if available.
+	insns[0] = insns[0].WithSymbol(pi.Name)
+
+	return insns, nil
+}
+
 // MapIDs returns the maps related to the program.
+//
+// Available from 4.15.
 //
 // The bool return value indicates whether this optional field is available.
 func (pi *ProgramInfo) MapIDs() ([]MapID, bool) {
-	return pi.ids, pi.ids != nil
+	return pi.maps, pi.maps != nil
 }
 
-func scanFdInfo(fd *internal.FD, fields map[string]interface{}) error {
-	raw, err := fd.Value()
-	if err != nil {
-		return err
-	}
-
-	fh, err := os.Open(fmt.Sprintf("/proc/self/fdinfo/%d", raw))
+func scanFdInfo(fd *sys.FD, fields map[string]interface{}) error {
+	fh, err := os.Open(fmt.Sprintf("/proc/self/fdinfo/%d", fd.Int()))
 	if err != nil {
 		return err
 	}
@@ -247,6 +295,10 @@ func scanFdInfoReader(r io.Reader, fields map[string]interface{}) error {
 		return err
 	}
 
+	if len(fields) > 0 && scanned == 0 {
+		return ErrNotSupported
+	}
+
 	if scanned != len(fields) {
 		return errMissingFields
 	}
@@ -261,11 +313,9 @@ func scanFdInfoReader(r io.Reader, fields map[string]interface{}) error {
 //
 // Requires at least 5.8.
 func EnableStats(which uint32) (io.Closer, error) {
-	attr := internal.BPFEnableStatsAttr{
-		StatsType: which,
-	}
-
-	fd, err := internal.BPFEnableStats(&attr)
+	fd, err := sys.EnableStats(&sys.EnableStatsAttr{
+		Type: which,
+	})
 	if err != nil {
 		return nil, err
 	}

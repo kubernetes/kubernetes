@@ -1,0 +1,10 @@
+linters:
+  presets:
+    - bugs
+    - performance
+    - unused
+    - format
+
+linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true

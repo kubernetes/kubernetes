@@ -176,9 +176,10 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, boo
 					return err, false
 				}
 				state = waitingForReject
+			} else {
+				conn.uuid = string(s[1])
+				return nil, true
 			}
-			conn.uuid = string(s[1])
-			return nil, true
 		case state == waitingForData:
 			err = authWriteLine(conn.transport, []byte("ERROR"))
 			if err != nil {
@@ -191,9 +192,10 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, boo
 					return err, false
 				}
 				state = waitingForReject
+			} else {
+				conn.uuid = string(s[1])
+				return nil, true
 			}
-			conn.uuid = string(s[1])
-			return nil, true
 		case state == waitingForOk && string(s[0]) == "DATA":
 			err = authWriteLine(conn.transport, []byte("DATA"))
 			if err != nil {

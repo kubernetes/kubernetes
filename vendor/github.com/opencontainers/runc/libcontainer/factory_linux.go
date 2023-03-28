@@ -5,15 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"regexp"
 	"runtime/debug"
 	"strconv"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
-	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
+	//nolint:revive // Enable cgroup manager to manage devices
+	_ "github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/configs/validate"
@@ -27,131 +26,30 @@ const (
 	execFifoFilename = "exec.fifo"
 )
 
-var idRegex = regexp.MustCompile(`^[\w+-\.]+$`)
-
-// InitArgs returns an options func to configure a LinuxFactory with the
-// provided init binary path and arguments.
-func InitArgs(args ...string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) (err error) {
-		if len(args) > 0 {
-			// Resolve relative paths to ensure that its available
-			// after directory changes.
-			if args[0], err = filepath.Abs(args[0]); err != nil {
-				// The only error returned from filepath.Abs is
-				// the one from os.Getwd, i.e. a system error.
-				return err
-			}
-		}
-
-		l.InitArgs = args
-		return nil
-	}
-}
-
-// IntelRdtfs is an options func to configure a LinuxFactory to return
-// containers that use the Intel RDT "resource control" filesystem to
-// create and manage Intel RDT resources (e.g., L3 cache, memory bandwidth).
-func IntelRdtFs(l *LinuxFactory) error {
-	if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
-		l.NewIntelRdtManager = nil
-	} else {
-		l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
-			return intelrdt.NewManager(config, id, path)
-		}
-	}
-	return nil
-}
-
-// TmpfsRoot is an option func to mount LinuxFactory.Root to tmpfs.
-func TmpfsRoot(l *LinuxFactory) error {
-	mounted, err := mountinfo.Mounted(l.Root)
-	if err != nil {
-		return err
-	}
-	if !mounted {
-		if err := mount("tmpfs", l.Root, "", "tmpfs", 0, ""); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CriuPath returns an option func to configure a LinuxFactory with the
-// provided criupath
-func CriuPath(criupath string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) error {
-		l.CriuPath = criupath
-		return nil
-	}
-}
-
-// New returns a linux based container factory based in the root directory and
-// configures the factory with the provided option funcs.
-func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
-	if root != "" {
-		if err := os.MkdirAll(root, 0o700); err != nil {
-			return nil, err
-		}
-	}
-	l := &LinuxFactory{
-		Root:      root,
-		InitPath:  "/proc/self/exe",
-		InitArgs:  []string{os.Args[0], "init"},
-		Validator: validate.New(),
-		CriuPath:  "criu",
-	}
-
-	for _, opt := range options {
-		if opt == nil {
-			continue
-		}
-		if err := opt(l); err != nil {
-			return nil, err
-		}
-	}
-	return l, nil
-}
-
-// LinuxFactory implements the default factory interface for linux based systems.
-type LinuxFactory struct {
-	// Root directory for the factory to store state.
-	Root string
-
-	// InitPath is the path for calling the init responsibilities for spawning
-	// a container.
-	InitPath string
-
-	// InitArgs are arguments for calling the init responsibilities for spawning
-	// a container.
-	InitArgs []string
-
-	// CriuPath is the path to the criu binary used for checkpoint and restore of
-	// containers.
-	CriuPath string
-
-	// New{u,g}idmapPath is the path to the binaries used for mapping with
-	// rootless containers.
-	NewuidmapPath string
-	NewgidmapPath string
-
-	// Validator provides validation to container configurations.
-	Validator validate.Validator
-
-	// NewIntelRdtManager returns an initialized Intel RDT manager for a single container.
-	NewIntelRdtManager func(config *configs.Config, id string, path string) intelrdt.Manager
-}
-
-func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, error) {
-	if l.Root == "" {
+// Create creates a new container with the given id inside a given state
+// directory (root), and returns a Container object.
+//
+// The root is a state directory which many containers can share. It can be
+// used later to get the list of containers, or to get information about a
+// particular container (see Load).
+//
+// The id must not be empty and consist of only the following characters:
+// ASCII letters, digits, underscore, plus, minus, period. The id must be
+// unique and non-existent for the given root path.
+func Create(root, id string, config *configs.Config) (*Container, error) {
+	if root == "" {
 		return nil, errors.New("root not set")
 	}
-	if err := l.validateID(id); err != nil {
+	if err := validateID(id); err != nil {
 		return nil, err
 	}
-	if err := l.Validator.Validate(config); err != nil {
+	if err := validate.Validate(config); err != nil {
 		return nil, err
 	}
-	containerRoot, err := securejoin.SecureJoin(l.Root, id)
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return nil, err
+	}
+	containerRoot, err := securejoin.SecureJoin(root, id)
 	if err != nil {
 		return nil, err
 	}
@@ -195,43 +93,37 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 		return nil, errors.New("container's cgroup unexpectedly frozen")
 	}
 
-	if err := os.MkdirAll(containerRoot, 0o711); err != nil {
+	// Parent directory is already created above, so Mkdir is enough.
+	if err := os.Mkdir(containerRoot, 0o711); err != nil {
 		return nil, err
 	}
-	if err := os.Chown(containerRoot, unix.Geteuid(), unix.Getegid()); err != nil {
-		return nil, err
-	}
-	c := &linuxContainer{
-		id:            id,
-		root:          containerRoot,
-		config:        config,
-		initPath:      l.InitPath,
-		initArgs:      l.InitArgs,
-		criuPath:      l.CriuPath,
-		newuidmapPath: l.NewuidmapPath,
-		newgidmapPath: l.NewgidmapPath,
-		cgroupManager: cm,
-	}
-	if l.NewIntelRdtManager != nil {
-		c.intelRdtManager = l.NewIntelRdtManager(config, id, "")
+	c := &Container{
+		id:              id,
+		root:            containerRoot,
+		config:          config,
+		cgroupManager:   cm,
+		intelRdtManager: intelrdt.NewManager(config, id, ""),
 	}
 	c.state = &stoppedState{c: c}
 	return c, nil
 }
 
-func (l *LinuxFactory) Load(id string) (Container, error) {
-	if l.Root == "" {
+// Load takes a path to the state directory (root) and an id of an existing
+// container, and returns a Container object reconstructed from the saved
+// state. This presents a read only view of the container.
+func Load(root, id string) (*Container, error) {
+	if root == "" {
 		return nil, errors.New("root not set")
 	}
 	// when load, we need to check id is valid or not.
-	if err := l.validateID(id); err != nil {
+	if err := validateID(id); err != nil {
 		return nil, err
 	}
-	containerRoot, err := securejoin.SecureJoin(l.Root, id)
+	containerRoot, err := securejoin.SecureJoin(root, id)
 	if err != nil {
 		return nil, err
 	}
-	state, err := l.loadState(containerRoot)
+	state, err := loadState(containerRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -244,22 +136,15 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &linuxContainer{
+	c := &Container{
 		initProcess:          r,
 		initProcessStartTime: state.InitProcessStartTime,
 		id:                   id,
 		config:               &state.Config,
-		initPath:             l.InitPath,
-		initArgs:             l.InitArgs,
-		criuPath:             l.CriuPath,
-		newuidmapPath:        l.NewuidmapPath,
-		newgidmapPath:        l.NewgidmapPath,
 		cgroupManager:        cm,
+		intelRdtManager:      intelrdt.NewManager(&state.Config, id, state.IntelRdtPath),
 		root:                 containerRoot,
 		created:              state.Created,
-	}
-	if l.NewIntelRdtManager != nil {
-		c.intelRdtManager = l.NewIntelRdtManager(&state.Config, id, state.IntelRdtPath)
 	}
 	c.state = &loadedState{c: c}
 	if err := c.refreshState(); err != nil {
@@ -268,13 +153,10 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	return c, nil
 }
 
-func (l *LinuxFactory) Type() string {
-	return "libcontainer"
-}
-
-// StartInitialization loads a container by opening the pipe fd from the parent to read the configuration and state
-// This is a low level implementation detail of the reexec and should not be consumed externally
-func (l *LinuxFactory) StartInitialization() (err error) {
+// StartInitialization loads a container by opening the pipe fd from the parent
+// to read the configuration and state. This is a low level implementation
+// detail of the reexec and should not be consumed externally.
+func StartInitialization() (err error) {
 	// Get the INITPIPE.
 	envInitPipe := os.Getenv("_LIBCONTAINER_INITPIPE")
 	pipefd, err := strconv.Atoi(envInitPipe)
@@ -338,10 +220,9 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 
 	defer func() {
 		if e := recover(); e != nil {
-			if e, ok := e.(error); ok {
-				err = fmt.Errorf("panic from initialization: %w, %s", e, debug.Stack())
+			if ee, ok := e.(error); ok {
+				err = fmt.Errorf("panic from initialization: %w, %s", ee, debug.Stack())
 			} else {
-				//nolint:errorlint // here e is not of error type
 				err = fmt.Errorf("panic from initialization: %v, %s", e, debug.Stack())
 			}
 		}
@@ -356,7 +237,7 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 	return i.Init()
 }
 
-func (l *LinuxFactory) loadState(root string) (*State, error) {
+func loadState(root string) (*State, error) {
 	stateFilePath, err := securejoin.SecureJoin(root, stateFilename)
 	if err != nil {
 		return nil, err
@@ -376,41 +257,62 @@ func (l *LinuxFactory) loadState(root string) (*State, error) {
 	return state, nil
 }
 
-func (l *LinuxFactory) validateID(id string) error {
-	if !idRegex.MatchString(id) || string(os.PathSeparator)+id != utils.CleanPath(string(os.PathSeparator)+id) {
+// validateID checks if the supplied container ID is valid, returning
+// the ErrInvalidID in case it is not.
+//
+// The format of valid ID was never formally defined, instead the code
+// was modified to allow or disallow specific characters.
+//
+// Currently, a valid ID is a non-empty string consisting only of
+// the following characters:
+// - uppercase (A-Z) and lowercase (a-z) Latin letters;
+// - digits (0-9);
+// - underscore (_);
+// - plus sign (+);
+// - minus sign (-);
+// - period (.).
+//
+// In addition, IDs that can't be used to represent a file name
+// (such as . or ..) are rejected.
+
+func validateID(id string) error {
+	if len(id) < 1 {
+		return ErrInvalidID
+	}
+
+	// Allowed characters: 0-9 A-Z a-z _ + - .
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		case c >= '0' && c <= '9':
+		case c == '_':
+		case c == '+':
+		case c == '-':
+		case c == '.':
+		default:
+			return ErrInvalidID
+		}
+
+	}
+
+	if string(os.PathSeparator)+id != utils.CleanPath(string(os.PathSeparator)+id) {
 		return ErrInvalidID
 	}
 
 	return nil
 }
 
-// NewuidmapPath returns an option func to configure a LinuxFactory with the
-// provided ..
-func NewuidmapPath(newuidmapPath string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) error {
-		l.NewuidmapPath = newuidmapPath
-		return nil
-	}
-}
-
-// NewgidmapPath returns an option func to configure a LinuxFactory with the
-// provided ..
-func NewgidmapPath(newgidmapPath string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) error {
-		l.NewgidmapPath = newgidmapPath
-		return nil
-	}
-}
-
 func parseMountFds() ([]int, error) {
-	fdsJson := os.Getenv("_LIBCONTAINER_MOUNT_FDS")
-	if fdsJson == "" {
+	fdsJSON := os.Getenv("_LIBCONTAINER_MOUNT_FDS")
+	if fdsJSON == "" {
 		// Always return the nil slice if no fd is present.
 		return nil, nil
 	}
 
 	var mountFds []int
-	if err := json.Unmarshal([]byte(fdsJson), &mountFds); err != nil {
+	if err := json.Unmarshal([]byte(fdsJSON), &mountFds); err != nil {
 		return nil, fmt.Errorf("Error unmarshalling _LIBCONTAINER_MOUNT_FDS: %w", err)
 	}
 

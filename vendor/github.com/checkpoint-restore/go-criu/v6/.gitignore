@@ -1,0 +1,13 @@
+test/test
+test/test.coverage
+test/piggie/piggie
+test/phaul/phaul
+test/phaul/phaul.coverage
+test/loop/loop
+test/crit/crit-test
+test/crit/test-imgs
+image
+scripts/*.h
+scripts/expected.go
+scripts/output.go
+crit/bin

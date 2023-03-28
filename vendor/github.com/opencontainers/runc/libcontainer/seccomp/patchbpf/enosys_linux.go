@@ -43,10 +43,22 @@ const uintptr_t C_SET_MODE_FILTER = SECCOMP_SET_MODE_FILTER;
 #endif
 const uintptr_t C_FILTER_FLAG_LOG = SECCOMP_FILTER_FLAG_LOG;
 
+#ifndef SECCOMP_FILTER_FLAG_SPEC_ALLOW
+#	define SECCOMP_FILTER_FLAG_SPEC_ALLOW (1UL << 2)
+#endif
+const uintptr_t C_FILTER_FLAG_SPEC_ALLOW = SECCOMP_FILTER_FLAG_SPEC_ALLOW;
+
 #ifndef SECCOMP_FILTER_FLAG_NEW_LISTENER
 #	define SECCOMP_FILTER_FLAG_NEW_LISTENER (1UL << 3)
 #endif
 const uintptr_t C_FILTER_FLAG_NEW_LISTENER = SECCOMP_FILTER_FLAG_NEW_LISTENER;
+
+#ifndef AUDIT_ARCH_RISCV64
+#ifndef EM_RISCV
+#define EM_RISCV		243
+#endif
+#define AUDIT_ARCH_RISCV64	(EM_RISCV|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+#endif
 
 // We use the AUDIT_ARCH_* values because those are the ones used by the kernel
 // and SCMP_ARCH_* sometimes has fake values (such as SCMP_ARCH_X32). But we
@@ -67,10 +79,14 @@ const uint32_t C_AUDIT_ARCH_PPC64        = AUDIT_ARCH_PPC64;
 const uint32_t C_AUDIT_ARCH_PPC64LE      = AUDIT_ARCH_PPC64LE;
 const uint32_t C_AUDIT_ARCH_S390         = AUDIT_ARCH_S390;
 const uint32_t C_AUDIT_ARCH_S390X        = AUDIT_ARCH_S390X;
+const uint32_t C_AUDIT_ARCH_RISCV64      = AUDIT_ARCH_RISCV64;
 */
 import "C"
 
 var retErrnoEnosys = uint32(C.C_ACT_ERRNO_ENOSYS)
+
+// Assume sizeof(int) == 4 in the BPF program.
+const bpfSizeofInt = 4
 
 // This syscall is used for multiplexing "large" syscalls on s390(x). Unknown
 // syscalls will end up with this syscall number, so we need to explcitly
@@ -91,7 +107,6 @@ func isAllowAction(action configs.Action) bool {
 
 func parseProgram(rdr io.Reader) ([]bpf.RawInstruction, error) {
 	var program []bpf.RawInstruction
-loop:
 	for {
 		// Read the next instruction. We have to use NativeEndian because
 		// seccomp_export_bpf outputs the program in *host* endian-ness.
@@ -99,7 +114,7 @@ loop:
 		if err := binary.Read(rdr, utils.NativeEndian, &insn); err != nil {
 			if errors.Is(err, io.EOF) {
 				// Parsing complete.
-				break loop
+				break
 			}
 			if errors.Is(err, io.ErrUnexpectedEOF) {
 				// Parsing stopped mid-instruction.
@@ -202,6 +217,8 @@ func archToNative(arch libseccomp.ScmpArch) (nativeArch, error) {
 		return nativeArch(C.C_AUDIT_ARCH_S390), nil
 	case libseccomp.ArchS390X:
 		return nativeArch(C.C_AUDIT_ARCH_S390X), nil
+	case libseccomp.ArchRISCV64:
+		return nativeArch(C.C_AUDIT_ARCH_RISCV64), nil
 	default:
 		return invalidArch, fmt.Errorf("unknown architecture: %v", arch)
 	}
@@ -221,16 +238,6 @@ func findLastSyscalls(config *configs.Seccomp) (lastSyscallMap, error) {
 		arch, err := libseccomp.GetArchFromString(ociArch)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate seccomp architecture: %w", err)
-		}
-
-		// Map native architecture to a real architecture value to avoid
-		// doubling-up the lastSyscall mapping.
-		if arch == libseccomp.ArchNative {
-			nativeArch, err := libseccomp.GetNativeArch()
-			if err != nil {
-				return nil, fmt.Errorf("unable to get native architecture: %w", err)
-			}
-			arch = nativeArch
 		}
 
 		// Figure out native architecture representation of the architecture.
@@ -311,7 +318,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 		// share this code between architecture branches.
 		section := []bpf.Instruction{
 			// load [0] (syscall number)
-			bpf.LoadAbsolute{Off: 0, Size: 4}, // NOTE: We assume sizeof(int) == 4.
+			bpf.LoadAbsolute{Off: 0, Size: bpfSizeofInt},
 		}
 
 		switch len(maxSyscalls) {
@@ -371,8 +378,8 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				sectionTail = []bpf.Instruction{
 					// jle [syscall],1
 					bpf.JumpIf{Cond: bpf.JumpLessOrEqual, Val: uint32(sysno), SkipTrue: 1},
-					// ja [baseJumpEnosys+1]
-					bpf.Jump{Skip: baseJumpEnosys + 1},
+					// ret [ENOSYS]
+					bpf.RetConstant{Val: retErrnoEnosys},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}
@@ -456,7 +463,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				//   jset (1<<30),1
 				//   jgt [x86 syscall],1,2
 				//   jle [x32 syscall],1
-				//   ja [baseJumpEnosys+1]
+				//   ret [ENOSYS]
 				//   ja [baseJumpFilter]
 				section = append(section, []bpf.Instruction{
 					// jset (1<<30),1
@@ -467,14 +474,14 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 						Val:      uint32(x86sysno),
 						SkipTrue: 1, SkipFalse: 2,
 					},
-					// jle [x32 syscall],[baseJumpEnosys]
+					// jle [x32 syscall],1
 					bpf.JumpIf{
 						Cond:     bpf.JumpLessOrEqual,
 						Val:      uint32(x32sysno),
 						SkipTrue: 1,
 					},
-					// ja [baseJumpEnosys+1]
-					bpf.Jump{Skip: baseJumpEnosys + 1},
+					// ret [ENOSYS]
+					bpf.RetConstant{Val: retErrnoEnosys},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}...)
@@ -539,7 +546,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 	// Prepend the load instruction for the architecture.
 	programTail = append([]bpf.Instruction{
 		// load [4] (architecture)
-		bpf.LoadAbsolute{Off: 4, Size: 4}, // NOTE: We assume sizeof(int) == 4.
+		bpf.LoadAbsolute{Off: bpfSizeofInt, Size: bpfSizeofInt},
 	}, programTail...)
 
 	// And that's all folks!
@@ -629,8 +636,14 @@ func filterFlags(config *configs.Seccomp, filter *libseccomp.ScmpFilter) (flags 
 			flags |= uint(C.C_FILTER_FLAG_LOG)
 		}
 	}
-
-	// TODO: Support seccomp flags not yet added to libseccomp-golang...
+	if apiLevel >= 4 {
+		if ssb, err := filter.GetSSB(); err != nil {
+			return 0, false, fmt.Errorf("unable to fetch SECCOMP_FILTER_FLAG_SPEC_ALLOW bit: %w", err)
+		} else if ssb {
+			flags |= uint(C.C_FILTER_FLAG_SPEC_ALLOW)
+		}
+	}
+	// XXX: add newly supported filter flags above this line.
 
 	for _, call := range config.Syscalls {
 		if call.Action == configs.Notify {
@@ -643,6 +656,9 @@ func filterFlags(config *configs.Seccomp, filter *libseccomp.ScmpFilter) (flags 
 }
 
 func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (fd int, err error) {
+	// This debug output is validated in tests/integration/seccomp.bats
+	// by the SECCOMP_FILTER_FLAG_* test.
+	logrus.Debugf("seccomp filter flags: %d", flags)
 	fprog := unix.SockFprog{
 		Len:    uint16(len(filter)),
 		Filter: &filter[0],

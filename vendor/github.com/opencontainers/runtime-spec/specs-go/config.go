@@ -331,6 +331,9 @@ type LinuxCPU struct {
 	Shares *uint64 `json:"shares,omitempty"`
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
 	Quota *int64 `json:"quota,omitempty"`
+	// CPU hardcap burst limit (in usecs). Allowed accumulated cpu time additionally for burst in a
+	// given period.
+	Burst *uint64 `json:"burst,omitempty"`
 	// CPU period to be used for hardcapping (in usecs).
 	Period *uint64 `json:"period,omitempty"`
 	// How much time realtime scheduling may use (in usecs).

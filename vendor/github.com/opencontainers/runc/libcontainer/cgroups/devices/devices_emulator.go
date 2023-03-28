@@ -63,16 +63,16 @@ func (r deviceRules) orderedEntries() []deviceRule {
 	return rules
 }
 
-type Emulator struct {
+type emulator struct {
 	defaultAllow bool
 	rules        deviceRules
 }
 
-func (e *Emulator) IsBlacklist() bool {
+func (e *emulator) IsBlacklist() bool {
 	return e.defaultAllow
 }
 
-func (e *Emulator) IsAllowAll() bool {
+func (e *emulator) IsAllowAll() bool {
 	return e.IsBlacklist() && len(e.rules) == 0
 }
 
@@ -139,7 +139,7 @@ func parseLine(line string) (*deviceRule, error) {
 	return &rule, nil
 }
 
-func (e *Emulator) addRule(rule deviceRule) error { //nolint:unparam
+func (e *emulator) addRule(rule deviceRule) error { //nolint:unparam
 	if e.rules == nil {
 		e.rules = make(map[deviceMeta]devices.Permissions)
 	}
@@ -151,7 +151,7 @@ func (e *Emulator) addRule(rule deviceRule) error { //nolint:unparam
 	return nil
 }
 
-func (e *Emulator) rmRule(rule deviceRule) error {
+func (e *emulator) rmRule(rule deviceRule) error {
 	// Give an error if any of the permissions requested to be removed are
 	// present in a partially-matching wildcard rule, because such rules will
 	// be ignored by cgroupv1.
@@ -196,11 +196,11 @@ func (e *Emulator) rmRule(rule deviceRule) error {
 	return nil
 }
 
-func (e *Emulator) allow(rule *deviceRule) error {
+func (e *emulator) allow(rule *deviceRule) error {
 	// This cgroup is configured as a black-list. Reset the entire emulator,
 	// and put is into black-list mode.
 	if rule == nil || rule.meta.node == devices.WildcardDevice {
-		*e = Emulator{
+		*e = emulator{
 			defaultAllow: true,
 			rules:        nil,
 		}
@@ -216,11 +216,11 @@ func (e *Emulator) allow(rule *deviceRule) error {
 	return err
 }
 
-func (e *Emulator) deny(rule *deviceRule) error {
+func (e *emulator) deny(rule *deviceRule) error {
 	// This cgroup is configured as a white-list. Reset the entire emulator,
 	// and put is into white-list mode.
 	if rule == nil || rule.meta.node == devices.WildcardDevice {
-		*e = Emulator{
+		*e = emulator{
 			defaultAllow: false,
 			rules:        nil,
 		}
@@ -236,7 +236,7 @@ func (e *Emulator) deny(rule *deviceRule) error {
 	return err
 }
 
-func (e *Emulator) Apply(rule devices.Rule) error {
+func (e *emulator) Apply(rule devices.Rule) error {
 	if !rule.Type.CanCgroup() {
 		return fmt.Errorf("cannot add rule [%#v] with non-cgroup type %q", rule, rule.Type)
 	}
@@ -260,17 +260,17 @@ func (e *Emulator) Apply(rule devices.Rule) error {
 	return e.deny(innerRule)
 }
 
-// EmulatorFromList takes a reader to a "devices.list"-like source, and returns
+// emulatorFromList takes a reader to a "devices.list"-like source, and returns
 // a new Emulator that represents the state of the devices cgroup. Note that
 // black-list devices cgroups cannot be fully reconstructed, due to limitations
 // in the devices cgroup API. Instead, such cgroups are always treated as
 // "allow all" cgroups.
-func EmulatorFromList(list io.Reader) (*Emulator, error) {
+func emulatorFromList(list io.Reader) (*emulator, error) {
 	// Normally cgroups are in black-list mode by default, but the way we
 	// figure out the current mode is whether or not devices.list has an
 	// allow-all rule. So we default to a white-list, and the existence of an
 	// "a *:* rwm" entry will tell us otherwise.
-	e := &Emulator{
+	e := &emulator{
 		defaultAllow: false,
 	}
 
@@ -304,7 +304,7 @@ func EmulatorFromList(list io.Reader) (*Emulator, error) {
 // This function is the sole reason for all of Emulator -- to allow us
 // to figure out how to update a containers' cgroups without causing spurious
 // device errors (if possible).
-func (source *Emulator) Transition(target *Emulator) ([]*devices.Rule, error) {
+func (source *emulator) Transition(target *emulator) ([]*devices.Rule, error) { //nolint:revive // Ignore receiver-naming warning.
 	var transitionRules []*devices.Rule
 	oldRules := source.rules
 
@@ -373,8 +373,8 @@ func (source *Emulator) Transition(target *Emulator) ([]*devices.Rule, error) {
 // cgroup to the emulated filter state (note that this is not the same as a
 // default cgroupv1 cgroup -- which is allow-all). This is effectively just a
 // wrapper around Transition() with the source emulator being an empty cgroup.
-func (e *Emulator) Rules() ([]*devices.Rule, error) {
-	defaultCgroup := &Emulator{defaultAllow: false}
+func (e *emulator) Rules() ([]*devices.Rule, error) {
+	defaultCgroup := &emulator{defaultAllow: false}
 	return defaultCgroup.Transition(e)
 }
 

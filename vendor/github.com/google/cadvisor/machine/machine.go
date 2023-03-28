@@ -62,7 +62,7 @@ func GetCPUVendorID(procInfo []byte) string {
 
 	matches := vendorIDRegexp.FindSubmatch(procInfo)
 	if len(matches) != 2 {
-		klog.Warning("Cannot read vendor id correctly, set empty.")
+		klog.V(4).Info("Cannot read vendor id correctly, set empty.")
 		return vendorID
 	}
 

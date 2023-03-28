@@ -4,10 +4,10 @@ package asm
 
 // Source of ALU / ALU64 / Branch operations
 //
-//    msb      lsb
-//    +----+-+---+
-//    |op  |S|cls|
-//    +----+-+---+
+//	msb      lsb
+//	+----+-+---+
+//	|op  |S|cls|
+//	+----+-+---+
 type Source uint8
 
 const sourceMask OpCode = 0x08
@@ -39,10 +39,10 @@ const (
 
 // ALUOp are ALU / ALU64 operations
 //
-//    msb      lsb
-//    +----+-+---+
-//    |OP  |s|cls|
-//    +----+-+---+
+//	msb      lsb
+//	+----+-+---+
+//	|OP  |s|cls|
+//	+----+-+---+
 type ALUOp uint8
 
 const aluMask OpCode = 0xf0

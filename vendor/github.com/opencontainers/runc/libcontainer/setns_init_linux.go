@@ -26,7 +26,7 @@ type linuxSetnsInit struct {
 }
 
 func (l *linuxSetnsInit) getSessionRingName() string {
-	return "_ses." + l.config.ContainerId
+	return "_ses." + l.config.ContainerID
 }
 
 func (l *linuxSetnsInit) Init() error {
@@ -59,6 +59,10 @@ func (l *linuxSetnsInit) Init() error {
 			return err
 		}
 	}
+	if l.config.Config.Umask != nil {
+		unix.Umask(int(*l.config.Config.Umask))
+	}
+
 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return err
 	}
