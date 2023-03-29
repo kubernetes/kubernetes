@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -221,16 +222,17 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomSalt, commonSize, nil), key, nil
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomNonce, commonSize, nil), key, nil
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func() ([]byte, error), saltLen int, cache *simpleCache) value.Transformer {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func([]byte) error, saltLen int, cache *simpleCache) value.Transformer {
 	return &extendedNonceGCM{
 		key:      key,
 		nonceGen: newNonceGenerator(),
 		prf:      prf,
 		salt:     salt,
 		saltLen:  saltLen,
+		saltPool: &sync.Pool{New: func() any { b := make([]byte, saltLen); return &b }},
 		cache:    cache,
 	}
 }
@@ -239,8 +241,9 @@ type extendedNonceGCM struct {
 	key      []byte
 	nonceGen *nonceGenerator
 	prf      pseudoRandomFunction
-	salt     func() ([]byte, error)
+	salt     func([]byte) error
 	saltLen  int
+	saltPool *sync.Pool
 	cache    *simpleCache
 }
 
@@ -260,12 +263,14 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	salt, err := e.salt()
-	if err != nil {
+	salt := e.saltPool.Get().(*[]byte)
+	defer e.saltPool.Put(salt)
+
+	if err := e.salt(*salt); err != nil {
 		return nil, err // TODO fmt.Err
 	}
 
-	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
+	transformer, err := e.derivedKeyTransformer(*salt, dataCtx)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -279,24 +284,18 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return transformedData, nil
 	}
 
-	copy(transformedData, salt)
+	copy(transformedData, *salt)
 
 	return transformedData, nil
 }
 
-func randomSalt() ([]byte, error) {
-	salt := make([]byte, commonSize)
-	return salt, randomNonce(salt)
+func noSalt(_ []byte) error {
+	return nil
 }
 
-func noSalt() ([]byte, error) {
-	return nil, nil
-}
-
-func timeSalt() ([]byte, error) {
-	salt := make([]byte, 8)
+func timeSalt(salt []byte) error {
 	binary.LittleEndian.PutUint64(salt, uint64(time.Now().UTC().Round(time.Hour).Unix()))
-	return salt, nil
+	return nil
 }
 
 func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
