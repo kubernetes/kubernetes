@@ -28,6 +28,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -473,7 +474,7 @@ func BenchmarkGCMRead(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			for _, n := range benchmarks {
 				n := n
-				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
+				if t.keyLength == 16 && strings.Contains(n.name, "hchacha20") {
 					continue // HChaCha20 requires 32 byte keys
 				}
 				b.Run(n.name, func(b *testing.B) {
@@ -499,7 +500,7 @@ func BenchmarkGCMWrite(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			for _, n := range benchmarks {
 				n := n
-				if t.keyLength == 16 && n.name == "hchacha20NoInfo" {
+				if t.keyLength == 16 && strings.Contains(n.name, "hchacha20") {
 					continue // HChaCha20 requires 32 byte keys
 				}
 				b.Run(n.name, func(b *testing.B) {
