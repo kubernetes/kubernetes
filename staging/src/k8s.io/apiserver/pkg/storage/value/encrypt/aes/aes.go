@@ -45,6 +45,7 @@ const commonSize = 32
 type gcm struct {
 	aead      cipher.AEAD
 	nonceFunc func([]byte) error
+	saltLen   int
 }
 
 // NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
@@ -113,7 +114,7 @@ func newNonceGenerator() *nonceGenerator {
 	return nonceGen
 }
 
-func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGenerator) (value.Transformer, error) {
+func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGenerator) (*gcm, error) {
 	aead, err := newGCM(block)
 	if err != nil {
 		return nil, err
@@ -249,14 +250,13 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 	}
 
 	salt := data[:e.saltLen]
-	transformedData := data[e.saltLen:]
 
 	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
 	if err != nil {
 		return nil, false, err // TODO fmt.Err
 	}
 
-	return transformer.TransformFromStorage(ctx, transformedData, dataCtx)
+	return transformer.TransformFromStorage(ctx, data, dataCtx)
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
@@ -279,12 +279,9 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return transformedData, nil
 	}
 
-	// TODO come up with a way to pre-allocate this
-	out := make([]byte, 0, len(salt)+len(transformedData))
-	out = append(out, salt...)
-	out = append(out, transformedData...)
+	copy(transformedData, salt)
 
-	return out, nil
+	return transformedData, nil
 }
 
 func randomSalt() ([]byte, error) {
@@ -332,6 +329,7 @@ func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Cont
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
+	transformer.saltLen = e.saltLen // TODO probably better to set as part of the constructor
 
 	if e.cache != nil {
 		e.cache.set(cacheKey, transformer)
@@ -383,23 +381,23 @@ func hchacha20NoInfo(secret, salt, _ []byte) ([]byte, error) { // I am not reall
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	nonceSize := t.aead.NonceSize()
-	if len(data) < nonceSize {
+	if len(data) < t.saltLen+nonceSize {
 		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
-	result, err := t.aead.Open(nil, data[:nonceSize], data[nonceSize:], dataCtx.AuthenticatedData())
+	result, err := t.aead.Open(nil, data[t.saltLen:t.saltLen+nonceSize], data[t.saltLen+nonceSize:], dataCtx.AuthenticatedData())
 	return result, false, err
 }
 
 func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	nonceSize := t.aead.NonceSize()
-	result := make([]byte, nonceSize+t.aead.Overhead()+len(data))
+	result := make([]byte, t.saltLen+nonceSize+t.aead.Overhead()+len(data))
 
-	if err := t.nonceFunc(result[:nonceSize]); err != nil {
+	if err := t.nonceFunc(result[t.saltLen : t.saltLen+nonceSize]); err != nil {
 		return nil, fmt.Errorf("failed to write nonce for AES-GCM: %w", err)
 	}
 
-	cipherText := t.aead.Seal(result[nonceSize:nonceSize], result[:nonceSize], data, dataCtx.AuthenticatedData())
-	return result[:nonceSize+len(cipherText)], nil
+	cipherText := t.aead.Seal(result[t.saltLen+nonceSize:t.saltLen+nonceSize], result[t.saltLen:t.saltLen+nonceSize], data, dataCtx.AuthenticatedData())
+	return result[:t.saltLen+nonceSize+len(cipherText)], nil
 }
 
 // cbc implements encryption at rest of the provided values given a cipher.Block algorithm.
