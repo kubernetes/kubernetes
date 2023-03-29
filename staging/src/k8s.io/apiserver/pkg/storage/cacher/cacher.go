@@ -503,8 +503,21 @@ type namespacedName struct {
 	name      string
 }
 
+// WatchChannelSizes represents override to the size of watch channel for a given resource
+var WatchChannelSizes []string = []string{}
+var WatchChannelSizesMap map[schema.GroupResource]int
+var loadChannelSizesOnce sync.Once
+
 // Watch implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	loadChannelSizesOnce.Do(func() {
+		var err error
+		WatchChannelSizesMap, err = parseWatchChannelSizes(WatchChannelSizes)
+		if err != nil {
+			klog.Errorf("failed to parse watch-channel-sizes: %v", err)
+		}
+	})
+
 	pred := opts.Predicate
 	// if the watch-list feature wasn't set and the resourceVersion is unset
 	// ensure that the rv from which the watch is being served, is the latest
@@ -553,13 +566,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	// It boils down to a tradeoff between:
-	// - having it as small as possible to reduce memory usage
-	// - having it large enough to ensure that watchers that need to process
-	//   a bunch of changes have enough buffer to avoid from blocking other
-	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
-
+	chanSize := WatchChannelSizesMap[c.groupResource]
+	if chanSize == 0 {
+		// It boils down to a tradeoff between:
+		// - having it as small as possible to reduce memory usage
+		// - having it large enough to ensure that watchers that need to process
+		//   a bunch of changes have enough buffer to avoid from blocking other
+		//   watchers on our watcher having a processing hiccup
+		chanSize = c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
+	}
 	// Determine a function that computes the bookmarkAfterResourceVersion
 	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(ctx, requestedWatchRV, opts)
 	if err != nil {

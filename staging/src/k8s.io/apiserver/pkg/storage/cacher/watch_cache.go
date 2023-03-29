@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -722,4 +724,25 @@ func (w *watchCache) getIntervalFromStoreLocked() (*watchCacheInterval, error) {
 		return nil, err
 	}
 	return ci, nil
+}
+
+// parseWatchChannelSizes turns a map of group resources to watch channel sizes.
+func parseWatchChannelSizes(channelSizes []string) (map[schema.GroupResource]int, error) {
+	watchChannelSizes := make(map[schema.GroupResource]int)
+	for _, c := range channelSizes {
+		tokens := strings.Split(c, "#")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("invalid value of watch channel size: %s", c)
+		}
+
+		size, err := strconv.Atoi(tokens[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid size of watch channel size: %s", c)
+		}
+		if size <= 0 {
+			return nil, fmt.Errorf("watch cache size channel be zero or negative: %s", c)
+		}
+		watchChannelSizes[schema.ParseGroupResource(tokens[0])] = size
+	}
+	return watchChannelSizes, nil
 }

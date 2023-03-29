@@ -24,6 +24,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -240,6 +241,15 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	fs.StringSliceVar(&cacher.WatchChannelSizes, "watch-channel-sizes", cacher.WatchChannelSizes, ""+
+		"Watch channel size settings for some resources (pods, nodes, custom resources, etc.), comma separated. "+
+		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
+		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
+		"and size is a positive number. This option is meaningful for both resources built into the apiserver, "+
+		"and the ones defined by CRDs. When large values of apiserver_terminated_watchers_total metrics "+
+		"for some resources are observed, this option can be used to specify appropriate sizes for watch channels "+
+		"of these resources.")
 
 	return fss
 }
