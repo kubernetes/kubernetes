@@ -448,6 +448,7 @@ var benchmarks = []namedTransformerFunc{
 	// newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo, randomSalt, nil),
 
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-cache", sha256KDF, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-no-salt-cache", sha256KDF, noSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-time-cache", sha256KDF, timeSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly-cache", sha256KDFExpandOnly, noSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	// newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo-cache", sha256HMACNoInfo, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
