@@ -154,7 +154,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointsliceutil.EndpointSet{}
 
 	for _, pod := range pods {
-		if !endpointutil.ShouldPodBeInEndpoints(pod, true) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
 			continue
 		}
 
