@@ -34,6 +34,12 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+var containerGCOrders = map[string]int{
+	EphemeralContainer: 1,
+	Container:          2,
+	InitContainer:      3,
+}
+
 // containerGC is the manager of garbage collection.
 type containerGC struct {
 	client           internalapi.RuntimeService
@@ -63,6 +69,8 @@ type containerGCInfo struct {
 	// If true, the container is in unknown state. Garbage collector should try
 	// to stop containers before removal.
 	unknown bool
+
+	containerType string
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -106,6 +114,17 @@ type byCreated []containerGCInfo
 func (a byCreated) Len() int           { return len(a) }
 func (a byCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
+
+type typeAndCreated []containerGCInfo
+
+func (a typeAndCreated) Len() int      { return len(a) }
+func (a typeAndCreated) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a typeAndCreated) Less(i, j int) bool {
+	if containerGCOrders[a[i].containerType] != containerGCOrders[a[j].containerType] {
+		return containerGCOrders[a[i].containerType] > containerGCOrders[a[j].containerType]
+	}
+	return a[i].createTime.After(a[j].createTime)
+}
 
 // Newest first.
 type sandboxByCreated []sandboxGCInfo
@@ -207,11 +226,13 @@ func (cgc *containerGC) evictableContainers(ctx context.Context, minAge time.Dur
 		}
 
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
+		annotatedInfo := getContainerInfoFromAnnotations(container.Annotations)
 		containerInfo := containerGCInfo{
-			id:         container.Id,
-			name:       container.Metadata.Name,
-			createTime: createdAt,
-			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			id:            container.Id,
+			name:          container.Metadata.Name,
+			createTime:    createdAt,
+			unknown:       container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			containerType: annotatedInfo.ContainerType,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
@@ -262,9 +283,9 @@ func (cgc *containerGC) evictContainers(ctx context.Context, gcPolicy kubecontai
 			for key := range evictUnits {
 				flattened = append(flattened, evictUnits[key]...)
 			}
-			sort.Sort(byCreated(flattened))
+			sort.Sort(typeAndCreated(flattened))
 
-			cgc.removeOldestN(ctx, flattened, numContainers-gcPolicy.MaxContainers)
+			cgc.removeOldestN(ctx, flattened[gcPolicy.MaxContainers:], numContainers-gcPolicy.MaxContainers)
 		}
 	}
 	return nil

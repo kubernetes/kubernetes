@@ -395,3 +395,21 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	// Return true if one of the fields have changed.
 	return !isEqual
 }
+
+func HasContainer(containers []v1.Container, name string) bool {
+	for _, container := range containers {
+		if container.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func HasEphemeralContainer(containers []v1.EphemeralContainer, name string) bool {
+	for _, container := range containers {
+		if container.Name == name {
+			return true
+		}
+	}
+	return false
+}

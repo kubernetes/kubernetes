@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"strconv"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -41,6 +43,13 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerTypeLabel                     = "io.kubernetes.container.type"
+)
+
+const (
+	EphemeralContainer = "ephemeral"
+	InitContainer      = "init"
+	Container          = "container"
 )
 
 type labeledPodSandboxInfo struct {
@@ -73,6 +82,7 @@ type annotatedContainerInfo struct {
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
 	PreStopHandler            *v1.LifecycleHandler
 	ContainerPorts            []v1.ContainerPort
+	ContainerType             string
 }
 
 // newPodLabels creates pod labels from v1.Pod.
@@ -150,6 +160,14 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		}
 	}
 
+	switch {
+	case podutil.HasContainer(pod.Spec.InitContainers, container.Name):
+		annotations[containerTypeLabel] = InitContainer
+	case podutil.HasContainer(pod.Spec.Containers, container.Name):
+		annotations[containerTypeLabel] = Container
+	case podutil.HasEphemeralContainer(pod.Spec.EphemeralContainers, container.Name):
+		annotations[containerTypeLabel] = EphemeralContainer
+	}
 	return annotations
 }
 
@@ -195,6 +213,7 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	containerInfo := &annotatedContainerInfo{
 		TerminationMessagePath:   getStringValueFromLabel(annotations, containerTerminationMessagePathLabel),
 		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(annotations, containerTerminationMessagePolicyLabel)),
+		ContainerType:            getStringValueFromLabel(annotations, containerTypeLabel),
 	}
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
