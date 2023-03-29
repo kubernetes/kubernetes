@@ -1454,6 +1454,7 @@ func TestComputePodActionsWithSidecarContainers(t *testing.T) {
 		mutatePodFn    func(*v1.Pod)
 		mutateStatusFn func(*v1.Pod, *kubecontainer.PodStatus)
 		actions        podActions
+		resetStatusFn  func(*kubecontainer.PodStatus)
 	}{
 		"initialization completed; start all containers": {
 			actions: podActions{
@@ -1468,6 +1469,21 @@ func TestComputePodActionsWithSidecarContainers(t *testing.T) {
 				status.ContainerStatuses[2].State = kubecontainer.ContainerStateCreated
 			},
 			actions: noAction,
+		},
+		"kill and recreate the sidecar container if the startup check has failed": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
+				ContainersToStart:     []int{},
+			},
+			resetStatusFn: func(status *kubecontainer.PodStatus) {
+				m.startupManager.Remove(status.ContainerStatuses[2].ID)
+			},
 		},
 		"restart terminated sidecar container and next init container": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
@@ -1588,6 +1604,9 @@ func TestComputePodActionsWithSidecarContainers(t *testing.T) {
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
+		if test.resetStatusFn != nil {
+			test.resetStatusFn(status)
+		}
 	}
 }
 

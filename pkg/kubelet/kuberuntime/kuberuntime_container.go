@@ -52,7 +52,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/tail"
@@ -845,87 +844,6 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 			}
 		}
 	}
-}
-
-// findInitContainersToRun returns the indexes of sidecar containers to run and
-// next init container to run, and the flag whether the pod has been
-// initialized.
-func (m *kubeGenericRuntimeManager) findInitContainersToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) ([]int, bool) {
-	if len(pod.Spec.InitContainers) == 0 {
-		return nil, true
-	}
-
-	podHasInitialized := false
-	// If any of the main containers have status and are Running, then all init containers must
-	// have been executed at some point in the past.  However, they could have been removed
-	// from the container runtime now, and if we proceed, it would appear as if they
-	// never ran and will re-execute improperly except for the sidecar containers.
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status != nil && status.State == kubecontainer.ContainerStateRunning {
-			podHasInitialized = true
-			break
-		}
-	}
-
-	containersToRun := make([]int, 0, len(pod.Spec.InitContainers))
-	lastContainerInitialized := true
-	for i := range pod.Spec.InitContainers {
-		container := &pod.Spec.InitContainers[i]
-		if podHasInitialized && !types.IsSidecarContainer(container) {
-			// after initialization, only sidecar containers need to be kept running
-			continue
-		}
-
-		status := podStatus.FindContainerStatusByName(container.Name)
-		// If the container is not found, it means it has not been started yet.
-		if status == nil {
-			if podHasInitialized || lastContainerInitialized {
-				containersToRun = append(containersToRun, i)
-			}
-			// There is an init container that has not been started yet.
-			// We should not start any other containers.
-			return containersToRun, podHasInitialized
-		}
-
-		lastContainerInitialized = false
-		switch status.State {
-		case kubecontainer.ContainerStateCreated:
-			continue
-
-		case kubecontainer.ContainerStateRunning:
-			switch {
-			case types.IsSidecarContainer(container):
-				if startup, found := m.startupManager.Get(status.ID); !found || startup == proberesults.Success {
-					lastContainerInitialized = true
-				}
-			default:
-				return containersToRun, podHasInitialized
-			}
-
-		case kubecontainer.ContainerStateExited:
-			switch {
-			case types.IsSidecarContainer(container):
-				containersToRun = append(containersToRun, i)
-			default:
-				if status.ExitCode != 0 {
-					containersToRun = append(containersToRun, i)
-					return containersToRun, podHasInitialized
-				}
-				lastContainerInitialized = true
-			}
-
-		default:
-			containersToRun = append(containersToRun, i)
-		}
-	}
-
-	if lastContainerInitialized {
-		podHasInitialized = true
-	}
-
-	return containersToRun, podHasInitialized
 }
 
 // GetContainerLogs returns logs of a specific container.
