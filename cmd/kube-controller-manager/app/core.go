@@ -33,6 +33,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -522,7 +523,7 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 		return nil, true, err
 	}
 
-	ignoredResources := make(map[schema.GroupResource]struct{})
+	ignoredResources := make(sets.Set[schema.GroupResource])
 	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}

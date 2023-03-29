@@ -85,7 +85,7 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.RWMutex
-	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// informersStarted is closed after all the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
@@ -113,7 +113,7 @@ type GraphBuilder struct {
 	// be non-existent are added to the cached.
 	absentOwnerCache *ReferenceCache
 	sharedInformers  informerfactory.InformerFactory
-	ignoredResources map[schema.GroupResource]struct{}
+	ignoredResources sets.Set[schema.GroupResource]
 }
 
 // monitor runs a Controller with a local stop channel.
@@ -187,7 +187,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 // instead of immediately exiting on an error. It may be called before or after
 // Run. Monitors are NOT started as part of the sync. To ensure all existing
 // monitors are started, call startMonitors.
-func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.GroupVersionResource]struct{}) error {
+func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources sets.Set[schema.GroupVersionResource]) error {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 
@@ -322,7 +322,7 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 	logger.Info("stopped monitors", "stopped", stopped, "total", len(monitors))
 }
 
-var ignoredResources = map[schema.GroupResource]struct{}{
+var ignoredResources = sets.Set[schema.GroupResource]{
 	{Group: "", Resource: "events"}:                {},
 	{Group: eventv1.GroupName, Resource: "events"}: {},
 }
@@ -330,7 +330,7 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 // DefaultIgnoredResources returns the default set of resources that the garbage collector controller
 // should ignore. This is exposed so downstream integrators can have access to the defaults, and add
 // to them as necessary when constructing the controller.
-func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
+func DefaultIgnoredResources() sets.Set[schema.GroupResource] {
 	return ignoredResources
 }
 

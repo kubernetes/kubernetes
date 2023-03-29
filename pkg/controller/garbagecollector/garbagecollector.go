@@ -88,7 +88,7 @@ func NewGarbageCollector(
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	mapper meta.ResettableRESTMapper,
-	ignoredResources map[schema.GroupResource]struct{},
+	ignoredResources sets.Set[schema.GroupResource],
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
@@ -131,7 +131,7 @@ func NewGarbageCollector(
 
 // resyncMonitors starts or stops resource monitors as needed to ensure that all
 // (and only) those resources present in the map are monitored.
-func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResources map[schema.GroupVersionResource]struct{}) error {
+func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResources sets.Set[schema.GroupVersionResource]) error {
 	if err := gc.dependencyGraphBuilder.syncMonitors(logger, deletableResources); err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 // the mapper's underlying discovery client will be unnecessarily reset during
 // the course of detecting new resources.
 func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.ServerResourcesInterface, period time.Duration) {
-	oldResources := make(map[schema.GroupVersionResource]struct{})
+	oldResources := make(sets.Set[schema.GroupVersionResource])
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		logger := klog.FromContext(ctx)
 
@@ -276,7 +276,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 }
 
 // printDiff returns a human-readable summary of what resources were added and removed
-func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct{}) string {
+func printDiff(oldResources, newResources sets.Set[schema.GroupVersionResource]) string {
 	removed := sets.NewString()
 	for oldResource := range oldResources {
 		if _, ok := newResources[oldResource]; !ok {
@@ -809,7 +809,7 @@ func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
 // All discovery errors are considered temporary. Upon encountering any error,
 // GetDeletableResources will log and return any discovered resources it was
 // able to process (which may be none).
-func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
+func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) sets.Set[schema.GroupVersionResource] {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discovery.IsGroupDiscoveryFailedError(err) {
@@ -819,13 +819,13 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 		}
 	}
 	if preferredResources == nil {
-		return map[schema.GroupVersionResource]struct{}{}
+		return sets.Set[schema.GroupVersionResource]{}
 	}
 
 	// This is extracted from discovery.GroupVersionResources to allow tolerating
 	// failures on a per-resource basis.
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete", "list", "watch"}}, preferredResources)
-	deletableGroupVersionResources := map[schema.GroupVersionResource]struct{}{}
+	deletableGroupVersionResources := sets.Set[schema.GroupVersionResource]{}
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {

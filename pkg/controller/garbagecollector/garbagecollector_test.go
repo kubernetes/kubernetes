@@ -82,10 +82,10 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	podResource := map[schema.GroupVersionResource]struct{}{
+	podResource := sets.Set[schema.GroupVersionResource]{
 		{Version: "v1", Resource: "pods"}: {},
 	}
-	twoResources := map[schema.GroupVersionResource]struct{}{
+	twoResources := sets.Set[schema.GroupVersionResource]{
 		{Version: "v1", Resource: "pods"}:                     {},
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
@@ -97,7 +97,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
+	gc, err := NewGarbageCollector(client, metadataClient, rm, sets.Set[schema.GroupResource]{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
@@ -725,7 +725,7 @@ func TestGetDeletableResources(t *testing.T) {
 	tests := map[string]struct {
 		serverResources    []*metav1.APIResourceList
 		err                error
-		deletableResources map[schema.GroupVersionResource]struct{}
+		deletableResources sets.Set[schema.GroupVersionResource]
 	}{
 		"no error": {
 			serverResources: []*metav1.APIResourceList{
@@ -753,7 +753,7 @@ func TestGetDeletableResources(t *testing.T) {
 				},
 			},
 			err: nil,
-			deletableResources: map[schema.GroupVersionResource]struct{}{
+			deletableResources: sets.Set[schema.GroupVersionResource]{
 				{Group: "apps", Version: "v1", Resource: "pods"}: {},
 			},
 		},
@@ -768,7 +768,7 @@ func TestGetDeletableResources(t *testing.T) {
 				},
 			},
 			err: fmt.Errorf("internal error"),
-			deletableResources: map[schema.GroupVersionResource]struct{}{
+			deletableResources: sets.Set[schema.GroupVersionResource]{
 				{Group: "apps", Version: "v1", Resource: "pods"}: {},
 			},
 		},
@@ -787,14 +787,14 @@ func TestGetDeletableResources(t *testing.T) {
 					{Group: "foo", Version: "v1"}: fmt.Errorf("discovery failure"),
 				},
 			},
-			deletableResources: map[schema.GroupVersionResource]struct{}{
+			deletableResources: sets.Set[schema.GroupVersionResource]{
 				{Group: "apps", Version: "v1", Resource: "pods"}: {},
 			},
 		},
 		"discovery failure, no results": {
 			serverResources:    nil,
 			err:                fmt.Errorf("internal error"),
-			deletableResources: map[schema.GroupVersionResource]struct{}{},
+			deletableResources: sets.Set[schema.GroupVersionResource]{},
 		},
 	}
 
@@ -867,7 +867,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, rm, sets.Set[schema.GroupResource]{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
