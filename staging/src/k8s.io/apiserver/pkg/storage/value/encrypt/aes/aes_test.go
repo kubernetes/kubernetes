@@ -441,12 +441,14 @@ var benchmarks = []namedTransformerFunc{
 	{name: "gcm-counter-nonce", f: newGCMTransformerWithUniqueKeyUnsafeTest},
 
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF", sha256KDF, randomSalt, nil),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-time", sha256KDF, timeSalt, nil),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly", sha256KDFExpandOnly, noSalt, nil),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo", sha256HMACNoInfo, randomSalt, nil),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC", sha256HMAC, randomSalt, nil),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("hchacha20NoInfo", hchacha20NoInfo, randomSalt, nil),
 
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-cache", sha256KDF, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
+	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDF-time-cache", sha256KDF, timeSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256KDFExpandOnly-cache", sha256KDFExpandOnly, noSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMACNoInfo-cache", sha256HMACNoInfo, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),
 	newExtendedNonceGCMTransformerWithUniqueKeyUnsafeTest("sha256HMAC-cache", sha256HMAC, randomSalt, newSimpleCache(clock.RealClock{}, time.Hour)),

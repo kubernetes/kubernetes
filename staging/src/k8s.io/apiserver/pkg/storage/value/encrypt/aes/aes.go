@@ -296,6 +296,12 @@ func noSalt() ([]byte, error) {
 	return nil, nil
 }
 
+func timeSalt() ([]byte, error) {
+	salt := make([]byte, 8)
+	binary.LittleEndian.PutUint64(salt, uint64(time.Now().UTC().Round(time.Hour).Unix()))
+	return salt, nil
+}
+
 func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
 	var cacheKey []byte
 	if e.cache != nil {
