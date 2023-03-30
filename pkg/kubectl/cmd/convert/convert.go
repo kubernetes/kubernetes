@@ -267,6 +267,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			//Dont fail on error converting objects.
 			//Simply warn the user with the error returned from api-machinery and continue with the rest of the file
 			fmt.Fprintln(os.Stderr, err.Error())
+			continue
 		}
 		objects = append(objects, converted)
 	}
