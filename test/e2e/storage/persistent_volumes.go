@@ -201,6 +201,57 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.ExpectNoError(err)
 				completeTest(ctx, f, c, ns, pv, pvc)
 			})
+
+			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
+			// the LastPhaseTransitionTime filed of the PV is updated.
+			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp is set [Feature: PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
+				framework.ExpectNoError(err)
+
+				// The claim should transition phase to: Bound
+				err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+				framework.ExpectNoError(err)
+				pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				if pv.Status.LastPhaseTransitionTime == nil {
+					framework.Failf("Persistent volume %v should have LastPhaseTransitionTime value set after transitioning phase, but it's nil.", pv.GetName())
+				}
+				completeTest(ctx, f, c, ns, pv, pvc)
+			})
+
+			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
+			// the LastPhaseTransitionTime field of the PV is set, then delete the PVC to change PV phase to
+			// released and validate PV LastPhaseTransitionTime correctly updated timestamp.
+			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp multiple updates [Feature: PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
+				framework.ExpectNoError(err)
+
+				// The claim should transition phase to: Bound.
+				err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+				framework.ExpectNoError(err)
+				pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				// Save first phase transition time.
+				firstPhaseTransition := pv.Status.LastPhaseTransitionTime
+
+				// Let test finish and delete PVC.
+				completeTest(ctx, f, c, ns, pv, pvc)
+
+				// The claim should transition phase to: Released.
+				err = e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeReleased, c, pv.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+				framework.ExpectNoError(err)
+
+				// Verify the phase transition timestamp got updated chronologically *after* first phase transition.
+				pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+				if !firstPhaseTransition.Before(pv.Status.LastPhaseTransitionTime) {
+					framework.Failf("Persistent volume %v should have LastPhaseTransitionTime value updated to be chronologically after previous phase change: %v, but it's %v.", pv.GetName(), firstPhaseTransition, pv.Status.LastPhaseTransitionTime)
+				}
+			})
 		})
 
 		// Create multiple pvs and pvcs, all in the same namespace. The PVs-PVCs are
