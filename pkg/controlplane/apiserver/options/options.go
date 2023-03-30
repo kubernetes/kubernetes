@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/keyutil"
@@ -62,6 +63,16 @@ type Options struct {
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
+
+	// PeerCAFile is the ca bundle used by this kube-apiserver to verify peer apiservers'
+	// serving certs when routing a request to the peer in the case the request can not be served
+	// locally due to version skew.
+	PeerCAFile string
+
+	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
+	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
+	// version skew.
+	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	EnableAggregatorRouting             bool
 	AggregatorRejectForwardingRedirects bool
@@ -153,6 +164,20 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+
 		"when it must call out during a request. This includes proxying requests to a user "+
 		"api-server and calling out to webhook admission plugins.")
+
+	fs.StringVar(&s.PeerCAFile, "peer-ca-file", s.PeerCAFile,
+		"If set and the UnknownVersionInteroperabilityProxy feature gate is enabled, this file will be used to verify serving certificates of peer kube-apiservers. "+
+			"This flag is only used in clusters configured with multiple kube-apiservers for high availability.")
+
+	fs.StringVar(&s.PeerAdvertiseAddress.PeerAdvertiseIP, "peer-advertise-ip", s.PeerAdvertiseAddress.PeerAdvertiseIP,
+		"If set and the UnknownVersionInteroperabilityProxy feature gate is enabled, this IP will be used by peer kube-apiservers to proxy requests to this kube-apiserver "+
+			"when the request cannot be handled by the peer due to version skew between the kube-apiservers. "+
+			"This flag is only used in clusters configured with multiple kube-apiservers for high availability. ")
+
+	fs.StringVar(&s.PeerAdvertiseAddress.PeerAdvertisePort, "peer-advertise-port", s.PeerAdvertiseAddress.PeerAdvertisePort,
+		"If set and the UnknownVersionInteroperabilityProxy feature gate is enabled, this port will be used by peer kube-apiservers to proxy requests to this kube-apiserver "+
+			"when the request cannot be handled by the peer due to version skew between the kube-apiservers. "+
+			"This flag is only used in clusters configured with multiple kube-apiservers for high availability. ")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
