@@ -100,6 +100,16 @@ func TestConvertObject(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "v1beta1 Ingress to extensions Ingress",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/serviceandingress.yml",
+			outputVersion: "networking.k8s.io/v1",
+			fields: []checkField{
+				{
+					expected: "apiVersion: networking.k8s.io/v1",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

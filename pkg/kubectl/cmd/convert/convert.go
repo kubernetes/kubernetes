@@ -18,6 +18,7 @@ package convert
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
@@ -263,7 +264,9 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 
 		converted, err := tryConvert(scheme.Scheme, info.Object, targetVersions...)
 		if err != nil {
-			return nil, err
+			//Dont fail on error converting objects.
+			//Simply warn the user with the error returned from api-machinery and continue with the rest of the file
+			fmt.Fprintln(os.Stderr, err.Error())
 		}
 		objects = append(objects, converted)
 	}
