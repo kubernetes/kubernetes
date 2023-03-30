@@ -23,12 +23,12 @@ set -o pipefail
 
 if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
-Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
+Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <external-apis-package> <groups-versions> ...
 
   <generators>        the generators comma separated to run (applyconfiguration,client,conversion,deepcopy,defaulter,informer,lister,openapi).
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
-  <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis) or "" if none.
-  <ext-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
+  <internal-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis) or "" if none.
+  <external-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
                       to <api-package>.
   ...                 arbitrary flags passed to all generator binaries.
