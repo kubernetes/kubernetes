@@ -571,6 +571,39 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
 		})
 
+		ginkgo.It("should allow egress access from namespace on one named port while blocking other namespaces and ports[Feature:NetworkPolicy]", func(ctx context.Context) {
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{80, 81}
+			k8s = initializeResources(ctx, f, protocols, ports)
+			nsX, nsY, nsZ := getK8sNamespaces(k8s)
+			allowedLabels := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					namespaceLabelKey: nsY, // only allowing outgoing access to a/x --> Y
+				},
+			}
+			egressRule := networkingv1.NetworkPolicyEgressRule{}
+			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80-tcp"}})
+			egressRule.To = append(egressRule.To, networkingv1.NetworkPolicyPeer{NamespaceSelector: allowedLabels})
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-ns-selector-80", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule))
+			CreatePolicy(ctx, k8s, policy, nsX)
+
+			reachabilityPort80 := NewReachability(k8s.AllPodStrings(), true)
+
+			// disallow all traffic to the X or Z namespace, BUT allow Y
+			reachabilityPort80.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, true)
+			reachabilityPort80.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsX}, false)
+			reachabilityPort80.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsZ}, false)
+			ginkgo.By("Verify that port 80 is from ns y, but not from namespaces x and z")
+			// traffic to X over port 80 should succeed
+			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort80})
+
+			// traffic to X over port 81 should fail
+			ginkgo.By("Verify that port 81 is blocked for all namespaces including nxY")
+			reachabilityPort81 := NewReachability(k8s.AllPodStrings(), true)
+			reachabilityPort81.ExpectAllEgress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
+		})
+
 		ginkgo.It("should enforce updated policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Using the simplest possible mutation: start with allow all, then switch to deny all")
 			// part 1) allow all
