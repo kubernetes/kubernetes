@@ -339,7 +339,7 @@ func CreateTestingNS(ctx context.Context, baseName string, c clientset.Interface
 	// We don't use ObjectMeta.GenerateName feature, as in case of API call
 	// failure we don't know whether the namespace was created and what is its
 	// name.
-	name := fmt.Sprintf("%v-%v", baseName, RandomSuffix())
+	name := fmt.Sprintf("%v-%d-%v", baseName, ginkgo.GinkgoParallelProcess(), RandomSuffix())
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
