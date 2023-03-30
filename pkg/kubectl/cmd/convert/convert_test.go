@@ -101,7 +101,7 @@ func TestConvertObject(t *testing.T) {
 			},
 		},
 		{
-			name:          "v1beta1 Ingress to extensions Ingress",
+			name:          "converting multiple including service to neworking.k8s.io/v1",
 			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/serviceandingress.yml",
 			outputVersion: "networking.k8s.io/v1",
 			fields: []checkField{
