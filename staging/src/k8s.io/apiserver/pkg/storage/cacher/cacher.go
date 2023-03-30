@@ -912,8 +912,6 @@ func (c *Cacher) dispatchEvents() {
 			// Never send a bookmark event if we did not see an event here, this is fine
 			// because we don't provide any guarantees on sending bookmarks.
 			if lastProcessedResourceVersion == 0 {
-				// pop expired watchers in case there has been no update
-				c.bookmarkWatchers.popExpiredWatchers()
 				continue
 			}
 			bookmarkEvent := &watchCacheEvent{
