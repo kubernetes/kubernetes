@@ -106,7 +106,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(ctx, containerID)
+	err = m.DeleteContainer(ctx, kubecontainer.ContainerID{ID: containerID})
 	assert.NoError(t, err)
 
 	// Verify container log is removed.

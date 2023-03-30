@@ -974,30 +974,15 @@ func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, contain
 		return err
 	}
 
-	// Remove the container log.
-	// TODO: Separate log and container lifecycle management.
-	if err := m.removeContainerLog(ctx, containerID); err != nil {
-		return err
-	}
-
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(ctx, containerID)
 }
 
-func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, containerID string) error {
+func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, containerID string, status *runtimeapi.ContainerStatus) error {
 	// Use log manager to remove rotated logs.
 	err := m.logManager.Clean(ctx, containerID)
 	if err != nil {
 		return err
-	}
-
-	resp, err := m.runtimeService.ContainerStatus(ctx, containerID, false)
-	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
-	}
-	status := resp.GetStatus()
-	if status == nil {
-		return remote.ErrContainerStatusNil
 	}
 
 	// Remove the legacy container log symlink.
@@ -1043,7 +1028,7 @@ func (m *kubeGenericRuntimeManager) DeleteContainer(ctx context.Context, contain
 
 	var errs []error
 	// Remove the container log.
-	if err := m.removeContainerLog(ctx, containerID.ID); err != nil {
+	if err := m.removeContainerLog(ctx, containerID.ID, status); err != nil {
 		errs = append(errs, err)
 	}
 	// Remove the container termination log.
