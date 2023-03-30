@@ -9,6 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.51.2
 	github.com/google/go-flow-levee v0.1.5
+	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
 	honnef.co/go/tools v0.4.2
 	sigs.k8s.io/logtools v0.4.1
