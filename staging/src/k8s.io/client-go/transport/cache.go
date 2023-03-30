@@ -26,7 +26,6 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/metrics"
 )
 
@@ -37,11 +36,6 @@ type tlsTransportCache struct {
 	mu         sync.Mutex
 	transports map[tlsCacheKey]*http.Transport
 }
-
-// DialerStopCh is stop channel that is passed down to dynamic cert dialer.
-// It's exposed as variable for testing purposes to avoid testing for goroutine
-// leakages.
-var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
@@ -71,7 +65,7 @@ func (t tlsCacheKey) String() string {
 		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
-func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
+func (c *tlsTransportCache) get(ch <-chan struct{}, config *Config) (http.RoundTripper, error) {
 	key, canCache, err := tlsConfigKey(config)
 	if err != nil {
 		return nil, err
@@ -119,7 +113,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
 		dial = dynamicCertDialer.connDialer.DialContext
-		go dynamicCertDialer.Run(DialerStopCh)
+		go dynamicCertDialer.Run(ch)
 	}
 
 	proxy := http.ProxyFromEnvironment

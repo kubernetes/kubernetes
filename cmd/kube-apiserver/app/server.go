@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/dynamic"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -55,6 +56,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/apiserver/pkg/util/openapi"
+	utilunknownversionproxy "k8s.io/apiserver/pkg/util/unknownversionproxy"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -484,6 +486,14 @@ func buildGenericConfig(
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
+			genericConfig.UnknownVersionProxy, lastErr = BuildUnknownVersionProxy(versionedInformers, genericConfig.StorageVersionManager, s.ProxyClientCertFile,
+				s.ProxyClientKeyFile, s.GenericServerRunOptions.PeerCAFile, s.GenericServerRunOptions.PeerBindAddress)
+		} else {
+			klog.V(3).Infof("UnknownVersionInteroperabilityProxy feature requires both APIServerIdentity and StorageVersionAPI feature flag to be enabled")
+		}
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
 	}
@@ -516,6 +526,17 @@ func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgocli
 		extclient.FlowcontrolV1beta3(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
+	), nil
+}
+
+func BuildUnknownVersionProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager, proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerBindAddress string) (utilunknownversionproxy.Interface, error) {
+	return utilunknownversionproxy.New(
+		versionedInformer,
+		svm,
+		proxyClientCertFile,
+		proxyClientKeyFile,
+		peerCAFile,
+		peerBindAddress,
 	), nil
 }
 

@@ -49,6 +49,9 @@ type AggregatorOptions struct {
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
 
+	PeerCAFile      string
+	PeerBindAddress string
+
 	StdOut io.Writer
 	StdErr io.Writer
 }
@@ -85,6 +88,11 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 	o.APIEnablement.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
+	fs.StringVar(&o.PeerCAFile, "peer-ca-file", o.PeerCAFile,
+		"File containing trust bundle used to verify serving certificates for other kube-apiserver instances")
+	fs.StringVar(&o.PeerBindAddress, "peer-bind-address", o.PeerBindAddress,
+		"Network address <ip:port> of the kube-apiserver which will be used by remote kube-apiservers to connect to this server for UVIP")
+
 }
 
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
@@ -161,6 +169,14 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 
 	config.ExtraConfig.ProxyClientCertFile = o.ProxyClientCertFile
 	config.ExtraConfig.ProxyClientKeyFile = o.ProxyClientKeyFile
+
+	if len(o.PeerCAFile) != 0 {
+		config.ExtraConfig.PeerCAFile = o.PeerCAFile
+	}
+
+	if len(o.PeerBindAddress) != 0 {
+		config.ExtraConfig.PeerBindAddress = o.PeerBindAddress
+	}
 
 	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
 	if err != nil {

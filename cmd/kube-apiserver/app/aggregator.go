@@ -105,6 +105,8 @@ func createAggregatorConfig(
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
 			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
 			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			PeerCAFile:                commandOptions.GenericServerRunOptions.PeerCAFile,
+			PeerBindAddress:           commandOptions.GenericServerRunOptions.PeerBindAddress,
 			ServiceResolver:           serviceResolver,
 			ProxyTransport:            proxyTransport,
 			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,

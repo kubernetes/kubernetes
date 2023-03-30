@@ -76,6 +76,12 @@ const (
 
 // ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
+	// PeerCA is the ca bundle used to verify remote apiservers
+	PeerCAFile string
+
+	// PeerBindAddress is the bind address for this apiserver that should be used by other apiservers for UVIP
+	PeerBindAddress string
+
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	ProxyClientCertFile string

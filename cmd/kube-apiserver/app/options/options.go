@@ -29,10 +29,11 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+
 	logsapi "k8s.io/component-base/logs/api/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -231,6 +232,12 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+
 		"when it must call out during a request. This includes proxying requests to a user "+
 		"api-server and calling out to webhook admission plugins.")
+
+	fs.StringVar(&s.GenericServerRunOptions.PeerCAFile, "peer-ca-file", s.GenericServerRunOptions.PeerCAFile,
+		"File containing trust bundle used to verify serving certificates for other kube-apiserver instances")
+
+	fs.StringVar(&s.GenericServerRunOptions.PeerBindAddress, "peer-bind-address", s.GenericServerRunOptions.PeerBindAddress,
+		"Network address <ip:port> of the kube-apiserver which will be used by remote kube-apiservers to connect to this server for UVIP")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")

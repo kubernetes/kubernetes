@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"net"
@@ -66,6 +67,8 @@ type TestServerInstanceOptions struct {
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
 	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
+	// proxy CA cert
+	ProxyCA *ProxyCA
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -84,6 +87,11 @@ type Logger interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
+}
+
+type ProxyCA struct {
+	ProxySigningCert *x509.Certificate
+	ProxySigningKey  *rsa.PrivateKey
 }
 
 // NewDefaultTestServerOptions Default options for TestServer instances
@@ -150,20 +158,29 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
 		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
 
-		// create certificates for aggregation and client-cert auth
-		proxySigningKey, err := testutil.NewPrivateKey()
-		if err != nil {
-			return result, err
-		}
-		proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
-		if err != nil {
-			return result, err
+		var proxySigningKey *rsa.PrivateKey
+		var proxySigningCert *x509.Certificate
+
+		if instanceOptions.ProxyCA != nil {
+			// use provided proxyCA
+			proxySigningKey = instanceOptions.ProxyCA.ProxySigningKey
+			proxySigningCert = instanceOptions.ProxyCA.ProxySigningCert
+
+		} else {
+			// create certificates for aggregation and client-cert auth
+			proxySigningKey, err = testutil.NewPrivateKey()
+			if err != nil {
+				return result, err
+			}
+			proxySigningCert, err = cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
+			if err != nil {
+				return result, err
+			}
 		}
 		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
 		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 			return result, err
 		}
-		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
 
 		// give the kube api server an "identity" it can use to for request header auth
 		// so that aggregated api servers can understand who the calling user is
@@ -186,8 +203,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err := pkiutil.WriteCertAndKey(s.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
 			return result, err
 		}
-		s.ProxyClientKeyFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
-		s.ProxyClientCertFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
@@ -197,11 +212,17 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err != nil {
 			return result, err
 		}
+
 		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
 		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 			return result, err
 		}
+
+		s.ProxyClientKeyFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
+		s.ProxyClientCertFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
+		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
+		s.GenericServerRunOptions.PeerCAFile = path.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 	}
 
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device

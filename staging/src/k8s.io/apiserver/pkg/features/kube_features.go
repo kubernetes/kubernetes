@@ -191,6 +191,12 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
+	// owner: @richabanker
+	// alpha: v1.20
+	//
+	// Proxies client to an apiserver capable of serving the request in the event of a cluster upgrade/downgrade.
+	UnknownVersionInteroperabilityProxy featuregate.Feature = "UnknownVersionInteroperabilityProxy"
+
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
@@ -261,6 +267,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
+
+	UnknownVersionInteroperabilityProxy: {Default: false, PreRelease: featuregate.Alpha},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

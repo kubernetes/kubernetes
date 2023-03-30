@@ -265,6 +265,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 		klog.Fatalf("Error creating storage factory config: %v", err)
 	}
 	masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+
 	if err != nil {
 		klog.Fatalf("Error creating leases: %v", err)
 	}
@@ -492,6 +493,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
+			host, port, err := net.SplitHostPort(c.GenericConfig.ExternalAddress)
+			if err != nil {
+				return err
+			}
+
+			if c.GenericConfig.PeerBindAddress != "" {
+				host, port, err = net.SplitHostPort(c.GenericConfig.PeerBindAddress)
+				if err != nil {
+					return err
+				}
+			}
+
 			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
@@ -502,7 +515,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				leaseName,
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(KubeAPIServer))
+				labelAPIServerHeartbeatFunc(KubeAPIServer, m.GenericAPIServer.APIServerID, host, port))
 			go controller.Run(ctx)
 			return nil
 		})
@@ -550,7 +563,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
-func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
+func labelAPIServerHeartbeatFunc(identity string, apiserverId string, peerIp string, peerPort string) lease.ProcessLeaseFunc {
 	return func(lease *coordinationapiv1.Lease) error {
 		if lease.Labels == nil {
 			lease.Labels = map[string]string{}
@@ -566,6 +579,10 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 
 		// convenience label to easily map a lease object to a specific apiserver
 		lease.Labels[apiv1.LabelHostname] = hostname
+
+		// save apiserver network location for visibility for UVIP
+		lease.Labels[apiv1.LabelPeerBindIp] = peerIp
+		lease.Labels[apiv1.LabelPeerBindPort] = peerPort
 		return nil
 	}
 }

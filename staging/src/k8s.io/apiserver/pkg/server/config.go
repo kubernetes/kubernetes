@@ -69,6 +69,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	utilunknownversionproxy "k8s.io/apiserver/pkg/util/unknownversionproxy"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
@@ -124,6 +125,14 @@ type Config struct {
 	HSTSDirectives        []string
 	// FlowControl, if not nil, gives priority and fairness to request handling
 	FlowControl utilflowcontrol.Interface
+
+	UnknownVersionProxy utilunknownversionproxy.Interface
+
+	// PeerCAFile is the ca bundle used by kube-apiservers to verify remote kube-apiservers for UVIP
+	PeerCAFile string
+
+	// PeerBindAddress is the <ip:port> for this kube-apiserver which is used by other remote apiservers for UVIP
+	PeerBindAddress string
 
 	EnableIndex     bool
 	EnableProfiling bool
@@ -386,7 +395,12 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		}
 
 		hash := sha256.Sum256(hashData)
-		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+		// random uuid at the end is added to ensure unique IDs for apiservers especially for
+		// cases when there could be multiple apiservers at varying versions. Just using hostname in that case
+		// will lead to both apiservers having same ID
+		// TODO: check if there's a better way to ensure unique ids
+		randsuffix := uuid.NewString()[:4]
+		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16])) + randsuffix
 	}
 	lifecycleSignals := newLifecycleSignals()
 
@@ -839,6 +853,20 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
+	// Add PostStartHooks for Unknown Version Proxy filter.
+	if c.UnknownVersionProxy != nil {
+		const unknownVersionProxyFilterHookName = "unknown-version-proxy-filter"
+		if !s.isPostStartHookRegistered(unknownVersionProxyFilterHookName) {
+			err := s.AddPostStartHook(unknownVersionProxyFilterHookName, func(context PostStartHookContext) error {
+				err := c.UnknownVersionProxy.WaitForCacheSync(context.StopCh)
+				return err
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// Add PostStartHook for maintenaing the object count tracker.
 	if c.StorageObjectCountTracker != nil {
 		const storageObjectCountTrackerHookName = "storage-object-count-tracker-hook"
@@ -898,6 +926,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
+	if c.UnknownVersionProxy != nil {
+		handler = genericfilters.WithUnknownVersionProxy(handler, c.APIServerID, c.UnknownVersionProxy, c.Serializer)
+	}
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(

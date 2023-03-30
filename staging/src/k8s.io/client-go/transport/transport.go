@@ -28,12 +28,22 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
+// DialerStopCh is stop channel that is passed down to dynamic cert dialer.
+// It's exposed as variable for testing purposes to avoid testing for goroutine
+// leakages.
+var DialerStopCh = wait.NeverStop
+
+func New(config *Config) (http.RoundTripper, error) {
+	return NewWithContext(DialerStopCh, config)
+}
+
 // New returns an http.RoundTripper that will provide the authentication
 // or transport level security defined by the provided Config.
-func New(config *Config) (http.RoundTripper, error) {
+func NewWithContext(ch <-chan struct{}, config *Config) (http.RoundTripper, error) {
 	// Set transport level security
 	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
@@ -51,7 +61,7 @@ func New(config *Config) (http.RoundTripper, error) {
 	if config.Transport != nil {
 		rt = config.Transport
 	} else {
-		rt, err = tlsCache.get(config)
+		rt, err = tlsCache.get(ch, config)
 		if err != nil {
 			return nil, err
 		}

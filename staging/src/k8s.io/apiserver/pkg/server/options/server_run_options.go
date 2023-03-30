@@ -44,6 +44,8 @@ const (
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
+	PeerCAFile       string
+	PeerBindAddress  string
 
 	CorsAllowedOriginList       []string
 	HSTSDirectives              []string
@@ -126,6 +128,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.PeerCAFile = s.PeerCAFile
+	c.PeerBindAddress = s.PeerBindAddress
 
 	return nil
 }

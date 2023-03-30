@@ -77,10 +77,10 @@ type Controller struct {
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
+	ServerId                  string
 	PublicServicePort         int
 	KubernetesServiceNodePort int
-
-	runner *async.Runner
+	runner                    *async.Runner
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master

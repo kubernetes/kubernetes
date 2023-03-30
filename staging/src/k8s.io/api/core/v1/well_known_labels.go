@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 const (
-	LabelHostname = "kubernetes.io/hostname"
+	LabelHostname     = "kubernetes.io/hostname"
+	LabelPeerBindIp   = "kubernetes.io/peer-ip"
+	LabelPeerBindPort = "kubernetes.io/peer-port"
 
 	LabelTopologyZone   = "topology.kubernetes.io/zone"
 	LabelTopologyRegion = "topology.kubernetes.io/region"
