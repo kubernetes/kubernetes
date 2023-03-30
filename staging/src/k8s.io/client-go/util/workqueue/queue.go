@@ -205,7 +205,6 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 	}
 
 	item = q.queue[0]
-	// The underlying array still exists and reference this object, so the object will not be garbage collected.
 	q.queue[0] = nil
 	q.queue = q.queue[1:]
 
