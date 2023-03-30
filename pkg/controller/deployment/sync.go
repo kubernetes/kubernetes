@@ -27,9 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -193,10 +195,14 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 
 	// Create new ReplicaSet
+	ReplicaSetName := d.Name + "-" + podTemplateSpecHash
+	if utilfeature.DefaultFeatureGate.Enabled(features.TruncateReplicaSetBaseName) {
+		ReplicaSetName = deploymentutil.GetReplicaSetName(d.Name, podTemplateSpecHash)
+	}
 	newRS := apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:            d.Name + "-" + podTemplateSpecHash,
+			Name:            ReplicaSetName,
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 			Labels:          newRSTemplate.Labels,

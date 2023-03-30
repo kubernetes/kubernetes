@@ -948,6 +948,12 @@ const (
 	//
 	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
 	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
+
+	// owner: @hysyeah
+	// beta: v1.29
+	//
+	// TruncateReplicaSetBaseName Enables to truncate deployment name as replicaset basename if deployment name length larger than 242 char.
+	TruncateReplicaSetBaseName featuregate.Feature = "TruncateReplicaSetBaseName"
 )
 
 func init() {
@@ -1250,4 +1256,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 
 	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
+
+	TruncateReplicaSetBaseName: {Default: true, PreRelease: featuregate.Beta},
 }

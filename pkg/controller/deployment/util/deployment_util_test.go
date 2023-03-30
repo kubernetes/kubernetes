@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1315,6 +1316,43 @@ func TestMinAvailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MinAvailable(tt.deployment); got != tt.expected {
 				t.Errorf("MinAvailable() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetReplicaSetName(t *testing.T) {
+	hash := "6b4c6ffcfc"
+	tests := []struct {
+		name           string
+		deploymentName string
+		expected       string
+	}{
+		{
+			"deploymentName length less than 242",
+			"deploy",
+			"deploy" + "-" + hash,
+		},
+		{
+			"deploymentName length equal 242",
+			strings.Repeat("a", 242),
+			strings.Repeat("a", 242) + "-" + hash,
+		},
+		{
+			"deploymentName length equal 243",
+			strings.Repeat("a", 243),
+			strings.Repeat("a", 242) + "-" + hash,
+		},
+		{
+			"deploymentName length equal 253",
+			strings.Repeat("a", 253),
+			strings.Repeat("a", 242) + "-" + hash,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetReplicaSetName(tt.deploymentName, hash); got != tt.expected {
+				t.Errorf("GetReplicaSetName() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
