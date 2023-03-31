@@ -169,7 +169,7 @@ func DisableStrict(options *CodecFactoryOptions) {
 //
 // Mutators can be passed to change the CodecFactoryOptions before construction of the factory.
 // It is recommended to explicitly pass mutators instead of relying on defaults.
-// By default, Pretty is enabled -- this is conformant with previously supported behavior.
+// By default, Pretty is enabled, which conforms to the previously supported behavior.
 //
 // TODO: allow other codecs to be compiled in?
 // TODO: accept a scheme interface
