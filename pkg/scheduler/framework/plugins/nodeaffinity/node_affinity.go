@@ -222,6 +222,10 @@ func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.Cycl
 	if err != nil {
 		return framework.AsStatus(err)
 	}
+	if preferredNodeAffinity == nil && pl.addedPrefSchedTerms == nil {
+		// NodeAffinity Score has nothing to do with the Pod.
+		return framework.NewStatus(framework.Skip)
+	}
 	state := &preScoreState{
 		preferredNodeAffinity: preferredNodeAffinity,
 	}
