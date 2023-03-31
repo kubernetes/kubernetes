@@ -116,13 +116,13 @@ func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string
 
 	ts := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if subtle.ConstantTimeCompare([]byte(ts), []byte(tokenSecret)) != 1 {
-		tokenErrorf(secret, "has invalid value for key %s, expected %s.", bootstrapapi.BootstrapTokenSecretKey, tokenSecret)
+		tokenErrorf(secret, "has invalid value for key %s.", bootstrapapi.BootstrapTokenSecretKey)
 		return nil, false, nil
 	}
 
 	id := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenIDKey)
 	if id != tokenID {
-		tokenErrorf(secret, "has invalid value for key %s, expected %s.", bootstrapapi.BootstrapTokenIDKey, tokenID)
+		tokenErrorf(secret, "has invalid value for key %s.", bootstrapapi.BootstrapTokenIDKey)
 		return nil, false, nil
 	}
 
