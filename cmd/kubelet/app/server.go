@@ -457,6 +457,13 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 		return
 	}
 	eventBroadcaster := record.NewBroadcaster()
+	// set event qps/burst,default qps is 1/300, event may be lost
+	if kubeDeps.EventQPS > 0 || kubeDeps.EventBurst > 0 {
+		eventBroadcaster = record.NewBroadcasterWithCorrelatorOptions(record.CorrelatorOptions{
+			BurstSize: kubeDeps.EventBurst,
+			QPS:       kubeDeps.EventQPS,
+		})
+	}
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
@@ -600,6 +607,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet event client: %w", err)
 		}
+
+		kubeDeps.EventQPS = eventClientConfig.QPS
+		kubeDeps.EventBurst = eventClientConfig.Burst
 
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
 		heartbeatClientConfig := *clientConfig

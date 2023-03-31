@@ -250,6 +250,8 @@ type Dependencies struct {
 	Cloud                    cloudprovider.Interface
 	ContainerManager         cm.ContainerManager
 	EventClient              v1core.EventsGetter
+	EventQPS                 float32
+	EventBurst               int
 	HeartbeatClient          clientset.Interface
 	OnHeartbeatFailure       func()
 	KubeClient               clientset.Interface
