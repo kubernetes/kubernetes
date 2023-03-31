@@ -688,7 +688,12 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 		return result, err
 	})
-	return result, wasCreated, err
+	if err != nil {
+		// Don't read wasCreated when it is unsure that the request has
+		// been handled.
+		return result, false, err
+	}
+	return result, wasCreated, nil
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
