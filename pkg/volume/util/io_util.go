@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -38,10 +38,38 @@ func NewIOHandler() IoUtil {
 }
 
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	dirEntries, err := os.ReadDir(dirname)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fileInfos := make([]os.FileInfo, len(dirEntries))
+	iserror := false
+	var goterror error
+
+	for index, dirEntry := range dirEntries {
+		fileInfo, err := dirEntry.Info()
+		if err != nil {
+			// TODO: what to do on error ? return first ??
+			iserror = true
+			goterror = err
+			break
+		} else {
+			fileInfos[index] = fileInfo
+		}
+	}
+
+	if iserror {
+		// TODO: what to do on error ?
+		return nil, fmt.Errorf("Unable to read file info: %v", goterror.Error())
+	}
+
+	// no error
+	return fileInfos, nil
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)

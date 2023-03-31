@@ -33,6 +33,7 @@ type Filesystem interface {
 	RemoveAll(path string) error
 	Remove(name string) error
 
+	// TODO: io/ioutil need to be removed here
 	// from "io/ioutil"
 	ReadFile(filename string) ([]byte, error)
 	TempDir(dir, prefix string) (string, error)

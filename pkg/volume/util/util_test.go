@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"runtime"
@@ -93,7 +92,7 @@ spec:
 	}
 
 	for _, test := range tests {
-		tempFile, err := ioutil.TempFile("", "podfile")
+		tempFile, err := os.CreateTemp("", "podfile")
 		defer os.Remove(tempFile.Name())
 		if err != nil {
 			t.Fatalf("cannot create temporary file: %v", err)
@@ -170,14 +169,14 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 						{
@@ -196,19 +195,19 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(999),
+								RunAsUser: utilptr.Int64(999),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 					},
@@ -224,25 +223,25 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: utilptr.Int64(1000),
 							},
 						},
 					},
 				},
 			},
-			wantFsUser: utilptr.Int64Ptr(1000),
+			wantFsUser: utilptr.Int64(1000),
 		},
 	}
 

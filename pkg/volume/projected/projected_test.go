@@ -18,7 +18,6 @@ package projected
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -254,7 +253,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, utilptr.Int32Ptr(tc.mode), "secret")
+			source := makeProjection(tc.name, utilptr.Int32(tc.mode), "secret")
 			source.Sources[0].Secret.Items = tc.mappings
 			source.Sources[0].Secret.Optional = &tc.optional
 
@@ -503,7 +502,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, utilptr.Int32Ptr(tc.mode), "configMap")
+			source := makeProjection(tc.name, utilptr.Int32(tc.mode), "configMap")
 			source.Sources[0].ConfigMap.Items = tc.mappings
 			source.Sources[0].ConfigMap.Optional = &tc.optional
 
@@ -677,7 +676,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source := makeProjection("", utilptr.Int32Ptr(tc.mode), "downwardAPI")
+			source := makeProjection("", utilptr.Int32(tc.mode), "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
 			client := fake.NewSimpleClientset(tc.pod)
@@ -737,7 +736,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:        "good service account",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32(0644),
 			path:        "token",
 			expiration:  &minute,
 
@@ -748,7 +747,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:        "good service account other path",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32(0644),
 			path:        "other-token",
 			expiration:  &minute,
 			wantPayload: map[string]util.FileProjection{
@@ -757,7 +756,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "good service account defaults audience",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32(0644),
 			path:        "token",
 			expiration:  &minute,
 
@@ -767,7 +766,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "good service account defaults expiration",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32(0644),
 			path:        "token",
 
 			wantPayload: map[string]util.FileProjection{
@@ -781,21 +780,21 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "fsUser != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsUser:      utilptr.Int64Ptr(1000),
+			defaultMode: utilptr.Int32(0644),
+			fsUser:      utilptr.Int64(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
 					Mode:   0600,
-					FsUser: utilptr.Int64Ptr(1000),
+					FsUser: utilptr.Int64(1000),
 				},
 			},
 		},
 		{
 			name:        "fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsGroup:     utilptr.Int64Ptr(1000),
+			defaultMode: utilptr.Int32(0644),
+			fsGroup:     utilptr.Int64(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
@@ -806,15 +805,15 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "fsUser != nil && fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsGroup:     utilptr.Int64Ptr(1000),
-			fsUser:      utilptr.Int64Ptr(1000),
+			defaultMode: utilptr.Int32(0644),
+			fsGroup:     utilptr.Int64(1000),
+			fsUser:      utilptr.Int64(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
 					Mode:   0600,
-					FsUser: utilptr.Int64Ptr(1000),
+					FsUser: utilptr.Int64(1000),
 				},
 			},
 		},
@@ -874,7 +873,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 }
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("", "projected_volume_test.")
+	tempDir, err := os.MkdirTemp("", "projected_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -1139,7 +1138,7 @@ func TestPluginOptional(t *testing.T) {
 	}
 	datadirPath := filepath.Join(volumePath, datadir)
 
-	infos, err := ioutil.ReadDir(volumePath)
+	infos, err := os.ReadDir(volumePath)
 	if err != nil {
 		t.Fatalf("couldn't find volume path, %s", volumePath)
 	}
@@ -1151,7 +1150,7 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
-	infos, err = ioutil.ReadDir(datadirPath)
+	infos, err = os.ReadDir(datadirPath)
 	if err != nil {
 		t.Fatalf("couldn't find volume data path, %s", datadirPath)
 	}
@@ -1235,7 +1234,7 @@ func makeVolumeSpec(volumeName, name string, defaultMode int32) *v1.Volume {
 	return &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
-			Projected: makeProjection(name, utilptr.Int32Ptr(defaultMode), "secret"),
+			Projected: makeProjection(name, utilptr.Int32(defaultMode), "secret"),
 		},
 	}
 }
@@ -1292,7 +1291,7 @@ func doTestSecretDataInVolume(volumePath string, secret v1.Secret, t *testing.T)
 		if _, err := os.Stat(secretDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find secret data on disk: %v", secretDataHostPath)
 		} else {
-			actualSecretBytes, err := ioutil.ReadFile(secretDataHostPath)
+			actualSecretBytes, err := os.ReadFile(secretDataHostPath)
 			if err != nil {
 				t.Fatalf("Couldn't read secret data from: %v", secretDataHostPath)
 			}
