@@ -998,7 +998,6 @@ func TestRescheduleProvisioning(t *testing.T) {
 	ns := testCtx.NS.Name
 
 	defer func() {
-		testCtx.CancelFn()
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
 	}()
 

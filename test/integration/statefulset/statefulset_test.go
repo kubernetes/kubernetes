@@ -351,8 +351,12 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 // add for issue: https://github.com/kubernetes/kubernetes/issues/108837
 func TestStatefulSetStatusWithPodFail(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	limitedPodNumber := 2
-	c, config, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+	c, config, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
 				limitedPodNumber: limitedPodNumber,
@@ -363,9 +367,6 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	ssc := statefulset.NewStatefulSetController(
 		ctx,
 		informers.Core().V1().Pods(),
@@ -382,7 +383,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	go ssc.Run(ctx, 5)
 
 	sts := newSTS("sts", ns.Name, 4)
-	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(ctx, sts, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
 	}
@@ -390,7 +391,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	wantReplicas := limitedPodNumber
 	var gotReplicas int32
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(ctx, sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

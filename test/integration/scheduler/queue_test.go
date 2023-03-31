@@ -291,8 +291,12 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		testfwk.SharedEtcd(),
 	)
 	testCtx := &testutils.TestContext{}
-	testCtx.Ctx, testCtx.CancelFn = context.WithCancel(context.Background())
-	testCtx.CloseFn = func() { server.TearDownFn() }
+	ctx, cancel := context.WithCancel(context.Background())
+	testCtx.Ctx = ctx
+	testCtx.CloseFn = func() {
+		cancel()
+		server.TearDownFn()
+	}
 
 	apiExtensionClient := apiextensionsclient.NewForConfigOrDie(server.ClientConfig)
 	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)

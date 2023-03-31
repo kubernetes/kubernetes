@@ -80,7 +80,7 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(b, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, b, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}

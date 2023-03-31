@@ -58,6 +58,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -151,8 +152,6 @@ type TestContext struct {
 	Scheduler          *scheduler.Scheduler
 	// This is the top context when initializing the test environment.
 	Ctx context.Context
-	// CancelFn will cancel the context above.
-	CancelFn context.CancelFunc
 	// CloseFn will stop the apiserver and clean up the resources
 	// after itself, including shutting down its storage layer.
 	CloseFn framework.TearDownFunc
@@ -210,14 +209,10 @@ func SyncSchedulerInformerFactory(testCtx *TestContext) {
 
 // CleanupTest cleans related resources which were created during integration test
 func CleanupTest(t *testing.T, testCtx *TestContext) {
-	// Cancel the context of the whole test environment, it will terminate the scheduler as well.
-	testCtx.CancelFn()
-
 	// Cleanup nodes and namespaces.
 	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, t)
-
-	// Terminate the apiserver.
+	// Terminate the scheduler and apiserver.
 	testCtx.CloseFn()
 }
 
@@ -356,13 +351,11 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 // It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
 // no need to do this again.
 func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	ctx, cancel := context.WithCancel(context.Background())
-	testCtx := TestContext{
-		Ctx:      ctx,
-		CancelFn: cancel,
-	}
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	testCtx := TestContext{Ctx: ctx}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(t, framework.TestServerSetup{
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 		},
@@ -372,6 +365,12 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			}
 		},
 	})
+
+	oldCloseFn := testCtx.CloseFn
+	testCtx.CloseFn = func() {
+		cancel()
+		oldCloseFn()
+	}
 
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, nsPrefix+string(uuid.NewUUID()), t)

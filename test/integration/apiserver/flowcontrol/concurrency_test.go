@@ -38,6 +38,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -48,8 +49,11 @@ const (
 	timeout                           = time.Second * 10
 )
 
-func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (*rest.Config, framework.TearDownFunc) {
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (context.Context, *rest.Config, framework.TearDownFunc) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
@@ -57,13 +61,18 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFligh
 			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
 		},
 	})
-	return kubeConfig, tearDownFn
+
+	newTeardown := func() {
+		cancel()
+		tearDownFn()
+	}
+	return ctx, kubeConfig, newTeardown
 }
 
 func TestPriorityLevelIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	kubeConfig, closeFn := setup(t, 1, 1)
+	ctx, kubeConfig, closeFn := setup(t, 1, 1)
 	defer closeFn()
 
 	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
@@ -106,7 +115,7 @@ func TestPriorityLevelIsolation(t *testing.T) {
 	// "elephant"
 	wg.Add(concurrencyShares + queueLength)
 	streamRequests(concurrencyShares+queueLength, func() {
-		_, err := noxu1Client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+		_, err := noxu1Client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			t.Error(err)
 		}
@@ -114,7 +123,7 @@ func TestPriorityLevelIsolation(t *testing.T) {
 	// "mouse"
 	wg.Add(3)
 	streamRequests(3, func() {
-		_, err := noxu2Client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+		_, err := noxu2Client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			t.Error(err)
 		}

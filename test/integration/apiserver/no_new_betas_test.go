@@ -57,7 +57,7 @@ func TestNoNewBetaAPIsByDefault(t *testing.T) {
 
 	// if you found this because you want to create an integration test for your new beta API, the method you're looking for
 	// is this setupWithResources method and you need to pass the resource you want to enable into it.
-	kubeClient, _, tearDownFn := setupWithResources(t,
+	_, kubeClient, _, tearDownFn := setupWithResources(t,
 		[]schema.GroupVersion{},
 		[]schema.GroupVersionResource{},
 	)

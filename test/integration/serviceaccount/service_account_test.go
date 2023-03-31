@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -59,7 +60,11 @@ const (
 )
 
 func TestServiceAccountAutoCreate(t *testing.T) {
-	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -68,7 +73,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	ns := "test-service-account-creation"
 
 	// Create namespace
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+	_, err = c.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -80,7 +85,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), defaultUser.Name, metav1.DeleteOptions{})
+	err = c.CoreV1().ServiceAccounts(ns).Delete(ctx, defaultUser.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Could not delete default serviceaccount: %v", err)
 	}
@@ -96,7 +101,11 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 }
 
 func TestServiceAccountTokenAutoMount(t *testing.T) {
-	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -105,7 +114,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	ns := "auto-mount-ns"
 
 	// Create "my" namespace
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+	_, err = c.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -123,7 +132,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 		},
 	}
 
-	createdPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), &protoPod, metav1.CreateOptions{})
+	createdPod, err := c.CoreV1().Pods(ns).Create(ctx, &protoPod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +147,11 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 }
 
 func TestServiceAccountTokenAuthentication(t *testing.T) {
-	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -148,19 +161,19 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	otherns := "other-ns"
 
 	// Create "my" namespace
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
+	_, err = c.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "other" namespace
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: otherns}}, metav1.CreateOptions{})
+	_, err = c.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: otherns}}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "ro" user in myns
-	roSA, err := c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
+	roSA, err := c.CoreV1().ServiceAccounts(myns).Create(ctx, &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -175,13 +188,13 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	roClient := clientset.NewForConfigOrDie(&roClientConfig)
 	doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
 	doServiceAccountAPIRequests(t, roClient, otherns, true, false, false)
-	err = c.CoreV1().Secrets(myns).Delete(context.TODO(), roTokenName, metav1.DeleteOptions{})
+	err = c.CoreV1().Secrets(myns).Delete(ctx, roTokenName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
 	// wait for delete to be observed and reacted to via watch
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		_, err := roClient.CoreV1().Secrets(myns).List(context.TODO(), metav1.ListOptions{})
+		_, err := roClient.CoreV1().Secrets(myns).List(ctx, metav1.ListOptions{})
 		if err == nil {
 			t.Logf("token is still valid, waiting")
 			return false, nil
@@ -198,7 +211,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns
-	rwSA, err := c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readWriteServiceAccountName}}, metav1.CreateOptions{})
+	rwSA, err := c.CoreV1().ServiceAccounts(myns).Create(ctx, &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readWriteServiceAccountName}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -215,8 +228,12 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 }
 
 func TestLegacyServiceAccountTokenTracking(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenTracking, true)()
-	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
+	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -224,11 +241,11 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 
 	// create service account
 	myns := "auth-ns"
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
+	_, err = c.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
-	mysa, err := c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
+	mysa, err := c.CoreV1().ServiceAccounts(myns).Create(ctx, &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -287,7 +304,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 			}
 			wg.Wait()
 			dateAfter := time.Now().UTC().Format(dateFormat)
-			liveSecret, err := c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
+			liveSecret, err := c.CoreV1().Secrets(myns).Get(ctx, test.secretName, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Could not get secret: %v", err)
 			}
@@ -314,7 +331,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 	// configmap should exist with 'since' timestamp.
 	if err = wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
 		dateBefore := time.Now().UTC().Format("2006-01-02")
-		configMap, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), legacytokentracking.ConfigMapName, metav1.GetOptions{})
+		configMap, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, legacytokentracking.ConfigMapName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get %q configmap, err %w", legacytokentracking.ConfigMapDataKey, err)
 		}
@@ -334,11 +351,13 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 
 // startServiceAccountTestServerAndWaitForCaches returns a started server
 // It is the responsibility of the caller to ensure the returned stopFunc is called
-func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (clientset.Interface, *restclient.Config, func(), error) {
+func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testing.T) (clientset.Interface, *restclient.Config, func(), error) {
 	var serviceAccountKey interface{}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	// Set up a API server
-	rootClientset, clientConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	rootClientset, clientConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			var err error
 			serviceAccountKey, err = keyutil.PrivateKeyFromFile(opts.ServiceAccountSigningKeyFile)
@@ -379,7 +398,6 @@ func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (clientset.Inte
 		},
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
 	stop := func() {
 		cancel()
 		tearDownFn()

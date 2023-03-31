@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetsSelfAttributes(t *testing.T) {
@@ -88,6 +89,10 @@ func TestGetsSelfAttributes(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APISelfSubjectReview, true)()
 
 	var respMu sync.RWMutex
@@ -95,7 +100,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 		Name: "stub",
 	}
 
-	kubeClient, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
@@ -122,7 +127,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 
 			res, err := kubeClient.AuthenticationV1alpha1().
 				SelfSubjectReviews().
-				Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+				Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -149,7 +154,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 
 			res2, err := kubeClient.AuthenticationV1beta1().
 				SelfSubjectReviews().
-				Create(context.TODO(), &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+				Create(ctx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -202,7 +207,6 @@ func TestGetsSelfAttributes(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestGetsSelfAttributesError(t *testing.T) {
@@ -211,7 +215,11 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APISelfSubjectReview, true)()
 
-	kubeClient, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
@@ -243,7 +251,7 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 		_, err := kubeClient.AuthenticationV1alpha1().
 			SelfSubjectReviews().
-			Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+			Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatalf("expected error: %v, got nil", err)
 		}
@@ -259,7 +267,7 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 		_, err := kubeClient.AuthenticationV1beta1().
 			SelfSubjectReviews().
-			Create(context.TODO(), &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+			Create(ctx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatalf("expected error: %v, got nil", err)
 		}
