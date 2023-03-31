@@ -16,6 +16,8 @@ var (
 			`\[Feature:ReadWriteOncePod\]`,
 			`\[Feature:SELinuxMountReadWriteOncePod\]`,
 			`\[Feature:PodSchedulingReadiness\]`,
+			`\[Feature:InPlacePodVerticalScaling\]`,
+			`\[Feature:APISelfSubjectReview\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -66,9 +68,9 @@ var (
 
 			"RuntimeClass should reject",
 
-			`Services should implement service.kubernetes.io/headless`,       // requires SSH access to function, needs to be refactored
-			`ClusterDns \[Feature:Example\] should create pod that uses dns`, // doesn't use bindata, not part of kube test binary
-			`Simple pod should handle in-cluster config`,                     // kubectl cp doesn't work or is not preserving executable bit, we have this test already
+			`Services should implement service.kubernetes.io/headless`,                    // requires SSH access to function, needs to be refactored
+			`ClusterDns \[Feature:Example\] should create pod that uses dns`,              // doesn't use bindata, not part of kube test binary
+			`Simple pod should return command exit codes should handle in-cluster config`, // kubectl cp doesn't work or is not preserving executable bit, we have this test already
 
 			// TODO(node): configure the cri handler for the runtime class to make this work
 			"should run a Pod requesting a RuntimeClass with a configured handler",
@@ -115,6 +117,8 @@ var (
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {
 			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`, // TODO not working, yet not testing anything new
+			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`,      // TODO(network): simple test in k8s 1.27, needs investigation
+			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                         // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
