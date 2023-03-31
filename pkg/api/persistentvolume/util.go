@@ -17,11 +17,18 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+)
+
+const (
+	deprecatedStorageClassAnnotationsMsg = `deprecated since v1.8; use "storageClassName" attribute instead`
 )
 
 // DropDisabledFields removes disabled fields from the pv spec.
@@ -49,11 +56,21 @@ func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {
 	if pv == nil {
 		return nil
 	}
-	return warningsForPersistentVolumeSpecAndMeta(nil, &pv.Spec)
+	return warningsForPersistentVolumeSpecAndMeta(nil, &pv.Spec, &pv.ObjectMeta)
 }
 
-func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.PersistentVolumeSpec) []string {
+func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.PersistentVolumeSpec, pvMeta *metav1.ObjectMeta) []string {
 	var warnings []string
+
+	if _, ok := pvMeta.Annotations[api.BetaStorageClassAnnotation]; ok {
+		warnings = append(warnings,
+			fmt.Sprintf(
+				"%s: %s",
+				fieldPath.Child("metadata", "annotations").Key(api.BetaStorageClassAnnotation),
+				deprecatedStorageClassAnnotationsMsg,
+			),
+		)
+	}
 
 	if pvSpec.NodeAffinity != nil && pvSpec.NodeAffinity.Required != nil {
 		termFldPath := fieldPath.Child("spec", "nodeAffinity", "required", "nodeSelectorTerms")
