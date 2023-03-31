@@ -4,12 +4,11 @@
 package antlr
 
 import (
-"bytes"
-"fmt"
+	"bytes"
+	"fmt"
 )
 
-
-// 
+//
 // Useful for rewriting out a buffered input token stream after doing some
 // augmentation or other manipulations on it.
 
@@ -85,12 +84,10 @@ import (
 // If you don't use named rewrite streams, a "default" stream is used as the
 // first example shows.</p>
 
-
-
-const(
+const (
 	Default_Program_Name = "default"
-	Program_Init_Size = 100
-	Min_Token_Index = 0
+	Program_Init_Size    = 100
+	Min_Token_Index      = 0
 )
 
 // Define the rewrite operation hierarchy
@@ -98,13 +95,13 @@ const(
 type RewriteOperation interface {
 	// Execute the rewrite operation by possibly adding to the buffer.
 	// Return the index of the next token to operate on.
-	Execute(buffer *bytes.Buffer)	int
-	String()			string
-	GetInstructionIndex()		int
-	GetIndex()			int
-	GetText()			string
-	GetOpName()			string
-	GetTokens()			TokenStream
+	Execute(buffer *bytes.Buffer) int
+	String() string
+	GetInstructionIndex() int
+	GetIndex() int
+	GetText() string
+	GetOpName() string
+	GetTokens() TokenStream
 	SetInstructionIndex(val int)
 	SetIndex(int)
 	SetText(string)
@@ -114,63 +111,62 @@ type RewriteOperation interface {
 
 type BaseRewriteOperation struct {
 	//Current index of rewrites list
-	instruction_index		int
+	instruction_index int
 	//Token buffer index
-	index				int
+	index int
 	//Substitution text
-	text				string
+	text string
 	//Actual operation name
-	op_name				string
+	op_name string
 	//Pointer to token steam
-	tokens				TokenStream
+	tokens TokenStream
 }
 
-func (op *BaseRewriteOperation)GetInstructionIndex() int{
+func (op *BaseRewriteOperation) GetInstructionIndex() int {
 	return op.instruction_index
 }
 
-func (op *BaseRewriteOperation)GetIndex() int{
+func (op *BaseRewriteOperation) GetIndex() int {
 	return op.index
 }
 
-func (op *BaseRewriteOperation)GetText() string{
+func (op *BaseRewriteOperation) GetText() string {
 	return op.text
 }
 
-func (op *BaseRewriteOperation)GetOpName() string{
+func (op *BaseRewriteOperation) GetOpName() string {
 	return op.op_name
 }
 
-func (op *BaseRewriteOperation)GetTokens() TokenStream{
+func (op *BaseRewriteOperation) GetTokens() TokenStream {
 	return op.tokens
 }
 
-func (op *BaseRewriteOperation)SetInstructionIndex(val int){
+func (op *BaseRewriteOperation) SetInstructionIndex(val int) {
 	op.instruction_index = val
 }
 
-func (op *BaseRewriteOperation)SetIndex(val int) {
+func (op *BaseRewriteOperation) SetIndex(val int) {
 	op.index = val
 }
 
-func (op *BaseRewriteOperation)SetText(val string){
+func (op *BaseRewriteOperation) SetText(val string) {
 	op.text = val
 }
 
-func (op *BaseRewriteOperation)SetOpName(val string){
+func (op *BaseRewriteOperation) SetOpName(val string) {
 	op.op_name = val
 }
 
-func (op *BaseRewriteOperation)SetTokens(val TokenStream)  {
+func (op *BaseRewriteOperation) SetTokens(val TokenStream) {
 	op.tokens = val
 }
 
-
-func (op *BaseRewriteOperation) Execute(buffer *bytes.Buffer) int{
+func (op *BaseRewriteOperation) Execute(buffer *bytes.Buffer) int {
 	return op.index
 }
 
-func (op *BaseRewriteOperation) String() string  {
+func (op *BaseRewriteOperation) String() string {
 	return fmt.Sprintf("<%s@%d:\"%s\">",
 		op.op_name,
 		op.tokens.Get(op.GetIndex()),
@@ -179,26 +175,25 @@ func (op *BaseRewriteOperation) String() string  {
 
 }
 
-
 type InsertBeforeOp struct {
 	BaseRewriteOperation
 }
 
-func NewInsertBeforeOp(index int, text string, stream TokenStream) *InsertBeforeOp{
-	return &InsertBeforeOp{BaseRewriteOperation:BaseRewriteOperation{
-		index:index,
-		text:text,
-		op_name:"InsertBeforeOp",
-		tokens:stream,
+func NewInsertBeforeOp(index int, text string, stream TokenStream) *InsertBeforeOp {
+	return &InsertBeforeOp{BaseRewriteOperation: BaseRewriteOperation{
+		index:   index,
+		text:    text,
+		op_name: "InsertBeforeOp",
+		tokens:  stream,
 	}}
 }
 
-func (op *InsertBeforeOp) Execute(buffer *bytes.Buffer) int{
+func (op *InsertBeforeOp) Execute(buffer *bytes.Buffer) int {
 	buffer.WriteString(op.text)
-	if op.tokens.Get(op.index).GetTokenType() != TokenEOF{
+	if op.tokens.Get(op.index).GetTokenType() != TokenEOF {
 		buffer.WriteString(op.tokens.Get(op.index).GetText())
 	}
-	return op.index+1
+	return op.index + 1
 }
 
 func (op *InsertBeforeOp) String() string {
@@ -213,20 +208,20 @@ type InsertAfterOp struct {
 	BaseRewriteOperation
 }
 
-func NewInsertAfterOp(index int, text string, stream TokenStream) *InsertAfterOp{
-	return &InsertAfterOp{BaseRewriteOperation:BaseRewriteOperation{
-		index:index+1,
-		text:text,
-		tokens:stream,
+func NewInsertAfterOp(index int, text string, stream TokenStream) *InsertAfterOp {
+	return &InsertAfterOp{BaseRewriteOperation: BaseRewriteOperation{
+		index:  index + 1,
+		text:   text,
+		tokens: stream,
 	}}
 }
 
 func (op *InsertAfterOp) Execute(buffer *bytes.Buffer) int {
 	buffer.WriteString(op.text)
-	if op.tokens.Get(op.index).GetTokenType() != TokenEOF{
+	if op.tokens.Get(op.index).GetTokenType() != TokenEOF {
 		buffer.WriteString(op.tokens.Get(op.index).GetText())
 	}
-	return op.index+1
+	return op.index + 1
 }
 
 func (op *InsertAfterOp) String() string {
@@ -235,28 +230,28 @@ func (op *InsertAfterOp) String() string {
 
 // I'm going to try replacing range from x..y with (y-x)+1 ReplaceOp
 // instructions.
-type ReplaceOp struct{
+type ReplaceOp struct {
 	BaseRewriteOperation
 	LastIndex int
 }
 
-func NewReplaceOp(from, to int, text string, stream TokenStream)*ReplaceOp {
+func NewReplaceOp(from, to int, text string, stream TokenStream) *ReplaceOp {
 	return &ReplaceOp{
-		BaseRewriteOperation:BaseRewriteOperation{
-			index:from,
-			text:text,
-			op_name:"ReplaceOp",
-			tokens:stream,
+		BaseRewriteOperation: BaseRewriteOperation{
+			index:   from,
+			text:    text,
+			op_name: "ReplaceOp",
+			tokens:  stream,
 		},
-		LastIndex:to,
+		LastIndex: to,
 	}
 }
 
-func (op *ReplaceOp)Execute(buffer *bytes.Buffer) int{
-	if op.text != ""{
+func (op *ReplaceOp) Execute(buffer *bytes.Buffer) int {
+	if op.text != "" {
 		buffer.WriteString(op.text)
 	}
-	return op.LastIndex +1
+	return op.LastIndex + 1
 }
 
 func (op *ReplaceOp) String() string {
@@ -268,54 +263,54 @@ func (op *ReplaceOp) String() string {
 		op.tokens.Get(op.index), op.tokens.Get(op.LastIndex), op.text)
 }
 
-
 type TokenStreamRewriter struct {
 	//Our source stream
-	tokens						TokenStream
+	tokens TokenStream
 	// You may have multiple, named streams of rewrite operations.
 	//  I'm calling these things "programs."
 	//  Maps String (name) &rarr; rewrite (List)
-	programs					map[string][]RewriteOperation
-	last_rewrite_token_indexes	map[string]int
+	programs                   map[string][]RewriteOperation
+	last_rewrite_token_indexes map[string]int
 }
 
-func NewTokenStreamRewriter(tokens TokenStream) *TokenStreamRewriter{
+func NewTokenStreamRewriter(tokens TokenStream) *TokenStreamRewriter {
 	return &TokenStreamRewriter{
-		tokens:						tokens,
-		programs:					map[string][]RewriteOperation{
-			Default_Program_Name:make([]RewriteOperation,0, Program_Init_Size),
+		tokens: tokens,
+		programs: map[string][]RewriteOperation{
+			Default_Program_Name: make([]RewriteOperation, 0, Program_Init_Size),
 		},
-		last_rewrite_token_indexes:	map[string]int{},
+		last_rewrite_token_indexes: map[string]int{},
 	}
 }
 
-func (tsr *TokenStreamRewriter) GetTokenStream() TokenStream{
+func (tsr *TokenStreamRewriter) GetTokenStream() TokenStream {
 	return tsr.tokens
 }
 
-//  Rollback the instruction stream for a program so that
-//  the indicated instruction (via instructionIndex) is no
-//  longer in the stream. UNTESTED!
-func (tsr *TokenStreamRewriter) Rollback(program_name string, instruction_index int){
-	is, ok  := tsr.programs[program_name]
-	if ok{
+// Rollback the instruction stream for a program so that
+// the indicated instruction (via instructionIndex) is no
+// longer in the stream. UNTESTED!
+func (tsr *TokenStreamRewriter) Rollback(program_name string, instruction_index int) {
+	is, ok := tsr.programs[program_name]
+	if ok {
 		tsr.programs[program_name] = is[Min_Token_Index:instruction_index]
 	}
 }
 
-func (tsr *TokenStreamRewriter) RollbackDefault(instruction_index int){
+func (tsr *TokenStreamRewriter) RollbackDefault(instruction_index int) {
 	tsr.Rollback(Default_Program_Name, instruction_index)
 }
-//Reset the program so that no instructions exist
-func (tsr *TokenStreamRewriter) DeleteProgram(program_name string){
+
+// Reset the program so that no instructions exist
+func (tsr *TokenStreamRewriter) DeleteProgram(program_name string) {
 	tsr.Rollback(program_name, Min_Token_Index) //TODO: double test on that cause lower bound is not included
 }
 
-func (tsr *TokenStreamRewriter) DeleteProgramDefault(){
+func (tsr *TokenStreamRewriter) DeleteProgramDefault() {
 	tsr.DeleteProgram(Default_Program_Name)
 }
 
-func (tsr *TokenStreamRewriter) InsertAfter(program_name string, index int, text string){
+func (tsr *TokenStreamRewriter) InsertAfter(program_name string, index int, text string) {
 	// to insert after, just insert before next index (even if past end)
 	var op RewriteOperation = NewInsertAfterOp(index, text, tsr.tokens)
 	rewrites := tsr.GetProgram(program_name)
@@ -323,31 +318,31 @@ func (tsr *TokenStreamRewriter) InsertAfter(program_name string, index int, text
 	tsr.AddToProgram(program_name, op)
 }
 
-func (tsr *TokenStreamRewriter) InsertAfterDefault(index int, text string){
+func (tsr *TokenStreamRewriter) InsertAfterDefault(index int, text string) {
 	tsr.InsertAfter(Default_Program_Name, index, text)
 }
 
-func (tsr *TokenStreamRewriter) InsertAfterToken(program_name string, token Token, text string){
+func (tsr *TokenStreamRewriter) InsertAfterToken(program_name string, token Token, text string) {
 	tsr.InsertAfter(program_name, token.GetTokenIndex(), text)
 }
 
-func (tsr* TokenStreamRewriter) InsertBefore(program_name string, index int, text string){
+func (tsr *TokenStreamRewriter) InsertBefore(program_name string, index int, text string) {
 	var op RewriteOperation = NewInsertBeforeOp(index, text, tsr.tokens)
 	rewrites := tsr.GetProgram(program_name)
 	op.SetInstructionIndex(len(rewrites))
 	tsr.AddToProgram(program_name, op)
 }
 
-func (tsr *TokenStreamRewriter) InsertBeforeDefault(index int, text string){
+func (tsr *TokenStreamRewriter) InsertBeforeDefault(index int, text string) {
 	tsr.InsertBefore(Default_Program_Name, index, text)
 }
 
-func (tsr *TokenStreamRewriter) InsertBeforeToken(program_name string,token Token, text string){
+func (tsr *TokenStreamRewriter) InsertBeforeToken(program_name string, token Token, text string) {
 	tsr.InsertBefore(program_name, token.GetTokenIndex(), text)
 }
 
-func (tsr *TokenStreamRewriter) Replace(program_name string, from, to int, text string){
-	if from > to || from < 0 || to < 0 || to >= tsr.tokens.Size(){
+func (tsr *TokenStreamRewriter) Replace(program_name string, from, to int, text string) {
+	if from > to || from < 0 || to < 0 || to >= tsr.tokens.Size() {
 		panic(fmt.Sprintf("replace: range invalid: %d..%d(size=%d)",
 			from, to, tsr.tokens.Size()))
 	}
@@ -357,207 +352,216 @@ func (tsr *TokenStreamRewriter) Replace(program_name string, from, to int, text 
 	tsr.AddToProgram(program_name, op)
 }
 
-func (tsr *TokenStreamRewriter)ReplaceDefault(from, to int, text string)  {
+func (tsr *TokenStreamRewriter) ReplaceDefault(from, to int, text string) {
 	tsr.Replace(Default_Program_Name, from, to, text)
 }
 
-func (tsr *TokenStreamRewriter)ReplaceDefaultPos(index int, text string){
+func (tsr *TokenStreamRewriter) ReplaceDefaultPos(index int, text string) {
 	tsr.ReplaceDefault(index, index, text)
 }
 
-func (tsr *TokenStreamRewriter)ReplaceToken(program_name string, from, to Token, text string){
+func (tsr *TokenStreamRewriter) ReplaceToken(program_name string, from, to Token, text string) {
 	tsr.Replace(program_name, from.GetTokenIndex(), to.GetTokenIndex(), text)
 }
 
-func (tsr *TokenStreamRewriter)ReplaceTokenDefault(from, to Token, text string){
+func (tsr *TokenStreamRewriter) ReplaceTokenDefault(from, to Token, text string) {
 	tsr.ReplaceToken(Default_Program_Name, from, to, text)
 }
 
-func (tsr *TokenStreamRewriter)ReplaceTokenDefaultPos(index Token, text string){
+func (tsr *TokenStreamRewriter) ReplaceTokenDefaultPos(index Token, text string) {
 	tsr.ReplaceTokenDefault(index, index, text)
 }
 
-func (tsr *TokenStreamRewriter)Delete(program_name string, from, to int){
-	tsr.Replace(program_name, from, to, "" )
+func (tsr *TokenStreamRewriter) Delete(program_name string, from, to int) {
+	tsr.Replace(program_name, from, to, "")
 }
 
-func (tsr *TokenStreamRewriter)DeleteDefault(from, to int){
+func (tsr *TokenStreamRewriter) DeleteDefault(from, to int) {
 	tsr.Delete(Default_Program_Name, from, to)
 }
 
-func (tsr *TokenStreamRewriter)DeleteDefaultPos(index int){
-	tsr.DeleteDefault(index,index)
+func (tsr *TokenStreamRewriter) DeleteDefaultPos(index int) {
+	tsr.DeleteDefault(index, index)
 }
 
-func (tsr *TokenStreamRewriter)DeleteToken(program_name string, from, to Token)  {
+func (tsr *TokenStreamRewriter) DeleteToken(program_name string, from, to Token) {
 	tsr.ReplaceToken(program_name, from, to, "")
 }
 
-func (tsr *TokenStreamRewriter)DeleteTokenDefault(from,to Token){
+func (tsr *TokenStreamRewriter) DeleteTokenDefault(from, to Token) {
 	tsr.DeleteToken(Default_Program_Name, from, to)
 }
 
-func (tsr *TokenStreamRewriter)GetLastRewriteTokenIndex(program_name string)int  {
+func (tsr *TokenStreamRewriter) GetLastRewriteTokenIndex(program_name string) int {
 	i, ok := tsr.last_rewrite_token_indexes[program_name]
-	if !ok{
+	if !ok {
 		return -1
 	}
 	return i
 }
 
-func (tsr *TokenStreamRewriter)GetLastRewriteTokenIndexDefault()int{
+func (tsr *TokenStreamRewriter) GetLastRewriteTokenIndexDefault() int {
 	return tsr.GetLastRewriteTokenIndex(Default_Program_Name)
 }
 
-func (tsr *TokenStreamRewriter)SetLastRewriteTokenIndex(program_name string, i int){
+func (tsr *TokenStreamRewriter) SetLastRewriteTokenIndex(program_name string, i int) {
 	tsr.last_rewrite_token_indexes[program_name] = i
 }
 
-func (tsr *TokenStreamRewriter)InitializeProgram(name string)[]RewriteOperation{
+func (tsr *TokenStreamRewriter) InitializeProgram(name string) []RewriteOperation {
 	is := make([]RewriteOperation, 0, Program_Init_Size)
 	tsr.programs[name] = is
 	return is
 }
 
-func (tsr *TokenStreamRewriter)AddToProgram(name string, op RewriteOperation){
+func (tsr *TokenStreamRewriter) AddToProgram(name string, op RewriteOperation) {
 	is := tsr.GetProgram(name)
 	is = append(is, op)
 	tsr.programs[name] = is
 }
 
-func (tsr *TokenStreamRewriter)GetProgram(name string) []RewriteOperation  {
+func (tsr *TokenStreamRewriter) GetProgram(name string) []RewriteOperation {
 	is, ok := tsr.programs[name]
-	if !ok{
+	if !ok {
 		is = tsr.InitializeProgram(name)
 	}
 	return is
 }
-//  Return the text from the original tokens altered per the
-//  instructions given to this rewriter.
-func (tsr *TokenStreamRewriter)GetTextDefault() string{
+
+// Return the text from the original tokens altered per the
+// instructions given to this rewriter.
+func (tsr *TokenStreamRewriter) GetTextDefault() string {
 	return tsr.GetText(
 		Default_Program_Name,
 		NewInterval(0, tsr.tokens.Size()-1))
 }
-//  Return the text from the original tokens altered per the
-//  instructions given to this rewriter.
-func (tsr *TokenStreamRewriter)GetText(program_name string, interval *Interval) string  {
+
+// Return the text from the original tokens altered per the
+// instructions given to this rewriter.
+func (tsr *TokenStreamRewriter) GetText(program_name string, interval *Interval) string {
 	rewrites := tsr.programs[program_name]
 	start := interval.Start
-	stop  := interval.Stop
+	stop := interval.Stop
 	// ensure start/end are in range
 	stop = min(stop, tsr.tokens.Size()-1)
-	start = max(start,0)
-	if rewrites == nil || len(rewrites) == 0{
+	start = max(start, 0)
+	if rewrites == nil || len(rewrites) == 0 {
 		return tsr.tokens.GetTextFromInterval(interval) // no instructions to execute
 	}
 	buf := bytes.Buffer{}
 	// First, optimize instruction stream
 	indexToOp := reduceToSingleOperationPerIndex(rewrites)
 	// Walk buffer, executing instructions and emitting tokens
-	for i:=start; i<=stop && i<tsr.tokens.Size();{
+	for i := start; i <= stop && i < tsr.tokens.Size(); {
 		op := indexToOp[i]
-		delete(indexToOp, i)// remove so any left have index size-1
+		delete(indexToOp, i) // remove so any left have index size-1
 		t := tsr.tokens.Get(i)
-		if op == nil{
+		if op == nil {
 			// no operation at that index, just dump token
-			if t.GetTokenType() != TokenEOF {buf.WriteString(t.GetText())}
+			if t.GetTokenType() != TokenEOF {
+				buf.WriteString(t.GetText())
+			}
 			i++ // move to next token
-		}else {
-			i = op.Execute(&buf)// execute operation and skip
+		} else {
+			i = op.Execute(&buf) // execute operation and skip
 		}
 	}
 	// include stuff after end if it's last index in buffer
 	// So, if they did an insertAfter(lastValidIndex, "foo"), include
 	// foo if end==lastValidIndex.
-	if stop == tsr.tokens.Size()-1{
+	if stop == tsr.tokens.Size()-1 {
 		// Scan any remaining operations after last token
 		// should be included (they will be inserts).
-		for _, op := range indexToOp{
-			if op.GetIndex() >= tsr.tokens.Size()-1 {buf.WriteString(op.GetText())}
+		for _, op := range indexToOp {
+			if op.GetIndex() >= tsr.tokens.Size()-1 {
+				buf.WriteString(op.GetText())
+			}
 		}
 	}
 	return buf.String()
 }
 
-//  We need to combine operations and report invalid operations (like
-//  overlapping replaces that are not completed nested). Inserts to
-//  same index need to be combined etc...  Here are the cases:
+//	 We need to combine operations and report invalid operations (like
+//	 overlapping replaces that are not completed nested). Inserts to
+//	 same index need to be combined etc...  Here are the cases:
 //
-//  I.i.u I.j.v								leave alone, nonoverlapping
-//  I.i.u I.i.v								combine: Iivu
+//	 I.i.u I.j.v								leave alone, nonoverlapping
+//	 I.i.u I.i.v								combine: Iivu
 //
-//  R.i-j.u R.x-y.v	| i-j in x-y			delete first R
-//  R.i-j.u R.i-j.v							delete first R
-//  R.i-j.u R.x-y.v	| x-y in i-j			ERROR
-//  R.i-j.u R.x-y.v	| boundaries overlap	ERROR
+//	 R.i-j.u R.x-y.v	| i-j in x-y			delete first R
+//	 R.i-j.u R.i-j.v							delete first R
+//	 R.i-j.u R.x-y.v	| x-y in i-j			ERROR
+//	 R.i-j.u R.x-y.v	| boundaries overlap	ERROR
 //
-//  Delete special case of replace (text==null):
-//  D.i-j.u D.x-y.v	| boundaries overlap	combine to max(min)..max(right)
+//	 Delete special case of replace (text==null):
+//	 D.i-j.u D.x-y.v	| boundaries overlap	combine to max(min)..max(right)
 //
-//  I.i.u R.x-y.v | i in (x+1)-y			delete I (since insert before
-//											we're not deleting i)
-//  I.i.u R.x-y.v | i not in (x+1)-y		leave alone, nonoverlapping
-//  R.x-y.v I.i.u | i in x-y				ERROR
-//  R.x-y.v I.x.u 							R.x-y.uv (combine, delete I)
-//  R.x-y.v I.i.u | i not in x-y			leave alone, nonoverlapping
+//	 I.i.u R.x-y.v | i in (x+1)-y			delete I (since insert before
+//												we're not deleting i)
+//	 I.i.u R.x-y.v | i not in (x+1)-y		leave alone, nonoverlapping
+//	 R.x-y.v I.i.u | i in x-y				ERROR
+//	 R.x-y.v I.x.u 							R.x-y.uv (combine, delete I)
+//	 R.x-y.v I.i.u | i not in x-y			leave alone, nonoverlapping
 //
-//  I.i.u = insert u before op @ index i
-//  R.x-y.u = replace x-y indexed tokens with u
+//	 I.i.u = insert u before op @ index i
+//	 R.x-y.u = replace x-y indexed tokens with u
 //
-//  First we need to examine replaces. For any replace op:
+//	 First we need to examine replaces. For any replace op:
 //
-// 		1. wipe out any insertions before op within that range.
-//		2. Drop any replace op before that is contained completely within
-//	 	that range.
-//		3. Throw exception upon boundary overlap with any previous replace.
+//			1. wipe out any insertions before op within that range.
+//			2. Drop any replace op before that is contained completely within
+//		 	that range.
+//			3. Throw exception upon boundary overlap with any previous replace.
 //
-//  	Then we can deal with inserts:
+//	 	Then we can deal with inserts:
 //
-// 		1. for any inserts to same index, combine even if not adjacent.
-// 		2. for any prior replace with same left boundary, combine this
-//	 	insert with replace and delete this replace.
-// 		3. throw exception if index in same range as previous replace
+//			1. for any inserts to same index, combine even if not adjacent.
+//			2. for any prior replace with same left boundary, combine this
+//		 	insert with replace and delete this replace.
+//			3. throw exception if index in same range as previous replace
 //
-//  Don't actually delete; make op null in list. Easier to walk list.
-//  Later we can throw as we add to index &rarr; op map.
+//	 Don't actually delete; make op null in list. Easier to walk list.
+//	 Later we can throw as we add to index &rarr; op map.
 //
-//  Note that I.2 R.2-2 will wipe out I.2 even though, technically, the
-//  inserted stuff would be before the replace range. But, if you
-//  add tokens in front of a method body '{' and then delete the method
-//  body, I think the stuff before the '{' you added should disappear too.
+//	 Note that I.2 R.2-2 will wipe out I.2 even though, technically, the
+//	 inserted stuff would be before the replace range. But, if you
+//	 add tokens in front of a method body '{' and then delete the method
+//	 body, I think the stuff before the '{' you added should disappear too.
 //
-//  Return a map from token index to operation.
-//
-func reduceToSingleOperationPerIndex(rewrites []RewriteOperation) map[int]RewriteOperation{
+//	 Return a map from token index to operation.
+func reduceToSingleOperationPerIndex(rewrites []RewriteOperation) map[int]RewriteOperation {
 	// WALK REPLACES
-	for i:=0; i < len(rewrites); i++{
+	for i := 0; i < len(rewrites); i++ {
 		op := rewrites[i]
-		if op == nil{continue}
+		if op == nil {
+			continue
+		}
 		rop, ok := op.(*ReplaceOp)
-		if !ok{continue}
+		if !ok {
+			continue
+		}
 		// Wipe prior inserts within range
-		for j:=0; j<i && j < len(rewrites); j++{
-			if iop, ok := rewrites[j].(*InsertBeforeOp);ok{
-				if iop.index == rop.index{
+		for j := 0; j < i && j < len(rewrites); j++ {
+			if iop, ok := rewrites[j].(*InsertBeforeOp); ok {
+				if iop.index == rop.index {
 					// E.g., insert before 2, delete 2..2; update replace
 					// text to include insert before, kill insert
 					rewrites[iop.instruction_index] = nil
-					if rop.text != ""{
+					if rop.text != "" {
 						rop.text = iop.text + rop.text
-					}else{
+					} else {
 						rop.text = iop.text
 					}
-				}else if iop.index > rop.index && iop.index <=rop.LastIndex{
+				} else if iop.index > rop.index && iop.index <= rop.LastIndex {
 					// delete insert as it's a no-op.
 					rewrites[iop.instruction_index] = nil
 				}
 			}
 		}
 		// Drop any prior replaces contained within
-		for j:=0; j<i && j < len(rewrites); j++{
-			if prevop, ok := rewrites[j].(*ReplaceOp);ok{
-				if prevop.index>=rop.index && prevop.LastIndex <= rop.LastIndex{
+		for j := 0; j < i && j < len(rewrites); j++ {
+			if prevop, ok := rewrites[j].(*ReplaceOp); ok {
+				if prevop.index >= rop.index && prevop.LastIndex <= rop.LastIndex {
 					// delete replace as it's a no-op.
 					rewrites[prevop.instruction_index] = nil
 					continue
@@ -566,61 +570,67 @@ func reduceToSingleOperationPerIndex(rewrites []RewriteOperation) map[int]Rewrit
 				disjoint := prevop.LastIndex < rop.index || prevop.index > rop.LastIndex
 				// Delete special case of replace (text==null):
 				// D.i-j.u D.x-y.v	| boundaries overlap	combine to max(min)..max(right)
-				if prevop.text == "" && rop.text == "" && !disjoint{
+				if prevop.text == "" && rop.text == "" && !disjoint {
 					rewrites[prevop.instruction_index] = nil
 					rop.index = min(prevop.index, rop.index)
 					rop.LastIndex = max(prevop.LastIndex, rop.LastIndex)
 					println("new rop" + rop.String()) //TODO: remove console write, taken from Java version
-				}else if !disjoint{
+				} else if !disjoint {
 					panic("replace op boundaries of " + rop.String() + " overlap with previous " + prevop.String())
 				}
 			}
 		}
 	}
 	// WALK INSERTS
-	for i:=0; i < len(rewrites); i++ {
+	for i := 0; i < len(rewrites); i++ {
 		op := rewrites[i]
-		if op == nil{continue}
+		if op == nil {
+			continue
+		}
 		//hack to replicate inheritance in composition
 		_, iok := rewrites[i].(*InsertBeforeOp)
 		_, aok := rewrites[i].(*InsertAfterOp)
-		if !iok && !aok{continue}
+		if !iok && !aok {
+			continue
+		}
 		iop := rewrites[i]
 		// combine current insert with prior if any at same index
 		// deviating a bit from TokenStreamRewriter.java - hard to incorporate inheritance logic
-		for j:=0; j<i && j < len(rewrites); j++{
-			if nextIop, ok := rewrites[j].(*InsertAfterOp); ok{
-				if nextIop.index == iop.GetIndex(){
+		for j := 0; j < i && j < len(rewrites); j++ {
+			if nextIop, ok := rewrites[j].(*InsertAfterOp); ok {
+				if nextIop.index == iop.GetIndex() {
 					iop.SetText(nextIop.text + iop.GetText())
 					rewrites[j] = nil
 				}
 			}
-			if prevIop, ok := rewrites[j].(*InsertBeforeOp); ok{
-				if prevIop.index == iop.GetIndex(){
+			if prevIop, ok := rewrites[j].(*InsertBeforeOp); ok {
+				if prevIop.index == iop.GetIndex() {
 					iop.SetText(iop.GetText() + prevIop.text)
 					rewrites[prevIop.instruction_index] = nil
 				}
 			}
 		}
 		// look for replaces where iop.index is in range; error
-		for j:=0; j<i && j < len(rewrites); j++{
-			if rop,ok := rewrites[j].(*ReplaceOp); ok{
-				if iop.GetIndex() == rop.index{
+		for j := 0; j < i && j < len(rewrites); j++ {
+			if rop, ok := rewrites[j].(*ReplaceOp); ok {
+				if iop.GetIndex() == rop.index {
 					rop.text = iop.GetText() + rop.text
 					rewrites[i] = nil
 					continue
 				}
-				if iop.GetIndex() >= rop.index && iop.GetIndex() <= rop.LastIndex{
-					panic("insert op "+iop.String()+" within boundaries of previous "+rop.String())
+				if iop.GetIndex() >= rop.index && iop.GetIndex() <= rop.LastIndex {
+					panic("insert op " + iop.String() + " within boundaries of previous " + rop.String())
 				}
 			}
 		}
 	}
 	m := map[int]RewriteOperation{}
-	for i:=0; i < len(rewrites); i++{
+	for i := 0; i < len(rewrites); i++ {
 		op := rewrites[i]
-		if op == nil {continue}
-		if _, ok := m[op.GetIndex()]; ok{
+		if op == nil {
+			continue
+		}
+		if _, ok := m[op.GetIndex()]; ok {
 			panic("should only be one op per index")
 		}
 		m[op.GetIndex()] = op
@@ -628,22 +638,21 @@ func reduceToSingleOperationPerIndex(rewrites []RewriteOperation) map[int]Rewrit
 	return m
 }
 
-
 /*
 	Quick fixing Go lack of overloads
- */
+*/
 
-func max(a,b int)int{
-	if a>b{
+func max(a, b int) int {
+	if a > b {
 		return a
-	}else {
+	} else {
 		return b
 	}
 }
-func min(a,b int)int{
-	if a<b{
+func min(a, b int) int {
+	if a < b {
 		return a
-	}else {
+	} else {
 		return b
 	}
 }
