@@ -115,7 +115,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 		// warn if labelSelector is empty which is no-match.
 		if t.LabelSelector == nil {
-			warnings = append(warnings, fmt.Sprintf("%s: LabelSelector mustn't be empty; it will result in matching with no object", fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("labelSelector")))
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("labelSelector")))
 		}
 	}
 
@@ -278,7 +278,7 @@ func warningsForPodAffinityTerms(terms []api.PodAffinityTerm, fieldPath *field.P
 	var warnings []string
 	for i, t := range terms {
 		if t.LabelSelector == nil {
-			warnings = append(warnings, fmt.Sprintf("%s: LabelSelector mustn't be empty; it will result in matching with no object", fieldPath.Index(i).Child("labelSelector")))
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("labelSelector")))
 		}
 	}
 	return warnings
@@ -289,7 +289,7 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 	for i, t := range terms {
 		// warn if labelSelector is empty which is no-match.
 		if t.PodAffinityTerm.LabelSelector == nil {
-			warnings = append(warnings, fmt.Sprintf("%s: LabelSelector mustn't be empty; it will result in matching with no object", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
 		}
 	}
 	return warnings

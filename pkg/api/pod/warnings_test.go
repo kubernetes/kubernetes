@@ -521,7 +521,7 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "empty LabelSelector in topologySpreadConstraints",
+			name: "null LabelSelector in topologySpreadConstraints",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: api.PodSpec{
@@ -536,11 +536,11 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.topologySpreadConstraints[1].labelSelector: LabelSelector mustn't be empty; it will result in matching with no object`,
+				`spec.topologySpreadConstraints[1].labelSelector: a null labelSelector results in matching no pod`,
 			},
 		},
 		{
-			name: "empty LabelSelector in PodAffinity",
+			name: "null LabelSelector in PodAffinity",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: api.PodSpec{
@@ -593,10 +593,10 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: LabelSelector mustn't be empty; it will result in matching with no object`,
-				`spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: LabelSelector mustn't be empty; it will result in matching with no object`,
-				`spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: LabelSelector mustn't be empty; it will result in matching with no object`,
-				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: LabelSelector mustn't be empty; it will result in matching with no object`,
+				`spec.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
 			},
 		},
 	}
