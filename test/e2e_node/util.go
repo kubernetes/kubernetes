@@ -339,7 +339,7 @@ func findKubeletServiceName(running bool) string {
 	}
 	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
 	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-\\w+)")
+	regex := regexp.MustCompile(`(kubelet-\w+)`)
 	matches := regex.FindStringSubmatch(string(stdout))
 	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
 	kubeletServiceName := matches[0]

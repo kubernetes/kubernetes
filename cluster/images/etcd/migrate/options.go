@@ -159,7 +159,7 @@ func (opts *migrateOpts) validateAndDefault() error {
 		}
 	}
 
-	etcdEventsRE := regexp.MustCompile("event")
+	etcdEventsRE := regexp.MustCompile(`event`)
 	if opts.port == 0 {
 		if etcdEventsRE.MatchString(opts.dataDir) {
 			opts.port = 18631

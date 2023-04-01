@@ -216,9 +216,7 @@ func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.Kubele
 	if initialCfg.ReservedMemory == nil {
 		initialCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
-	for _, memoryReservation := range params.systemReservedMemory {
-		initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
-	}
+	initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, params.systemReservedMemory...)
 }
 
 func getAllNUMANodes() []int {
@@ -311,11 +309,11 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		if isMultiNUMASupported == nil {
-			isMultiNUMASupported = pointer.BoolPtr(isMultiNUMA())
+			isMultiNUMASupported = pointer.Bool(isMultiNUMA())
 		}
 
 		if is2MiHugepagesSupported == nil {
-			is2MiHugepagesSupported = pointer.BoolPtr(isHugePageAvailable(hugepagesSize2M))
+			is2MiHugepagesSupported = pointer.Bool(isHugePageAvailable(hugepagesSize2M))
 		}
 
 		if len(allNUMANodes) == 0 {
@@ -326,7 +324,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Configuring hugepages")
 			gomega.Eventually(ctx, func() error {
-				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.IntPtr(0))
+				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.Int(0))
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 		}
 	})

@@ -30,7 +30,7 @@ import (
 
 var (
 	typeSrc = flag.StringP("type-src", "s", "", "From where we are going to read the types")
-	re      = regexp.MustCompile("`(\\b\\w+\\b)`")
+	re      = regexp.MustCompile(`(\b\w+\b)`)
 )
 
 // kubeTypesMap is a map from field name to its tag name and doc.
