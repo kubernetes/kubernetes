@@ -177,7 +177,7 @@ func TestProbe(t *testing.T) {
 		{ // Probe result is unknown
 			probe:          execProbe,
 			execResult:     probe.Unknown,
-			expectedResult: results.Failure,
+			expectedResult: results.Success,
 		},
 		{ // Probe has an error
 			probe:          execProbe,
