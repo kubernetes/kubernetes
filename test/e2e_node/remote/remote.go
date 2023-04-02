@@ -102,33 +102,33 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 
 // RunRemote returns the command Output, whether the exit was ok, and any errors
 type RunRemoteConfig struct {
-	suite                                                                                    TestSuite
-	archive                                                                                  string
-	host                                                                                     string
-	cleanup                                                                                  bool
-	imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string
+	Suite                                                                                    TestSuite
+	Archive                                                                                  string
+	Host                                                                                     string
+	Cleanup                                                                                  bool
+	ImageDesc, JunitFileName, TestArgs, GinkgoArgs, SystemSpecName, ExtraEnvs, RuntimeConfig string
 }
 
 func RunRemote(cfg RunRemoteConfig) (string, bool, error) {
 	// Create the temp staging directory
-	klog.V(2).Infof("Staging test binaries on %q", cfg.host)
+	klog.V(2).Infof("Staging test binaries on %q", cfg.Host)
 	workspace := newWorkspaceDir()
 	// Do not sudo here, so that we can use scp to copy test archive to the directory.
-	if output, err := SSHNoSudo(cfg.host, "mkdir", workspace); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to create workspace directory %q on Host %q: %v Output: %q", workspace, cfg.host, err, output)
+		return "", false, fmt.Errorf("failed to create workspace directory %q on Host %q: %v Output: %q", workspace, cfg.Host, err, output)
 	}
-	if cfg.cleanup {
+	if cfg.Cleanup {
 		defer func() {
-			output, err := SSH(cfg.host, "rm", "-rf", workspace)
+			output, err := SSH(cfg.Host, "rm", "-rf", workspace)
 			if err != nil {
-				klog.Errorf("failed to cleanup workspace %q on Host %q: %v.  Output:\n%s", workspace, cfg.host, err, output)
+				klog.Errorf("failed to cleanup workspace %q on Host %q: %v.  Output:\n%s", workspace, cfg.Host, err, output)
 			}
 		}()
 	}
 
 	// Copy the archive to the staging directory
-	if output, err := runSSHCommand(cfg.host, "scp", cfg.archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(cfg.host), workspace)); err != nil {
+	if output, err := runSSHCommand(cfg.Host, "scp", cfg.Archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(cfg.Host), workspace)); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to copy test archive: %v, Output: %q", err, output)
 	}
@@ -138,34 +138,34 @@ func RunRemote(cfg RunRemoteConfig) (string, bool, error) {
 		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
-	klog.V(2).Infof("Extracting tar on %q", cfg.host)
+	klog.V(2).Infof("Extracting tar on %q", cfg.Host)
 	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
 	// we want the extracted files to be owned by the current user.
-	if output, err := SSHNoSudo(cfg.host, "sh", "-c", cmd); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to extract test archive: %v, Output: %q", err, output)
 	}
 
 	// Create the test result directory.
 	resultDir := filepath.Join(workspace, "results")
-	if output, err := SSHNoSudo(cfg.host, "mkdir", resultDir); err != nil {
+	if output, err := SSHNoSudo(cfg.Host, "mkdir", resultDir); err != nil {
 		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to create test result directory %q on Host %q: %v Output: %q", resultDir, cfg.host, err, output)
+		return "", false, fmt.Errorf("failed to create test result directory %q on Host %q: %v Output: %q", resultDir, cfg.Host, err, output)
 	}
 
-	klog.V(2).Infof("Running test on %q", cfg.host)
-	output, err := cfg.suite.RunTest(cfg.host, workspace, resultDir, cfg.imageDesc, cfg.junitFileName, cfg.testArgs,
-		cfg.ginkgoArgs, cfg.systemSpecName, cfg.extraEnvs, cfg.runtimeConfig, *testTimeout)
+	klog.V(2).Infof("Running test on %q", cfg.Host)
+	output, err := cfg.Suite.RunTest(cfg.Host, workspace, resultDir, cfg.ImageDesc, cfg.JunitFileName, cfg.TestArgs,
+		cfg.GinkgoArgs, cfg.SystemSpecName, cfg.ExtraEnvs, cfg.RuntimeConfig, *testTimeout)
 
 	var aggErrs []error
 	// Do not log the Output here, let the caller deal with the test Output.
 	if err != nil {
 		aggErrs = append(aggErrs, err)
-		collectSystemLog(cfg.host)
+		collectSystemLog(cfg.Host)
 	}
 
-	klog.V(2).Infof("Copying test artifacts from %q", cfg.host)
-	scpErr := getTestArtifacts(cfg.host, workspace)
+	klog.V(2).Infof("Copying test artifacts from %q", cfg.Host)
+	scpErr := getTestArtifacts(cfg.Host, workspace)
 	if scpErr != nil {
 		aggErrs = append(aggErrs, scpErr)
 	}

@@ -74,3 +74,19 @@ func GetTestSuite(name string) (TestSuite, error) {
 	}
 	return nil, fmt.Errorf("unable to find testsuite for %s", name)
 }
+
+type NewRunner func(Config) Runner
+
+var runners = make(map[string]NewRunner)
+
+func RegisterRunner(name string, runner NewRunner) {
+	runners[name] = runner
+}
+
+func GetRunner(name string) (NewRunner, error) {
+	runner, ok := runners[name]
+	if ok {
+		return runner, nil
+	}
+	return nil, fmt.Errorf("unable to runner for %s", name)
+}
