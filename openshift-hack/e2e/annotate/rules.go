@@ -17,7 +17,6 @@ var (
 			`\[Feature:SELinuxMountReadWriteOncePod\]`,
 			`\[Feature:PodSchedulingReadiness\]`,
 			`\[Feature:InPlacePodVerticalScaling\]`,
-			`\[Feature:APISelfSubjectReview\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
