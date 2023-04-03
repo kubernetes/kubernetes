@@ -112,6 +112,62 @@ func TestIsMigratable(t *testing.T) {
 	}
 }
 
+func TestCheckMigrationFeatureFlags(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		pluginFeature           featuregate.Feature
+		pluginFeatureEnabled    bool
+		pluginUnregsiterFeature featuregate.Feature
+		pluginUnregsiterEnabled bool
+		expectMigrationComplete bool
+		expectErr               bool
+	}{
+		{
+			name:                    "plugin specific migration feature enabled with plugin unregister disabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    true,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               false,
+		},
+		{
+			name:                    "plugin specific migration feature and plugin unregister disabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    false,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               false,
+		},
+		{
+			name:                    "all features enabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    true,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: true,
+			expectMigrationComplete: true,
+			expectErr:               false,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
+			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginUnregsiterFeature)
+			if err != nil && test.expectErr == false {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if err == nil && test.expectErr == true {
+				t.Errorf("Unexpected validation pass")
+			}
+			if migrationComplete != test.expectMigrationComplete {
+				t.Errorf("Unexpected migrationComplete result. Exp: %v, got %v", test.expectMigrationComplete, migrationComplete)
+			}
+		})
+	}
+}
+
 func TestMigrationFeatureFlagStatus(t *testing.T) {
 	testCases := []struct {
 		name                          string
