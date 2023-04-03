@@ -279,5 +279,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
-	WatchList: {Default: false, PreRelease: featuregate.Alpha},
+	WatchList: {Default: true, PreRelease: featuregate.Alpha},
 }
