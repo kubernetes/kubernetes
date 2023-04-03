@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: TestClusterIP
+  name: test-cluster-ip
 spec:
   ports:
   - name: port
@@ -9,13 +9,13 @@ spec:
     protocol: TCP
     targetPort: 80
   selector:
-    app: ClusterIPExample
+    app: test-cluster-ip
   type: ClusterIP
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: testIngress
+  name: test-ingress
 spec:
   rules:
   - host: test.com

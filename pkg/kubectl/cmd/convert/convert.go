@@ -263,9 +263,9 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 
 		converted, err := tryConvert(scheme.Scheme, info.Object, targetVersions...)
 		if err != nil {
-			//Dont fail on not registered error converting objects.
-			//Simply warn the user with the error returned from api-machinery and continue with the rest of the file
-			//fail on all other errors
+			// Dont fail on not registered error converting objects.
+			// Simply warn the user with the error returned from api-machinery and continue with the rest of the file
+			// fail on all other errors
 			if runtime.IsNotRegisteredError(err) {
 				fmt.Fprintln(iostream.ErrOut, err.Error())
 				continue
