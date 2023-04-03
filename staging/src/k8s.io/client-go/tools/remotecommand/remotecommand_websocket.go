@@ -265,8 +265,18 @@ func (s *stream) Close() error {
 	defer klog.V(4).Infof("Close() done on stream %d", s.id)
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
+	if s.id == streamStdIn {
+		// Half-close the stream by sending a frame with the STDIN channel id, but
+		// with empty message data. Server interprets this frame as a Close
+		// signal and closes STDIN stream on server-side. In this way, the
+		// server side complete the command and send the remaining output
+		// before closing the WebSockets Connection.
+		//
+		// See https://github.com/kubernetes/kubernetes/issues/89899#issuecomment-1132502190.
+		klog.V(4).Infof("Sending half-close signal on stream %d", s.id)
+		s.conn.WriteMessage(gwebsocket.BinaryMessage, []byte{s.id})
+	}
 	s.conn = nil
-	// TODO See https://github.com/kubernetes/kubernetes/issues/89899#issuecomment-1132502190.
 	return nil
 }
 

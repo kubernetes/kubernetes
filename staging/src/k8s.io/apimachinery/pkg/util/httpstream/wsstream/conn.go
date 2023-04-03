@@ -82,6 +82,8 @@ var (
 	connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
 )
 
+const stdinChannelId = 0
+
 // IsWebSocketRequest returns true if the incoming request contains connection upgrade headers
 // for WebSockets.
 func IsWebSocketRequest(req *http.Request) bool {
@@ -264,6 +266,18 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		if int(channel) >= len(conn.channels) {
 			klog.V(6).Infof("Frame is targeted for a reader %d that is not valid, possible protocol error", channel)
 			continue
+		}
+		// Half-close the stream when receiving a frame with the STDIN channel id, but
+		// with empty message data. This frame is interpreted as a Close
+		// signal and closes STDIN stream on this server-side. This protocol allows
+		// the command to complete and the remaining output to be sent to the client
+		// before the WebSockets Connection is closed.
+		//
+		// See https://github.com/kubernetes/kubernetes/issues/89899#issuecomment-1132502190.
+		if int(channel) == stdinChannelId && len(data) == 0 {
+			klog.V(4).Infof("Received half-close signal from client; close STDIN stream")
+			conn.channels[int(channel)].Close()
+			continue // MUST continue and call Receive again.
 		}
 		if _, err := conn.channels[channel].DataFromSocket(data); err != nil {
 			klog.Errorf("Unable to write frame to %d: %v\n%s", channel, err, string(data))
