@@ -986,6 +986,77 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			})
 		})
 
+		ginkgo.It("should restart a sidecar before and after the regular container started", func() {
+			sidecar1 := "sidecar-1"
+			init1 := "init-1"
+			regular1 := "regular-1"
+
+			podSpec := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sidecar-container-exit-0-continuously",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:  sidecar1,
+							Image: busyboxImage,
+							Command: ExecCommand(sidecar1, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:  init1,
+							Image: busyboxImage,
+							Command: ExecCommand(init1, execCommand{
+								Delay:    5,
+								ExitCode: 0,
+							}),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regular1,
+							Image: busyboxImage,
+							Command: ExecCommand(regular1, execCommand{
+								Delay:    60,
+								ExitCode: 0,
+							}),
+						},
+					},
+				},
+			}
+
+			preparePod(podSpec)
+			var results containerOutputList
+
+			// TODO: pod with sidecar, init, regular container
+			ginkgo.By("waiting for a pod successfully to complete and produce log", func() {
+				client := e2epod.NewPodClient(f)
+				podSpec = client.Create(context.TODO(), podSpec)
+
+				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
+				framework.ExpectNoError(err)
+
+				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				results = parseOutput(podSpec)
+
+				framework.Logf("podSpec: %v", podSpec)
+			})
+			ginkgo.By("checking a sidecar container started before the regular container started", func() {
+				framework.ExpectNoError(results.StartsBefore(sidecar1, regular1))
+			})
+			ginkgo.By("checking a sidecar container started after the regular container started", func() {
+				framework.ExpectNoError(results.StartsBefore(regular1, sidecar1))
+			})
+			ginkgo.By("checking a regular container to be complete", func() {
+				framework.ExpectNoError(results.Exits(regular1))
+			})
+		})
+
 		ginkgo.When("a sidecar starts and exits with exit code 1 continuously", ginkgo.Ordered, func() {
 			// TODO: pod with sidecar, init, regular container
 
