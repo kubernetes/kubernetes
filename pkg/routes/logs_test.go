@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +55,62 @@ func TestPreCheckLogFileNameLength(t *testing.T) {
 	defer f.Close()
 	if logFileNameIsTooLong(normalFileName) {
 		t.Error("failed to check normal filename")
+	}
+}
+
+func TestPrepareLogPath(t *testing.T) {
+	validPaths := []string{
+		"/foo/bar/baz/a.b.c/",
+		"/foo",
+		"foo/bar/baz",
+		"/foo/bar..baz/",
+		"/foo/bar..",
+		"foo",
+		"foo/bar",
+		"/foo/bar/",
+	}
+	invalidPaths := []string{
+		"/foo/bar/../a.b.c/",
+		"..",
+		"/..",
+		"../",
+		"/foo/bar/..",
+		"../foo/bar",
+		"/../foo",
+		"/foo/bar/../",
+		".",
+		"/.",
+		"./",
+		"/./",
+		"/foo/.",
+		"./bar",
+		"/foo/./bar/",
+	}
+
+	for _, path := range validPaths {
+		path := path
+		t.Run("valid:"+path, func(t *testing.T) {
+			logPath, err := prepareLogPath(path)
+			if err != nil {
+				t.Errorf("path %q should be valid; unexpected error: %v", path, err)
+				return
+			}
+			if !strings.HasPrefix(logPath, "/var/log/") {
+				t.Errorf("path %q should have prefix %q", logPath, "/var/log/")
+			}
+			if strings.HasPrefix(logPath, "/var/log//") {
+				t.Errorf("path %q should not have prefix %q", logPath, "/var/log//")
+			}
+		})
+	}
+
+	for _, path := range invalidPaths {
+		path := path
+		t.Run("invalid:"+path, func(t *testing.T) {
+			_, err := prepareLogPath(path)
+			if err == nil {
+				t.Errorf("path %q should be invalid", path)
+			}
+		})
 	}
 }
