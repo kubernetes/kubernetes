@@ -40,9 +40,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 			Testname: SelfSubjectReview API
 			Description:
 			The authentication.k8s.io API group MUST exist in the /apis discovery document.
-			The authentication.k8s.io/v1alpha1 API group/version MUST exist in the /apis/mode.k8s.io discovery document.
 		    The authentication.k8s.io/v1beta1 API group/version MUST exist in the /apis/mode.k8s.io discovery document.
-			The selfsubjectreviews resource MUST exist in the /apis/authentication.k8s.io/v1alpha1 discovery document.
 			The selfsubjectreviews resource MUST exist in the /apis/authentication.k8s.io/v1beta1 discovery document.
 			The selfsubjectreviews resource MUST support create.
 	*/
@@ -103,7 +101,8 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 				}
 			}
 		},
-		ginkgo.Entry("authentication/v1alpha1", "v1alpha1", authenticationv1alpha1.SchemeGroupVersion.String()),
+		// OpenShift: Skip v1alpha check
+		// ginkgo.Entry("authentication/v1alpha1", "v1alpha1", authenticationv1alpha1.SchemeGroupVersion.String()),
 		ginkgo.Entry("authentication/v1beta1", "v1beta1", authenticationv1beta1.SchemeGroupVersion.String()),
 	)
 
@@ -111,6 +110,9 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 		// Check creating
 		ginkgo.By("creating SSR authentication/v1alpha1")
 		{
+			// OpenShift: Skip v1alpha check
+			ginkgo.Skip("No authentication/v1alpha1 available")
+
 			// Use impersonate to make user attributes predictable
 			config := restConfig(f)
 
