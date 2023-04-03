@@ -49,7 +49,7 @@ const (
 	timeout                           = time.Second * 10
 )
 
-func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (context.Context, *rest.Config, framework.TearDownFunc) {
+func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFlight int) (context.Context, *rest.Config, framework.TearDownFunc) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -58,7 +58,7 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFligh
 			// Ensure all clients are allowed to send requests.
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
 			opts.GenericServerRunOptions.MaxRequestsInFlight = maxReadonlyRequestsInFlight
-			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
+			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = maxMutatingRequestsInFlight
 		},
 	})
 

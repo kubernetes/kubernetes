@@ -36,7 +36,9 @@ func TestExportRejection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		clientSet.CoreV1().Namespaces().Delete(ctx, "export-fail", metav1.DeleteOptions{})
+		if err := clientSet.CoreV1().Namespaces().Delete(ctx, "export-fail", metav1.DeleteOptions{}); err != nil {
+			t.Errorf("error whiling deleting the namespace, err: %v", err)
+		}
 	}()
 
 	result := clientSet.Discovery().RESTClient().Get().AbsPath("/api/v1/namespaces/export-fail").Param("export", "true").Do(ctx)

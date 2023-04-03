@@ -490,7 +490,7 @@ func TestPreemption(t *testing.T) {
 
 			// Cleanup
 			pods = append(pods, preemptor)
-			testutils.CleanupPods(cs, t, pods)
+			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 		})
 	}
 }
@@ -546,7 +546,7 @@ func TestNonPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer testutils.CleanupPods(cs, t, []*v1.Pod{preemptor, victim})
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{preemptor, victim})
 			preemptor.Spec.PreemptionPolicy = test.PreemptionPolicy
 			victimPod, err := createPausePod(cs, victim)
 			if err != nil {
@@ -647,7 +647,7 @@ func TestDisablePreemption(t *testing.T) {
 
 			// Cleanup
 			pods = append(pods, preemptor)
-			testutils.CleanupPods(cs, t, pods)
+			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 		})
 	}
 }
@@ -750,7 +750,7 @@ func TestPodPriorityResolution(t *testing.T) {
 			})
 		})
 	}
-	testutils.CleanupPods(cs, t, pods)
+	testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 	testutils.CleanupNodes(cs, t)
 }
 
@@ -864,7 +864,7 @@ func TestPreemptionStarvation(t *testing.T) {
 			allPods := pendingPods
 			allPods = append(allPods, runningPods...)
 			allPods = append(allPods, preemptor)
-			testutils.CleanupPods(cs, t, allPods)
+			testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
 		})
 	}
 }
@@ -960,7 +960,7 @@ func TestPreemptionRaces(t *testing.T) {
 
 				klog.Info("Check unschedulable pods still exists and were never scheduled...")
 				for _, p := range additionalPods {
-					pod, err := cs.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+					pod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
 					if err != nil {
 						t.Errorf("Error in getting Pod %v/%v info: %v", p.Namespace, p.Name, err)
 					}
@@ -977,7 +977,7 @@ func TestPreemptionRaces(t *testing.T) {
 				allPods := additionalPods
 				allPods = append(allPods, initialPods...)
 				allPods = append(allPods, preemptor)
-				testutils.CleanupPods(cs, t, allPods)
+				testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
 			}
 		})
 	}
@@ -1461,9 +1461,13 @@ func TestPDBInPreemption(t *testing.T) {
 
 			// Cleanup
 			pods = append(pods, preemptor)
-			testutils.CleanupPods(cs, t, pods)
-			cs.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+			if err := cs.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+				t.Errorf("error while deleting PDBs, error: %v", err)
+			}
+			if err := cs.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+				t.Errorf("error whiling deleting nodes, error: %v", err)
+			}
 		})
 	}
 }
@@ -1907,7 +1911,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 
 			pods := make([]*v1.Pod, len(test.existingPods))
 			t.Cleanup(func() {
-				testutils.CleanupPods(cs, t, pods)
+				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 				if err := test.cleanup(); err != nil {
 					t.Errorf("Error cleaning up test: %v", err)
 				}

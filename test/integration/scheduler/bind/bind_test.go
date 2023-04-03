@@ -54,7 +54,7 @@ func TestDefaultBinder(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
-			defer testutil.CleanupPods(testCtx.ClientSet, t, []*corev1.Pod{pod})
+			defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*corev1.Pod{pod})
 
 			podCopy := pod.DeepCopy()
 			if tc.anotherUID {

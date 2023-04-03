@@ -171,9 +171,9 @@ func CleanupNodes(cs clientset.Interface, t *testing.T) {
 }
 
 // PodDeleted returns true if a pod is not found in the given namespace.
-func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+func PodDeleted(ctx context.Context, c clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -185,8 +185,8 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 }
 
 // PodsCleanedUp returns true if all pods are deleted in the specific namespace.
-func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
+func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
 		list, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -210,7 +210,9 @@ func SyncSchedulerInformerFactory(testCtx *TestContext) {
 // CleanupTest cleans related resources which were created during integration test
 func CleanupTest(t *testing.T, testCtx *TestContext) {
 	// Cleanup nodes and namespaces.
-	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+	if err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Errorf("error while cleaning up nodes, error: %v", err)
+	}
 	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, t)
 	// Terminate the scheduler and apiserver.
 	testCtx.CloseFn()
@@ -233,16 +235,16 @@ func RemovePodFinalizers(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 }
 
 // CleanupPods deletes the given pods and waits for them to be actually deleted.
-func CleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
-		err := cs.CoreV1().Pods(p.Namespace).Delete(context.TODO(), p.Name, *metav1.NewDeleteOptions(0))
+		err := cs.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, *metav1.NewDeleteOptions(0))
 		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
 		}
 	}
 	for _, p := range pods {
-		if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout,
-			PodDeleted(cs, p.Namespace, p.Name)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, time.Duration(time.Microsecond.Seconds()), wait.ForeverTestTimeout, true,
+			PodDeleted(ctx, cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}
 	}

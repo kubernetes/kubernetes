@@ -2445,8 +2445,9 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 		}
 		// Wait for all pods to be deleted, or will failed to create same name pods
 		// required in other test cases.
-		if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout,
-			testutils.PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name)); err != nil {
+		err = wait.PollUntilContextTimeout(testCtx.SchedulerCtx, time.Millisecond, wait.ForeverTestTimeout, true,
+			testutils.PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name))
+		if err != nil {
 			t.Errorf("error while waiting for all pods to be deleted: %v", err)
 		}
 		// Kill the scheduler.
