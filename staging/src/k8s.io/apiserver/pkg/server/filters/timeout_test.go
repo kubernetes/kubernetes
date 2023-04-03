@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
@@ -218,6 +219,7 @@ func TestTimeoutHeaders(t *testing.T) {
 	}
 
 	postTimeoutCh := make(chan struct{})
+	defer close(postTimeoutCh)
 	ts := httptest.NewServer(
 		withDeadline(
 			WithTimeout(
@@ -236,7 +238,7 @@ func TestTimeoutHeaders(t *testing.T) {
 					}
 				}),
 				func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
-					return req, false, func() { close(postTimeoutCh) }, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+					return req, false, func() {}, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 				},
 			),
 		),
@@ -272,6 +274,8 @@ func TestTimeoutRequestHeaders(t *testing.T) {
 		})
 	}
 
+	postTimeoutCh := make(chan struct{})
+	defer close(postTimeoutCh)
 	ts := httptest.NewServer(
 		withDeadline(
 			WithTimeoutForNonLongRunningRequests(
@@ -283,6 +287,8 @@ func TestTimeoutRequestHeaders(t *testing.T) {
 					for j := 0; j < 10000; j++ {
 						req.Header.Set("Test", "post")
 					}
+					// Block until ServerHTTP has handled the timeout.
+					<-postTimeoutCh
 				}),
 				func(r *http.Request, requestInfo *request.RequestInfo) bool {
 					return false
@@ -323,6 +329,8 @@ func TestTimeoutWithLogging(t *testing.T) {
 		})
 	}
 
+	postTimeoutCh := make(chan struct{})
+	defer close(postTimeoutCh)
 	ts := httptest.NewServer(
 		WithHTTPLogging(
 			withDeadline(
@@ -335,6 +343,8 @@ func TestTimeoutWithLogging(t *testing.T) {
 						for j := 0; j < 10000; j++ {
 							req.Header.Set("Test", "post")
 						}
+						// Block until ServerHTTP has handled the timeout.
+						<-postTimeoutCh
 					}),
 					func(r *http.Request, requestInfo *request.RequestInfo) bool {
 						return false
@@ -347,6 +357,67 @@ func TestTimeoutWithLogging(t *testing.T) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
+func TestTimeoutWithTracing(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	postTimeoutCh := make(chan struct{})
+	defer close(postTimeoutCh)
+	ts := httptest.NewServer(
+		filters.WithTracing(
+			withDeadline(
+				WithTimeoutForNonLongRunningRequests(
+					http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						// Trigger the timeout.
+						cancel()
+						// Let's pretend that this handler is not aware of
+						// the req.Context. If this code was allowed to
+						// read the body, otelhttp would update the read
+						// counter, which would race with retrieving the
+						// counter.
+						buffer := make([]byte, 100)
+						_, _ = req.Body.Read(buffer)
+						// Block until ServerHTTP has handled the timeout.
+						<-postTimeoutCh
+					}),
+					func(r *http.Request, requestInfo *request.RequestInfo) bool {
+						return false
+					},
+				),
+			),
+			nil, /* trace provider */
+		),
+	)
+	defer ts.Close()
+
+	body := bytes.NewBuffer([]byte("hello"))
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPost, ts.URL, body)
 	if err != nil {
 		t.Fatal(err)
 	}

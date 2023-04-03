@@ -18,8 +18,10 @@ package filters
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"runtime"
@@ -33,6 +35,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/server/httplog"
 )
+
+// timeoutFallbackDelay defines how long timeoutHandler.ServeHTTP waits for the
+// handler to finish before taking over timeout handling.
+const timeoutFallbackDelay = time.Second
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
 func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck) http.Handler {
@@ -88,8 +94,6 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeoutCh := r.Context().Done()
-
 	// resultCh is used as both errCh and stopCh
 	resultCh := make(chan interface{})
 	var tw timeoutWriter
@@ -98,6 +102,14 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Make a copy of request and work on it in new goroutine
 	// to avoid race condition when accessing/modifying request (e.g. headers)
 	rCopy := r.Clone(r.Context())
+
+	// Just in case that the handler fails to observe the context we also
+	// make reading the body fail once the timeout occurs. This is only
+	// done when there really is something to read.
+	if rCopy.Body != http.NoBody && rCopy.Body != nil {
+		rCopy.Body = &timeoutReader{ReadCloser: r.Body, ctx: r.Context()}
+	}
+
 	go func() {
 		defer func() {
 			err := recover()
@@ -114,6 +126,32 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}()
 		t.handler.ServeHTTP(w, rCopy)
 	}()
+
+	// Normally, the handler should notice the cancellation of the request
+	// context and stop. We give it some additional time and only then take
+	// over.
+	timeoutCh := make(chan struct{})
+
+	// This signals when ServeHTTP has returned, *not* when it is time to
+	// return. I.e. this intentionally doesn't use r.Context()!  We could
+	// wait for the timeout, but then the goroutine keeps running longer
+	// than it needs to.
+	done, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer close(timeoutCh)
+
+		// This context will get cancelled either in case of a timeout or when
+		// ServeHTTP returns.
+		<-r.Context().Done()
+
+		// Now wait a bit longer or until ServeHTTP returns.
+		select {
+		case <-time.After(timeoutFallbackDelay):
+		case <-done.Done():
+		}
+	}()
+
 	select {
 	case err := <-resultCh:
 		// panic if error occurs; stop otherwise
@@ -307,4 +345,24 @@ func (tw *baseTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		tw.hijacked = true
 	}
 	return conn, rw, err
+}
+
+var _ io.ReadCloser = &timeoutReader{}
+
+// timeoutReader wraps a http.Request.Body (an io.ReadCloser) to make
+// read calls fail once the timeout has occurred.
+type timeoutReader struct {
+	io.ReadCloser
+	ctx context.Context
+}
+
+func (r *timeoutReader) Read(b []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.ReadCloser.Read(b)
+}
+
+func (r *timeoutReader) Close() error {
+	return r.ReadCloser.Close()
 }
