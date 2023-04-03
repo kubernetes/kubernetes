@@ -955,10 +955,7 @@ func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Co
 
 	class, err := util.GetDefaultClass(ctrl.classLister)
 	if err != nil {
-		// It is safe to ignore errors here because it means we either could not list SCs or there is more than one default.
-		// TODO: do not ignore errors after this PR is merged: https://github.com/kubernetes/kubernetes/pull/110559
-		logger.V(4).Info("Failed to get default storage class", "err", err)
-		return false, nil
+		return false, err
 	} else if class == nil {
 		logger.V(4).Info("Can not assign storage class to PersistentVolumeClaim: default storage class not found", "PVC", klog.KObj(claim))
 		return false, nil
