@@ -4072,6 +4072,7 @@ func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequi
 	for i, value := range rq.Values {
 		if valueSet.Has(value) {
 			allErrs = append(allErrs, field.Duplicate(valuesPath.Index(i), value))
+			continue
 		}
 		valueSet.Insert(value)
 	}
@@ -5465,6 +5466,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 			for i, value := range node.Spec.PodCIDRs {
 				if seen.Has(value) {
 					allErrs = append(allErrs, field.Duplicate(podCIDRsField.Index(i), value))
+					continue
 				}
 				seen.Insert(value)
 			}
@@ -7068,6 +7070,7 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		// no duplicate check also ensures that ipfamilies is dualstacked, in any order
 		if seen.Has(string(ipFamily)) {
 			allErrs = append(allErrs, field.Duplicate(ipFamiliesField.Index(i), ipFamily))
+			continue
 		}
 		seen.Insert(string(ipFamily))
 	}
