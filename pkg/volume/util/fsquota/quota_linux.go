@@ -35,6 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
+// Pod -> External Pod UID
+var podUidMap = make(map[types.UID]types.UID)
+
 // Pod -> ID
 var podQuotaMap = make(map[types.UID]common.QuotaID)
 
@@ -214,7 +217,7 @@ func setQuotaOnDir(path string, id common.QuotaID, bytes int64) error {
 	return getApplier(path).SetQuotaOnDir(path, id, bytes)
 }
 
-func getQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
+func GetQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 	_, _, err := getFSInfo(m, path)
 	if err != nil {
 		return common.BadQuotaID, err
@@ -235,7 +238,7 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 	if !supportsQuotas {
 		return nil
 	}
-	projid, err := getQuotaOnDir(m, path)
+	projid, err := GetQuotaOnDir(m, path)
 	if err == nil && projid != common.BadQuotaID {
 		// This means that we have a quota on the directory but
 		// we can't clear it.  That's not good.
@@ -304,7 +307,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
-func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error { //nolint:staticcheck // SA4009 poduid is overwritten by design, see comment below
+func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error { //nolint:staticcheck
 	if bytes == nil {
 		return fmt.Errorf("attempting to assign null quota to %s", path)
 	}
@@ -314,19 +317,31 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 	}
 	quotaLock.Lock()
 	defer quotaLock.Unlock()
-	// Current policy is to set individual quotas on each volumes.
+	// Current policy is to set individual quotas on each volume,
+	// for each new volume we generate a random UUID and we use that as
+	// the internal pod uid.
+	// From fsquota point of view each volume is attached to a
+	// single unique pod.
 	// If we decide later that we want to assign one quota for all
-	// volumes in a pod, we can simply remove this line of code.
+	// volumes in a pod, we can simply use poduid parameter directly
 	// If and when we decide permanently that we're going to adopt
 	// one quota per volume, we can rip all of the pod code out.
-	poduid = types.UID(uuid.NewUUID()) //nolint:staticcheck // SA4009 poduid is overwritten by design, see comment above
-	if pod, ok := dirPodMap[path]; ok && pod != poduid {
-		return fmt.Errorf("requesting quota on existing directory %s but different pod %s %s", path, pod, poduid)
+	externalPodUid := poduid
+	internalPodUid, ok := dirPodMap[path]
+	if ok {
+		if podUidMap[internalPodUid] != externalPodUid {
+			return fmt.Errorf("requesting quota on existing directory %s but different pod %s %s", path, podUidMap[internalPodUid], externalPodUid)
+		}
+	} else {
+		internalPodUid = types.UID(uuid.NewUUID())
 	}
-	oid, ok := podQuotaMap[poduid]
+	oid, ok := podQuotaMap[internalPodUid]
 	if ok {
 		if quotaSizeMap[oid] != ibytes {
 			return fmt.Errorf("requesting quota of different size: old %v new %v", quotaSizeMap[oid], bytes)
+		}
+		if _, ok := dirPodMap[path]; ok {
+			return nil
 		}
 	} else {
 		oid = common.BadQuotaID
@@ -342,12 +357,13 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 			ibytes = -1
 		}
 		if err = setQuotaOnDir(path, id, ibytes); err == nil {
-			quotaPodMap[id] = poduid
+			quotaPodMap[id] = internalPodUid
 			quotaSizeMap[id] = ibytes
-			podQuotaMap[poduid] = id
+			podQuotaMap[internalPodUid] = id
 			dirQuotaMap[path] = id
-			dirPodMap[path] = poduid
-			podDirCountMap[poduid]++
+			dirPodMap[path] = internalPodUid
+			podUidMap[internalPodUid] = externalPodUid
+			podDirCountMap[internalPodUid]++
 			klog.V(4).Infof("Assigning quota ID %d (%d) to %s", id, ibytes, path)
 			return nil
 		}
@@ -415,7 +431,7 @@ func ClearQuota(m mount.Interface, path string) error {
 	if !ok {
 		return fmt.Errorf("clearQuota: No quota available for %s", path)
 	}
-	projid, err := getQuotaOnDir(m, path)
+	projid, err := GetQuotaOnDir(m, path)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
@@ -436,6 +452,7 @@ func ClearQuota(m mount.Interface, path string) error {
 		delete(quotaPodMap, podQuotaMap[poduid])
 		delete(podDirCountMap, poduid)
 		delete(podQuotaMap, poduid)
+		delete(podUidMap, poduid)
 	} else {
 		err = removeProjectID(path, projid)
 		podDirCountMap[poduid]--
