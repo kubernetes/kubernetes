@@ -109,7 +109,7 @@ type ApplySet struct {
 	client resource.RESTClient
 }
 
-var builtinApplySetParentGVRs = sets.New[schema.GroupVersionResource](
+var builtinApplySetParentGVRs = sets.New(
 	defaultApplySetParentGVR,
 	schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 )

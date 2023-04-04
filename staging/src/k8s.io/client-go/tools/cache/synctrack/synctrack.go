@@ -40,7 +40,7 @@ func (t *AsyncTracker[T]) Start(key T) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.waiting == nil {
-		t.waiting = sets.New[T](key)
+		t.waiting = sets.New(key)
 	} else {
 		t.waiting.Insert(key)
 	}
