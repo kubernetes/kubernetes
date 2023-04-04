@@ -493,6 +493,7 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
 		}
 	}
+	sort.Strings(unattachedVolumes)
 
 	return unattachedVolumes
 }
@@ -540,6 +541,8 @@ func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string
 			unmountedVolumes = append(unmountedVolumes, expectedVolume)
 		}
 	}
+	sort.Strings(unmountedVolumes)
+
 	return unmountedVolumes
 }
 
