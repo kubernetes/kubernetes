@@ -260,14 +260,25 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
 				CreatedAt: createdAt,
 				StartedAt: startedAt,
-				Resources: &runtimeapi.ContainerResources{
-					Linux: &runtimeapi.LinuxContainerResources{
-						CpuQuota:           25000,
-						CpuPeriod:          100000,
-						MemoryLimitInBytes: 524288000,
-						OomScoreAdj:        -998,
-					},
-				},
+				Resources: func() *runtimeapi.ContainerResources {
+					if goruntime.GOOS == "windows" {
+						return &runtimeapi.ContainerResources{
+							Windows: &runtimeapi.WindowsContainerResources{
+								CpuMaximum:         2500,
+								CpuCount:           1,
+								MemoryLimitInBytes: 524288000,
+							},
+						}
+					}
+					return &runtimeapi.ContainerResources{
+						Linux: &runtimeapi.LinuxContainerResources{
+							CpuQuota:           25000,
+							CpuPeriod:          100000,
+							MemoryLimitInBytes: 524288000,
+							OomScoreAdj:        -998,
+						},
+					}
+				}(),
 			},
 			expected: &kubecontainer.Status{
 				ID:        *cid,
@@ -289,12 +300,22 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
 				CreatedAt: createdAt,
 				StartedAt: startedAt,
-				Resources: &runtimeapi.ContainerResources{
-					Linux: &runtimeapi.LinuxContainerResources{
-						CpuQuota:  50000,
-						CpuPeriod: 100000,
-					},
-				},
+				Resources: func() *runtimeapi.ContainerResources {
+					if goruntime.GOOS == "windows" {
+						return &runtimeapi.ContainerResources{
+							Windows: &runtimeapi.WindowsContainerResources{
+								CpuMaximum: 2500,
+								CpuCount:   2,
+							},
+						}
+					}
+					return &runtimeapi.ContainerResources{
+						Linux: &runtimeapi.LinuxContainerResources{
+							CpuQuota:  50000,
+							CpuPeriod: 100000,
+						},
+					}
+				}(),
 			},
 			expected: &kubecontainer.Status{
 				ID:        *cid,
@@ -319,6 +340,9 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 					Linux: &runtimeapi.LinuxContainerResources{
 						MemoryLimitInBytes: 524288000,
 						OomScoreAdj:        -998,
+					},
+					Windows: &runtimeapi.WindowsContainerResources{
+						MemoryLimitInBytes: 524288000,
 					},
 				},
 			},
