@@ -300,11 +300,11 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 			klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
 		} else if hasQuotas {
 			klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterSize, dir)
-			err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize)
-			if err != nil {
+			if err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize); err != nil {
 				klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+				return err
 			}
-			return err
+			return nil
 		}
 	}
 	return nil
