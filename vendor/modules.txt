@@ -428,7 +428,7 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/imdario/mergo v0.3.6
 ## explicit
 github.com/imdario/mergo
-# github.com/inconshreveable/mousetrap v1.0.1
+# github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
 # github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
@@ -643,7 +643,7 @@ github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.5
 ## explicit; go 1.11
 github.com/soheilhy/cmux
-# github.com/spf13/cobra v1.6.0
+# github.com/spf13/cobra v1.7.0
 ## explicit; go 1.15
 github.com/spf13/cobra
 github.com/spf13/cobra/doc
