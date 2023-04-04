@@ -1751,87 +1751,83 @@ func (m fakeStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (
 
 func BenchmarkCacher_GetList(b *testing.B) {
 	testCases := []struct {
-		name            string
 		totalObjectNum  int
 		expectObjectNum int
 	}{
 		{
-			name:            "totalObjectNum=5000, expectObjectNum=50",
 			totalObjectNum:  5000,
 			expectObjectNum: 50,
 		},
 		{
-			name:            "totalObjectNum=5000, expectObjectNum=500",
 			totalObjectNum:  5000,
 			expectObjectNum: 500,
 		},
 		{
-			name:            "totalObjectNum=5000, expectObjectNum=1000",
 			totalObjectNum:  5000,
 			expectObjectNum: 1000,
 		},
 		{
-			name:            "totalObjectNum=5000, expectObjectNum=2500",
 			totalObjectNum:  5000,
 			expectObjectNum: 2500,
 		},
 		{
-			name:            "totalObjectNum=5000, expectObjectNum=5000",
 			totalObjectNum:  5000,
 			expectObjectNum: 5000,
 		},
 	}
 	for _, tc := range testCases {
-		b.Run(tc.name, func(b *testing.B) {
-			// create sample pods
-			fakePods := make([]example.Pod, tc.totalObjectNum, tc.totalObjectNum)
-			for i := range fakePods {
-				fakePods[i].Namespace = "default"
-				fakePods[i].Name = fmt.Sprintf("pod-%d", i)
-				fakePods[i].ResourceVersion = strconv.Itoa(i)
-				if i%(tc.totalObjectNum/tc.expectObjectNum) == 0 {
-					fakePods[i].Spec.NodeName = "node-0"
+		b.Run(
+			fmt.Sprintf("totalObjectNum=%d, expectObjectNum=%d", tc.totalObjectNum, tc.expectObjectNum),
+			func(b *testing.B) {
+				// create sample pods
+				fakePods := make([]example.Pod, tc.totalObjectNum, tc.totalObjectNum)
+				for i := range fakePods {
+					fakePods[i].Namespace = "default"
+					fakePods[i].Name = fmt.Sprintf("pod-%d", i)
+					fakePods[i].ResourceVersion = strconv.Itoa(i)
+					if i%(tc.totalObjectNum/tc.expectObjectNum) == 0 {
+						fakePods[i].Spec.NodeName = "node-0"
+					}
+					data := make([]byte, 1024*2, 1024*2) // 2k labels
+					rand.Read(data)
+					fakePods[i].Spec.NodeSelector = map[string]string{
+						"key": string(data),
+					}
 				}
-				data := make([]byte, 1024*2, 1024*2) // 2k labels
-				rand.Read(data)
-				fakePods[i].Spec.NodeSelector = map[string]string{
-					"key": string(data),
-				}
-			}
 
-			// build test cacher
-			cacher, _, err := newTestCacher(newObjectStorage(fakePods))
-			if err != nil {
-				b.Fatalf("new cacher: %v", err)
-			}
-			defer cacher.Stop()
-
-			// prepare result and pred
-			parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
-			if err != nil {
-				b.Fatalf("parse selector: %v", err)
-			}
-			pred := storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: parsedField,
-			}
-
-			// now we start benchmarking
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				result := &example.PodList{}
-				err = cacher.GetList(context.TODO(), "pods", storage.ListOptions{
-					Predicate:       pred,
-					Recursive:       true,
-					ResourceVersion: "12345",
-				}, result)
+				// build test cacher
+				cacher, _, err := newTestCacher(newObjectStorage(fakePods))
 				if err != nil {
-					b.Fatalf("GetList cache: %v", err)
+					b.Fatalf("new cacher: %v", err)
 				}
-				if len(result.Items) != tc.expectObjectNum {
-					b.Fatalf("expect %d but got %d", tc.expectObjectNum, len(result.Items))
+				defer cacher.Stop()
+
+				// prepare result and pred
+				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
+				if err != nil {
+					b.Fatalf("parse selector: %v", err)
 				}
-			}
-		})
+				pred := storage.SelectionPredicate{
+					Label: labels.Everything(),
+					Field: parsedField,
+				}
+
+				// now we start benchmarking
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					result := &example.PodList{}
+					err = cacher.GetList(context.TODO(), "pods", storage.ListOptions{
+						Predicate:       pred,
+						Recursive:       true,
+						ResourceVersion: "12345",
+					}, result)
+					if err != nil {
+						b.Fatalf("GetList cache: %v", err)
+					}
+					if len(result.Items) != tc.expectObjectNum {
+						b.Fatalf("expect %d but got %d", tc.expectObjectNum, len(result.Items))
+					}
+				}
+			})
 	}
 }
