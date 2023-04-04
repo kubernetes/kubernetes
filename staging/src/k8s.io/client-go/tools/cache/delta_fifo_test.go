@@ -121,6 +121,130 @@ func TestDeltaFIFO_replaceWithDeleteDeltaIn(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
+	obj := mkFifoObj("foo", 2)
+	objV2 := mkFifoObj("foo", 3)
+	table := []struct {
+		name           string
+		operations     func(f *DeltaFIFO)
+		expectedDeltas Deltas
+	}{
+		{
+			name: "Added object should be deleted on Replace",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Replaced object should have only a single Delete",
+			operations: func(f *DeltaFIFO) {
+				f.emitDeltaTypeReplaced = true
+				f.Add(obj)
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Replaced, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Deleted object should have only a single Delete",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Delete(obj)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, obj},
+			},
+		},
+		{
+			name: "Synced objects should have a single delete",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{obj}, "0")
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Sync, obj},
+				{Sync, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Added objects should have a single delete on multiple Replaces",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Replace([]interface{}{}, "0")
+				f.Replace([]interface{}{}, "1")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+			},
+		},
+		{
+			name: "Added and deleted and added object should be deleted",
+			operations: func(f *DeltaFIFO) {
+				f.Add(obj)
+				f.Delete(obj)
+				f.Add(objV2)
+				f.Replace([]interface{}{}, "0")
+			},
+			expectedDeltas: Deltas{
+				{Added, obj},
+				{Deleted, obj},
+				{Added, objV2},
+				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: objV2}},
+			},
+		},
+	}
+	for _, tt := range table {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			// Test with a DeltaFIFO with a backing KnownObjects
+			fWithKnownObjects := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+				KeyFunction: testFifoObjectKeyFunc,
+				KnownObjects: literalListerGetter(func() []testFifoObject {
+					return []testFifoObject{}
+				}),
+			})
+			tt.operations(fWithKnownObjects)
+			actualDeltasWithKnownObjects := Pop(fWithKnownObjects)
+			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithKnownObjects) {
+				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithKnownObjects)
+			}
+			if len(fWithKnownObjects.items) != 0 {
+				t.Errorf("expected no extra deltas (empty map), got %#v", fWithKnownObjects.items)
+			}
+
+			// Test with a DeltaFIFO without a backing KnownObjects
+			fWithoutKnownObjects := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+				KeyFunction: testFifoObjectKeyFunc,
+			})
+			tt.operations(fWithoutKnownObjects)
+			actualDeltasWithoutKnownObjects := Pop(fWithoutKnownObjects)
+			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithoutKnownObjects) {
+				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithoutKnownObjects)
+			}
+			if len(fWithoutKnownObjects.items) != 0 {
+				t.Errorf("expected no extra deltas (empty map), got %#v", fWithoutKnownObjects.items)
+			}
+		})
+	}
+}
+
 func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 
@@ -200,6 +324,88 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	_, exists, _ := f.Get(mkFifoObj("foo", ""))
 	if exists {
 		t.Errorf("item did not get removed")
+	}
+}
+
+type rvAndXfrm struct {
+	rv   int
+	xfrm int
+}
+
+func TestDeltaFIFO_transformer(t *testing.T) {
+	mk := func(name string, rv int) testFifoObject {
+		return mkFifoObj(name, &rvAndXfrm{rv, 0})
+	}
+	xfrm := TransformFunc(func(obj interface{}) (interface{}, error) {
+		switch v := obj.(type) {
+		case testFifoObject:
+			v.val.(*rvAndXfrm).xfrm++
+		case DeletedFinalStateUnknown:
+			if x := v.Obj.(testFifoObject).val.(*rvAndXfrm).xfrm; x != 1 {
+				return nil, fmt.Errorf("object has been transformed wrong number of times: %#v", obj)
+			}
+		default:
+			return nil, fmt.Errorf("unexpected object: %#v", obj)
+		}
+		return obj, nil
+	})
+
+	must := func(err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		Transformer: xfrm,
+	})
+	must(f.Add(mk("foo", 10)))
+	must(f.Add(mk("bar", 11)))
+	must(f.Update(mk("foo", 12)))
+	must(f.Delete(mk("foo", 15)))
+	must(f.Replace([]interface{}{}, ""))
+	must(f.Add(mk("bar", 16)))
+	must(f.Replace([]interface{}{}, ""))
+
+	// Should be empty
+	if e, a := []string{"foo", "bar"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+
+	for i := 0; i < 2; i++ {
+		obj, err := f.Pop(func(o interface{}) error { return nil })
+		if err != nil {
+			t.Fatalf("got nothing on try %v?", i)
+		}
+		obj = obj.(Deltas).Newest().Object
+		switch v := obj.(type) {
+		case testFifoObject:
+			if v.name != "foo" {
+				t.Errorf("expected regular deletion of foo, got %q", v.name)
+			}
+			rx := v.val.(*rvAndXfrm)
+			if rx.rv != 15 {
+				t.Errorf("expected last message, got %#v", obj)
+			}
+			if rx.xfrm != 1 {
+				t.Errorf("obj %v transformed wrong number of times.", obj)
+			}
+		case DeletedFinalStateUnknown:
+			tf := v.Obj.(testFifoObject)
+			rx := tf.val.(*rvAndXfrm)
+			if tf.name != "bar" {
+				t.Errorf("expected tombstone deletion of bar, got %q", tf.name)
+			}
+			if rx.rv != 16 {
+				t.Errorf("expected last message, got %#v", obj)
+			}
+			if rx.xfrm != 1 {
+				t.Errorf("tombstoned obj %v transformed wrong number of times.", obj)
+			}
+		default:
+			t.Errorf("unknown item %#v", obj)
+		}
 	}
 }
 
@@ -371,11 +577,72 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 
 	expectedList = []Deltas{
 		{{Added, mkFifoObj("baz", 10)},
-			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
+			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
 		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+
+	// Now try deleting and recreating the object in the queue, then delete it by a Replace call
+	f = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		KnownObjects: literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
+		}),
+	})
+	f.Delete(mkFifoObj("bar", 6))
+	f.Add(mkFifoObj("bar", 100))
+	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
+
+	expectedList = []Deltas{
+		{
+			{Deleted, mkFifoObj("bar", 6)},
+			{Added, mkFifoObj("bar", 100)},
+			// Since "bar" has a newer object in the queue than in the state,
+			// it should get a tombstone key with the latest object from the queue
+			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 100)}},
+		},
+		{{Sync, mkFifoObj("foo", 5)}},
+		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+
+	// Now try syncing it first to ensure the delete use the latest version
+	f = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		KnownObjects: literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
+		}),
+	})
+	f.Replace([]interface{}{mkFifoObj("bar", 100), mkFifoObj("foo", 5)}, "0")
+	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
+
+	expectedList = []Deltas{
+		{
+			{Sync, mkFifoObj("bar", 100)},
+			// Since "bar" didn't have a delete event and wasn't in the Replace list
+			// it should get a tombstone key with the right Obj.
+			{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 100)}},
+		},
+		{
+			{Sync, mkFifoObj("foo", 5)},
+			{Sync, mkFifoObj("foo", 5)},
+		},
+		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
 	}
 
 	for _, expected := range expectedList {
