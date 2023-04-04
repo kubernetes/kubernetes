@@ -17,6 +17,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	saadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 )
 
@@ -68,6 +69,9 @@ func (s *SCCMutatingPodSpecExtractor) ExtractPodSpec(obj runtime.Object) (*metav
 	}
 	if len(pod.Name) == 0 {
 		pod.Name = "pod-for-container-named-" + objectMeta.GetName()
+	}
+	if len(pod.Spec.ServiceAccountName) == 0 {
+		pod.Spec.ServiceAccountName = saadmission.DefaultServiceAccountName
 	}
 	internalPod := &core.Pod{}
 	if err := v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
