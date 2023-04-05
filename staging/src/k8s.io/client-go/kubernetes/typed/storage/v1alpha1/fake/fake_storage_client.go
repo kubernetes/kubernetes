@@ -32,10 +32,6 @@ func (c *FakeStorageV1alpha1) CSIStorageCapacities(namespace string) v1alpha1.CS
 	return &FakeCSIStorageCapacities{c, namespace}
 }
 
-func (c *FakeStorageV1alpha1) VolumeAttachments() v1alpha1.VolumeAttachmentInterface {
-	return &FakeVolumeAttachments{c}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeStorageV1alpha1) RESTClient() rest.Interface {
