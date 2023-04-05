@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericclioptions
+package genericiooptions
 
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 )
 
 // IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
 // Inconsistent and different names make it hard to read and review code
-// DEPRECATED: use genericiooptions.IOSTREAMS
 type IOStreams struct {
 	// In think, os.Stdin
 	In io.Reader
@@ -35,7 +33,6 @@ type IOStreams struct {
 }
 
 // NewTestIOStreams returns a valid IOStreams and in, out, errout buffers for unit tests
-// DEPRECATED: use genericiooptions.NewTestIOStreams
 func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -49,12 +46,11 @@ func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer)
 }
 
 // NewTestIOStreamsDiscard returns a valid IOStreams that just discards
-// DEPRECATED: use genericiooptions.NewTestIOStreamsDiscard
 func NewTestIOStreamsDiscard() IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{
 		In:     in,
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
+		Out:    io.Discard,
+		ErrOut: io.Discard,
 	}
 }
