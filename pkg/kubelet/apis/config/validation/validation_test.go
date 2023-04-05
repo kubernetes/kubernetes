@@ -521,7 +521,15 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
-	}}
+	}, {
+		name: "invalid configuration, resolverConfig not exist",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.ResolverConfig = "./test"
+			return conf
+		},
+		errMsg: "invalid configuration: resolverConfig with error: stat ./test: no such file or directory",
+	},
+	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

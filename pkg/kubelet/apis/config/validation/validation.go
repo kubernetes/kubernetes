@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -171,6 +172,18 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
+
+	// Verify that the ResolverConfig file exists. This doesn't guarantee it will still exist when we later try
+	// to open it, but if it doesn't exist, at least we can fail early.
+	if len(kc.ResolverConfig) > 0 {
+		info, err := os.Stat(kc.ResolverConfig)
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: resolverConfig with error: %v", err))
+		} else if info.IsDir() {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: resolverConfig is dir"))
+		}
+	}
+
 	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Cannot specify both shutdownGracePeriodByPodPriority and shutdownGracePeriod at the same time"))
