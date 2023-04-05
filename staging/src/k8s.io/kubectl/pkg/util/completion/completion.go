@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/get"
@@ -170,7 +171,7 @@ func CompGetContainers(f cmdutil.Factory, podName string, toComplete string) []s
 // which begin with `toComplete`.
 func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, args []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
+	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := get.NewGetOptions("kubectl", streams)
 
 	// Get the list of names of the specified resource
@@ -260,7 +261,7 @@ func ListUsersInConfig(toComplete string) []string {
 // compGetResourceList returns the list of api resources which begin with `toComplete`.
 func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
+	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
 
 	o.Complete(restClientGetter, cmd, nil)

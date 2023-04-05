@@ -22,14 +22,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestNewCmdVersionClientVersion(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	o := NewOptions(streams)
 	if err := o.Complete(tf, &cobra.Command{}, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)

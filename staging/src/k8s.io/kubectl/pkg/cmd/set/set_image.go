@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -60,7 +61,7 @@ type SetImageOptions struct {
 	Resources              []string
 	ContainerImages        map[string]string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ImageResolver is a func that receives an image name, and
@@ -96,7 +97,7 @@ var (
 )
 
 // NewImageOptions returns an initialized SetImageOptions instance
-func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
+func NewImageOptions(streams genericiooptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -108,7 +109,7 @@ func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 }
 
 // NewCmdImage returns an initialized Command instance for the 'set image' sub command
-func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdImage(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewImageOptions(streams)
 
 	cmd := &cobra.Command{

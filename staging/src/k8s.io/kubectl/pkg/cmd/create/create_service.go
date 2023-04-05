@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -40,7 +41,7 @@ import (
 )
 
 // NewCmdCreateService is a macro command to create a new service
-func NewCmdCreateService(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateService(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
 		Aliases: []string{"svc"},
@@ -76,11 +77,11 @@ type ServiceOptions struct {
 	Client              corev1client.CoreV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewServiceOptions creates a ServiceOptions struct
-func NewServiceOptions(ioStreams genericclioptions.IOStreams, serviceType corev1.ServiceType) *ServiceOptions {
+func NewServiceOptions(ioStreams genericiooptions.IOStreams, serviceType corev1.ServiceType) *ServiceOptions {
 	return &ServiceOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -239,7 +240,7 @@ var (
 )
 
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
-func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeClusterIP)
 
 	cmd := &cobra.Command{
@@ -277,7 +278,7 @@ var (
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
-func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeNodePort)
 
 	cmd := &cobra.Command{
@@ -314,7 +315,7 @@ var (
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
-func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeLoadBalancer)
 
 	cmd := &cobra.Command{
@@ -354,7 +355,7 @@ var (
 )
 
 // NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
-func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeExternalName)
 
 	cmd := &cobra.Command{

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -227,7 +227,7 @@ func TestEdit(t *testing.T) {
 			}
 			tf.WithNamespace(testcase.Namespace)
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 
 			var cmd *cobra.Command
 			switch testcase.Mode {

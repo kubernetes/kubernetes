@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -74,7 +75,7 @@ type PatchOptions struct {
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	fieldManager                 string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -107,7 +108,7 @@ var (
 
 var supportedSubresources = []string{"status", "scale"}
 
-func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
+func NewPatchOptions(ioStreams genericiooptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
@@ -116,7 +117,7 @@ func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
 	}
 }
 
-func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPatch(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPatchOptions(ioStreams)
 
 	cmd := &cobra.Command{

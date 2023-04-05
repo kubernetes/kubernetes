@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
@@ -554,7 +555,7 @@ func TestWaitForDeletion(t *testing.T) {
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: IsDeleted,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -964,7 +965,7 @@ func TestWaitForCondition(t *testing.T) {
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -995,7 +996,7 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 		DynamicClient:  fakeClient,
 		Printer:        printers.NewDiscardingPrinter(),
 		ConditionFn:    IsDeleted,
-		IOStreams:      genericclioptions.NewTestIOStreamsDiscard(),
+		IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
 		ForCondition:   "delete",
 	}
 	err := o.RunWait()
@@ -1182,7 +1183,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 					jsonPathCondition: test.jsonPathCond,
 					jsonPathParser:    j,
 					errOut:            io.Discard}.IsJSONPathConditionMet,
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()
@@ -1445,7 +1446,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
 					jsonPathParser:    j, errOut: io.Discard}.IsJSONPathConditionMet,
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()
