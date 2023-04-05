@@ -53,7 +53,7 @@ spec:
         image: registry.k8s.io/metrics-server/metrics-server:v0.5.2
         command:
         - /metrics-server
-        - --metric-resolution=30s
+        - --metric-resolution=15s
         - --kubelet-use-node-status-port
         - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
