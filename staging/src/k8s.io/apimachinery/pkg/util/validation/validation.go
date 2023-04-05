@@ -29,7 +29,7 @@ import (
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
-const qnameExtCharFmt string = "[-A-Za-z0-9_.]"
+const qnameExtCharFmt string = "[-A-Za-z0-9_./]"
 const qualifiedNameFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
 const qualifiedNameErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
 const qualifiedNameMaxLength int = 63
