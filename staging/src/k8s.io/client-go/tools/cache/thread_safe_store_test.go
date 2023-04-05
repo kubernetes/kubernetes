@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -114,7 +115,11 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert := assert.New(t)
 
 	compare := func(key string, expected []string) error {
-		values := store.index.indices[testIndexer][key].List()
+		values := make([]string, 0)
+		for k, _ := range store.index.indices[testIndexer][key] {
+			values = append(values, k)
+		}
+		sort.Strings(values)
 		if cmp.Equal(values, expected) {
 			return nil
 		}
@@ -191,5 +196,35 @@ func BenchmarkIndexer(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.Update(objects[i%objectCount], objects[i%objectCount])
+	}
+}
+
+func BenchmarkIndexerIndex(b *testing.B) {
+	b.ReportAllocs()
+	testIndexer := "testIndexer"
+
+	indexers := Indexers{
+		testIndexer: func(obj interface{}) (strings []string, e error) {
+			indexes := []string{"test"}
+			return indexes, nil
+		},
+	}
+
+	indices := Indices{}
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+
+	// The following benchmark imitates what is happening in indexes
+	// used in storage layer, where indexing is mostly static (e.g.
+	// indexing objects by their (namespace, name)).
+	// The 10000 number imitates indexing pods in 10k-pod namespace.
+	objectCount := 10000
+	for i := 0; i < objectCount; i++ {
+		object := fmt.Sprintf("object-number-%d", i)
+		store.Add(object, object)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.Index("testIndexer", fmt.Sprintf("object-number-%d", i))
 	}
 }
