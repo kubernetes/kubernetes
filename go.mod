@@ -53,7 +53,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.23.0
-	github.com/opencontainers/runc v1.1.4
+	github.com/opencontainers/runc v1.1.5
 	github.com/opencontainers/selinux v1.10.0
 	github.com/openshift/api v0.0.0-20230208193339-068b2ae5534f
 	github.com/openshift/apiserver-library-go v0.0.0-20230330194906-c22aa58bb574
