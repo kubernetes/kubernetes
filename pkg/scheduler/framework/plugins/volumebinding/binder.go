@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,11 +39,10 @@ import (
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -224,7 +222,8 @@ type volumeBinder struct {
 	// Amount of time to wait for the bind operation to succeed
 	bindTimeout time.Duration
 
-	translator InTreeToCSITranslator
+	translator               InTreeToCSITranslator
+	csiMigratedPluginManager csimigration.PluginManager
 
 	csiDriverLister          storagelisters.CSIDriverLister
 	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
@@ -253,20 +252,21 @@ func NewVolumeBinder(
 	storageClassInformer storageinformers.StorageClassInformer,
 	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
+	translator := csitrans.New()
 	b := &volumeBinder{
-		kubeClient:    kubeClient,
-		podLister:     podInformer.Lister(),
-		classLister:   storageClassInformer.Lister(),
-		nodeLister:    nodeInformer.Lister(),
-		csiNodeLister: csiNodeInformer.Lister(),
-		pvcCache:      NewPVCAssumeCache(pvcInformer.Informer()),
-		pvCache:       NewPVAssumeCache(pvInformer.Informer()),
-		bindTimeout:   bindTimeout,
-		translator:    csitrans.New(),
+		kubeClient:               kubeClient,
+		podLister:                podInformer.Lister(),
+		classLister:              storageClassInformer.Lister(),
+		nodeLister:               nodeInformer.Lister(),
+		csiNodeLister:            csiNodeInformer.Lister(),
+		pvcCache:                 NewPVCAssumeCache(pvcInformer.Informer()),
+		pvCache:                  NewPVAssumeCache(pvInformer.Informer()),
+		bindTimeout:              bindTimeout,
+		translator:               translator,
+		csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
+		csiDriverLister:          capacityCheck.CSIDriverInformer.Lister(),
+		csiStorageCapacityLister: capacityCheck.CSIStorageCapacityInformer.Lister(),
 	}
-
-	b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
-	b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
 
 	return b
 }
@@ -1082,48 +1082,6 @@ func (a byPVCSize) Less(i, j int) bool {
 	return iSize.Cmp(jSize) == -1
 }
 
-// isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string) bool {
-	switch pluginName {
-	case csiplugins.AWSEBSInTreePluginName:
-		return true
-	case csiplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
-	case csiplugins.AzureDiskInTreePluginName:
-		return true
-	case csiplugins.CinderInTreePluginName:
-		return true
-	case csiplugins.PortworxVolumePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
-	case csiplugins.RBDVolumePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
-	}
-	return false
-}
-
-// isPluginMigratedToCSIOnNode checks if an in-tree plugin has been migrated to a CSI driver on the node.
-func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
-	if csiNode == nil {
-		return false
-	}
-
-	csiNodeAnn := csiNode.GetAnnotations()
-	if csiNodeAnn == nil {
-		return false
-	}
-
-	var mpaSet sets.Set[string]
-	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
-	if len(mpa) == 0 {
-		mpaSet = sets.New[string]()
-	} else {
-		tok := strings.Split(mpa, ",")
-		mpaSet = sets.New(tok...)
-	}
-
-	return mpaSet.Has(pluginName)
-}
-
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
 func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
@@ -1135,11 +1093,11 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
 	}
 
-	if !isCSIMigrationOnForPlugin(pluginName) {
+	if !b.csiMigratedPluginManager.IsMigrationEnabledForPlugin(pluginName) {
 		return pv, nil
 	}
 
-	if !isPluginMigratedToCSIOnNode(pluginName, csiNode) {
+	if !csimigration.IsPluginMigratedToCSIOnNode(pluginName, csiNode) {
 		return pv, nil
 	}
 

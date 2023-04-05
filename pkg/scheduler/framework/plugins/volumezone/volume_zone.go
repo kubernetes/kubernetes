@@ -22,17 +22,20 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -40,6 +43,10 @@ type VolumeZone struct {
 	pvLister  corelisters.PersistentVolumeLister
 	pvcLister corelisters.PersistentVolumeClaimLister
 	scLister  storagelisters.StorageClassLister
+
+	csiNodeLister            storagelisters.CSINodeLister
+	translator               InTreeToCSITranslator
+	csiMigratedPluginManager csimigration.PluginManager
 }
 
 var _ framework.FilterPlugin = &VolumeZone{}
@@ -63,6 +70,12 @@ type pvTopology struct {
 	values sets.Set[string]
 }
 
+// InTreeToCSITranslator contains methods required to check migratable status
+type InTreeToCSITranslator interface {
+	IsPVMigratable(pv *v1.PersistentVolume) bool
+	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
+}
+
 // the state is initialized in PreFilter phase. because we save the pointer in
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
@@ -70,6 +83,9 @@ type stateData struct {
 	// podPVTopologies holds the pv information we need
 	// it's initialized in the PreFilter phase
 	podPVTopologies []pvTopology
+	// csiPVTopologies holds the pv information with csi migration
+	// it's initialized in the PreFilter phase, checked in the Filter phase
+	csiPVTopologies map[string][]pvTopology
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -95,20 +111,20 @@ func (pl *VolumeZone) Name() string {
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
 func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	podPVTopologies, status := pl.getPVbyPod(ctx, pod)
+	podPVTopologies, csiPVTopologies, status := pl.getPVbyPod(ctx, pod)
 	if !status.IsSuccess() {
 		return nil, status
 	}
-	if len(podPVTopologies) == 0 {
+	if len(podPVTopologies) == 0 && len(csiPVTopologies) == 0 {
 		return nil, framework.NewStatus(framework.Skip)
 	}
-	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
+	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies, csiPVTopologies: csiPVTopologies})
 	return nil, nil
 }
 
-func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
-	logger := klog.FromContext(ctx)
+func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, map[string][]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
+	csiPVTopologies := make(map[string][]pvTopology)
 
 	for i := range pod.Spec.Volumes {
 		volume := pod.Spec.Volumes[i]
@@ -117,56 +133,75 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 		}
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		if pvcName == "" {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
+			return nil, nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
-			return nil, s
+			return nil, nil, s
 		}
 
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
+				return nil, nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
 			class, err := pl.scLister.Get(scName)
 			if s := getErrorAsStatus(err); !s.IsSuccess() {
-				return nil, s
+				return nil, nil, s
 			}
 			if class.VolumeBindingMode == nil {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+				return nil, nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
-			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+			if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 				// Skip unbound volumes
 				continue
 			}
 
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+			return nil, nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
-			return nil, s
+			return nil, nil, s
 		}
 
-		for _, key := range topologyLabels {
-			if value, ok := pv.ObjectMeta.Labels[key]; ok {
-				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
-				if err != nil {
-					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
-					continue
-				}
-				podPVTopologies = append(podPVTopologies, pvTopology{
-					pvName: pv.Name,
-					key:    key,
-					values: sets.Set[string](volumeVSet),
-				})
+		if pl.translator.IsPVMigratable(pv) {
+			pluginName, err := pl.translator.GetInTreePluginNameFromSpec(pv, nil)
+			if err != nil {
+				return nil, nil, framework.AsStatus(fmt.Errorf("could not get plugin name from pv: %v", err))
 			}
+			if !pl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(pluginName) {
+				podPVTopologies = append(podPVTopologies, getPodPVTopologies(ctx, pv)...)
+			} else {
+				csiPVTopologies[pluginName] = append(csiPVTopologies[pluginName], getPodPVTopologies(ctx, pv)...)
+			}
+			continue
+		}
+		podPVTopologies = append(podPVTopologies, getPodPVTopologies(ctx, pv)...)
+	}
+	return podPVTopologies, csiPVTopologies, nil
+}
+
+func getPodPVTopologies(ctx context.Context, pv *v1.PersistentVolume) []pvTopology {
+	logger := klog.FromContext(ctx)
+	podPVTopologies := make([]pvTopology, 0)
+	for _, key := range topologyLabels {
+		if value, ok := pv.ObjectMeta.Labels[key]; ok {
+			volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+			if err != nil {
+				logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "pv", klog.KObj(pv), "err", err)
+				continue
+			}
+			podPVTopologies = append(podPVTopologies, pvTopology{
+				pvName: pv.Name,
+				key:    key,
+				values: sets.Set[string](volumeVSet),
+			})
 		}
 	}
-	return podPVTopologies, nil
+	return podPVTopologies
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -191,23 +226,26 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
 	}
-	var podPVTopologies []pvTopology
+	var (
+		podPVTopologies []pvTopology
+		csiPVTopologies map[string][]pvTopology
+	)
 	state, err := getStateData(cs)
 	if err != nil {
 		// Fallback to calculate pv list here
 		var status *framework.Status
-		podPVTopologies, status = pl.getPVbyPod(ctx, pod)
+		podPVTopologies, csiPVTopologies, status = pl.getPVbyPod(ctx, pod)
 		if !status.IsSuccess() {
 			return status
 		}
 	} else {
 		podPVTopologies = state.podPVTopologies
+		csiPVTopologies = state.csiPVTopologies
 	}
 
 	node := nodeInfo.Node()
@@ -225,6 +263,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
 		if !ok || !pvTopology.values.Has(v) {
@@ -233,6 +272,28 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 		}
 	}
 
+	if pl.csiNodeLister == nil {
+		return nil
+	}
+
+	csiNode, err := pl.csiNodeLister.Get(node.Name)
+	if err != nil {
+		logger.V(4).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
+	}
+
+	for pluginName, topologies := range csiPVTopologies {
+		// volumebinding will handle it
+		if csimigration.IsPluginMigratedToCSIOnNode(pluginName, csiNode) {
+			continue
+		}
+		for _, pvTopology := range topologies {
+			v, ok := node.Labels[pvTopology.key]
+			if !ok || !pvTopology.values.Has(v) {
+				logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+			}
+		}
+	}
 	return nil
 }
 
@@ -281,9 +342,15 @@ func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
+	csiNodeInformer := handle.SharedInformerFactory().Storage().V1().CSINodes()
+	translator := csitrans.New()
 	return &VolumeZone{
-		pvLister,
-		pvcLister,
-		scLister,
+		pvLister:  pvLister,
+		pvcLister: pvcLister,
+		scLister:  scLister,
+
+		csiNodeLister:            csiNodeInformer.Lister(),
+		translator:               translator,
+		csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
 	}, nil
 }

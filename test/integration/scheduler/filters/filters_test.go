@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1788,6 +1789,295 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			pendingPods, s := testCtx.Scheduler.SchedulingQueue.PendingPods()
 			if len(pendingPods) != 0 {
 				t.Errorf("pending pods queue is not empty, size is: %d, summary is: %s", len(pendingPods), s)
+			}
+		})
+	}
+}
+
+func TestPvTopology(t *testing.T) {
+	pause := imageutils.GetPauseImageName()
+	tests := []struct {
+		name           string
+		incomingPod    *v1.Pod
+		fits           bool
+		nodes          []*v1.Node
+		candidateNodes []string // nodes expected to schedule onto
+		csiNode        *storagev1.CSINode
+		pv             v1.PersistentVolume
+	}{
+		{
+			name:           "pv label matched",
+			incomingPod:    st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			fits:           true,
+			candidateNodes: []string{"node1"},
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology.gke.io/zone", "us-west1-a").Obj(),
+			},
+			csiNode: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+		},
+		{
+			name: "pv beta label matched",
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology.gke.io/zone", "us-west1-a").Obj(),
+			},
+			incomingPod:    st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			fits:           true,
+			candidateNodes: []string{"node1"},
+			csiNode: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+		},
+		{
+			name: "pv label conflict",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology.gke.io/zone", "us-west1-a").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			csiNode: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+		},
+		{
+			name: "pv label conflicts, node has no csi plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label(v1.LabelTopologyZone, "us-west1-b").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			csiNode: nil,
+		},
+		{
+			name: "pv label matches, node has no csi plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label(v1.LabelTopologyZone, "us-west1-a").Obj(),
+			},
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			incomingPod:    st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			csiNode:        nil,
+			fits:           true,
+			candidateNodes: []string{"node1"},
+		},
+		{
+			name: "beta pv label conflicts, node has no csi plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label(v1.LabelFailureDomainBetaZone, "us-west1-b").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			csiNode: nil,
+		},
+		{
+			name: "beta pv label matches, node has no csi plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label(v1.LabelFailureDomainBetaZone, "us-west1-a").Obj(),
+			},
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			incomingPod:    st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			csiNode:        nil,
+			fits:           true,
+			candidateNodes: []string{"node1"},
+		},
+		{
+			name: "pv with beta label, node with ga label matches, node has no csi plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label(v1.LabelTopologyZone, "us-west1-a").Obj(),
+			},
+			pv: v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "pv-with-csi", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+					Capacity:    v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			incomingPod: st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			csiNode:     nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "pv-topology")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for i := range tt.nodes {
+				if _, err := createNode(cs, tt.nodes[i]); err != nil {
+					t.Fatalf("Cannot create node: %v", err)
+				}
+			}
+
+			if tt.csiNode != nil {
+				defer cs.StorageV1().CSINodes().Delete(context.TODO(), tt.csiNode.Name, metav1.DeleteOptions{})
+				cs.StorageV1().CSINodes().Create(context.TODO(), tt.csiNode, metav1.CreateOptions{})
+			}
+
+			storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+
+			defer testutils.DeletePV(cs, tt.pv.Name)
+			pv, err := testutils.CreatePV(cs, &tt.pv)
+			if err != nil {
+				t.Fatalf("cannot create pv: %v", err)
+			}
+
+			pvc := st.MakePersistentVolumeClaim().
+				Name("pvc1").
+				Namespace(ns).
+				// Annotation and volume name required for PVC to be considered bound.
+				Annotation(volume.AnnBindCompleted, "true").
+				VolumeName(pv.Name).
+				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+				Resources(storage).
+				Obj()
+
+			defer testutils.DeletePVC(cs, pvc.Name, ns)
+
+			_, err = testutils.CreatePVC(cs, pvc)
+			if err != nil {
+				t.Fatalf("cannot create pvc: %v", err)
+			}
+
+			tt.incomingPod.SetNamespace(ns)
+
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{tt.incomingPod})
+
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(context.TODO(), tt.incomingPod, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsInvalid(err) {
+				t.Fatalf("Error while creating pod during test: %v", err)
+			}
+
+			if tt.fits {
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.candidateNodes))
+			} else {
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+			}
+			if err != nil {
+				t.Errorf("Test Failed: %v", err)
 			}
 		})
 	}

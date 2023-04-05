@@ -19,8 +19,11 @@ package csimigration
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
@@ -122,6 +125,29 @@ func (pm PluginManager) IsMigratable(spec *volume.Spec) (bool, error) {
 	}
 	// found an in-tree plugin that supports the spec
 	return pm.IsMigrationEnabledForPlugin(pluginName), nil
+}
+
+// IsPluginMigratedToCSIOnNode checks if an in-tree plugin has been migrated to a CSI driver on the node.
+func IsPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
+	if csiNode == nil {
+		return false
+	}
+
+	csiNodeAnn := csiNode.GetAnnotations()
+	if csiNodeAnn == nil {
+		return false
+	}
+
+	var mpaSet sets.String
+	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	if len(mpa) == 0 {
+		mpaSet = sets.NewString()
+	} else {
+		tok := strings.Split(mpa, ",")
+		mpaSet = sets.NewString(tok...)
+	}
+
+	return mpaSet.Has(pluginName)
 }
 
 // InTreeToCSITranslator performs translation of Volume sources for PV and Volume objects

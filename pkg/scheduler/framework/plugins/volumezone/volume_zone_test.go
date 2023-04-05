@@ -19,6 +19,7 @@ package volumezone
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -26,13 +27,18 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2/ktesting"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	csitrans "k8s.io/csi-translation-lib"
+	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
@@ -233,24 +239,28 @@ func TestSingleZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			state := framework.NewCycleState()
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
+			translator := csitrans.New()
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  nil,
+
+				csiNodeLister:            nil,
+				translator:               translator,
+				csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
 			filterStatus := p.Filter(ctx, state, test.Pod, node)
-			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
 				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
@@ -365,24 +375,28 @@ func TestMultiZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			state := framework.NewCycleState()
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
+			translator := csitrans.New()
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  nil,
+
+				csiNodeLister:            nil,
+				translator:               translator,
+				csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
 			filterStatus := p.Filter(ctx, state, test.Pod, node)
-			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
 				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
@@ -490,24 +504,241 @@ func TestWithBinding(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			state := framework.NewCycleState()
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
+			translator := csitrans.New()
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				scLister,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  scLister,
+
+				csiNodeLister:            nil,
+				translator:               translator,
+				csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
 			filterStatus := p.Filter(ctx, state, test.Pod, node)
-			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func createPodWithVolumes(pod string, pvcs ...string) *v1.Pod {
+	podWrapper := st.MakePod().Name(pod).Namespace(metav1.NamespaceDefault)
+	for _, pvc := range pvcs {
+		podWrapper = podWrapper.PVC(pvc)
+	}
+	return podWrapper.Obj()
+}
+
+func TestWithCSI(t *testing.T) {
+	pvLister := fakeframework.PersistentVolumeLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_CSI_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName:    "test-disk",
+						FSType:    "ext4",
+						Partition: 0,
+						ReadOnly:  false,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_CSI_2", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"}},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName:    "test-disk",
+						FSType:    "ext4",
+						Partition: 0,
+						ReadOnly:  false,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_CSI_3", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"}},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+						VolumeID:  "vol01",
+						FSType:    "ext3",
+						Partition: 1,
+						ReadOnly:  true,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_CSI_4", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"}},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Cinder: &v1.CinderPersistentVolumeSource{
+						VolumeID: "vol1",
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
+	}
+
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_CSI_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_CSI_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_CSI_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_CSI_2"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_CSI_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_CSI_3"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_CSI_4", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_CSI_4"},
+		},
+	}
+
+	tests := []struct {
+		name                string
+		Pod                 *v1.Pod
+		Node                *v1.Node
+		CSINode             *storagev1.CSINode
+		wantPreFilterStatus *framework.Status
+		wantFilterStatus    *framework.Status
+	}{
+		{
+			name: "migratable volume matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_CSI_1", "PVC_CSI_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			CSINode: makeCSINode("host1", csilibplugins.GCEPDInTreePluginName, csilibplugins.AWSEBSInTreePluginName, csilibplugins.CinderInTreePluginName),
+		},
+		{
+			name: "migratable volume doesn't match",
+			Pod:  createPodWithVolume("pod_1", "Vol_CSI_2", "PVC_CSI_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			CSINode: makeCSINode("host1", csilibplugins.GCEPDInTreePluginName, csilibplugins.AWSEBSInTreePluginName, csilibplugins.CinderInTreePluginName),
+		},
+		{
+			name: "node doesn't enable csi, labels don't match",
+			Pod:  createPodWithVolume("pod_1", "Vol_CSI_2", "PVC_CSI_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			CSINode:          makeCSINode("host2", csilibplugins.GCEPDInTreePluginName),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had no available volume zone"),
+		},
+		{
+			name: "node doesn't enable csi, labels do match",
+			Pod:  createPodWithVolume("pod_1", "Vol_CSI_2", "PVC_CSI_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"},
+				},
+			},
+			CSINode: makeCSINode("host2", csilibplugins.GCEPDInTreePluginName),
+		},
+		{
+			name: "pod has multiple PVs from different plugins, all matches node",
+			Pod:  createPodWithVolumes("pod_1", "PVC_CSI_2", "PVC_CSI_3", "PVC_CSI_4"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"},
+				},
+			},
+			CSINode: makeCSINode("host1", csilibplugins.GCEPDInTreePluginName, csilibplugins.AWSEBSInTreePluginName, csilibplugins.CinderInTreePluginName),
+		},
+		{
+			name: "pod has multiple PVs from different plugins, one of them doesn't match node",
+			// This will success because we'll just ignore these pvs and let volumebinding hanle
+			Pod: createPodWithVolumes("pod_1", "PVC_CSI_1", "PVC_CSI_3", "PVC_CSI_4"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"},
+				},
+			},
+			CSINode: makeCSINode("host1", csilibplugins.GCEPDInTreePluginName, csilibplugins.AWSEBSInTreePluginName, csilibplugins.CinderInTreePluginName),
+		},
+		{
+			name: "pod has multiple PVs from different plugins. Node doesn't migrate GCEPD plugin. GCEPD PV has a unmatched label",
+			// This will success because we'll just ignore these pvs and let volumebinding hanle
+			Pod: createPodWithVolumes("pod_1", "PVC_CSI_1", "PVC_CSI_3", "PVC_CSI_4"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1"},
+				},
+			},
+			CSINode:          makeCSINode("host1", csilibplugins.AWSEBSInTreePluginName, csilibplugins.CinderInTreePluginName),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had no available volume zone"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			state := framework.NewCycleState()
+			node := &framework.NodeInfo{}
+			node.SetNode(test.Node)
+
+			cs := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+
+			cs.StorageV1().CSINodes().Create(ctx, test.CSINode, metav1.CreateOptions{})
+
+			translator := csitrans.New()
+			p := &VolumeZone{
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  nil,
+
+				csiNodeLister:            informerFactory.Storage().V1().CSINodes().Lister(),
+				translator:               translator,
+				csiMigratedPluginManager: csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate),
+			}
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+			}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
 				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
@@ -621,4 +852,16 @@ func makeNodesWithTopologyZone(num int) []*v1.Node {
 		}
 	}
 	return nodeList
+}
+
+func makeCSINode(name string, migratedPlugin ...string) *storagev1.CSINode {
+	annotationValue := strings.Join(migratedPlugin, ",")
+	return &storagev1.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				v1.MigratedPluginsAnnotationKey: annotationValue,
+			},
+		},
+	}
 }
