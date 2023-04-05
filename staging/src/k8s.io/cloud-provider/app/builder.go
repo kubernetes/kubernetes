@@ -137,7 +137,7 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 			completedConfig := config.Complete()
 			cloud := cb.cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(cb.controllerInitFuncConstructors, completedConfig, cloud)
-			webhooks := newWebhookHandlers(cb.webhookConfigs, completedConfig, cloud)
+			webhooks := NewWebhookHandlers(cb.webhookConfigs, completedConfig, cloud)
 
 			if err := Run(completedConfig, cloud, controllerInitializers, webhooks, cb.stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
