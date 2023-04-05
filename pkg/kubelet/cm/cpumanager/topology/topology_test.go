@@ -1100,3 +1100,106 @@ func TestCPUNUMANodeID(t *testing.T) {
 		})
 	}
 }
+
+func TestCPUTopology_CPUsPerCore(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields *CPUTopology
+		want   int
+	}{
+		{
+			name: "Cores num is zero",
+			fields: &CPUTopology{
+				NumCores:   0,
+				NumCPUs:    20,
+				NumSockets: 10,
+			},
+			want: 0,
+		},
+		{
+			name: "Cores num is not zero",
+			fields: &CPUTopology{
+				NumCores:   10,
+				NumCPUs:    20,
+				NumSockets: 10,
+			},
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			topo := tt.fields
+			if got := topo.CPUsPerCore(); got != tt.want {
+				t.Errorf("CPUTopology.CPUsPerCore() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUTopology_CPUsPerSocket(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields *CPUTopology
+		want   int
+	}{
+		{
+			name: "sockets num is zero",
+			fields: &CPUTopology{
+				NumCores:   10,
+				NumCPUs:    20,
+				NumSockets: 0,
+			},
+			want: 0,
+		},
+		{
+			name: "sockets num is not zero",
+			fields: &CPUTopology{
+				NumCores:   10,
+				NumCPUs:    20,
+				NumSockets: 5,
+			},
+			want: 4,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			topo := tt.fields
+			if got := topo.CPUsPerSocket(); got != tt.want {
+				t.Errorf("CPUTopology.CPUsPerSocket() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getUniqueCoreID(t *testing.T) {
+	tests := []struct {
+		name       string
+		threads    []int
+		wantCoreID int
+		wantErr    bool
+	}{
+		{
+			name:       "threads is empty",
+			threads:    []int{},
+			wantCoreID: 0,
+			wantErr:    true,
+		},
+		{
+			name:       "get lowest Core id",
+			threads:    []int{2, 1, 5, 3},
+			wantCoreID: 1,
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCoreID, err := getUniqueCoreID(tt.threads)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("getUniqueCoreID() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if gotCoreID != tt.wantCoreID {
+				t.Errorf("getUniqueCoreID() = %v, want %v", gotCoreID, tt.wantCoreID)
+			}
+		})
+	}
+}
