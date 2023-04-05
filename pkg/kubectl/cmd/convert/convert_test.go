@@ -23,7 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -116,7 +115,7 @@ func TestConvertObject(t *testing.T) {
 				}
 
 				buf := bytes.NewBuffer([]byte{})
-				cmd := NewCmdConvert(tf, genericclioptions.IOStreams{Out: buf, ErrOut: buf})
+				cmd := NewCmdConvert(tf, genericiooptions.IOStreams{Out: buf, ErrOut: buf})
 				cmd.Flags().Set("filename", tc.file)
 				cmd.Flags().Set("output-version", tc.outputVersion)
 				cmd.Flags().Set("local", "true")

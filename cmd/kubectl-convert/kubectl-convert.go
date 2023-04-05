@@ -36,7 +36,7 @@ func main() {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-	cmd := convert.NewCmdConvert(f, genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr})
+	cmd := convert.NewCmdConvert(f, genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr})
 	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
 	code := cli.Run(cmd)
 	os.Exit(code)

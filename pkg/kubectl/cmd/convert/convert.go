@@ -73,10 +73,10 @@ type ConvertOptions struct {
 	validator func() (validation.Schema, error)
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
+func NewConvertOptions(ioStreams genericiooptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
@@ -86,7 +86,7 @@ func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
-func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdConvert(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewConvertOptions(ioStreams)
 
 	cmd := &cobra.Command{
