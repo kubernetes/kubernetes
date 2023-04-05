@@ -18,30 +18,19 @@ package genericclioptions
 
 import (
 	"bytes"
-	"io"
 	"io/ioutil"
-)
 
-// IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
-// Inconsistent and different names make it hard to read and review code
-// DEPRECATED: use genericiooptions.IOSTREAMS
-type IOStreams struct {
-	// In think, os.Stdin
-	In io.Reader
-	// Out think, os.Stdout
-	Out io.Writer
-	// ErrOut think, os.Stderr
-	ErrOut io.Writer
-}
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+)
 
 // NewTestIOStreams returns a valid IOStreams and in, out, errout buffers for unit tests
 // DEPRECATED: use genericiooptions.NewTestIOStreams
-func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
+func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 
-	return IOStreams{
+	return genericiooptions.IOStreams{
 		In:     in,
 		Out:    out,
 		ErrOut: errOut,
@@ -50,9 +39,9 @@ func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer)
 
 // NewTestIOStreamsDiscard returns a valid IOStreams that just discards
 // DEPRECATED: use genericiooptions.NewTestIOStreamsDiscard
-func NewTestIOStreamsDiscard() IOStreams {
+func NewTestIOStreamsDiscard() genericiooptions.IOStreams {
 	in := &bytes.Buffer{}
-	return IOStreams{
+	return genericiooptions.IOStreams{
 		In:     in,
 		Out:    ioutil.Discard,
 		ErrOut: ioutil.Discard,
