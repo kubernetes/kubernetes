@@ -28,13 +28,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()

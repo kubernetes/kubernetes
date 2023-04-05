@@ -81,6 +81,11 @@ func TestGlogSetter(t *testing.T) {
 			}
 			os.Stderr = newStderr
 
+			defer func() {
+				if err := logsapi.ResetForTest(nil /* feature gates */); err != nil {
+					t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+				}
+			}()
 			tc.init(t)
 
 			// First write with default verbosity level of 0 -> no output.
