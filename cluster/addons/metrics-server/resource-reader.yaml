@@ -6,31 +6,19 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - nodes
-  - nodes/stats
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - "apps"
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - update
-  - watch
-  - patch
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
+  - apiGroups: [""]
+    resources:
+      - nodes/metrics
+    verbs:
+      - get
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
