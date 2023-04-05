@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/sample-cli-plugin/pkg/cmd"
 )
 

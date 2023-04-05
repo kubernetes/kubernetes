@@ -1558,6 +1558,7 @@ k8s.io/apiserver/plugin/pkg/authorizer/webhook
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
 ## explicit; go 1.20
 k8s.io/cli-runtime/pkg/genericclioptions
+k8s.io/cli-runtime/pkg/genericiooptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
 # k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go

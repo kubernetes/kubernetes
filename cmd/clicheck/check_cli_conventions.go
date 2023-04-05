@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd"
 	cmdsanity "k8s.io/kubectl/pkg/cmd/util/sanity"
 )
