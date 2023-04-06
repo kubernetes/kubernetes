@@ -23,6 +23,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
+// IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
+// Inconsistent and different names make it hard to read and review code
+// DEPRECATED: use genericiooptions.IOStreams
+type IOStreams = genericiooptions.IOStreams
+
 // NewTestIOStreams returns a valid IOStreams and in, out, errout buffers for unit tests
 // DEPRECATED: use genericiooptions.NewTestIOStreams
 func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
@@ -30,7 +35,7 @@ func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffe
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 
-	return genericiooptions.IOStreams{
+	return IOStreams{
 		In:     in,
 		Out:    out,
 		ErrOut: errOut,
@@ -41,7 +46,7 @@ func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffe
 // DEPRECATED: use genericiooptions.NewTestIOStreamsDiscard
 func NewTestIOStreamsDiscard() genericiooptions.IOStreams {
 	in := &bytes.Buffer{}
-	return genericiooptions.IOStreams{
+	return IOStreams{
 		In:     in,
 		Out:    ioutil.Discard,
 		ErrOut: ioutil.Discard,
