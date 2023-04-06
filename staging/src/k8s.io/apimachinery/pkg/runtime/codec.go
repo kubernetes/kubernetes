@@ -26,7 +26,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,21 +45,11 @@ func NewCodec(e Encoder, d Decoder) Codec {
 
 // Encode is a convenience wrapper for encoding to a []byte from an Encoder
 func Encode(e Encoder, obj Object) ([]byte, error) {
-	buf := bufPool.Get().(*bytes.Buffer)
-	defer bufPool.Put(buf)
-
-	buf.Reset()
+	buf := &bytes.Buffer{}
 	if err := e.Encode(obj, buf); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// bufPool is a pool of byte buffer objects that can be reused.
-var bufPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
 }
 
 // Decode is a convenience wrapper for decoding data into an Object.
