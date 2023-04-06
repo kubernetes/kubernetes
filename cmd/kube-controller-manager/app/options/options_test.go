@@ -94,6 +94,7 @@ var args = []string{
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
+	"--concurrent-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
 	"--concurrent-resource-quota-syncs=10",
 	"--concurrent-service-syncs=2",
@@ -319,7 +320,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &JobControllerOptions{
 			&jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 		},
 		CronJobController: &CronJobControllerOptions{
@@ -570,7 +571,7 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerTolerance:                    0.1,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 			CronJobController: cronjobconfig.CronJobControllerConfiguration{
 				ConcurrentCronJobSyncs: 5,
@@ -1076,6 +1077,16 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			}).Validate,
 		},
+		{
+			name:                   "JobControllerOptions ConcurrentJobSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-job-syncs must be greater than 0",
+			validate: (&JobControllerOptions{
+				&jobconfig.JobControllerConfiguration{
+					ConcurrentJobSyncs: 0,
+				},
+			}).Validate,
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1139,7 +1150,7 @@ func TestValidateControllersOptions(t *testing.T) {
 			expectErrors: false,
 			validate: (&JobControllerOptions{
 				&jobconfig.JobControllerConfiguration{
-					ConcurrentJobSyncs: 5,
+					ConcurrentJobSyncs: 10,
 				},
 			}).Validate,
 		},
