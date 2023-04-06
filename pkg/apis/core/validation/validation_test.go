@@ -6746,8 +6746,8 @@ func TestValidatePullPolicy(t *testing.T) {
 
 func TestValidateResizePolicy(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
-	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
+	tSupportedResizeResources := sets.New(string(core.ResourceCPU), string(core.ResourceMemory))
+	tSupportedResizePolicies := sets.New(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
 		PolicyList  []core.ContainerResizePolicy
 		ExpectError bool
@@ -6787,7 +6787,7 @@ func TestValidateResizePolicy(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "Restarrrt"},
 			},
 			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("Restarrrt"), tSupportedResizePolicies.List())},
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("Restarrrt"), sets.List(tSupportedResizePolicies))},
 		},
 		"ValidMemoryandInvalidCPUPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6795,14 +6795,14 @@ func TestValidateResizePolicy(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
 			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartNotRequirrred"), tSupportedResizePolicies.List())},
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartNotRequirrred"), sets.List(tSupportedResizePolicies))},
 		},
 		"InvalidResourceNameValidPolicy": {
 			[]core.ContainerResizePolicy{
 				{ResourceName: "cpuuu", RestartPolicy: "NotRequired"},
 			},
 			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), sets.List(tSupportedResizeResources))},
 		},
 		"ValidResourceNameMissingPolicy": {
 			[]core.ContainerResizePolicy{
@@ -19159,7 +19159,7 @@ func TestValidateOSFields(t *testing.T) {
 	// - Add documentation to the os specific field indicating which os it can/cannot be set for
 	// - Add documentation to the os field in the api
 	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
-	osSpecificFields := sets.NewString(
+	osSpecificFields := sets.New(
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
@@ -19206,7 +19206,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)
-	osNeutralFields := sets.NewString(
+	osNeutralFields := sets.New(
 		"ActiveDeadlineSeconds",
 		"Affinity",
 		"AutomountServiceAccountToken",
@@ -19313,7 +19313,7 @@ func TestValidateOSFields(t *testing.T) {
 		"TopologySpreadConstraints",
 	)
 
-	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
+	expect := sets.New[string]().Union(osSpecificFields).Union(osNeutralFields)
 
 	result := collectResourcePaths(t, expect, reflect.TypeOf(&core.PodSpec{}), nil)
 
@@ -19326,13 +19326,13 @@ func TestValidateOSFields(t *testing.T) {
 			t.Errorf("the following fields were expected, but missing from the result. "+
 				"If the field has been removed, please remove it from the osNeutralFields set "+
 				"or remove it from the osSpecificFields set, as appropriate:\n%s",
-				strings.Join(missing.List(), "\n"))
+				strings.Join(sets.List(missing), "\n"))
 		}
 		if len(unexpected) > 0 {
 			t.Errorf("the following fields were in the result, but unexpected. "+
 				"If the field is new, please add it to the osNeutralFields set "+
 				"or add it to the osSpecificFields set, as appropriate:\n%s",
-				strings.Join(unexpected.List(), "\n"))
+				strings.Join(sets.List(unexpected), "\n"))
 		}
 	}
 }
@@ -19408,22 +19408,22 @@ func TestValidateSchedulingGates(t *testing.T) {
 }
 
 // collectResourcePaths traverses the object, computing all the struct paths.
-func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.Type, path *field.Path) sets.String {
+func collectResourcePaths(t *testing.T, skipRecurseList sets.Set[string], tp reflect.Type, path *field.Path) sets.Set[string] {
 	if pathStr := path.String(); len(pathStr) > 0 && skipRecurseList.Has(pathStr) {
-		return sets.NewString(pathStr)
+		return sets.New(pathStr)
 	}
 
-	paths := sets.NewString()
+	paths := sets.New[string]()
 	switch tp.Kind() {
 	case reflect.Pointer:
-		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).List()...)
+		paths.Insert(sets.List(collectResourcePaths(t, skipRecurseList, tp.Elem(), path))...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			paths.Insert(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)).List()...)
+			paths.Insert(sets.List(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)))...)
 		}
 	case reflect.Map, reflect.Slice:
-		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")).List()...)
+		paths.Insert(sets.List(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")))...)
 	case reflect.Interface:
 		t.Fatalf("unexpected interface{} field %s", path.String())
 	default:
@@ -20675,13 +20675,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), supportedScheduleActions.List())},
+		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), sets.List(supportedScheduleActions))},
 	}, {
 		name: "unsupported scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), supportedScheduleActions.List())},
+		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), sets.List(supportedScheduleActions))},
 	}, {
 		name: "multiple constraints ok with all required fields",
 		constraints: []core.TopologySpreadConstraint{
@@ -20725,7 +20725,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeTaintsPolicy:   &ignore,
 		}},
 		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeAffinityField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			field.NotSupported(nodeAffinityField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
 		},
 	}, {
 		name: "unsupported policy name set on NodeTaintsPolicy",
@@ -20737,7 +20737,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeTaintsPolicy:   &unknown,
 		}},
 		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeTaintsField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			field.NotSupported(nodeTaintsField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
 		},
 	}, {
 		name: "key in MatchLabelKeys isn't correctly defined",
