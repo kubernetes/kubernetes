@@ -20,10 +20,16 @@ import re
 import sys
 
 parser = argparse.ArgumentParser()
-parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
+parser.add_argument(
+    "filenames",
+    help="list of files to check, all files if unspecified",
+    nargs='*')
 args = parser.parse_args()
 
-# Cargo culted from http://stackoverflow.com/questions/898669/how-can-i-detect-if-a-file-is-binary-non-text-in-python
+# Cargo culted from
+# http://stackoverflow.com/questions/898669/how-can-i-detect-if-a-file-is-binary-non-text-in-python
+
+
 def is_binary(pathname):
     """Return true if the given filename is binary.
     @raise EnvironmentError: if the file does not exist or cannot be accessed.
@@ -35,14 +41,15 @@ def is_binary(pathname):
             CHUNKSIZE = 1024
             while True:
                 chunk = f.read(CHUNKSIZE)
-                if '\0' in chunk: # found null byte
+                if '\0' in chunk:  # found null byte
                     return True
                 if len(chunk) < CHUNKSIZE:
-                    break # done
-    except:
+                    break  # done
+    except BaseException:
         return True
 
     return False
+
 
 def get_all_files(rootdir):
     all_files = []
@@ -70,6 +77,8 @@ def get_all_files(rootdir):
 # Collects all the flags used in golang files and verifies the flags do
 # not contain underscore. If any flag needs to be excluded from this check,
 # need to add that flag in hack/verify-flags/excluded-flags.txt.
+
+
 def check_underscore_in_flags(rootdir, files):
     # preload the 'known' flags which don't follow the - standard
     pathname = os.path.join(rootdir, "hack/verify-flags/excluded-flags.txt")
@@ -77,12 +86,12 @@ def check_underscore_in_flags(rootdir, files):
     excluded_flags = set(f.read().splitlines())
     f.close()
 
-    regexs = [ re.compile('Var[P]?\([^,]*, "([^"]*)"'),
-               re.compile('.String[P]?\("([^"]*)",[^,]+,[^)]+\)'),
-               re.compile('.Int[P]?\("([^"]*)",[^,]+,[^)]+\)'),
-               re.compile('.Bool[P]?\("([^"]*)",[^,]+,[^)]+\)'),
-               re.compile('.Duration[P]?\("([^"]*)",[^,]+,[^)]+\)'),
-               re.compile('.StringSlice[P]?\("([^"]*)",[^,]+,[^)]+\)') ]
+    regexs = [re.compile('Var[P]?\\([^,]*, "([^"]*)"'),
+              re.compile('.String[P]?\\("([^"]*)",[^,]+,[^)]+\\)'),
+              re.compile('.Int[P]?\\("([^"]*)",[^,]+,[^)]+\\)'),
+              re.compile('.Bool[P]?\\("([^"]*)",[^,]+,[^)]+\\)'),
+              re.compile('.Duration[P]?\\("([^"]*)",[^,]+,[^)]+\\)'),
+              re.compile('.StringSlice[P]?\\("([^"]*)",[^,]+,[^)]+\\)')]
 
     new_excluded_flags = set()
     # walk all the files looking for any flags being declared
@@ -103,10 +112,10 @@ def check_underscore_in_flags(rootdir, files):
     if len(new_excluded_flags) != 0:
         print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
         print("Are you certain this flag should not have been declared with an - instead?")
-        l = list(new_excluded_flags)
-        l.sort()
+        l = sorted(new_excluded_flags)
         print(("%s" % "\n".join(l)))
         sys.exit(1)
+
 
 def main():
     rootdir = os.path.dirname(__file__) + "/../"
@@ -119,5 +128,6 @@ def main():
 
     check_underscore_in_flags(rootdir, files)
 
+
 if __name__ == "__main__":
-  sys.exit(main())
+    sys.exit(main())

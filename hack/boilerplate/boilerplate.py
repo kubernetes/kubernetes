@@ -50,7 +50,8 @@ verbose_out = sys.stderr if args.verbose else open("/dev/null", "w")
 def get_refs():
     refs = {}
 
-    for path in glob.glob(os.path.join(args.boilerplate_dir, "boilerplate.*.txt")):
+    for path in glob.glob(os.path.join(
+            args.boilerplate_dir, "boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
         ref_file = open(path, 'r')
@@ -114,15 +115,18 @@ def file_passes(filename, refs, regexs):
     for d in data:
         if p.search(d):
             if generated:
-                print('File %s has the YEAR field, but it should not be in generated file' %
-                      filename, file=verbose_out)
+                print(
+                    'File %s has the YEAR field, but it should not be in generated file' %
+                    filename, file=verbose_out)
             else:
-                print('File %s has the YEAR field, but missing the year of date' %
-                      filename, file=verbose_out)
+                print(
+                    'File %s has the YEAR field, but missing the year of date' %
+                    filename, file=verbose_out)
             return False
 
     if not generated:
-        # Replace all occurrences of the regex "2014|2015|2016|2017|2018" with "YEAR"
+        # Replace all occurrences of the regex "2014|2015|2016|2017|2018" with
+        # "YEAR"
         p = regexs["date"]
         for i, d in enumerate(data):
             (data[i], found) = p.subn('YEAR', d)
@@ -135,7 +139,8 @@ def file_passes(filename, refs, regexs):
               filename, file=verbose_out)
         if args.verbose:
             print(file=verbose_out)
-            for line in difflib.unified_diff(ref, data, 'reference', filename, lineterm=''):
+            for line in difflib.unified_diff(
+                    ref, data, 'reference', filename, lineterm=''):
                 print(line, file=verbose_out)
             print(file=verbose_out)
         return False
@@ -147,9 +152,16 @@ def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
 
-skipped_names = ['third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
-                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
-                 "staging/src/k8s.io/kubectl/pkg/generated/bindata.go"]
+skipped_names = [
+    'third_party',
+    '_gopath',
+    '_output',
+    '.git',
+    'cluster/env.sh',
+    "vendor",
+    "test/e2e/generated/bindata.go",
+    "hack/boilerplate/test",
+    "staging/src/k8s.io/kubectl/pkg/generated/bindata.go"]
 
 
 def normalize_files(files):
@@ -198,12 +210,13 @@ def get_files(extensions):
 
 def get_dates():
     years = datetime.datetime.now().year
-    return '(%s)' % '|'.join((str(year) for year in range(2014, years+1)))
+    return '(%s)' % '|'.join((str(year) for year in range(2014, years + 1)))
 
 
 def get_regexs():
     regexs = {}
-    # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
+    # Search for "YEAR" which exists in the boilerplate, but shouldn't in the
+    # real thing
     regexs["year"] = re.compile('YEAR')
     # get_dates return 2014, 2015, 2016, 2017, or 2018 until the current year as a regex like: "(2014|2015|2016|2017|2018)";
     # company holder names can be anything
@@ -216,7 +229,8 @@ def get_regexs():
     # strip #!.* from scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
     # Search for generated files
-    regexs["generated"] = re.compile(r"^[/*#]+ +.* DO NOT EDIT\.$", re.MULTILINE)
+    regexs["generated"] = re.compile(
+        r"^[/*#]+ +.* DO NOT EDIT\.$", re.MULTILINE)
     return regexs
 
 

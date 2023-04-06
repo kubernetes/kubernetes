@@ -26,15 +26,14 @@ def get_gomod_dependencies(rootdir, components):
         with open(os.path.join(rootdir, component, "go.mod")) as f:
             print((component + " dependencies"))
             all_dependencies[component] = []
-            lines = list(set(f))
-            lines.sort()
+            lines = sorted(set(f))
             for line in lines:
                 for dep in components:
                     if dep == component:
                         continue
                     if ("k8s.io/" + dep + " =>") not in line:
                         continue
-                    print(("\t"+dep))
+                    print(("\t" + dep))
                     if dep not in all_dependencies[component]:
                         all_dependencies[component].append(dep)
     return all_dependencies
@@ -60,11 +59,13 @@ def main():
     try:
         import yaml
     except ImportError:
-        print(("Please install missing pyyaml module and re-run %s" % sys.argv[0]))
+        print(("Please install missing pyyaml module and re-run %s" %
+              sys.argv[0]))
         sys.exit(1)
     rules_dependencies = get_rules_dependencies(rootdir + rules_file)
 
-    gomod_dependencies = get_gomod_dependencies(rootdir + '/staging/src/k8s.io/', components)
+    gomod_dependencies = get_gomod_dependencies(
+        rootdir + '/staging/src/k8s.io/', components)
 
     processed_repos = []
     for rule in rules_dependencies["rules"]:
@@ -75,23 +76,34 @@ def main():
             # Make sure we don't include a rule to publish it from master
             for branch in rule["branches"]:
                 if branch["name"] == "master":
-                    raise Exception("cannot find master branch for destination %s" % rule["destination"])
+                    raise Exception(
+                        "cannot find master branch for destination %s" %
+                        rule["destination"])
             # And skip validation of publishing rules for it
             continue
 
         for item in rule["branches"]:
             if not item["source"]["dir"].endswith(rule["destination"]):
-                raise Exception("copy/paste error `%s` refers to `%s`" % (rule["destination"],item["source"]["dir"]))
+                raise Exception(
+                    "copy/paste error `%s` refers to `%s`" %
+                    (rule["destination"], item["source"]["dir"]))
 
         if branch["name"] != "master":
-            raise Exception("cannot find master branch for destination %s" % rule["destination"])
+            raise Exception(
+                "cannot find master branch for destination %s" %
+                rule["destination"])
         if branch["source"]["branch"] != "master":
-            raise Exception("cannot find master source branch for destination %s" % rule["destination"])
+            raise Exception(
+                "cannot find master source branch for destination %s" %
+                rule["destination"])
 
         # we specify the go version for all master branches through `default-go-version`
-        # so ensure we don't specify explicit go version for master branch in rules
+        # so ensure we don't specify explicit go version for master branch in
+        # rules
         if "go" in branch:
-            raise Exception("go version must not be specified for master branch for destination %s" % rule["destination"])
+            raise Exception(
+                "go version must not be specified for master branch for destination %s" %
+                rule["destination"])
 
         print(("processing : %s" % rule["destination"]))
         if rule["destination"] not in gomod_dependencies:
@@ -104,23 +116,33 @@ def main():
                 for dep2 in branch["dependencies"]:
                     processed_deps.append(dep2["repository"])
                     if dep2["branch"] != "master":
-                        raise Exception("Looking for master branch and found : %s for destination", dep2,
-                                        rule["destination"])
+                        raise Exception(
+                            "Looking for master branch and found : %s for destination",
+                            dep2, rule["destination"])
                     if dep2["repository"] == dep:
                         found = True
             else:
-                raise Exception(
-                    "Please add %s as dependencies under destination %s in %s" % (gomod_dependencies[rule["destination"]], rule["destination"], rules_file))
+                raise Exception("Please add %s as dependencies under destination %s in %s" % (
+                    gomod_dependencies[rule["destination"]], rule["destination"], rules_file))
             if not found:
-                raise Exception("Please add %s as a dependency under destination %s in %s" % (dep, rule["destination"], rules_file))
+                raise Exception(
+                    "Please add %s as a dependency under destination %s in %s" %
+                    (dep, rule["destination"], rules_file))
             else:
                 print(("  found dependency %s" % dep))
-        extraDeps = set(processed_deps) - set(gomod_dependencies[rule["destination"]])
+        extraDeps = set(
+            processed_deps) - set(gomod_dependencies[rule["destination"]])
         if len(extraDeps) > 0:
-            raise Exception("extra dependencies in rules for %s: %s" % (rule["destination"], ','.join(str(s) for s in extraDeps)))
+            raise Exception(
+                "extra dependencies in rules for %s: %s" %
+                (rule["destination"], ','.join(
+                    str(s) for s in extraDeps)))
     items = set(gomod_dependencies.keys()) - set(processed_repos)
     if len(items) > 0:
-        raise Exception("missing rules for %s" % ','.join(str(s) for s in items))
+        raise Exception(
+            "missing rules for %s" %
+            ','.join(
+                str(s) for s in items))
     print("Done.")
 
 
