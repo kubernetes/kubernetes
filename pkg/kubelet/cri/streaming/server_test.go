@@ -43,6 +43,9 @@ const (
 	testAddr         = "localhost:12345"
 	testContainerID  = "container789"
 	testPodSandboxID = "pod0987"
+	testPodUid       = "podUid0987"
+	testPodName      = "test-pod"
+	testPodNamespace = "test-pod-ns"
 )
 
 func TestGetExec(t *testing.T) {
@@ -277,6 +280,9 @@ func TestServePortForward(t *testing.T) {
 
 	resp, err := s.GetPortForward(&runtimeapi.PortForwardRequest{
 		PodSandboxId: testPodSandboxID,
+		PodUid:       testPodUid,
+		PodName:      testPodName,
+		PodNamespace: testPodNamespace,
 	})
 	require.NoError(t, err)
 	reqURL, err := url.Parse(resp.Url)

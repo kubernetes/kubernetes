@@ -375,6 +375,9 @@ func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName,
 	}
 	req := &runtimeapi.PortForwardRequest{
 		PodSandboxId: sandboxIDs[0],
+		PodName:      podName,
+		PodNamespace: podNamespace,
+		PodUid:       string(podUID),
 		Port:         ports,
 	}
 	resp, err := m.runtimeService.PortForward(ctx, req)

@@ -52,7 +52,7 @@ type fakePortForwarder struct {
 
 var _ portforward.PortForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) PortForward(_ context.Context, name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+func (pf *fakePortForwarder) PortForward(_ context.Context, uid types.UID, port int32, stream io.ReadWriteCloser) error {
 	defer stream.Close()
 
 	// read from the client
@@ -85,7 +85,7 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 			received: make(map[int32]string),
 			send:     serverSends,
 		}
-		portforward.ServePortForward(w, req, pf, "pod", "uid", nil, 0, 10*time.Second, portforward.SupportedProtocols)
+		portforward.ServePortForward(w, req, pf, "pod", "namespace", "sandboxId", types.UID("uid"), nil, 10*time.Second, 10*time.Second, portforward.SupportedProtocols)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]

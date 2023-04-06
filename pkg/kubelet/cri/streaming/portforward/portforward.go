@@ -31,7 +31,7 @@ import (
 // in a pod.
 type PortForwarder interface {
 	// PortForwarder copies data between a data stream and a port in a pod.
-	PortForward(ctx context.Context, name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
+	PortForward(ctx context.Context, sandboxId types.UID, port int32, stream io.ReadWriteCloser) error
 }
 
 // ServePortForward handles a port forwarding request.  A single request is
@@ -39,12 +39,12 @@ type PortForwarder interface {
 // been timed out due to idleness. This function handles multiple forwarded
 // connections; i.e., multiple `curl http://localhost:8888/` requests will be
 // handled by a single invocation of ServePortForward.
-func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder PortForwarder, podName string, uid types.UID, portForwardOptions *V4Options, idleTimeout time.Duration, streamCreationTimeout time.Duration, supportedProtocols []string) {
+func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder PortForwarder, podName, podNamespace, podSandboxId string, uid types.UID, portForwardOptions *V4Options, idleTimeout time.Duration, streamCreationTimeout time.Duration, supportedProtocols []string) {
 	var err error
 	if wsstream.IsWebSocketRequest(req) {
-		err = handleWebSocketStreams(req, w, portForwarder, podName, uid, portForwardOptions, supportedProtocols, idleTimeout, streamCreationTimeout)
+		err = handleWebSocketStreams(req, w, portForwarder, podName, podNamespace, podSandboxId, uid, portForwardOptions, supportedProtocols, idleTimeout, streamCreationTimeout)
 	} else {
-		err = handleHTTPStreams(req, w, portForwarder, podName, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
+		err = handleHTTPStreams(req, w, portForwarder, podName, podNamespace, podSandboxId, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
 	}
 
 	if err != nil {

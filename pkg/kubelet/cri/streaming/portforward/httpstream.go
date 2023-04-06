@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName, podNamespace, podSandboxId string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
 	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
@@ -60,6 +60,8 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 		streamPairs:           make(map[string]*httpStreamPair),
 		streamCreationTimeout: streamCreationTimeout,
 		pod:                   podName,
+		namespace:             podNamespace,
+		sandboxId:             podSandboxId,
 		uid:                   uid,
 		forwarder:             portForwarder,
 	}
@@ -110,6 +112,8 @@ type httpStreamHandler struct {
 	streamPairs           map[string]*httpStreamPair
 	streamCreationTimeout time.Duration
 	pod                   string
+	namespace             string
+	sandboxId             string
 	uid                   types.UID
 	forwarder             PortForwarder
 }
@@ -249,11 +253,11 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
-	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
+	err := h.forwarder.PortForward(ctx, types.UID(h.sandboxId), int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
 	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
+		msg := fmt.Errorf("error forwarding port %d to pod %s/%s, uid %v: %v", port, h.namespace, h.pod, h.uid, err)
 		utilruntime.HandleError(msg)
 		fmt.Fprint(p.errorStream, msg.Error())
 	}
