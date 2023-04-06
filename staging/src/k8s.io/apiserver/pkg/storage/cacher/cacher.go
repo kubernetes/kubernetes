@@ -592,6 +592,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		identifier,
 	)
 
+	forceAllEvents, err := c.waitUntilWatchCacheFreshAndForceAllEvents(ctx, requestedWatchRV, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
+
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
 	// on return from this function.
@@ -599,10 +604,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	forceAllEvents, err := c.waitUntilWatchCacheFreshAndForceAllEvents(ctx, requestedWatchRV, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
-	}
+
 	startWatchRV := startWatchResourceVersionFn()
 	var cacheInterval *watchCacheInterval
 	if forceAllEvents {
