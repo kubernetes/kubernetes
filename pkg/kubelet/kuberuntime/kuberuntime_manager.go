@@ -850,8 +850,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 		// We should not create a sandbox for a Pod if initialization is done and there is no container to start.
 		if len(containersToStart) == 0 {
-			_, hasInitialized := m.findInitContainersToRun(pod, podStatus)
-			if hasInitialized {
+			initContainersToRun, hasInitialized := m.findInitContainersToRun(pod, podStatus)
+			if len(initContainersToRun) == 0 && hasInitialized {
 				changes.CreateSandbox = false
 				return changes
 			}
