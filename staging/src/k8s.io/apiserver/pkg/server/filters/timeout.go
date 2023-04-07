@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"runtime"
@@ -95,6 +96,11 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var tw timeoutWriter
 	tw, w = newTimeoutWriter(w)
 
+	var reqBodyReader *timeoutReader
+	if r.Body != http.NoBody && r.Body != nil {
+		reqBodyReader = &timeoutReader{ReadCloser: r.Body}
+		r.Body = reqBodyReader
+	}
 	// Make a copy of request and work on it in new goroutine
 	// to avoid race condition when accessing/modifying request (e.g. headers)
 	rCopy := r.Clone(r.Context())
@@ -146,6 +152,9 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return false
 		})
 		defer postTimeoutFn()
+		if reqBodyReader != nil {
+			reqBodyReader.timeout()
+		}
 		tw.timeout(err)
 	}
 }
@@ -307,4 +316,38 @@ func (tw *baseTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		tw.hijacked = true
 	}
 	return conn, rw, err
+}
+
+// timeoutReader wraps a http.Request.Body (an io.ReadCloser) to make
+// read calls fail once the timeout has occurred.
+type timeoutReader struct {
+	lock sync.Mutex
+	io.ReadCloser
+	timedOut bool
+}
+
+func (tr *timeoutReader) timeout() {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+	tr.timedOut = true
+}
+
+func (tr *timeoutReader) Read(b []byte) (int, error) {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+
+	if tr.timedOut {
+		return 0, http.ErrHandlerTimeout
+	}
+	return tr.ReadCloser.Read(b)
+}
+
+func (tr *timeoutReader) Close() error {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+
+	if tr.timedOut {
+		return http.ErrHandlerTimeout
+	}
+	return tr.ReadCloser.Close()
 }

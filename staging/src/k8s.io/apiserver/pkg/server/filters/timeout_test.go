@@ -23,6 +23,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -523,6 +525,133 @@ func isStackTraceLoggedByRuntime(message string) bool {
 	}
 
 	return false
+}
+
+func TestRequestBodyReadWithTimeoutHandler(t *testing.T) {
+	waitCh := make(chan struct{})
+	var handlerInvoked int64
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// this handler will be executed by the timeout handler in a separate
+		// goroutine, and we intentionally block here so the request times out.
+		<-waitCh
+
+		// the following activity will happen after the timeout
+		// handler has timed out the request (goroutine A).
+		if _, err := ioutil.ReadAll(req.Body); err != http.ErrHandlerTimeout {
+			t.Errorf("expected error: %v, but got: %v", http.ErrHandlerTimeout, err)
+		}
+		atomic.AddInt64(&handlerInvoked, 1)
+	})
+	handler = WithTimeoutForNonLongRunningRequests(handler, func(r *http.Request, requestInfo *request.RequestInfo) bool {
+		return false
+	})
+
+	cancelCh := make(chan context.CancelFunc, 1)
+	var wrappedRequestBody bool
+	timeoutHandlerDoneCh := make(chan struct{})
+	handler = func(inner http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// this is the first filter to execute, and it will execute the
+			// timeout handler. wire a cancellable context to the request
+			// so we can control the timeout
+			ctx, cancel := context.WithCancel(req.Context())
+			cancelCh <- cancel
+			ctx = request.WithRequestInfo(ctx, &request.RequestInfo{})
+			req = req.WithContext(ctx)
+
+			var bw bodyWrapper
+			if req.Body != nil && req.Body != http.NoBody {
+				bw.ReadCloser = req.Body
+				bw.record = func(n int64) {}
+				req.Body = &bw
+				wrappedRequestBody = true
+			}
+
+			inner.ServeHTTP(w, req)
+			close(timeoutHandlerDoneCh)
+
+			<-waitCh
+
+			// the following activity will happen after the timeout
+			// handler has timed out the request (goroutine B)
+			if _, err := ioutil.ReadAll(req.Body); err != http.ErrHandlerTimeout {
+				t.Errorf("expected error: %v, but got: %v", http.ErrHandlerTimeout, err)
+			}
+			atomic.AddInt64(&handlerInvoked, 1)
+		})
+	}(handler)
+
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	client := &http.Client{}
+	body := bytes.NewBuffer([]byte(strings.Repeat("hello", 10000)))
+	req, err := http.NewRequest(http.MethodPatch, ts.URL, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct {
+		resp *http.Response
+		err  error
+	}
+	resultCh := make(chan result)
+	go func() {
+		resp, err := client.Do(req)
+		resultCh <- result{resp: resp, err: err}
+	}()
+
+	// let the request timeout
+	cancel := <-cancelCh
+	if cancel == nil {
+		t.Fatalf("expected cancel to be set")
+	}
+	cancel()
+	<-timeoutHandlerDoneCh
+	// unblock both goroutines A and B, so both can access the
+	// Request.Body at the same time.
+	close(waitCh)
+
+	resultGot := <-resultCh
+	if resultGot.err != nil {
+		t.Errorf("expected an HTTP response")
+		return
+	}
+	if !wrappedRequestBody {
+		t.Errorf("expected the request body to be wrapped by %T", bodyWrapper{})
+	}
+	defer resultGot.resp.Body.Close()
+	statusGot := resultGot.resp.StatusCode
+	if statusGot != http.StatusGatewayTimeout {
+		t.Errorf("expected Status Code: %d, but got: %d", http.StatusServiceUnavailable, statusGot)
+	}
+	if atomic.LoadInt64(&handlerInvoked) != 2 {
+		t.Errorf("expected both the handlers to be executed")
+	}
+}
+
+// copied from otelhttp
+// bodyWrapper wraps a http.Request.Body (an io.ReadCloser) to track the number
+// of bytes read and the last error.
+type bodyWrapper struct {
+	io.ReadCloser
+	record func(n int64) // must not be nil
+
+	read int64
+	err  error
+}
+
+func (w *bodyWrapper) Read(b []byte) (int, error) {
+	n, err := w.ReadCloser.Read(b)
+	n1 := int64(n)
+	w.read += n1
+	w.err = err
+	w.record(n1)
+	return n, err
+}
+
+func (w *bodyWrapper) Close() error {
+	return w.ReadCloser.Close()
 }
 
 var tsCrt = []byte(`-----BEGIN CERTIFICATE-----
