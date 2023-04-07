@@ -35,6 +35,10 @@ var (
 		The edit command allows you to directly edit any API resource you can retrieve via the
 		command-line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
 		environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
+		When attempting to open the editor, it will first attempt to use the shell
+		that has been defined in the 'SHELL' environment variable. If this is not defined,
+		the default shell will be used, which is '/bin/bash' for Linux or 'cmd' for Windows.
+
 		You can edit multiple objects, although changes are applied one at a time. The command
 		accepts file names as well as command-line arguments, although the files you point to must
 		be previously saved versions of resources.
