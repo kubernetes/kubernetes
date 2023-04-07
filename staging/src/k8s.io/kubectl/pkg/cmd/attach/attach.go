@@ -17,7 +17,6 @@ limitations under the License.
 package attach
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -156,11 +155,8 @@ type DefaultRemoteAttach struct{}
 
 // Attach executes attach to a running container
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
-	if err != nil {
-		return err
-	}
-	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	exec := remotecommand.NewWebSocketExecutor(config, method, url.String())
+	return exec.Stream(remotecommand.StreamOptions{
 		Stdin:             stdin,
 		Stdout:            stdout,
 		Stderr:            stderr,
