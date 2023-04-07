@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	gwebsocket "github.com/gorilla/websocket"
 
@@ -43,6 +44,11 @@ const (
 	streamStdErr = 2
 	streamErr    = 3
 	streamResize = 4
+
+	pingReadDeadline = 60 * time.Second
+	// should be less than pingReadDeadline
+	pingWriteDeadline = 10 * time.Second
+	PingPeriod        = 5 * time.Second
 )
 
 var (
@@ -125,10 +131,14 @@ type wsStreamCreator struct {
 }
 
 func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
-	return &wsStreamCreator{
+	ws := &wsStreamCreator{
 		conn:    conn,
 		streams: map[byte]*stream{},
 	}
+
+	go ws.sendPings(PingPeriod)
+
+	return ws
 }
 
 func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
@@ -150,11 +160,52 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 		id:        id,
 	}
 	c.streams[id] = s
+
 	return s, nil
+}
+
+func (c *wsStreamCreator) sendPings(period time.Duration) {
+	c.connMu.Lock()
+	closedCh := make(chan struct{})
+	closeHandler := c.conn.CloseHandler()
+	c.conn.SetCloseHandler(func(code int, text string) error {
+		close(closedCh)
+		return closeHandler(code, text)
+	})
+	c.connMu.Unlock()
+	t := time.NewTicker(period)
+	defer t.Stop()
+	for {
+		select {
+		case <-closedCh:
+			return
+		case <-t.C:
+			c.connMu.Lock()
+			if err := c.conn.WriteControl(gwebsocket.PingMessage, nil, time.Now().Add(period)); err != nil {
+				klog.Infof("Websocket Ping failed: %v", err)
+				// Continue, in case this is a transient failure.
+				// c.conn.CloseChan above will tell us when the connection is
+				// actually closed.
+			} else {
+				klog.Infof("Websocket Ping succeeeded")
+			}
+			c.connMu.Unlock()
+		}
+	}
 }
 
 func (c *wsStreamCreator) Run() {
 	readBuffer := make([]byte, 32*1024) // same as io.Copy()
+	if err := c.conn.SetReadDeadline(time.Now().Add(pingReadDeadline)); err != nil {
+		klog.Infof("Websocket setting read deadline failed %v", err)
+	}
+	c.conn.SetPongHandler(func(string) error {
+		err := c.conn.SetReadDeadline(time.Now().Add(pingReadDeadline))
+		if err != nil {
+			klog.Infof("Websocket setting read deadline failed %v", err)
+		}
+		return nil
+	})
 	for {
 		messageType, r, err := c.conn.NextReader()
 		if err != nil {
@@ -239,7 +290,11 @@ func (s *stream) Write(p []byte) (n int, err error) {
 	if s.conn == nil {
 		return 0, fmt.Errorf("write on closed stream %d", s.id)
 	}
-	// TODO s.conn.SetWriteDeadline()
+
+	err = s.conn.SetWriteDeadline(time.Now().Add(pingWriteDeadline))
+	if err != nil {
+		klog.Infof("Websocket setting write deadline failed %v", err)
+	}
 	// Message writer buffers the message data, so we don't need to do that ourselves.
 	// Just write id and the data as two separate writes to avoid allocating an intermediate buffer.
 	w, err := s.conn.NextWriter(gwebsocket.BinaryMessage)
