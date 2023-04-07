@@ -44,40 +44,37 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-verbose_out = sys.stderr if args.verbose else open("/dev/null", "w")
+verbose_out = sys.stderr if args.verbose else open(os.devnull, "w")
 
 
-def get_refs():
+def get_refs(boilerplate_dir):
     refs = {}
 
-    for path in glob.glob(os.path.join(args.boilerplate_dir, "boilerplate.*.txt")):
+    for path in glob.glob(os.path.join(boilerplate_dir, "boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
-        ref_file = open(path, 'r')
-        ref = ref_file.read().splitlines()
-        ref_file.close()
-        refs[extension] = ref
+        with open(path, 'r') as ref_file:
+            ref = ref_file.read().splitlines()
+            refs[extension] = ref
 
     return refs
 
 
-def is_generated_file(filename, data, regexs):
+def is_generated_file(data, regexs):
     p = regexs["generated"]
     return p.search(data)
 
 
 def file_passes(filename, refs, regexs):
     try:
-        f = open(filename, 'r')
+        with open(filename, 'r') as f:
+            data = f.read()
     except Exception as exc:
         print("Unable to open %s: %s" % (filename, exc), file=verbose_out)
         return False
 
-    data = f.read()
-    f.close()
-
     # determine if the file is automatically generated
-    generated = is_generated_file(filename, data, regexs)
+    generated = is_generated_file(data, regexs)
 
     basename = os.path.basename(filename)
     extension = file_extension(filename)
@@ -222,7 +219,7 @@ def get_regexs():
 
 def main():
     regexs = get_regexs()
-    refs = get_refs()
+    refs = get_refs(args.boilerplate_dir)
     filenames = get_files(list(refs.keys()))
 
     for filename in filenames:
