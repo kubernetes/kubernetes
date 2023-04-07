@@ -404,6 +404,90 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2))
 	})
 
+	ginkgo.It("should not restart succeeded containers when pod restartPolicy is OnFailure", func() {
+		init1 := "init-1"
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		regular3 := "regular-3"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "initcontainer-test-pod-with-post-start",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyOnFailure,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: busyboxImage,
+						Command: ExecCommand(init1, execCommand{
+							Delay:    1,
+							ExitCode: 0,
+						}),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    1,
+							ExitCode: 1,
+						}),
+					},
+					{
+						Name:  regular2,
+						Image: busyboxImage,
+						Command: ExecCommand(regular2, execCommand{
+							Delay:    1,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:  regular3,
+						Image: busyboxImage,
+						Command: ExecCommand(regular3, execCommand{
+							Delay:    120,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(context.TODO(), podSpec)
+		ginkgo.By("Waiting for the regular3 container to finish")
+		err := e2epod.WaitForPodCondition(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, "regular3 container completed", 5*time.Minute, func(pod *v1.Pod) (bool, error) {
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.Name == regular3 &&
+					containerStatus.State.Terminated != nil &&
+					containerStatus.State.Terminated.ExitCode == 0 {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing results")
+		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(podSpec)
+
+		ginkgo.By("Analyzing results")
+		framework.ExpectNoError(results.StartsBefore(init1, regular1))
+		framework.ExpectNoError(results.ExitsBefore(init1, regular1))
+		framework.ExpectNoError(results.StartsBefore(init1, regular2))
+		framework.ExpectNoError(results.ExitsBefore(init1, regular2))
+
+		framework.ExpectNoError(results.RunTogether(regular1, regular2))
+		framework.ExpectNoError(results.DoesntRestart(init1))
+		framework.ExpectNoError(results.DoesntRestart(regular2))
+		framework.ExpectNoError(results.DoesntRestart(regular3))
+	})
 })
 
 type containerOutput struct {
@@ -505,6 +589,21 @@ func (o containerOutputList) Exits(name string) error {
 	if idx := o.findIndex(name, "Exiting", 0); idx == -1 {
 		return fmt.Errorf("couldn't find that %s ever exited, got %v", name, o)
 	}
+	return nil
+}
+
+// DoesntRestart returns an error if the container was found to have restarted
+func (o containerOutputList) DoesntRestart(name string) error {
+	exitIdx := o.findIndex(name, "Starting", 0)
+	if exitIdx == -1 {
+		return nil
+	}
+
+	restartIdx := o.findIndex(name, "Starting", exitIdx+1)
+	if restartIdx != -1 {
+		return fmt.Errorf("found %s restarted, but didn't expect to, got %v", name, o)
+	}
+
 	return nil
 }
 
