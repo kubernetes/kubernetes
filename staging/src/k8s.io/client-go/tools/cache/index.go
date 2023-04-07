@@ -94,7 +94,8 @@ type Object struct {
 	obj interface{}
 }
 
-// Index maps the indexed value to a set of keys in the store that match on that value
+// Index maps the indexed value to a set of keys in the store that match on that value,
+// and to the wrapped original object.
 type Index map[string]map[string]*Object
 
 // Indexers maps a name to an IndexFunc

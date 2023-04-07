@@ -17,12 +17,12 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func testIndexFunc(obj interface{}) ([]string, error) {
@@ -129,5 +129,22 @@ func TestMultiIndexKeys(t *testing.T) {
 		if bertPod.(*v1.Pod).Name != "one" {
 			t.Errorf("Expected only 'one' but got %s", bertPod.(*v1.Pod).Name)
 		}
+	}
+
+	// Test optimized code path in storeIndex.updateIndices when object is changed,
+	// but indices are not rebuilt.
+	anotherCopyOfPod2 := copyOfPod2.DeepCopy()
+	anotherCopyOfPod2.Annotations["new annotation"] = "test"
+	index.Update(anotherCopyOfPod2)
+	oscarPods, err := index.ByIndex("byUser", "oscar")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(oscarPods) != 1 {
+		t.Errorf("Expected 1 pods but got %v", len(bertPods))
+	}
+	oscarPod := oscarPods[0].(*v1.Pod)
+	if oscarPod.Annotations["new annotation"] != "test" {
+		t.Errorf("Expected only 'test' but got %s", oscarPod.Annotations["new annotation"])
 	}
 }

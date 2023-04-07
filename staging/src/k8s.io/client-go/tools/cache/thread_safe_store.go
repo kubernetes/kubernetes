@@ -88,23 +88,21 @@ func (i *storeIndex) getObjectsByObject(indexName string, obj interface{}) ([]in
 func (i *storeIndex) getObjectsByIndexValues(indexName string, indexedValues []string) ([]interface{}, error) {
 	var result []interface{}
 	index := i.indices[indexName]
-	resultSet := sets.Set[*Object]{}
 
 	if len(indexedValues) == 1 {
 		// In majority of cases, there is exactly one value matching.
 		// Optimize the most common path - deduping is not needed here.
 		result = make([]interface{}, 0, len(index[indexedValues[0]]))
-		resultSet = index[indexedValues[0]]
 		for _, val := range index[indexedValues[0]] {
 			result = append(result, val.obj)
 		}
 	} else {
 		// Need to de-dupe the return list.
 		// Since multiple keys are allowed, this can happen.
-		resultSet := sets.Set[*Object]{}
+		resultSet := make(map[*Object]struct{})
 		for _, indexedValue := range indexedValues {
 			for _, val := range index[indexedValue] {
-				resultSet.Insert(val)
+				resultSet[val] = struct{}{}
 			}
 		}
 		for obj := range resultSet {
@@ -152,16 +150,15 @@ func (i *storeIndex) addIndexers(newIndexers Indexers) error {
 }
 
 // updateIndices modifies the objects location in the managed indexes:
-// - for create you must provide only the newObj
-// - for update you must provide both the oldObj and the newObj
-// - for delete you must provide only the oldObj
+// - for create or update you must provide newObj and cachedObj
+// - for delete you must provide only the cachedObj
 // updateIndices must be called from a function that already has a lock on the cache
-func (i *storeIndex) updateIndices(oldObj, newObj *Object, key string) {
+func (i *storeIndex) updateIndices(newObj interface{}, cachedWrappedObj *Object, key string) {
 	var oldIndexValues, indexValues []string
 	var err error
 	for name, indexFunc := range i.indexers {
-		if oldObj != nil {
-			oldIndexValues, err = indexFunc(oldObj.obj)
+		if cachedWrappedObj != nil && cachedWrappedObj.obj != nil {
+			oldIndexValues, err = indexFunc(cachedWrappedObj.obj)
 		} else {
 			oldIndexValues = oldIndexValues[:0]
 		}
@@ -170,7 +167,7 @@ func (i *storeIndex) updateIndices(oldObj, newObj *Object, key string) {
 		}
 
 		if newObj != nil {
-			indexValues, err = indexFunc(newObj.obj)
+			indexValues, err = indexFunc(newObj)
 		} else {
 			indexValues = indexValues[:0]
 		}
@@ -193,7 +190,7 @@ func (i *storeIndex) updateIndices(oldObj, newObj *Object, key string) {
 			i.deleteKeyFromIndex(key, value, index)
 		}
 		for _, value := range indexValues {
-			i.addKeyToIndex(key, value, index, newObj)
+			i.addKeyToIndex(key, value, index, cachedWrappedObj)
 		}
 	}
 }
@@ -238,17 +235,20 @@ func (c *threadSafeMap) Update(key string, obj interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	oldObject := c.items[key]
-	wrappedObj := &Object{obj: obj}
-	c.items[key] = wrappedObj
-	c.index.updateIndices(oldObject, wrappedObj, key)
+	wrappedObj, ok := c.items[key]
+	if !ok {
+		wrappedObj = &Object{}
+		c.items[key] = wrappedObj
+	}
+	c.index.updateIndices(obj, wrappedObj, key)
+	wrappedObj.obj = obj
 }
 
 func (c *threadSafeMap) Delete(key string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if obj, exists := c.items[key]; exists {
-		c.index.updateIndices(obj, nil, key)
+		c.index.updateIndices(nil, obj, key)
 		delete(c.items, key)
 	}
 }
