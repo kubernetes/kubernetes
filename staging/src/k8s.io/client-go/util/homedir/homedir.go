@@ -18,6 +18,7 @@ package homedir
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 )
@@ -28,6 +29,10 @@ import (
 // 2. if none of those locations contain a `.kube\config` file, the first of %HOME%, %USERPROFILE%, %HOMEDRIVE%%HOMEPATH% that exists and is writeable is returned.
 // 3. if none of those locations are writeable, the first of %HOME%, %USERPROFILE%, %HOMEDRIVE%%HOMEPATH% that exists is returned.
 // 4. if none of those locations exists, the first of %HOME%, %USERPROFILE%, %HOMEDRIVE%%HOMEPATH% that is set is returned.
+// On other OS:
+// 1. if $SNAP_REAL_HOME containing a `.kube\config` file, it will get returned.
+// 2. if $HOME is unset, try os/user.HomeDir and return it.
+// 3. if none of those locations are available, return $HOME anyway.
 func HomeDir() string {
 	if runtime.GOOS == "windows" {
 		home := os.Getenv("HOME")
@@ -88,5 +93,23 @@ func HomeDir() string {
 		// We've got nothing
 		return ""
 	}
+
+	// Return $SNAP_REAL_HOME when in snap and it contains a `.kube\config` file
+	// https://github.com/snapcore/snapd/pull/9189
+	if value, ok := os.LookupEnv("SNAP_REAL_HOME"); ok {
+		if _, err := os.Stat(filepath.Join(value, ".kube", "config")); err == nil {
+			return value
+		}
+	}
+
+	// Try os/user.HomeDir when $HOME is unset.
+	if _, ok := os.LookupEnv("HOME"); !ok {
+		u, err := user.Current()
+		if err == nil {
+			return u.HomeDir
+		}
+	}
+
+	// Return $HOME anyway
 	return os.Getenv("HOME")
 }
