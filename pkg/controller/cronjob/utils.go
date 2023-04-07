@@ -106,9 +106,13 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	if timeBetweenTwoSchedules < 1 {
 		return earliestTime, nil, 0, fmt.Errorf("time difference between two schedules is less than 1 second")
 	}
-	timeElapsed := int64(now.Sub(t1).Seconds())
-	numberOfMissedSchedules := (timeElapsed / timeBetweenTwoSchedules) + 1
-	mostRecentTime := time.Unix(t1.Unix()+((numberOfMissedSchedules-1)*timeBetweenTwoSchedules), 0).UTC()
+
+	var numberOfMissedSchedules int64
+	var mostRecentTime time.Time
+	for t := schedule.Next(earliestTime); !t.After(now); t = schedule.Next(t) {
+		numberOfMissedSchedules++
+		mostRecentTime = t
+	}
 
 	return earliestTime, &mostRecentTime, numberOfMissedSchedules, nil
 }

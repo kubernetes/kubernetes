@@ -25,7 +25,7 @@ import (
 
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -345,6 +345,24 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			expectedRecentTime:     deltaTimeAfterTopOfTheHour(300 * time.Minute),
 			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(10 * time.Second),
 			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(1471 * time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(1470 * time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 3,
 		},
 		{
 			name: "rogue cronjob",
