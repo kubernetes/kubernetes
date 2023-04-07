@@ -119,7 +119,7 @@ func (i *storeIndex) getKeysByIndex(indexName, indexedValue string) ([]string, e
 	}
 
 	index := i.indices[indexName]
-	keys := make([]string, 0)
+	keys := make([]string, 0, len(index[indexedValue]))
 	for key := range index[indexedValue] {
 		keys = append(keys, key)
 	}
