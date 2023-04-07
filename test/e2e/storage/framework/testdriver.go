@@ -185,8 +185,14 @@ const (
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
 
-	// Anti-capability for drivers that do not support filesystem resizing of PVCs that are cloned or restored from a snapshot.
+	// Anti-capability for drivers that do not support filesystem resizing of PVCs
+	// that are cloned or restored from a snapshot.
 	CapFSResizeFromSourceNotSupported Capability = "FSResizeFromSourceNotSupported"
+
+	// Anti-capability for drivers that do not support filesystem resizing of PVCs
+	// that are cloned or restored from a snapshot specifically in ReadOnlyMany
+	// mode.
+	CapFSROXResizeFromSourceNotSupported Capability = "FSROXResizeFromSourceNotSupported"
 
 	// To support ReadWriteOncePod, the following CSI sidecars must be
 	// updated to these versions or greater:

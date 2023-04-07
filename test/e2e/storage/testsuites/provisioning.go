@@ -622,8 +622,13 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			l.testCase.Claim = claim
 			l.testCase.TestDynamicProvisioning(ctx)
 
-			// Do not proceed to fs size check for block file systems
+			// Do not proceed to fs size check for block file systems, or drivers
+			// that support fs resize in ROX mode
 			if pattern.VolMode == "Block" {
+				continue
+			}
+
+			if dInfo.Capabilities[storageframework.CapFSROXResizeFromSourceNotSupported] {
 				continue
 			}
 
