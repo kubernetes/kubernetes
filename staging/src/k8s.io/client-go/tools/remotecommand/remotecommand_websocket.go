@@ -107,13 +107,13 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 	var streamer streamProtocolHandler
 
 	streamingProto := conn.Subprotocol()
-	klog.V(4).Infof("The protocol is %s", streamingProto)
+	klog.Infof("The protocol is %s", streamingProto)
 
 	switch streamingProto {
 	case remotecommand.StreamProtocolV4Name:
 		streamer = newStreamProtocolV4(options)
 	case "":
-		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		klog.Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
 		streamer = newStreamProtocolV1(options)
@@ -283,8 +283,8 @@ func (s *stream) Read(p []byte) (n int, err error) {
 
 // Write writes directly to the underlying WebSocket connection.
 func (s *stream) Write(p []byte) (n int, err error) {
-	klog.V(4).Infof("Write() on stream %d", s.id)
-	defer klog.V(4).Infof("Write() done on stream %d", s.id)
+	klog.Infof("Write() on stream %d", s.id)
+	defer klog.Infof("Write() done on stream %d", s.id)
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	if s.conn == nil {
@@ -316,8 +316,8 @@ func (s *stream) Write(p []byte) (n int, err error) {
 
 // Close half-closes the stream, indicating this side is finished with the stream.
 func (s *stream) Close() error {
-	klog.V(4).Infof("Close() on stream %d", s.id)
-	defer klog.V(4).Infof("Close() done on stream %d", s.id)
+	klog.Infof("Close() on stream %d", s.id)
+	defer klog.Infof("Close() done on stream %d", s.id)
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	if s.id == streamStdIn {
@@ -328,7 +328,7 @@ func (s *stream) Close() error {
 		// before closing the WebSockets Connection.
 		//
 		// See https://github.com/kubernetes/kubernetes/issues/89899#issuecomment-1132502190.
-		klog.V(4).Infof("Sending half-close signal on stream %d", s.id)
+		klog.Infof("Sending half-close signal on stream %d", s.id)
 		s.conn.WriteMessage(gwebsocket.BinaryMessage, []byte{s.id})
 	}
 	s.conn = nil
@@ -336,8 +336,8 @@ func (s *stream) Close() error {
 }
 
 func (s *stream) Reset() error {
-	klog.V(4).Infof("Reset() on stream %d", s.id)
-	defer klog.V(4).Infof("Reset() done on stream %d", s.id)
+	klog.Infof("Reset() on stream %d", s.id)
+	defer klog.Infof("Reset() done on stream %d", s.id)
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	s.conn = nil
