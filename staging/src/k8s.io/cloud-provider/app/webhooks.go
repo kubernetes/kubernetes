@@ -58,29 +58,29 @@ type WebhookConfig struct {
 	AdmissionHandler func(*admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error)
 }
 
-type webhookHandler struct {
-	name string
-	path string
+type WebhookHandler struct {
+	Name string
+	Path string
 	http.Handler
-	admissionHandler func(*admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error)
-	completedConfig  *config.CompletedConfig
-	cloud            cloudprovider.Interface
+	AdmissionHandler func(*admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error)
+	CompletedConfig  *config.CompletedConfig
+	Cloud            cloudprovider.Interface
 }
 
-func newWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) map[string]webhookHandler {
-	webhookHandlers := make(map[string]webhookHandler)
+func NewWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) map[string]WebhookHandler {
+	webhookHandlers := make(map[string]WebhookHandler)
 	for name, config := range webhookConfigs {
 		if !genericcontrollermanager.IsControllerEnabled(name, WebhooksDisabledByDefault, completedConfig.ComponentConfig.Webhook.Webhooks) {
 			klog.Warningf("Webhook %q is disabled", name)
 			continue
 		}
 		klog.Infof("Webhook enabled: %q", name)
-		webhookHandlers[name] = webhookHandler{
-			name:             name,
-			path:             config.Path,
-			admissionHandler: config.AdmissionHandler,
-			completedConfig:  completedConfig,
-			cloud:            cloud,
+		webhookHandlers[name] = WebhookHandler{
+			Name:             name,
+			Path:             config.Path,
+			AdmissionHandler: config.AdmissionHandler,
+			CompletedConfig:  completedConfig,
+			Cloud:            cloud,
 		}
 	}
 	return webhookHandlers
@@ -91,17 +91,17 @@ func WebhookNames(webhooks map[string]WebhookConfig) []string {
 	return ret.List()
 }
 
-func newHandler(webhooks map[string]webhookHandler) *mux.PathRecorderMux {
+func newHandler(webhooks map[string]WebhookHandler) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager-webhook")
 
 	for _, handler := range webhooks {
-		mux.Handle(handler.path, handler)
+		mux.Handle(handler.Path, handler)
 	}
 
 	return mux
 }
 
-func (h webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	klog.Infof("Received validation request: %q", r.RequestURI)
 
@@ -116,14 +116,14 @@ func (h webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		latency := time.Since(start)
 
 		if statusCode != 0 {
-			recordRequestTotal(ctx, strconv.Itoa(statusCode), h.name)
-			recordRequestLatency(ctx, strconv.Itoa(statusCode), h.name, latency.Seconds())
+			recordRequestTotal(ctx, strconv.Itoa(statusCode), h.Name)
+			recordRequestLatency(ctx, strconv.Itoa(statusCode), h.Name, latency.Seconds())
 			return
 		}
 
 		if err != nil {
-			recordRequestTotal(ctx, "<error>", h.name)
-			recordRequestLatency(ctx, "<error>", h.name, latency.Seconds())
+			recordRequestTotal(ctx, "<error>", h.Name)
+			recordRequestLatency(ctx, "<error>", h.Name, latency.Seconds())
 		}
 	}()
 
@@ -135,7 +135,7 @@ func (h webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admissionResponse, err = h.admissionHandler(in.Request)
+	admissionResponse, err = h.AdmissionHandler(in.Request)
 	if err != nil {
 		e := fmt.Sprintf("error generating admission response: %v", err)
 		klog.Errorf(e)
