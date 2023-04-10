@@ -240,12 +240,22 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		metricTargetType: metricTargetType,
 	}
 	if resourceType == cpuResource {
-		st.initCPUTotal = 250
+		if framework.NodeOSDistroIs("windows") {
+			st.initCPUTotal = 325
+		} else {
+			st.initCPUTotal = 250
+		}
 		st.cpuBurst = 700
 	}
 	if resourceType == memResource {
-		st.initMemTotal = 250
-		st.memBurst = 700
+		if framework.NodeOSDistroIs("windows") {
+			st.initMemTotal = 275
+			st.memBurst = 750
+		} else {
+			st.initMemTotal = 250
+			st.memBurst = 700
+		}
+
 	}
 	st.run(ctx, name, kind, f)
 }
@@ -356,7 +366,13 @@ func scaleUpContainerResource(ctx context.Context, name string, kind schema.Grou
 		st.cpuBurst = 700
 	}
 	if resourceType == memResource {
-		st.initMemTotal = 250
+		if framework.NodeOSDistroIs("windows") {
+			// Windows containers consume 30-40Mb of memory idle, so we need to
+			// lover the initial mem total so we don't scale to 4 replicas on accident.
+			st.initMemTotal = 200
+		} else {
+			st.initMemTotal = 250
+		}
 		st.memBurst = 700
 	}
 	st.run(ctx, name, kind, f)
