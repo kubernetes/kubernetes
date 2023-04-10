@@ -19,7 +19,6 @@ package filters
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -32,137 +31,90 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 )
 
-func TestWithShutdownLateAnnotation(t *testing.T) {
+func TestWithShutdownResponseHeader(t *testing.T) {
 	var (
-		shutdownDelayDuration     = 100 * time.Second
-		signaledAt                = time.Now()
-		elapsedAtWithingThreshold = signaledAt.Add(shutdownDelayDuration - 21*time.Second)
-		elapsedAtBeyondThreshold  = signaledAt.Add(shutdownDelayDuration - 19*time.Second)
+		signaledAt = time.Now()
+		elapsedAt  = signaledAt.Add(20 * time.Second)
 	)
 
 	tests := []struct {
-		name                    string
-		shutdownInitiated       func() lifecycleEvent
-		delayDuration           time.Duration
-		user                    authenticationuser.Info
-		clock                   func() utilsclock.PassiveClock
-		url                     string
-		remoteAddr              string
-		handlerInvoked          int
-		statusCodeExpected      int
-		annotationShouldContain string
+		name               string
+		optIn              bool
+		shutdownInitiated  func() lifecycleEvent
+		delayDuration      time.Duration
+		clock              func() utilsclock.PassiveClock
+		handlerInvoked     int
+		statusCodeExpected int
+		responseHeader     string
 	}{
 		{
-			name: "shutdown is not initiated",
+			name: "client did not opt in",
+			shutdownInitiated: func() lifecycleEvent {
+				return nil
+			},
+			handlerInvoked:     1,
+			statusCodeExpected: http.StatusOK,
+		},
+		{
+			name:  "client opted in, shutdown not initiated",
+			optIn: true,
 			shutdownInitiated: func() lifecycleEvent {
 				return fakeLifecycleSignal{ch: make(chan struct{})}
 			},
+			delayDuration:      10 * time.Second,
 			handlerInvoked:     1,
 			statusCodeExpected: http.StatusOK,
+			responseHeader:     "shutdown=false shutdown-delay-duration=10s elapsed=0s host=foo",
 		},
 		{
-			name: "shutdown initiated, health probes are not annotated",
+			name:          "client opted in, shutdown initiated, signaled at is nil",
+			optIn:         true,
+			delayDuration: 10 * time.Second,
 			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel()}
+				return fakeLifecycleSignal{ch: newClosedChannel(), at: nil}
 			},
-			url:                "/readyz?verbos=1",
-			user:               &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
 			handlerInvoked:     1,
 			statusCodeExpected: http.StatusOK,
+			responseHeader:     "shutdown=true shutdown-delay-duration=10s elapsed=0s host=foo",
 		},
-		// use cases where the request will be annotated
 		{
-			name: "shutdown initiated, no user in request context",
+			name:          "client opted in, shutdown initiated, signaled at is nil",
+			optIn:         true,
+			delayDuration: 10 * time.Second,
+			shutdownInitiated: func() lifecycleEvent {
+				return fakeLifecycleSignal{ch: newClosedChannel(), at: nil}
+			},
+			handlerInvoked:     1,
+			statusCodeExpected: http.StatusOK,
+			responseHeader:     "shutdown=true shutdown-delay-duration=10s elapsed=0s host=foo",
+		},
+		{
+			name:          "client opted in, shutdown delay duration is zero",
+			optIn:         true,
+			delayDuration: 0,
 			shutdownInitiated: func() lifecycleEvent {
 				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
 			},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "self= loopback=",
-		},
-		{
-			name: "shutdown initiated, self=true",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.APIServerUser},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "self=true",
-		},
-		{
-			name: "shutdown initiated, self=false",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "self=false",
-		},
-		{
-			name: "shutdown initiated, loopback=true",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			remoteAddr:              "127.0.0.1:80",
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "loopback=true",
-		},
-		{
-			name: "shutdown initiated, loopback=false",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			remoteAddr:              "www.foo.bar:80",
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "loopback=false",
-		},
-		{
-			name: "shutdown initiated, shutdown delay duration is zero",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			delayDuration: time.Duration(0),
 			clock: func() utilsclock.PassiveClock {
-				return clocktesting.NewFakeClock(elapsedAtWithingThreshold)
+				return clocktesting.NewFakeClock(elapsedAt)
 			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "elapsed=1m19s threshold= late=true",
+			handlerInvoked:     1,
+			statusCodeExpected: http.StatusOK,
+			responseHeader:     "shutdown=true shutdown-delay-duration=0s elapsed=20s host=foo",
 		},
 		{
-			name: "shutdown initiated, within 80%",
+			name:          "client opted in, shutdown initiated, signaled at is valied",
+			optIn:         true,
+			delayDuration: 10 * time.Second,
 			shutdownInitiated: func() lifecycleEvent {
 				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
 			},
-			delayDuration: shutdownDelayDuration,
 			clock: func() utilsclock.PassiveClock {
-				return clocktesting.NewFakeClock(elapsedAtWithingThreshold)
+				return clocktesting.NewFakeClock(elapsedAt)
 			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "elapsed=1m19s threshold=79.00% late=false self=false loopback=false",
-		},
-		{
-			name: "shutdown initiated, outside 80%",
-			shutdownInitiated: func() lifecycleEvent {
-				return fakeLifecycleSignal{ch: newClosedChannel(), at: &signaledAt}
-			},
-			delayDuration: shutdownDelayDuration,
-			clock: func() utilsclock.PassiveClock {
-				return clocktesting.NewFakeClock(elapsedAtBeyondThreshold)
-			},
-			user:                    &authenticationuser.DefaultInfo{Name: authenticationuser.Anonymous},
-			handlerInvoked:          1,
-			statusCodeExpected:      http.StatusOK,
-			annotationShouldContain: "elapsed=1m21s threshold=81.00% late=true self=false loopback=false",
+			handlerInvoked:     1,
+			statusCodeExpected: http.StatusOK,
+			responseHeader:     "shutdown=true shutdown-delay-duration=10s elapsed=20s host=foo",
 		},
 	}
 
@@ -179,33 +131,14 @@ func TestWithShutdownLateAnnotation(t *testing.T) {
 			if test.clock != nil {
 				clock = test.clock()
 			}
-			target := withShutdownLateAnnotation(handler, event, test.delayDuration, exemptIfHealthProbe, clock)
+			target := withShutdownResponseHeader(handler, event, test.delayDuration, "foo", clock)
 
-			url := "/api/v1/namespaces"
-			if test.url != "" {
-				url = test.url
-			}
-			req, err := http.NewRequest(http.MethodGet, url, nil)
+			req, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 			if err != nil {
 				t.Fatalf("failed to create new http request - %v", err)
 			}
-			if test.remoteAddr != "" {
-				req.RemoteAddr = test.remoteAddr
-			}
-
-			ctx := req.Context()
-			if test.user != nil {
-				ctx = apirequest.WithUser(ctx, test.user)
-			}
-			ctx = audit.WithAuditContext(ctx)
-			req = req.WithContext(ctx)
-
-			ac := audit.AuditContextFrom(req.Context())
-			if ac == nil {
-				t.Fatalf("expected audit context inside the request context")
-			}
-			ac.Event = &auditinternal.Event{
-				Level: auditinternal.LevelMetadata,
+			if test.optIn {
+				req.Header.Set("X-Openshift-If-Disruption", "true")
 			}
 
 			w := httptest.NewRecorder()
@@ -219,16 +152,16 @@ func TestWithShutdownLateAnnotation(t *testing.T) {
 				t.Errorf("expected status code: %d, but got: %d", test.statusCodeExpected, w.Result().StatusCode)
 			}
 
-			key := "apiserver.k8s.io/shutdown"
+			key := "X-OpenShift-Disruption"
 			switch {
-			case len(test.annotationShouldContain) == 0:
-				if valueGot, ok := ac.Event.Annotations[key]; ok {
-					t.Errorf("did not expect annotation to be added, but got: %s", valueGot)
+			case len(test.responseHeader) == 0:
+				if valueGot := w.Header().Get(key); len(valueGot) > 0 {
+					t.Errorf("did not expect header to be added to the response, but got: %s", valueGot)
 				}
 			default:
-				if valueGot, ok := ac.Event.Annotations[key]; !ok || !strings.Contains(valueGot, test.annotationShouldContain) {
+				if valueGot := w.Header().Get(key); len(valueGot) == 0 || test.responseHeader != valueGot {
 					t.Logf("got: %s", valueGot)
-					t.Errorf("expected annotation to match, diff: %s", cmp.Diff(test.annotationShouldContain, valueGot))
+					t.Errorf("expected response header to match, diff: %s", cmp.Diff(test.responseHeader, valueGot))
 				}
 			}
 		})

@@ -64,16 +64,20 @@ func exemptIfHealthProbe(r *http.Request) bool {
 	return false
 }
 
-// WithShutdownLateAnnotation, if added to the handler chain, tracks the
-// incoming request(s) after the apiserver has initiated the graceful
-// shutdown, and annoates the audit event for these request(s) with
-// diagnostic information.
-// This enables us to identify the actor(s)/load balancer(s) that are sending
-// requests to the apiserver late during the server termination.
-// It should be placed after (in order of execution) the
-// 'WithAuthentication' filter.
-func WithShutdownLateAnnotation(handler http.Handler, shutdownInitiated lifecycleEvent, delayDuration time.Duration) http.Handler {
-	return withShutdownLateAnnotation(handler, shutdownInitiated, delayDuration, exemptIfHealthProbe, clockutils.RealClock{})
+// WithShutdownResponseHeader, if added to the handler chain, adds a header
+// 'X-OpenShift-Disruption' to the response with the following information:
+//
+//	shutdown={true|false} shutdown-delay-duration=%s elapsed=%s host=%s
+//	 shutdown: whether the server is currently shutting down gracefully.
+//	 shutdown-delay-duration: value of --shutdown-delay-duration server run option
+//	 elapsed: how much time has elapsed since the server received a TERM signal
+//	 host: host name of the server, it is used to identify the server instance
+//	       from the others.
+//
+// This handler will add the response header only if the client opts in by
+// adding the 'X-Openshift-If-Disruption' header to the request.
+func WithShutdownResponseHeader(handler http.Handler, shutdownInitiated lifecycleEvent, delayDuration time.Duration, apiServerID string) http.Handler {
+	return withShutdownResponseHeader(handler, shutdownInitiated, delayDuration, apiServerID, clockutils.RealClock{})
 }
 
 // WithStartupEarlyAnnotation annotates the request with an annotation keyed as
@@ -84,56 +88,36 @@ func WithStartupEarlyAnnotation(handler http.Handler, hasBeenReady lifecycleEven
 	return withStartupEarlyAnnotation(handler, hasBeenReady, exemptIfHealthProbe)
 }
 
-func withShutdownLateAnnotation(handler http.Handler, shutdownInitiated lifecycleEvent, delayDuration time.Duration, shouldExemptFn shouldExemptFunc, clock clockutils.PassiveClock) http.Handler {
+func withShutdownResponseHeader(handler http.Handler, shutdownInitiated lifecycleEvent, delayDuration time.Duration, apiServerID string, clock clockutils.PassiveClock) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if len(req.Header.Get("X-Openshift-If-Disruption")) == 0 {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		msgFn := func(shutdown bool, elapsed time.Duration) string {
+			return fmt.Sprintf("shutdown=%t shutdown-delay-duration=%s elapsed=%s host=%s",
+				shutdown, delayDuration.Round(time.Second).String(), elapsed.Round(time.Second).String(), apiServerID)
+		}
+
 		select {
 		case <-shutdownInitiated.Signaled():
 		default:
+			w.Header().Set("X-OpenShift-Disruption", msgFn(false, time.Duration(0)))
 			handler.ServeHTTP(w, req)
 			return
 		}
 
-		if shouldExemptFn(req) {
-			handler.ServeHTTP(w, req)
-			return
-		}
 		shutdownInitiatedAt := shutdownInitiated.SignaledAt()
 		if shutdownInitiatedAt == nil {
+			w.Header().Set("X-OpenShift-Disruption", msgFn(true, time.Duration(0)))
 			handler.ServeHTTP(w, req)
 			return
 		}
 
-		elapsedSince := clock.Since(*shutdownInitiatedAt)
-		// TODO: 80% is the threshold, if requests arrive after 80% of
-		//  shutdown-delay-duration elapses we annotate the request as late=true.
-		late := lateMsg(delayDuration, elapsedSince, 80)
-
-		// NOTE: some upstream unit tests have authentication disabled and will
-		//  fail if we require the requestor to be present in the request
-		//  context. Fixing those unit tests will increase the chance of merge
-		//  conflict during rebase.
-		// This also implies that this filter must be placed after (in order of
-		// execution) the 'WithAuthentication' filter.
-		self := "self="
-		if requestor, exists := request.UserFrom(req.Context()); exists && requestor != nil {
-			self = fmt.Sprintf("%s%t", self, requestor.GetName() == user.APIServerUser)
-		}
-
-		audit.AddAuditAnnotation(req.Context(), "apiserver.k8s.io/shutdown",
-			fmt.Sprintf("%s %s loopback=%t", late, self, isLoopback(req.RemoteAddr)))
-
+		w.Header().Set("X-OpenShift-Disruption", msgFn(true, clock.Since(*shutdownInitiatedAt)))
 		handler.ServeHTTP(w, req)
 	})
-}
-
-func lateMsg(delayDuration, elapsedSince time.Duration, threshold float64) string {
-	if delayDuration == time.Duration(0) {
-		return fmt.Sprintf("elapsed=%s threshold= late=%t", elapsedSince.Round(time.Second).String(), true)
-	}
-
-	percentElapsed := (float64(elapsedSince) / float64(delayDuration)) * 100
-	return fmt.Sprintf("elapsed=%s threshold=%.2f%% late=%t",
-		elapsedSince.Round(time.Second).String(), percentElapsed, percentElapsed > threshold)
 }
 
 func withStartupEarlyAnnotation(handler http.Handler, hasBeenReady lifecycleEvent, shouldExemptFn shouldExemptFunc) http.Handler {
