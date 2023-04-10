@@ -93,36 +93,9 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.0.0
-	k8s.io/apiextensions-apiserver v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
-	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.0.0
-	k8s.io/cloud-provider v0.0.0
-	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.0.0
-	k8s.io/component-base v0.0.0
-	k8s.io/component-helpers v0.0.0
-	k8s.io/controller-manager v0.0.0
-	k8s.io/cri-api v0.0.0
-	k8s.io/csi-translation-lib v0.0.0
-	k8s.io/dynamic-resource-allocation v0.0.0
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/klog/v2 v2.90.1
-	k8s.io/kms v0.0.0
-	k8s.io/kube-aggregator v0.0.0
-	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a
-	k8s.io/kube-proxy v0.0.0
-	k8s.io/kube-scheduler v0.0.0
-	k8s.io/kubectl v0.0.0
-	k8s.io/kubelet v0.0.0
-	k8s.io/legacy-cloud-providers v0.0.0
-	k8s.io/metrics v0.0.0
-	k8s.io/mount-utils v0.0.0
-	k8s.io/pod-security-admission v0.0.0
-	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.8.0
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
@@ -235,6 +208,35 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/warnings.v0 v0.1.1 // indirect
+	k8s.io/api v0.0.0
+	k8s.io/apiextensions-apiserver v0.0.0
+	k8s.io/apimachinery v0.0.0
+	k8s.io/apiserver v0.0.0
+	k8s.io/cli-runtime v0.0.0
+	k8s.io/client-go v0.0.0
+	k8s.io/cloud-provider v0.0.0
+	k8s.io/cluster-bootstrap v0.0.0
+	k8s.io/code-generator v0.0.0
+	k8s.io/component-base v0.0.0
+	k8s.io/component-helpers v0.0.0
+	k8s.io/controller-manager v0.0.0
+	k8s.io/cri-api v0.0.0
+	k8s.io/csi-translation-lib v0.0.0
+	k8s.io/dynamic-resource-allocation v0.0.0
+	k8s.io/kms v0.0.0
+	k8s.io/kube-aggregator v0.0.0
+	k8s.io/kube-controller-manager v0.0.0
+	k8s.io/kube-proxy v0.0.0
+	k8s.io/kube-scheduler v0.0.0
+	k8s.io/kubectl v0.0.0
+	k8s.io/kubelet v0.0.0
+	k8s.io/legacy-cloud-providers v0.0.0
+	k8s.io/metrics v0.0.0
+	k8s.io/mount-utils v0.0.0
+	k8s.io/pod-security-admission v0.0.0
+	k8s.io/sample-apiserver v0.0.0
+	k8s.io/sample-cli-plugin v0.0.0
+	k8s.io/sample-controller v0.0.0
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.2 // indirect
@@ -242,34 +244,60 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.1 // indirect
 )
 
-replace (
-	k8s.io/api => ./staging/src/k8s.io/api
-	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
-	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
-	k8s.io/apiserver => ./staging/src/k8s.io/apiserver
-	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-	k8s.io/client-go => ./staging/src/k8s.io/client-go
-	k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
-	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
-	k8s.io/code-generator => ./staging/src/k8s.io/code-generator
-	k8s.io/component-base => ./staging/src/k8s.io/component-base
-	k8s.io/component-helpers => ./staging/src/k8s.io/component-helpers
-	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
-	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
-	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
-	k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
-	k8s.io/kms => ./staging/src/k8s.io/kms
-	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
-	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
-	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
-	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
-	k8s.io/kubelet => ./staging/src/k8s.io/kubelet
-	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
-	k8s.io/metrics => ./staging/src/k8s.io/metrics
-	k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
-	k8s.io/pod-security-admission => ./staging/src/k8s.io/pod-security-admission
-	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
-	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
-	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-)
+replace k8s.io/api => ./staging/src/k8s.io/api
+
+replace k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
+
+replace k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
+
+replace k8s.io/apiserver => ./staging/src/k8s.io/apiserver
+
+replace k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
+
+replace k8s.io/client-go => ./staging/src/k8s.io/client-go
+
+replace k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
+
+replace k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
+
+replace k8s.io/code-generator => ./staging/src/k8s.io/code-generator
+
+replace k8s.io/component-base => ./staging/src/k8s.io/component-base
+
+replace k8s.io/component-helpers => ./staging/src/k8s.io/component-helpers
+
+replace k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
+
+replace k8s.io/cri-api => ./staging/src/k8s.io/cri-api
+
+replace k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
+
+replace k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
+
+replace k8s.io/kms => ./staging/src/k8s.io/kms
+
+replace k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
+
+replace k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
+
+replace k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
+
+replace k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
+
+replace k8s.io/kubectl => ./staging/src/k8s.io/kubectl
+
+replace k8s.io/kubelet => ./staging/src/k8s.io/kubelet
+
+replace k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
+
+replace k8s.io/metrics => ./staging/src/k8s.io/metrics
+
+replace k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
+
+replace k8s.io/pod-security-admission => ./staging/src/k8s.io/pod-security-admission
+
+replace k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
+
+replace k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
+
+replace k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
