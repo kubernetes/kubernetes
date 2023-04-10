@@ -1715,6 +1715,7 @@
         "message": "messageValue"
       }
     ],
-    "collisionCount": 8
+    "collisionCount": 8,
+    "terminatingReplicas": 9
   }
 }

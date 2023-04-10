@@ -353,6 +353,10 @@ message DeploymentStatus {
   // newest ReplicaSet.
   // +optional
   optional int32 collisionCount = 8;
+
+  // terminatingReplicas is the number of terminating pods
+  // +optional
+  optional int32 terminatingReplicas = 9;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
@@ -482,6 +486,10 @@ message ReplicaSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated ReplicaSetCondition conditions = 6;
+
+  // terminatingReplicas is the number of terminating pods
+  // +optional
+  optional int32 terminatingReplicas = 7;
 }
 
 // Spec to control the desired behavior of daemon set rolling update.

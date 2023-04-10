@@ -535,6 +535,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta1.D
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	return nil
 }
 
@@ -552,6 +553,7 @@ func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.Depl
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]v1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	return nil
 }
 

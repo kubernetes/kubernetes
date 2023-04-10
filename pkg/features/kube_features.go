@@ -818,6 +818,13 @@ const (
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
 
+	// owner: @kannon92
+	// kep: https://kep.k8s.io/3939
+	// alpha: v1.28
+	//
+	// Enable waiting for terminating pods to fully terminate
+	// before starting new ones. Feature for Deployment/RS
+	TerminatingPodsReplicaSetDeployments featuregate.Feature = "TerminatingPodsReplicaSetDeployments"
 	// owner: @lmdaly, @swatisehgal (for GA graduation)
 	// alpha: v1.16
 	// beta: v1.18
@@ -1135,6 +1142,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
 
 	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
+
+	TerminatingPodsReplicaSetDeployments: {Default: true, PreRelease: featuregate.Alpha},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 

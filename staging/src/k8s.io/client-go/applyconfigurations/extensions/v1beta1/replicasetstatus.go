@@ -27,6 +27,7 @@ type ReplicaSetStatusApplyConfiguration struct {
 	AvailableReplicas    *int32                                  `json:"availableReplicas,omitempty"`
 	ObservedGeneration   *int64                                  `json:"observedGeneration,omitempty"`
 	Conditions           []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty"`
+	TerminatingReplicas  *int32                                  `json:"terminatingReplicas,omitempty"`
 }
 
 // ReplicaSetStatusApplyConfiguration constructs an declarative configuration of the ReplicaSetStatus type for use with
@@ -85,5 +86,13 @@ func (b *ReplicaSetStatusApplyConfiguration) WithConditions(values ...*ReplicaSe
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithTerminatingReplicas sets the TerminatingReplicas field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminatingReplicas field is set to the value of the last call.
+func (b *ReplicaSetStatusApplyConfiguration) WithTerminatingReplicas(value int32) *ReplicaSetStatusApplyConfiguration {
+	b.TerminatingReplicas = &value
 	return b
 }

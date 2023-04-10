@@ -313,6 +313,17 @@ func IsPodTerminal(pod *v1.Pod) bool {
 	return IsPodPhaseTerminal(pod.Status.Phase)
 }
 
+// IsPodTerminating
+func IsPodTerminating(pod *v1.Pod) bool {
+	if IsPodTerminal(pod) {
+		return false
+	}
+	if pod.ObjectMeta.DeletionTimestamp != nil {
+		return true
+	}
+	return false
+}
+
 // IsPodPhaseTerminal returns true if the pod's phase is terminal.
 func IsPodPhaseTerminal(phase v1.PodPhase) bool {
 	return phase == v1.PodFailed || phase == v1.PodSucceeded

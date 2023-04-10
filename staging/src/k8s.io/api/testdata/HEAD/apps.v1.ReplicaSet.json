@@ -1699,6 +1699,7 @@
         "reason": "reasonValue",
         "message": "messageValue"
       }
-    ]
+    ],
+    "terminatingReplicas": 7
   }
 }

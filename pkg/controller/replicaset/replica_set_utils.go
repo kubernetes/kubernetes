@@ -24,6 +24,7 @@ import (
 	"reflect"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -92,6 +93,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 	// matching pods must be part of the filteredPods.
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
+	terminatingReplicasCount := 0
 	availableReplicasCount := 0
 	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
@@ -103,6 +105,9 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 			if podutil.IsPodAvailable(pod, rs.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
+		}
+		if podutil.IsPodTerminating(pod) {
+			terminatingReplicasCount++
 		}
 	}
 
@@ -124,6 +129,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 	newStatus.FullyLabeledReplicas = int32(fullyLabeledReplicasCount)
 	newStatus.ReadyReplicas = int32(readyReplicasCount)
 	newStatus.AvailableReplicas = int32(availableReplicasCount)
+	newStatus.TerminatingReplicas = pointer.Int32Ptr(int32(terminatingReplicasCount))
 	return newStatus
 }
 

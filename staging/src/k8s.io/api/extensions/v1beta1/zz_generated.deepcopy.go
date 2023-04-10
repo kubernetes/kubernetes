@@ -353,6 +353,11 @@ func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TerminatingReplicas != nil {
+		in, out := &in.TerminatingReplicas, &out.TerminatingReplicas
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
@@ -1075,6 +1080,11 @@ func (in *ReplicaSetStatus) DeepCopyInto(out *ReplicaSetStatus) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.TerminatingReplicas != nil {
+		in, out := &in.TerminatingReplicas, &out.TerminatingReplicas
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }

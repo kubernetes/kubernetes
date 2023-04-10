@@ -605,6 +605,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "terminatingReplicas": {
+            "description": "terminatingReplicas is the number of terminating pods",
+            "format": "int32",
+            "type": "integer"
+          },
           "unavailableReplicas": {
             "description": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
             "format": "int32",
@@ -842,6 +847,11 @@
           "replicas": {
             "default": 0,
             "description": "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+            "format": "int32",
+            "type": "integer"
+          },
+          "terminatingReplicas": {
+            "description": "The number of terminiating replicas for this replica set.",
             "format": "int32",
             "type": "integer"
           }

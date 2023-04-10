@@ -584,6 +584,10 @@ type DeploymentStatus struct {
 	// newest ReplicaSet.
 	// +optional
 	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
+
+	// terminatingReplicas is the number of terminating pods
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,9,opt,name=terminatingReplicas"`
 }
 
 type DeploymentConditionType string

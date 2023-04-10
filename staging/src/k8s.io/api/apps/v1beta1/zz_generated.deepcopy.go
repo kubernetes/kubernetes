@@ -258,6 +258,11 @@ func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TerminatingReplicas != nil {
+		in, out := &in.TerminatingReplicas, &out.TerminatingReplicas
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

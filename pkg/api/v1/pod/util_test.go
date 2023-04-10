@@ -760,6 +760,54 @@ func TestIsPodTerminal(t *testing.T) {
 		}
 	}
 }
+func TestIsPodTerminating(t *testing.T) {
+	now := metav1.Now()
+
+	tests := []struct {
+		podPhase          v1.PodPhase
+		deletionTimeStamp *metav1.Time
+		expected          bool
+	}{
+		{
+			podPhase:          v1.PodFailed,
+			deletionTimeStamp: &now,
+			expected:          false,
+		},
+		{
+			podPhase:          v1.PodSucceeded,
+			deletionTimeStamp: &now,
+			expected:          false,
+		},
+		{
+			podPhase: v1.PodFailed,
+			expected: false,
+		},
+		{
+			podPhase: v1.PodSucceeded,
+			expected: false,
+		},
+		{
+			podPhase:          v1.PodPending,
+			deletionTimeStamp: &now,
+			expected:          true,
+		},
+		{
+			podPhase:          v1.PodRunning,
+			deletionTimeStamp: &now,
+			expected:          true,
+		},
+	}
+
+	for i, test := range tests {
+		pod := newPod(now, true, 0)
+		pod.ObjectMeta.DeletionTimestamp = test.deletionTimeStamp
+		pod.Status.Phase = test.podPhase
+		isTerminating := IsPodTerminating(pod)
+		if isTerminating != test.expected {
+			t.Errorf("[tc #%d] expected terminating pod: %t, got: %t", i, test.expected, isTerminating)
+		}
+	}
+}
 
 func TestGetContainerStatus(t *testing.T) {
 	type ExpectedStruct struct {

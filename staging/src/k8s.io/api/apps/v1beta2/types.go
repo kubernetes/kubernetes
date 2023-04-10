@@ -562,6 +562,10 @@ type DeploymentStatus struct {
 	// newest ReplicaSet.
 	// +optional
 	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
+
+	// terminatingReplicas is the number of terminating pods
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,9,opt,name=terminatingReplicas"`
 }
 
 type DeploymentConditionType string
@@ -952,6 +956,10 @@ type ReplicaSetStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []ReplicaSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
+
+	// terminatingReplicas is the number of terminating pods
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,7,opt,name=terminatingReplicas"`
 }
 
 type ReplicaSetConditionType string

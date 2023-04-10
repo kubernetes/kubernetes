@@ -24,7 +24,9 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestCalculateStatus(t *testing.T) {
@@ -36,6 +38,7 @@ func TestCalculateStatus(t *testing.T) {
 	longMinReadySecondsRS := newReplicaSet(1, fullLabelMap)
 	longMinReadySecondsRS.Spec.MinReadySeconds = 3600
 
+	now := metav1.Now()
 	rsStatusTests := []struct {
 		name                     string
 		replicaset               *apps.ReplicaSet
@@ -46,7 +49,7 @@ func TestCalculateStatus(t *testing.T) {
 			"1 fully labelled pod",
 			fullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -59,7 +62,7 @@ func TestCalculateStatus(t *testing.T) {
 			"1 not fully labelled pod",
 			notFullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
+				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -72,8 +75,8 @@ func TestCalculateStatus(t *testing.T) {
 			"2 fully labelled pods",
 			fullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
-				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, nil, true),
+				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             2,
@@ -86,8 +89,8 @@ func TestCalculateStatus(t *testing.T) {
 			"2 not fully labelled pods",
 			notFullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
-				newPod("pod2", notFullyLabelledRS, v1.PodRunning, nil, true),
+				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, nil, true),
+				newPod("pod2", notFullyLabelledRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             2,
@@ -100,8 +103,8 @@ func TestCalculateStatus(t *testing.T) {
 			"1 fully labelled pod, 1 not fully labelled pod",
 			notFullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
-				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
+				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, nil, true),
+				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             2,
@@ -114,7 +117,7 @@ func TestCalculateStatus(t *testing.T) {
 			"1 non-ready pod",
 			fullyLabelledRS,
 			[]*v1.Pod{
-				newPod("pod1", fullyLabelledRS, v1.PodPending, nil, true),
+				newPod("pod1", fullyLabelledRS, v1.PodPending, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -127,13 +130,27 @@ func TestCalculateStatus(t *testing.T) {
 			"1 ready but non-available pod",
 			longMinReadySecondsRS,
 			[]*v1.Pod{
-				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true),
+				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, nil, true),
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        1,
 				AvailableReplicas:    0,
+			},
+		},
+		{
+			"1 fully labeld but terminating pod",
+			fullyLabelledRS,
+			[]*v1.Pod{
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, &now, true),
+			},
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
+				TerminatingReplicas:  pointer.Int32Ptr(1),
 			},
 		},
 	}
@@ -169,7 +186,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 			"manageReplicasErr != nil && failureCond == nil, diff < 0",
 			rs,
 			[]*v1.Pod{
-				newPod("pod1", rs, v1.PodRunning, nil, true),
+				newPod("pod1", rs, v1.PodRunning, nil, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
 			[]apps.ReplicaSetCondition{
@@ -185,9 +202,9 @@ func TestCalculateStatusConditions(t *testing.T) {
 			"manageReplicasErr != nil && failureCond == nil, diff > 0",
 			rs,
 			[]*v1.Pod{
-				newPod("pod1", rs, v1.PodRunning, nil, true),
-				newPod("pod2", rs, v1.PodRunning, nil, true),
-				newPod("pod3", rs, v1.PodRunning, nil, true),
+				newPod("pod1", rs, v1.PodRunning, nil, nil, true),
+				newPod("pod2", rs, v1.PodRunning, nil, nil, true),
+				newPod("pod3", rs, v1.PodRunning, nil, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
 			[]apps.ReplicaSetCondition{
@@ -203,7 +220,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 			"manageReplicasErr == nil && failureCond != nil",
 			replicaFailureRS,
 			[]*v1.Pod{
-				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, true),
+				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, nil, true),
 			},
 			nil,
 			nil,
@@ -212,7 +229,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 			"manageReplicasErr != nil && failureCond != nil",
 			replicaFailureRS,
 			[]*v1.Pod{
-				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, true),
+				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
 			[]apps.ReplicaSetCondition{
@@ -226,7 +243,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 			"manageReplicasErr == nil && failureCond == nil",
 			rs,
 			[]*v1.Pod{
-				newPod("pod1", rs, v1.PodRunning, nil, true),
+				newPod("pod1", rs, v1.PodRunning, nil, nil, true),
 			},
 			nil,
 			nil,

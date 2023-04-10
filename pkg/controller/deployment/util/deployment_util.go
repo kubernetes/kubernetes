@@ -698,6 +698,18 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int3
 	return totalAvailableReplicas
 }
 
+// GetTerminatingReplicaCountForReplicaSets returns the number of terminating pods corresponding to the given replica sets.
+func GetTerminatingReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
+	totalTerminatingReplicas := int32(0)
+	for _, rs := range replicaSets {
+		if rs != nil {
+			totalTerminatingReplicas += *rs.Status.TerminatingReplicas
+		}
+	}
+	return totalTerminatingReplicas
+}
+
+
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *apps.Deployment) bool {
 	return deployment.Spec.Strategy.Type == apps.RollingUpdateDeploymentStrategyType

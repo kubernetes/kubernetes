@@ -716,7 +716,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
 	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
-		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
+		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) &&
+		updatedRS.Status.TerminatingReplicas != (updatedRS.Spec.Replicas) {
 		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
 	}
 	return manageReplicasErr

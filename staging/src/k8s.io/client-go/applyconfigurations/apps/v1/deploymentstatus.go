@@ -29,6 +29,7 @@ type DeploymentStatusApplyConfiguration struct {
 	UnavailableReplicas *int32                                  `json:"unavailableReplicas,omitempty"`
 	Conditions          []DeploymentConditionApplyConfiguration `json:"conditions,omitempty"`
 	CollisionCount      *int32                                  `json:"collisionCount,omitempty"`
+	TerminatingReplicas *int32                                  `json:"terminatingReplicas,omitempty"`
 }
 
 // DeploymentStatusApplyConfiguration constructs an declarative configuration of the DeploymentStatus type for use with
@@ -103,5 +104,13 @@ func (b *DeploymentStatusApplyConfiguration) WithConditions(values ...*Deploymen
 // If called multiple times, the CollisionCount field is set to the value of the last call.
 func (b *DeploymentStatusApplyConfiguration) WithCollisionCount(value int32) *DeploymentStatusApplyConfiguration {
 	b.CollisionCount = &value
+	return b
+}
+
+// WithTerminatingReplicas sets the TerminatingReplicas field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminatingReplicas field is set to the value of the last call.
+func (b *DeploymentStatusApplyConfiguration) WithTerminatingReplicas(value int32) *DeploymentStatusApplyConfiguration {
+	b.TerminatingReplicas = &value
 	return b
 }

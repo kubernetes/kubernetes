@@ -135,7 +135,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *apps.ReplicaSet
 }
 
 // create a pod with the given phase for the given rs (same selectors and namespace)
-func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransitionTime *metav1.Time, properlyOwned bool) *v1.Pod {
+func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransitionTime, deletionTimeStamp *metav1.Time, properlyOwned bool) *v1.Pod {
 	var conditions []v1.PodCondition
 	if status == v1.PodRunning {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
@@ -149,7 +149,7 @@ func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransition
 		var trueVar = true
 		controllerReference = metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
 	}
-	return &v1.Pod{
+	pods := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            name,
@@ -159,6 +159,10 @@ func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransition
 		},
 		Status: v1.PodStatus{Phase: status, Conditions: conditions},
 	}
+	if deletionTimeStamp != nil {
+		pods.ObjectMeta.DeletionTimestamp = deletionTimeStamp
+	}
+	return pods
 }
 
 // create count pods with the given phase for the given ReplicaSet (same selectors and namespace), and add them to the store.
@@ -167,7 +171,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, labelMap map[s
 	var trueVar = true
 	controllerReference := metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
 	for i := 0; i < count; i++ {
-		pod := newPod(fmt.Sprintf("%s%d", name, i), rs, status, nil, false)
+		pod := newPod(fmt.Sprintf("%s%d", name, i), rs, status, nil, nil, false)
 		pod.ObjectMeta.Labels = labelMap
 		pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
 		if store != nil {
@@ -553,10 +557,10 @@ func TestRelatedPodsLookup(t *testing.T) {
 	pendingDeletionRS.ObjectMeta.OwnerReferences[0].UID = "789"
 	now := metav1.Now()
 	pendingDeletionRS.DeletionTimestamp = &now
-	pod1 := newPod("pod1", someRS, v1.PodRunning, nil, true)
-	pod2 := newPod("pod2", someRS, v1.PodRunning, nil, true)
-	pod3 := newPod("pod3", relatedRS, v1.PodRunning, nil, true)
-	pod4 := newPod("pod4", unrelatedRS, v1.PodRunning, nil, true)
+	pod1 := newPod("pod1", someRS, v1.PodRunning, nil, nil, true)
+	pod2 := newPod("pod2", someRS, v1.PodRunning, nil, nil, true)
+	pod3 := newPod("pod3", relatedRS, v1.PodRunning, nil, nil, true)
+	pod4 := newPod("pod4", unrelatedRS, v1.PodRunning, nil, nil, true)
 	logger, _ := ktesting.NewTestContext(t)
 
 	stopCh := make(chan struct{})
@@ -573,7 +577,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 			name:             "expect to get a pod even if its owning ReplicaSet is pending deletion",
 			rss:              []*apps.ReplicaSet{pendingDeletionRS, unrelatedRS},
 			rs:               pendingDeletionRS,
-			pods:             []*v1.Pod{newPod("pod", pendingDeletionRS, v1.PodRunning, nil, true)},
+			pods:             []*v1.Pod{newPod("pod", pendingDeletionRS, v1.PodRunning, nil, nil, true)},
 			expectedPodNames: []string{"pod"},
 		},
 		{
@@ -1496,7 +1500,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	var trueVar = true
 	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
 	// add to podLister a matching Pod controlled by another controller. Expect no patch.
-	pod := newPod("pod", rs, v1.PodRunning, nil, true)
+	pod := newPod("pod", rs, v1.PodRunning, nil, nil, true)
 	pod.OwnerReferences = []metav1.OwnerReference{otherControllerReference}
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
 	err := manager.syncReplicaSet(context.TODO(), GetKey(rs, t))
@@ -1519,8 +1523,8 @@ func TestPatchPodFails(t *testing.T) {
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// add to podLister two matching pods. Expect two patches to take control
 	// them.
-	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod1", rs, v1.PodRunning, nil, false))
-	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod2", rs, v1.PodRunning, nil, false))
+	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod1", rs, v1.PodRunning, nil, nil, false))
+	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod2", rs, v1.PodRunning, nil, nil, false))
 	// let both patches fail. The rs controller will assume it fails to take
 	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("fake Error")
@@ -1552,7 +1556,7 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	defer close(stopCh)
 	manager, fakePodControl, informers := setupManagerWithGCEnabled(t, stopCh, rs)
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
-	pod1 := newPod("pod1", rs, v1.PodRunning, nil, false)
+	pod1 := newPod("pod1", rs, v1.PodRunning, nil, nil, false)
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
 
 	// no patch, no create
@@ -1581,7 +1585,7 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(&rs2)
 
 	// Recheck occurs if a matching orphan is present.
-	pod1 := newPod("pod1", rs, v1.PodRunning, nil, false)
+	pod1 := newPod("pod1", rs, v1.PodRunning, nil, nil, false)
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
 
 	// sync should abort.
@@ -1828,12 +1832,12 @@ func TestGetPodsToDelete(t *testing.T) {
 	labelMap := map[string]string{"name": "foo"}
 	rs := newReplicaSet(1, labelMap)
 	// an unscheduled, pending pod
-	unscheduledPendingPod := newPod("unscheduled-pending-pod", rs, v1.PodPending, nil, true)
+	unscheduledPendingPod := newPod("unscheduled-pending-pod", rs, v1.PodPending, nil, nil, true)
 	// a scheduled, pending pod
-	scheduledPendingPod := newPod("scheduled-pending-pod", rs, v1.PodPending, nil, true)
+	scheduledPendingPod := newPod("scheduled-pending-pod", rs, v1.PodPending, nil, nil, true)
 	scheduledPendingPod.Spec.NodeName = "fake-node"
 	// a scheduled, running, not-ready pod
-	scheduledRunningNotReadyPod := newPod("scheduled-running-not-ready-pod", rs, v1.PodRunning, nil, true)
+	scheduledRunningNotReadyPod := newPod("scheduled-running-not-ready-pod", rs, v1.PodRunning, nil, nil, true)
 	scheduledRunningNotReadyPod.Spec.NodeName = "fake-node"
 	scheduledRunningNotReadyPod.Status.Conditions = []v1.PodCondition{
 		{
@@ -1842,7 +1846,7 @@ func TestGetPodsToDelete(t *testing.T) {
 		},
 	}
 	// a scheduled, running, ready pod on fake-node-1
-	scheduledRunningReadyPodOnNode1 := newPod("scheduled-running-ready-pod-on-node-1", rs, v1.PodRunning, nil, true)
+	scheduledRunningReadyPodOnNode1 := newPod("scheduled-running-ready-pod-on-node-1", rs, v1.PodRunning, nil, nil, true)
 	scheduledRunningReadyPodOnNode1.Spec.NodeName = "fake-node-1"
 	scheduledRunningReadyPodOnNode1.Status.Conditions = []v1.PodCondition{
 		{
@@ -1851,7 +1855,7 @@ func TestGetPodsToDelete(t *testing.T) {
 		},
 	}
 	// a scheduled, running, ready pod on fake-node-2
-	scheduledRunningReadyPodOnNode2 := newPod("scheduled-running-ready-pod-on-node-2", rs, v1.PodRunning, nil, true)
+	scheduledRunningReadyPodOnNode2 := newPod("scheduled-running-ready-pod-on-node-2", rs, v1.PodRunning, nil, nil, true)
 	scheduledRunningReadyPodOnNode2.Spec.NodeName = "fake-node-2"
 	scheduledRunningReadyPodOnNode2.Status.Conditions = []v1.PodCondition{
 		{
@@ -2027,8 +2031,8 @@ func TestGetPodsToDelete(t *testing.T) {
 func TestGetPodKeys(t *testing.T) {
 	labelMap := map[string]string{"name": "foo"}
 	rs := newReplicaSet(1, labelMap)
-	pod1 := newPod("pod1", rs, v1.PodRunning, nil, true)
-	pod2 := newPod("pod2", rs, v1.PodRunning, nil, true)
+	pod1 := newPod("pod1", rs, v1.PodRunning, nil, nil, true)
+	pod2 := newPod("pod2", rs, v1.PodRunning, nil, nil, true)
 
 	tests := []struct {
 		name            string

@@ -539,6 +539,10 @@ type DeploymentStatus struct {
 	// newest ReplicaSet.
 	// +optional
 	CollisionCount *int32
+
+	// terminatingReplicas is the number of terminating pods
+	// +optional
+	TerminatingReplicas *int32
 }
 
 // DeploymentConditionType defines conditions of a deployment.
@@ -881,6 +885,10 @@ type ReplicaSetStatus struct {
 	// The number of available replicas (ready for at least minReadySeconds) for this replica set.
 	// +optional
 	AvailableReplicas int32
+
+	// terminatingReplicas is the number of terminating pods
+	// +optional
+	TerminatingReplicas *int32
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	// +optional

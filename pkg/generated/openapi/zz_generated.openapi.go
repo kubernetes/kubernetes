@@ -4760,6 +4760,13 @@ func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback) com
 							Format:      "int32",
 						},
 					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "terminatingReplicas is the number of terminating pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},
@@ -5055,6 +5062,13 @@ func schema_k8sio_api_apps_v1_ReplicaSetStatus(ref common.ReferenceCallback) com
 									},
 								},
 							},
+						},
+					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of terminiating replicas for this replica set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
@@ -6058,6 +6072,13 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 					"collisionCount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "collisionCount is the count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "terminatingReplicas is the number of terminating pods",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -7465,6 +7486,13 @@ func schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref common.ReferenceCallback
 							Format:      "int32",
 						},
 					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "terminatingReplicas is the number of terminating pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},
@@ -7759,6 +7787,13 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref common.ReferenceCallback
 									},
 								},
 							},
+						},
+					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "terminatingReplicas is the number of terminating pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
@@ -30255,6 +30290,13 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCa
 							Format:      "int32",
 						},
 					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of terminiating replicas for this replica set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},
@@ -31426,6 +31468,13 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCa
 									},
 								},
 							},
+						},
+					},
+					"terminatingReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of terminiating replicas for this replica set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

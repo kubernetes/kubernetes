@@ -176,6 +176,7 @@ var map_DeploymentStatus = map[string]string{
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
 	"collisionCount":      "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
+	"terminatingReplicas": "The number of terminiating replicas for this replica set.",
 }
 
 func (DeploymentStatus) SwaggerDoc() map[string]string {
@@ -472,6 +473,7 @@ var map_ReplicaSetStatus = map[string]string{
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 	"conditions":           "Represents the latest available observations of a replica set's current state.",
+	"terminatingReplicas":  "The number of terminiating replicas for this replica set.",
 }
 
 func (ReplicaSetStatus) SwaggerDoc() map[string]string {

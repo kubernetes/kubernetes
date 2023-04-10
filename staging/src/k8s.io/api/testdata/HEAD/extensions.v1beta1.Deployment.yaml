@@ -1173,5 +1173,6 @@ status:
   observedGeneration: 1
   readyReplicas: 7
   replicas: 2
+  terminatingReplicas: 9
   unavailableReplicas: 5
   updatedReplicas: 3
