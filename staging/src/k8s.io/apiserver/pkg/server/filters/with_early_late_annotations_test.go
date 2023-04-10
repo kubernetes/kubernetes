@@ -230,6 +230,9 @@ func TestWithShutdownLateAnnotation(t *testing.T) {
 					t.Logf("got: %s", valueGot)
 					t.Errorf("expected annotation to match, diff: %s", cmp.Diff(test.annotationShouldContain, valueGot))
 				}
+				if header := w.Header().Get("X-OpenShift-Shutdown"); !strings.Contains(header, test.annotationShouldContain) {
+					t.Errorf("expected response header to match, diff: %s", cmp.Diff(test.annotationShouldContain, header))
+				}
 			}
 		})
 	}
