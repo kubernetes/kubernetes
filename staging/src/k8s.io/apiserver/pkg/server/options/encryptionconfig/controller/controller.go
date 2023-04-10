@@ -122,7 +122,7 @@ func (d *DynamicKMSEncryptionConfigContent) handleWatchEvent(event fsnotify.Even
 	defer d.queue.Add(workqueueKey)
 
 	// return if file has not been removed or renamed.
-	if event.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
+	if !event.Has(fsnotify.Remove) && !event.Has(fsnotify.Rename) {
 		return nil
 	}
 
