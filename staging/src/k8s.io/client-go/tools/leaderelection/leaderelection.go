@@ -292,19 +292,20 @@ func (le *LeaderElector) release() bool {
 	if !le.IsLeader() {
 		return true
 	}
+	oldLer := le.getObservedRecord()
 	now := metav1.NewTime(le.clock.Now())
-	leaderElectionRecord := rl.LeaderElectionRecord{
+	newLer := rl.LeaderElectionRecord{
 		LeaderTransitions:    le.observedRecord.LeaderTransitions,
 		LeaseDurationSeconds: 1,
 		RenewTime:            now,
 		AcquireTime:          now,
 	}
-	if err := le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
+	if err := le.config.Lock.Patch(context.TODO(), newLer, oldLer); err != nil {
 		klog.Errorf("Failed to release lock: %v", err)
 		return false
 	}
 
-	le.setObservedRecord(&leaderElectionRecord)
+	le.setObservedRecord(&newLer)
 	return true
 }
 

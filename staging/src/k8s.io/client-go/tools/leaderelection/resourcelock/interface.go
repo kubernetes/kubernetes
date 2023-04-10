@@ -19,9 +19,10 @@ package resourcelock
 import (
 	"context"
 	"fmt"
+	"time"
+
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -148,8 +149,11 @@ type Interface interface {
 	// Create attempts to create a LeaderElectionRecord
 	Create(ctx context.Context, ler LeaderElectionRecord) error
 
-	// Update will update and existing LeaderElectionRecord
+	// Update will update an existing LeaderElectionRecord
 	Update(ctx context.Context, ler LeaderElectionRecord) error
+
+	// Patch will patch an existing LeaderElectionRecord
+	Patch(ctx context.Context, newLer, oldLer LeaderElectionRecord) error
 
 	// RecordEvent is used to record events
 	RecordEvent(string)

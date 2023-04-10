@@ -25,6 +25,8 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 )
 
@@ -79,6 +81,39 @@ func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error
 
 	ll.lease = lease
 	return nil
+}
+
+// Patch will patch an existing Lease spec.
+func (ll *LeaseLock) Patch(ctx context.Context, newLer, oldLer LeaderElectionRecord) error {
+	if ll.lease == nil {
+		return errors.New("lease not initialized, call get or create first")
+	}
+	oldLease := coordinationv1.Lease{
+		Spec: LeaderElectionRecordToLeaseSpec(&oldLer),
+	}
+	newLease := coordinationv1.Lease{
+		Spec: LeaderElectionRecordToLeaseSpec(&newLer),
+	}
+	name := ll.LeaseMeta.Name
+	namespace := ll.LeaseMeta.Namespace
+	oldData, err := json.Marshal(oldLease)
+	if err != nil {
+		return fmt.Errorf("failed to Marshal oldData for lease %q/%q: %v", namespace, name, err)
+	}
+
+	newData, err := json.Marshal(newLease)
+	if err != nil {
+		return fmt.Errorf("failed to Marshal newData for lease %q/%q: %v", namespace, name, err)
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &coordinationv1.Lease{})
+	if err != nil {
+		return fmt.Errorf("failed to CreateTwoWayMergePatch for lease %q/%q: %v", namespace, name, err)
+	}
+	if "{}" == string(patchBytes) {
+		return fmt.Errorf("lease %q/%q is not modified", namespace, name)
+	}
+	_, err = ll.Client.Leases(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	return err
 }
 
 // RecordEvent in leader election while adding meta-data

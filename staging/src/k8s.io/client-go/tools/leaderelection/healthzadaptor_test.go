@@ -47,6 +47,11 @@ func (fl *fakeLock) Update(ctx context.Context, ler rl.LeaderElectionRecord) err
 	return nil
 }
 
+// Patch will patch an existing LeaderElectionRecord
+func (fl *fakeLock) Patch(ctx context.Context, newLer, oldLer rl.LeaderElectionRecord) error {
+	return nil
+}
+
 // RecordEvent is a dummy to allow us to have a fakeLock for testing.
 func (fl *fakeLock) RecordEvent(string) {}
 
