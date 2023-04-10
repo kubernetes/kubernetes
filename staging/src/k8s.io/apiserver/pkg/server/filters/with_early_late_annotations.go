@@ -119,10 +119,11 @@ func withShutdownLateAnnotation(handler http.Handler, shutdownInitiated lifecycl
 			self = fmt.Sprintf("%s%t", self, requestor.GetName() == user.APIServerUser)
 		}
 
-		audit.AddAuditAnnotation(req.Context(), "apiserver.k8s.io/shutdown",
-			fmt.Sprintf("%s %s loopback=%t", late, self, isLoopback(req.RemoteAddr)))
+		message := fmt.Sprintf("%s %s loopback=%t", late, self, isLoopback(req.RemoteAddr))
+		audit.AddAuditAnnotation(req.Context(), "apiserver.k8s.io/shutdown", message)
 
 		handler.ServeHTTP(w, req)
+		w.Header().Set("X-OpenShift-Shutdown", message)
 	})
 }
 
