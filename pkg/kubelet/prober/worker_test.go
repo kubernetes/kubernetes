@@ -19,7 +19,7 @@ package prober
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -155,7 +155,7 @@ func TestDoProbe(t *testing.T) {
 
 			// Clean up.
 			testRootDir := ""
-			if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 				t.Fatalf("can't make a temp rootdir: %v", err)
 			} else {
 				testRootDir = tempDir

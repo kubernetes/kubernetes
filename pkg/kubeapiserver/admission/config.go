@@ -17,8 +17,8 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -55,7 +55,7 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	var cloudConfig []byte
 	if c.CloudConfigFile != "" {
 		var err error
-		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
+		cloudConfig, err = os.ReadFile(c.CloudConfigFile)
 		if err != nil {
 			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
