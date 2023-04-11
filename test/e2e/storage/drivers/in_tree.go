@@ -1443,7 +1443,7 @@ func (a *azureDiskDriver) CreateVolume(ctx context.Context, config *storageframe
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}
@@ -1744,6 +1744,10 @@ func getInlineVolumeZone(ctx context.Context, f *framework.Framework) string {
 	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
 	if ok {
 		return zone
+	}
+	topologyZone, ok := node.Labels[v1.LabelTopologyZone]
+	if ok {
+		return topologyZone
 	}
 	return ""
 }
