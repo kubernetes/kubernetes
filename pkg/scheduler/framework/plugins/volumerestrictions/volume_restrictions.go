@@ -154,10 +154,26 @@ func haveOverlap(a1, a2 []string) bool {
 	return false
 }
 
+// return true if there are conflict checking targets.
+func needsRestrictionsCheck(v v1.Volume) bool {
+	return v.GCEPersistentDisk != nil || v.AWSElasticBlockStore != nil || v.RBD != nil || v.ISCSI != nil
+}
+
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
 func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	needsCheck := false
+	for i := range pod.Spec.Volumes {
+		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
+			needsCheck = true
+			break
+		}
+	}
+
 	if !pl.enableReadWriteOncePod {
-		return nil, nil
+		if needsCheck {
+			return nil, nil
+		}
+		return nil, framework.NewStatus(framework.Skip)
 	}
 
 	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
@@ -171,6 +187,10 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 	s, err := pl.calPreFilterState(ctx, pod, pvcs)
 	if err != nil {
 		return nil, framework.AsStatus(err)
+	}
+
+	if !needsCheck && s.conflictingPVCRefCount == 0 {
+		return nil, framework.NewStatus(framework.Skip)
 	}
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
@@ -257,14 +277,12 @@ func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, po
 // existing volumes.
 func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 	for i := range pod.Spec.Volumes {
-		v := &pod.Spec.Volumes[i]
-		// fast path if there is no conflict checking targets.
-		if v.GCEPersistentDisk == nil && v.AWSElasticBlockStore == nil && v.RBD == nil && v.ISCSI == nil {
+		v := pod.Spec.Volumes[i]
+		if !needsRestrictionsCheck(v) {
 			continue
 		}
-
 		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(v, ev.Pod) {
+			if isVolumeConflict(&v, ev.Pod) {
 				return false
 			}
 		}
