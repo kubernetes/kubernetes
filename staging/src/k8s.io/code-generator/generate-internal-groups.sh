@@ -25,17 +25,21 @@ if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,client,lister,informer,openapi) or "all".
+  <generators>        the generators comma separated to run (applyconfiguration,client,conversion,deepcopy,defaulter,informer,lister,openapi).
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
-  <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis).
+  <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis) or "" if none.
   <ext-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
                       to <api-package>.
   ...                 arbitrary flags passed to all generator binaries.
 
-Examples:
-  $(basename "$0") all                           github.com/example/project/pkg/client github.com/example/project/pkg/apis github.com/example/project/pkg/apis "foo:v1 bar:v1alpha1,v1beta1"
-  $(basename "$0") deepcopy,defaulter,conversion github.com/example/project/pkg/client github.com/example/project/pkg/apis github.com/example/project/apis     "foo:v1 bar:v1alpha1,v1beta1"
+Example:
+  $(basename "$0") \
+      deepcopy,defaulter,conversion \
+      github.com/example/project/pkg/client \
+      github.com/example/project/pkg/apis \
+      github.com/example/project/apis \
+      "foo:v1 bar:v1alpha1,v1beta1"
 EOF
   exit 0
 fi
@@ -47,11 +51,32 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
+if [ "${GENS}" = "all" ] || grep -qw "all" <<<"${GENS}"; then
+    ALL="client,conversion,deepcopy,defaulter,informer,lister,openapi"
+    echo "WARNING: Specifying \"all\" as a generator is deprecated."
+    echo "WARNING: Please list the specific generators needed."
+    echo "WARNING: \"all\" is now an alias for \"${ALL}\"; new code generators WILL NOT be added to this set"
+    echo
+    GENS="${ALL}"
+fi
+
 (
   # To support running this script from anywhere, first cd into this directory,
   # and then install with forced module mode on and fully qualified name.
   cd "$(dirname "${0}")"
-  GO111MODULE=on go install k8s.io/code-generator/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,openapi-gen}
+  BINS=(
+      applyconfiguration-gen
+      client-gen
+      conversion-gen
+      deepcopy-gen
+      defaulter-gen
+      informer-gen
+      lister-gen
+      openapi-gen
+  )
+  # Compile all the tools at once - it's slightly faster but also just simpler.
+  # shellcheck disable=2046 # printf word-splitting is intentional
+  GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
 )
 
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
@@ -77,38 +102,51 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
   done
 done
 
-if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
+if grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.deepcopy \
+      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      -O zz_generated.deepcopy \
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
+if grep -qw "defaulter" <<<"${GENS}"; then
   echo "Generating defaulters"
   "${gobin}/defaulter-gen"  \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" -O zz_generated.defaults \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
+      -O zz_generated.defaults \
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
+if grep -qw "conversion" <<<"${GENS}"; then
   echo "Generating conversions"
   "${gobin}/conversion-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.conversion \
+      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      -O zz_generated.conversion \
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
+if grep -qw "applyconfiguration" <<<"${GENS}"; then
+  echo "Generating apply configuration for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
+  APPLY_CONFIGURATION_PACKAGE="${OUTPUT_PKG}/${APPLYCONFIGURATION_PKG_NAME:-applyconfiguration}"
+  "${gobin}/applyconfiguration-gen" \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
+      --output-package "${APPLY_CONFIGURATION_PACKAGE}" \
+      "$@"
+fi
+
+if grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
   "${gobin}/client-gen" \
       --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --input-base "" \
       --input "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --apply-configuration-package "${APPLY_CONFIGURATION_PACKAGE:-}" \
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
+if grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
   "${gobin}/lister-gen" \
       --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
@@ -116,7 +154,7 @@ if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
+if grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   "${gobin}/informer-gen" \
       --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
@@ -126,7 +164,7 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
       "$@"
 fi
 
-if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
+if grep -qw "openapi" <<<"${GENS}"; then
   echo "Generating OpenAPI definitions for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/openapi"
   declare -a OPENAPI_EXTRA_PACKAGES
   "${gobin}/openapi-gen" \
