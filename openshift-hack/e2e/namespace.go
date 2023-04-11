@@ -35,7 +35,7 @@ func CreateTestingNS(baseName string, c kclientset.Interface, labels map[string]
 		labels["security.openshift.io/disable-securitycontextconstraints"] = "true"
 	}
 
-	ns, err := framework.CreateTestingNS(baseName, c, labels)
+	ns, err := framework.CreateTestingNS(context.Background(), baseName, c, labels)
 	if err != nil {
 		return ns, err
 	}
