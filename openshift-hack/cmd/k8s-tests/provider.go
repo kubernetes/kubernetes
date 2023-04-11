@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -44,10 +45,10 @@ func initializeTestFramework(provider string) error {
 		return fmt.Errorf("provider must decode into the ClusterConfig object: %v", err)
 	}
 
-	// update context with loaded config
-	context := &framework.TestContext
-	context.Provider = config.ProviderName
-	context.CloudConfig = framework.CloudConfig{
+	// update testContext with loaded config
+	testContext := &framework.TestContext
+	testContext.Provider = config.ProviderName
+	testContext.CloudConfig = framework.CloudConfig{
 		ProjectID:   config.ProjectID,
 		Region:      config.Region,
 		Zone:        config.Zone,
@@ -57,10 +58,10 @@ func initializeTestFramework(provider string) error {
 		MultiZone:   config.MultiZone,
 		ConfigFile:  config.ConfigFile,
 	}
-	context.AllowedNotReadyNodes = -1
-	context.MinStartupPods = -1
-	context.MaxNodesToGather = 0
-	context.KubeConfig = os.Getenv("KUBECONFIG")
+	testContext.AllowedNotReadyNodes = -1
+	testContext.MinStartupPods = -1
+	testContext.MaxNodesToGather = 0
+	testContext.KubeConfig = os.Getenv("KUBECONFIG")
 
 	// allow the CSI tests to access test data, but only briefly
 	// TODO: ideally CSI would not use any of these test methods
@@ -76,45 +77,45 @@ func initializeTestFramework(provider string) error {
 		os.Setenv("ARTIFACT_DIR", filepath.Join(os.TempDir(), "artifacts"))
 	}
 
-	context.DeleteNamespace = os.Getenv("DELETE_NAMESPACE") != "false"
-	context.VerifyServiceAccount = true
+	testContext.DeleteNamespace = os.Getenv("DELETE_NAMESPACE") != "false"
+	testContext.VerifyServiceAccount = true
 	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
 	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
-	context.KubectlPath = "kubectl"
+	testContext.KubectlPath = "kubectl"
 	// context.KubeConfig = KubeConfigPath()
-	context.KubeConfig = os.Getenv("KUBECONFIG")
+	testContext.KubeConfig = os.Getenv("KUBECONFIG")
 
 	// "debian" is used when not set. At least GlusterFS tests need "custom".
 	// (There is no option for "rhel" or "centos".)
-	context.NodeOSDistro = "custom"
-	context.MasterOSDistro = "custom"
+	testContext.NodeOSDistro = "custom"
+	testContext.MasterOSDistro = "custom"
 
 	// load and set the host variable for kubectl
-	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&clientcmd.ClientConfigLoadingRules{ExplicitPath: context.KubeConfig}, &clientcmd.ConfigOverrides{})
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&clientcmd.ClientConfigLoadingRules{ExplicitPath: testContext.KubeConfig}, &clientcmd.ConfigOverrides{})
 	cfg, err := clientConfig.ClientConfig()
 	if err != nil {
 		return err
 	}
-	context.Host = cfg.Host
+	testContext.Host = cfg.Host
 
 	// Ensure that Kube tests run privileged (like they do upstream)
-	context.CreateTestingNS = func(baseName string, c kclientset.Interface, labels map[string]string) (*corev1.Namespace, error) {
+	testContext.CreateTestingNS = func(ctx context.Context, baseName string, c kclientset.Interface, labels map[string]string) (*corev1.Namespace, error) {
 		return e2e.CreateTestingNS(baseName, c, labels, true)
 	}
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
-	framework.AfterReadingAllFlags(context)
-	context.DumpLogsOnFailure = true
+	framework.AfterReadingAllFlags(testContext)
+	testContext.DumpLogsOnFailure = true
 
 	// these constants are taken from kube e2e and used by tests
-	context.IPFamily = "ipv4"
+	testContext.IPFamily = "ipv4"
 	if config.HasIPv6 && !config.HasIPv4 {
-		context.IPFamily = "ipv6"
+		testContext.IPFamily = "ipv6"
 	}
 
-	context.ReportDir = os.Getenv("TEST_JUNIT_DIR")
+	testContext.ReportDir = os.Getenv("TEST_JUNIT_DIR")
 
 	return nil
 }
