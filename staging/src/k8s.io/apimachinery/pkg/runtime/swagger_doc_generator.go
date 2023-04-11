@@ -105,10 +105,12 @@ func fieldName(field *ast.Field) string {
 
 	jsonTag = strings.Split(jsonTag, ",")[0] // This can return "-"
 	if jsonTag == "" {
-		if field.Names != nil {
+		if len(field.Names) > 0 {
 			return field.Names[0].Name
 		}
-		return field.Type.(*ast.Ident).Name
+		// Anonymous structs get inlined. Interfaces don't, but those do not occur.
+		return ""
+
 	}
 	return jsonTag
 }
