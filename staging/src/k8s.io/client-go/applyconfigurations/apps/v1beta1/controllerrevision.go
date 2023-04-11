@@ -31,7 +31,7 @@ import (
 // ControllerRevisionApplyConfiguration represents an declarative configuration of the ControllerRevision type for use
 // with apply.
 type ControllerRevisionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Data                             *runtime.RawExtension `json:"data,omitempty"`
 	Revision                         *int64                `json:"revision,omitempty"`

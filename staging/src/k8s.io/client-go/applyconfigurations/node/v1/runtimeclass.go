@@ -30,7 +30,7 @@ import (
 // RuntimeClassApplyConfiguration represents an declarative configuration of the RuntimeClass type for use
 // with apply.
 type RuntimeClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Handler                          *string                       `json:"handler,omitempty"`
 	Overhead                         *OverheadApplyConfiguration   `json:"overhead,omitempty"`

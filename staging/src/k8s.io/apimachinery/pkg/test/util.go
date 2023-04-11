@@ -41,7 +41,7 @@ type List struct {
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ListV1 struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`

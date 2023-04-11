@@ -30,7 +30,7 @@ import (
 // HorizontalPodAutoscalerApplyConfiguration represents an declarative configuration of the HorizontalPodAutoscaler type for use
 // with apply.
 type HorizontalPodAutoscalerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`

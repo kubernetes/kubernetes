@@ -30,7 +30,7 @@ import (
 // ClusterRoleApplyConfiguration represents an declarative configuration of the ClusterRole type for use
 // with apply.
 type ClusterRoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Rules                            []PolicyRuleApplyConfiguration     `json:"rules,omitempty"`
 	AggregationRule                  *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`

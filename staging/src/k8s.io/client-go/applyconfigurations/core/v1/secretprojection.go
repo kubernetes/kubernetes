@@ -21,9 +21,9 @@ package v1
 // SecretProjectionApplyConfiguration represents an declarative configuration of the SecretProjection type for use
 // with apply.
 type SecretProjectionApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty"`
-	Optional                               *bool                         `json:"optional,omitempty"`
+	LocalObjectReferenceApplyConfiguration
+	Items    []KeyToPathApplyConfiguration `json:"items,omitempty"`
+	Optional *bool                         `json:"optional,omitempty"`
 }
 
 // SecretProjectionApplyConfiguration constructs an declarative configuration of the SecretProjection type for use with

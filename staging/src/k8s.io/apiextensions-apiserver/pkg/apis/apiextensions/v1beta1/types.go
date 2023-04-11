@@ -396,7 +396,7 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // <.spec.name>.<.spec.group>.
 // Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 type CustomResourceDefinition struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -417,7 +417,7 @@ type CustomResourceDefinition struct {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -490,7 +490,7 @@ type CustomResourceSubresourceScale struct {
 
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// request describes the attributes for the conversion request.
 	// +optional
 	Request *ConversionRequest `json:"request,omitempty" protobuf:"bytes,1,opt,name=request"`

@@ -26,7 +26,7 @@ import (
 // DefaultPreemptionArgs holds arguments used to configure the
 // DefaultPreemption plugin.
 type DefaultPreemptionArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// MinCandidateNodesPercentage is the minimum number of candidates to
 	// shortlist when dry running preemption as a percentage of number of nodes.
@@ -47,7 +47,7 @@ type DefaultPreemptionArgs struct {
 
 // InterPodAffinityArgs holds arguments used to configure the InterPodAffinity plugin.
 type InterPodAffinityArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// HardPodAffinityWeight is the scoring weight for existing pods with a
 	// matching hard affinity to the incoming pod.
@@ -62,7 +62,7 @@ type InterPodAffinityArgs struct {
 
 // NodeResourcesFitArgs holds arguments used to configure the NodeResourcesFit plugin.
 type NodeResourcesFitArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// IgnoredResources is the list of resources that NodeResources fit filter
 	// should ignore. This doesn't apply to scoring.
@@ -95,7 +95,7 @@ const (
 
 // PodTopologySpreadArgs holds arguments used to configure the PodTopologySpread plugin.
 type PodTopologySpreadArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// DefaultConstraints defines topology spread constraints to be applied to
 	// Pods that don't define any in `pod.spec.topologySpreadConstraints`.
@@ -123,7 +123,7 @@ type PodTopologySpreadArgs struct {
 
 // NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
 type NodeResourcesBalancedAllocationArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Resources to be managed, the default is "cpu" and "memory" if not specified.
 	// +listType=map
@@ -151,7 +151,7 @@ type ResourceSpec struct {
 
 // VolumeBindingArgs holds arguments used to configure the VolumeBinding plugin.
 type VolumeBindingArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// BindTimeoutSeconds is the timeout in seconds in volume binding operation.
 	// Value must be non-negative integer. The value zero indicates no waiting.
@@ -179,7 +179,7 @@ type VolumeBindingArgs struct {
 
 // NodeAffinityArgs holds arguments to configure the NodeAffinity plugin.
 type NodeAffinityArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// AddedAffinity is applied to all Pods additionally to the NodeAffinity
 	// specified in the PodSpec. That is, Nodes need to satisfy AddedAffinity

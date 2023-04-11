@@ -23,7 +23,7 @@ import (
 // LeaderMigrationConfiguration provides versioned configuration for all migrating leader locks.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type LeaderMigrationConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// LeaderName is the name of the leader election resource that protects the migration
 	// E.g. 1-20-KCM-to-1-21-CCM

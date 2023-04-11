@@ -26,7 +26,7 @@ import (
 // ExecCredential is used by exec-based plugins to communicate credentials to
 // HTTP transports.
 type ExecCredential struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Spec holds information passed to the plugin by the transport.
 	Spec ExecCredentialSpec `json:"spec,omitempty"`

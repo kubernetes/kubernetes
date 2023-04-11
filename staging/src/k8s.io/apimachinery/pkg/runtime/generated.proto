@@ -33,7 +33,7 @@ option go_package = "k8s.io/apimachinery/pkg/runtime";
 // // Internal package:
 //
 // 	type MyAPIObject struct {
-// 		runtime.TypeMeta `json:",inline"`
+// 		runtime.TypeMeta
 // 		MyPlugin runtime.Object `json:"myPlugin"`
 // 	}
 //
@@ -44,7 +44,7 @@ option go_package = "k8s.io/apimachinery/pkg/runtime";
 // // External package:
 //
 // 	type MyAPIObject struct {
-// 		runtime.TypeMeta `json:",inline"`
+// 		runtime.TypeMeta
 // 		MyPlugin runtime.RawExtension `json:"myPlugin"`
 // 	}
 //
@@ -85,7 +85,7 @@ message RawExtension {
 // like this:
 //
 // 	type MyAwesomeAPIObject struct {
-// 	     runtime.TypeMeta    `json:",inline"`
+// 	     runtime.TypeMeta
 // 	     ... // other fields
 // 	}
 //

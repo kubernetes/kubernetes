@@ -41,7 +41,7 @@ const (
 
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
 	Parallelism *int32 `json:"parallelism,omitempty"`
@@ -62,7 +62,7 @@ type KubeSchedulerConfiguration struct {
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
-	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+	componentbaseconfigv1alpha1.DebuggingConfiguration
 
 	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in

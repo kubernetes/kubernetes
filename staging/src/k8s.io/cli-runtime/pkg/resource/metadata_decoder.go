@@ -51,6 +51,6 @@ func (m *metadataValidatingDecoder) Decode(data []byte, defaults *schema.GroupVe
 }
 
 type metadataOnlyObject struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }

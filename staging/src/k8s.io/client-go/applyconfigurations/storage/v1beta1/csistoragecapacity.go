@@ -31,7 +31,7 @@ import (
 // CSIStorageCapacityApplyConfiguration represents an declarative configuration of the CSIStorageCapacity type for use
 // with apply.
 type CSIStorageCapacityApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	NodeTopology                     *v1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
 	StorageClassName                 *string                             `json:"storageClassName,omitempty"`

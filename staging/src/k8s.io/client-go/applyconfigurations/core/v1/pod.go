@@ -30,7 +30,7 @@ import (
 // PodApplyConfiguration represents an declarative configuration of the Pod type for use
 // with apply.
 type PodApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PodSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *PodStatusApplyConfiguration `json:"status,omitempty"`

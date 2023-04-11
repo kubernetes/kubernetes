@@ -30,7 +30,7 @@ import (
 // ImageReviewApplyConfiguration represents an declarative configuration of the ImageReview type for use
 // with apply.
 type ImageReviewApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ImageReviewSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`

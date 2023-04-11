@@ -30,7 +30,7 @@ import (
 // ConfigMapApplyConfiguration represents an declarative configuration of the ConfigMap type for use
 // with apply.
 type ConfigMapApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Immutable                        *bool             `json:"immutable,omitempty"`
 	Data                             map[string]string `json:"data,omitempty"`

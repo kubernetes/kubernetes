@@ -30,7 +30,7 @@ import (
 // ClusterCIDRApplyConfiguration represents an declarative configuration of the ClusterCIDR type for use
 // with apply.
 type ClusterCIDRApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ClusterCIDRSpecApplyConfiguration `json:"spec,omitempty"`
 }

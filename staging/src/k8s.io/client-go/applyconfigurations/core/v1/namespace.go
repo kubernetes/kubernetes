@@ -30,7 +30,7 @@ import (
 // NamespaceApplyConfiguration represents an declarative configuration of the Namespace type for use
 // with apply.
 type NamespaceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *NamespaceSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *NamespaceStatusApplyConfiguration `json:"status,omitempty"`

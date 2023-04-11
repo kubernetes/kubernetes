@@ -30,7 +30,7 @@ import (
 // PodTemplateApplyConfiguration represents an declarative configuration of the PodTemplate type for use
 // with apply.
 type PodTemplateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Template                         *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }

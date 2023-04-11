@@ -219,7 +219,7 @@ func (m *InternalTypeMeta) GetRemainingItemCount() *int64  { return m.RemainingI
 func (m *InternalTypeMeta) SetRemainingItemCount(c *int64) { m.RemainingItemCount = c }
 
 type MyAPIObject struct {
-	TypeMeta InternalTypeMeta `json:",inline"`
+	TypeMeta InternalTypeMeta
 }
 
 func (obj *MyAPIObject) GetListMeta() metav1.ListInterface { return &obj.TypeMeta }

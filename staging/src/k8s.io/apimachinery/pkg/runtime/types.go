@@ -23,7 +23,7 @@ package runtime
 // like this:
 //
 //	type MyAwesomeAPIObject struct {
-//	     runtime.TypeMeta    `json:",inline"`
+//	     runtime.TypeMeta
 //	     ... // other fields
 //	}
 //
@@ -57,7 +57,7 @@ const (
 // // Internal package:
 //
 //	type MyAPIObject struct {
-//		runtime.TypeMeta `json:",inline"`
+//		runtime.TypeMeta
 //		MyPlugin runtime.Object `json:"myPlugin"`
 //	}
 //
@@ -68,7 +68,7 @@ const (
 // // External package:
 //
 //	type MyAPIObject struct {
-//		runtime.TypeMeta `json:",inline"`
+//		runtime.TypeMeta
 //		MyPlugin runtime.RawExtension `json:"myPlugin"`
 //	}
 //
@@ -119,7 +119,7 @@ type RawExtension struct {
 // +protobuf=true
 // +k8s:openapi-gen=true
 type Unknown struct {
-	TypeMeta `json:",inline" protobuf:"bytes,1,opt,name=typeMeta"`
+	TypeMeta `protobuf:"bytes,1,opt,name=typeMeta"`
 	// Raw will hold the complete serialized object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.

@@ -31,7 +31,7 @@ import (
 // EventApplyConfiguration represents an declarative configuration of the Event type for use
 // with apply.
 type EventApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	EventTime                        *metav1.MicroTime                         `json:"eventTime,omitempty"`
 	Series                           *EventSeriesApplyConfiguration            `json:"series,omitempty"`

@@ -36,7 +36,7 @@ type MetricIdentifier struct {
 
 // a list of values for a given metric for some set of objects
 type MetricValueList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// the value of the metric across the described objects

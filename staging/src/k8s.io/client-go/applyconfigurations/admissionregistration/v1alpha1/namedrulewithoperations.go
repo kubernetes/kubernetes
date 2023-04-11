@@ -26,8 +26,8 @@ import (
 // NamedRuleWithOperationsApplyConfiguration represents an declarative configuration of the NamedRuleWithOperations type for use
 // with apply.
 type NamedRuleWithOperationsApplyConfiguration struct {
-	ResourceNames                           []string `json:"resourceNames,omitempty"`
-	v1.RuleWithOperationsApplyConfiguration `json:",inline"`
+	ResourceNames []string `json:"resourceNames,omitempty"`
+	v1.RuleWithOperationsApplyConfiguration
 }
 
 // NamedRuleWithOperationsApplyConfiguration constructs an declarative configuration of the NamedRuleWithOperations type for use with

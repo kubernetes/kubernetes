@@ -70,7 +70,7 @@ const (
 
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// AuditLevel at which event was generated
 	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
@@ -145,7 +145,7 @@ type Event struct {
 
 // EventList is a list of audit Events.
 type EventList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -157,7 +157,7 @@ type EventList struct {
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -187,7 +187,7 @@ type Policy struct {
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

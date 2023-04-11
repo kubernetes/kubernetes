@@ -28,7 +28,7 @@ import (
 // InitConfiguration contains a list of elements that is specific "kubeadm init"-only runtime
 // information.
 type InitConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
 	// After that, the information in the fields IS NOT uploaded to the `kubeadm-config` ConfigMap
@@ -73,7 +73,7 @@ type InitConfiguration struct {
 
 // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
 type ClusterConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Etcd holds configuration for etcd.
 	// +optional
@@ -154,7 +154,7 @@ type ControlPlaneComponent struct {
 
 // APIServer holds settings necessary for API server deployments in the cluster
 type APIServer struct {
-	ControlPlaneComponent `json:",inline"`
+	ControlPlaneComponent
 
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	// +optional
@@ -171,7 +171,7 @@ type DNSAddOnType string
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// ImageMeta allows to customize the image used for the DNS component
-	ImageMeta `json:",inline"`
+	ImageMeta
 }
 
 // ImageMeta allows to customize the image used for components that are not
@@ -269,7 +269,7 @@ type Etcd struct {
 // LocalEtcd describes that kubeadm should run an etcd cluster locally
 type LocalEtcd struct {
 	// ImageMeta allows to customize the container used for etcd
-	ImageMeta `json:",inline"`
+	ImageMeta
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".
@@ -313,7 +313,7 @@ type ExternalEtcd struct {
 
 // JoinConfiguration contains elements describing a particular node.
 type JoinConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	// +optional

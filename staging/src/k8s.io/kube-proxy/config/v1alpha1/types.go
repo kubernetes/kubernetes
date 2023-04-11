@@ -123,7 +123,7 @@ type DetectLocalConfiguration struct {
 // KubeProxyConfiguration contains everything necessary to configure the
 // Kubernetes proxy server.
 type KubeProxyConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`

@@ -35,7 +35,7 @@ import (
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
 type TokenReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -125,7 +125,7 @@ func (t ExtraValue) String() string {
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
 type SelfSubjectReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

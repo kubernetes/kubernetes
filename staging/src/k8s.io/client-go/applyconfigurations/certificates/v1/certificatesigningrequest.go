@@ -30,7 +30,7 @@ import (
 // CertificateSigningRequestApplyConfiguration represents an declarative configuration of the CertificateSigningRequest type for use
 // with apply.
 type CertificateSigningRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *CertificateSigningRequestSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`

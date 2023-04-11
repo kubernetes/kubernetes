@@ -25,8 +25,8 @@ import (
 // RuleWithOperationsApplyConfiguration represents an declarative configuration of the RuleWithOperations type for use
 // with apply.
 type RuleWithOperationsApplyConfiguration struct {
-	Operations             []v1.OperationType `json:"operations,omitempty"`
-	RuleApplyConfiguration `json:",inline"`
+	Operations []v1.OperationType `json:"operations,omitempty"`
+	RuleApplyConfiguration
 }
 
 // RuleWithOperationsApplyConfiguration constructs an declarative configuration of the RuleWithOperations type for use with

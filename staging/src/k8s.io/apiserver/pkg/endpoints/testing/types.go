@@ -23,7 +23,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Simple struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
@@ -34,7 +34,7 @@ type Simple struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SimpleRoot struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
@@ -45,10 +45,10 @@ type SimpleRoot struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SimpleGetOptions struct {
-	metav1.TypeMeta `json:",inline"`
-	Param1          string `json:"param1"`
-	Param2          string `json:"param2"`
-	Path            string `json:"atAPath"`
+	metav1.TypeMeta
+	Param1 string `json:"param1"`
+	Param2 string `json:"param2"`
+	Path   string `json:"atAPath"`
 }
 
 func (SimpleGetOptions) SwaggerDoc() map[string]string {
@@ -61,7 +61,7 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SimpleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata,inline"`
 	// +optional
 	Items []Simple `json:"items,omitempty"`
@@ -72,7 +72,7 @@ type SimpleList struct {
 // SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
 // same group as its parent resource.
 type SimpleXGSubresource struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata"`
 	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
 	Labels            map[string]string `json:"labels,omitempty"`

@@ -32,7 +32,7 @@ import (
 )
 
 type testDecodable struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	Other     string
 	Value     int           `json:"value"`
@@ -77,7 +77,7 @@ func (d *testDecodable) DeepCopyInto(out *testDecodable) {
 }
 
 type testDecodeCoercion struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	Bool bool `json:"bool"`
 

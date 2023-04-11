@@ -37,7 +37,7 @@ import (
 // to break ties using internal heuristics, but any ClusterCIDR whose node
 // selector matches the Node may be used.
 type ClusterCIDR struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -86,7 +86,7 @@ type ClusterCIDRSpec struct {
 
 // ClusterCIDRList contains a list of ClusterCIDR.
 type ClusterCIDRList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -110,7 +110,7 @@ type ClusterCIDRList struct {
 // Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
 // Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
 type IPAddress struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -153,7 +153,7 @@ type ParentReference struct {
 
 // IPAddressList contains a list of IPAddress.
 type IPAddressList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

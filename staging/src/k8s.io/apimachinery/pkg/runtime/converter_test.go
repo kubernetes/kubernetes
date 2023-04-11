@@ -63,7 +63,7 @@ type B struct {
 
 type C struct {
 	A []A `json:"ca"`
-	B `json:",inline"`
+	B
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
@@ -102,20 +102,20 @@ type G struct {
 
 type H struct {
 	A A `json:"ha"`
-	C `json:",inline"`
+	C
 }
 
 type I struct {
 	A A `json:"ia"`
-	H `json:",inline"`
+	H
 
 	UL1 UnknownLevel1 `json:"ul1"`
 }
 
 type UnknownLevel1 struct {
-	A          int64 `json:"a"`
-	InlinedAA  `json:",inline"`
-	InlinedAAA `json:",inline"`
+	A int64 `json:"a"`
+	InlinedAA
+	InlinedAAA
 }
 type InlinedAA struct {
 	AA int64 `json:"aa"`
@@ -126,9 +126,9 @@ type InlinedAAA struct {
 }
 
 type UnknownLevel2 struct {
-	B          int64 `json:"b"`
-	InlinedBB  `json:",inline"`
-	InlinedBBB `json:",inline"`
+	B int64 `json:"b"`
+	InlinedBB
+	InlinedBBB
 }
 type InlinedBB struct {
 	BB int64 `json:"bb"`
@@ -139,9 +139,9 @@ type InlinedBBB struct {
 }
 
 type UnknownLevel3 struct {
-	C          int64 `json:"c"`
-	InlinedCC  `json:",inline"`
-	InlinedCCC `json:",inline"`
+	C int64 `json:"c"`
+	InlinedCC
+	InlinedCCC
 }
 type InlinedCC struct {
 	CC int64 `json:"cc"`

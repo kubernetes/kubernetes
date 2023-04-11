@@ -30,7 +30,7 @@ import (
 // PodSecurityPolicyApplyConfiguration represents an declarative configuration of the PodSecurityPolicy type for use
 // with apply.
 type PodSecurityPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PodSecurityPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }

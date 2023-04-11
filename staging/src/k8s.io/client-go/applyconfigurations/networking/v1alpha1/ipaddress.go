@@ -30,7 +30,7 @@ import (
 // IPAddressApplyConfiguration represents an declarative configuration of the IPAddress type for use
 // with apply.
 type IPAddressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *IPAddressSpecApplyConfiguration `json:"spec,omitempty"`
 }

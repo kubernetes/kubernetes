@@ -30,7 +30,7 @@ import (
 // StorageVersionApplyConfiguration represents an declarative configuration of the StorageVersion type for use
 // with apply.
 type StorageVersionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *v1alpha1.StorageVersionSpec            `json:"spec,omitempty"`
 	Status                           *StorageVersionStatusApplyConfiguration `json:"status,omitempty"`

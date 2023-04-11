@@ -25,7 +25,7 @@ import (
 
 // Foo is a specification for a Foo resource
 type Foo struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   FooSpec   `json:"spec"`
@@ -47,7 +47,7 @@ type FooStatus struct {
 
 // FooList is a list of Foo resources
 type FooList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Foo `json:"items"`

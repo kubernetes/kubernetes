@@ -33,7 +33,7 @@ import (
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceClaim struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -200,7 +200,7 @@ const ResourceHandleDataMaxSize = 16 * 1024
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -220,7 +220,7 @@ type ResourceClaimList struct {
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type PodSchedulingContext struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -298,7 +298,7 @@ const PodSchedulingNodeListMaxSize = 128
 
 // PodSchedulingContextList is a collection of Pod scheduling objects.
 type PodSchedulingContextList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -318,7 +318,7 @@ type PodSchedulingContextList struct {
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -352,7 +352,7 @@ type ResourceClass struct {
 
 // ResourceClassList is a collection of classes.
 type ResourceClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -420,7 +420,7 @@ type ResourceClaimConsumerReference struct {
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 type ResourceClaimTemplate struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -452,7 +452,7 @@ type ResourceClaimTemplateSpec struct {
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

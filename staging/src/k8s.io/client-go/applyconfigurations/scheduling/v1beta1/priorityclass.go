@@ -31,7 +31,7 @@ import (
 // PriorityClassApplyConfiguration represents an declarative configuration of the PriorityClass type for use
 // with apply.
 type PriorityClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Value                            *int32                   `json:"value,omitempty"`
 	GlobalDefault                    *bool                    `json:"globalDefault,omitempty"`

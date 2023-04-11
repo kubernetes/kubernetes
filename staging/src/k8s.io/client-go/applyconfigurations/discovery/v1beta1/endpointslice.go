@@ -30,7 +30,7 @@ import (
 // EndpointSliceApplyConfiguration represents an declarative configuration of the EndpointSlice type for use
 // with apply.
 type EndpointSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	AddressType                      *v1beta1.AddressType             `json:"addressType,omitempty"`
 	Endpoints                        []EndpointApplyConfiguration     `json:"endpoints,omitempty"`

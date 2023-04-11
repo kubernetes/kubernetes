@@ -22,7 +22,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // WebhookAdmission provides configuration for the webhook admission controller.
 type WebhookAdmission struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// KubeConfigFile is the path to the kubeconfig file.
 	KubeConfigFile string `json:"kubeConfigFile"`

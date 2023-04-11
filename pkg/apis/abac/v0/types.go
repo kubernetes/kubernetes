@@ -26,7 +26,7 @@ import (
 
 // Policy contains a single ABAC policy rule
 type Policy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// User is the username this rule applies to.
 	// Either user or group is required to match the request.

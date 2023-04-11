@@ -38,7 +38,7 @@ var testData = TestStruct{
 }
 
 type TestStruct struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Key               string         `json:"Key"`
 	Map               map[string]int `json:"Map"`

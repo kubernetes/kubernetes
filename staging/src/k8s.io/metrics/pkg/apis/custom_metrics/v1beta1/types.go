@@ -26,7 +26,7 @@ import (
 
 // MetricValueList is a list of values for a given metric for some set of objects
 type MetricValueList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// the value of the metric across the described objects
@@ -37,7 +37,7 @@ type MetricValueList struct {
 
 // MetricValue is a metric value for some object
 type MetricValue struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// a reference to the described object
 	DescribedObject v1.ObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
@@ -69,7 +69,7 @@ type MetricValue struct {
 
 // MetricListOptions is used to select metrics by their label selectors
 type MetricListOptions struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.

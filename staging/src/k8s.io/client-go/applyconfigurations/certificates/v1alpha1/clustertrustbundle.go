@@ -30,7 +30,7 @@ import (
 // ClusterTrustBundleApplyConfiguration represents an declarative configuration of the ClusterTrustBundle type for use
 // with apply.
 type ClusterTrustBundleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ClusterTrustBundleSpecApplyConfiguration `json:"spec,omitempty"`
 }

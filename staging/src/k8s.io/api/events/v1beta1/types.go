@@ -33,7 +33,7 @@ import (
 // continued existence of events with that Reason.  Events should be
 // treated as informative, best-effort, supplemental data.
 type Event struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -120,7 +120,7 @@ type EventSeries struct {
 
 // EventList is a list of Event objects.
 type EventList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

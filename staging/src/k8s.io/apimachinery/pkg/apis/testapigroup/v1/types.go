@@ -31,7 +31,7 @@ type (
 
 // Carp is a collection of containers, used as either input (create, update) or as output (list, get).
 type Carp struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -184,7 +184,7 @@ type CarpSpec struct {
 
 // CarpList is a list of Carps.
 type CarpList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional

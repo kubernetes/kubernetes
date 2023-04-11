@@ -30,7 +30,7 @@ import (
 // CSIDriverApplyConfiguration represents an declarative configuration of the CSIDriver type for use
 // with apply.
 type CSIDriverApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }

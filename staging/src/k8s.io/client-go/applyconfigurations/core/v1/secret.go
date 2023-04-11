@@ -30,7 +30,7 @@ import (
 // SecretApplyConfiguration represents an declarative configuration of the Secret type for use
 // with apply.
 type SecretApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Immutable                        *bool              `json:"immutable,omitempty"`
 	Data                             map[string][]byte  `json:"data,omitempty"`

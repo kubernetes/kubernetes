@@ -25,8 +25,8 @@ import (
 // EphemeralContainerApplyConfiguration represents an declarative configuration of the EphemeralContainer type for use
 // with apply.
 type EphemeralContainerApplyConfiguration struct {
-	EphemeralContainerCommonApplyConfiguration `json:",inline"`
-	TargetContainerName                        *string `json:"targetContainerName,omitempty"`
+	EphemeralContainerCommonApplyConfiguration
+	TargetContainerName *string `json:"targetContainerName,omitempty"`
 }
 
 // EphemeralContainerApplyConfiguration constructs an declarative configuration of the EphemeralContainer type for use with

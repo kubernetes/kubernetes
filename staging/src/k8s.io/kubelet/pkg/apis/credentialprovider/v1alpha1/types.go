@@ -26,7 +26,7 @@ import (
 // Kubelet will pass this request object to the plugin via stdin. In general, plugins should
 // prefer responding with the same apiVersion they were sent.
 type CredentialProviderRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// image is the container image that is being pulled as part of the
 	// credential provider plugin request. Plugins may optionally parse the image
@@ -56,7 +56,7 @@ const (
 // image provided in the original request. Kubelet will read the response from the plugin via stdout.
 // This response should be set to the same apiVersion as CredentialProviderRequest.
 type CredentialProviderResponse struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// cacheKeyType indiciates the type of caching key to use based on the image provided
 	// in the request. There are three valid values for the cache key type: Image, Registry, and

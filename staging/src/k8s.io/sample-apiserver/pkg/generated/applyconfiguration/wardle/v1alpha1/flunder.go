@@ -28,7 +28,7 @@ import (
 // FlunderApplyConfiguration represents an declarative configuration of the Flunder type for use
 // with apply.
 type FlunderApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *FlunderSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *wardlev1alpha1.FlunderStatus  `json:"status,omitempty"`

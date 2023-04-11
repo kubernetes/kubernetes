@@ -32,7 +32,7 @@ import (
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -223,7 +223,7 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

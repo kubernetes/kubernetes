@@ -25,7 +25,7 @@ import (
 
 // Lease defines a lease concept.
 type Lease struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -63,7 +63,7 @@ type LeaseSpec struct {
 
 // LeaseList is a list of Lease objects.
 type LeaseList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

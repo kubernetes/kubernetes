@@ -29,7 +29,7 @@ import (
 
 // NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -48,7 +48,7 @@ type NodeMetrics struct {
 
 // NodeMetricsList is a list of NodeMetrics.
 type NodeMetricsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -64,7 +64,7 @@ type NodeMetricsList struct {
 
 // PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -83,7 +83,7 @@ type PodMetrics struct {
 
 // PodMetricsList is a list of PodMetrics.
 type PodMetricsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

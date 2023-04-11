@@ -166,7 +166,7 @@ type APIServer struct {
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// ImageMeta allows to customize the image used for the DNS component
-	ImageMeta `json:",inline"`
+	ImageMeta
 }
 
 // ImageMeta allows to customize the image used for components that are not
@@ -250,7 +250,7 @@ type Etcd struct {
 // LocalEtcd describes that kubeadm should run an etcd cluster locally
 type LocalEtcd struct {
 	// ImageMeta allows to customize the container used for etcd
-	ImageMeta `json:",inline"`
+	ImageMeta
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".

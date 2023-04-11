@@ -30,7 +30,7 @@ import (
 // IngressApplyConfiguration represents an declarative configuration of the Ingress type for use
 // with apply.
 type IngressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *IngressSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *IngressStatusApplyConfiguration `json:"status,omitempty"`

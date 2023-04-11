@@ -41,7 +41,7 @@ const (
 // Configuration provides configuration for the EventRateLimit admission
 // controller.
 type Configuration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// limits are the limits to place on event queries received.
 	// Limits can be placed on events received server-wide, per namespace,

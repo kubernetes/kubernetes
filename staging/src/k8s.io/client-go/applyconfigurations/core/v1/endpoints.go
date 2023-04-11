@@ -30,7 +30,7 @@ import (
 // EndpointsApplyConfiguration represents an declarative configuration of the Endpoints type for use
 // with apply.
 type EndpointsApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Subsets                          []EndpointSubsetApplyConfiguration `json:"subsets,omitempty"`
 }

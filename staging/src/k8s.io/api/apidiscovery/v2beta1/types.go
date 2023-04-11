@@ -31,7 +31,7 @@ import (
 // list of API resources (built-ins, Custom Resource Definitions, resources from aggregated servers)
 // that a cluster supports.
 type APIGroupDiscoveryList struct {
-	v1.TypeMeta `json:",inline"`
+	v1.TypeMeta
 	// ResourceVersion will not be set, because this does not have a replayable ordering among multiple apiservers.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -50,7 +50,7 @@ type APIGroupDiscoveryList struct {
 // It contains a list of APIVersionDiscovery that holds a list of APIResourceDiscovery types served for a version.
 // Versions are in descending order of preference, with the first version being the preferred entry.
 type APIGroupDiscovery struct {
-	v1.TypeMeta `json:",inline"`
+	v1.TypeMeta
 	// Standard object's metadata.
 	// The only field completed will be name. For instance, resourceVersion will be empty.
 	// name is the name of the API group whose discovery information is presented here.

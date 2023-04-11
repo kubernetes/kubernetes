@@ -25,7 +25,7 @@ import (
 
 // ExternalMetricValueList is a list of values for a given metric for some set labels
 type ExternalMetricValueList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// value of the metric matching a given set of labels
@@ -38,7 +38,7 @@ type ExternalMetricValueList struct {
 // A single metric value is identified by metric name and a set of string labels.
 // For one metric there can be multiple values with different sets of labels.
 type ExternalMetricValue struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// the name of the metric
 	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`

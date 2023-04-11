@@ -30,7 +30,7 @@ import (
 // ValidatingAdmissionPolicyApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicy type for use
 // with apply.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`

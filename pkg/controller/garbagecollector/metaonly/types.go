@@ -27,7 +27,7 @@ import (
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type MetadataOnlyObject struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
@@ -39,7 +39,7 @@ type MetadataOnlyObject struct {
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type MetadataOnlyObjectList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 

@@ -30,7 +30,7 @@ import (
 // LeaseApplyConfiguration represents an declarative configuration of the Lease type for use
 // with apply.
 type LeaseApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
 }

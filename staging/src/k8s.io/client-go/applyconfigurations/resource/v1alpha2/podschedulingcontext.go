@@ -30,7 +30,7 @@ import (
 // PodSchedulingContextApplyConfiguration represents an declarative configuration of the PodSchedulingContext type for use
 // with apply.
 type PodSchedulingContextApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PodSchedulingContextSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *PodSchedulingContextStatusApplyConfiguration `json:"status,omitempty"`

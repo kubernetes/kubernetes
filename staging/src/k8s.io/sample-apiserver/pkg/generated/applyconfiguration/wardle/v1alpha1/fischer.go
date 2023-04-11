@@ -27,7 +27,7 @@ import (
 // FischerApplyConfiguration represents an declarative configuration of the Fischer type for use
 // with apply.
 type FischerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	DisallowedFlunders               []string `json:"disallowedFlunders,omitempty"`
 }

@@ -30,7 +30,7 @@ import (
 // ReplicationControllerApplyConfiguration represents an declarative configuration of the ReplicationController type for use
 // with apply.
 type ReplicationControllerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`

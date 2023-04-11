@@ -87,7 +87,7 @@ const (
 
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// enableServer enables Kubelet's secured server.
 	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
@@ -906,7 +906,7 @@ type KubeletAnonymousAuthentication struct {
 // This type is used internally by the Kubelet for tracking checkpointed dynamic configs.
 // It exists in the kubeletconfig API group because it is classified as a versioned input to the Kubelet.
 type SerializedNodeConfigSource struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// source is the source that we are serializing.
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
@@ -941,7 +941,7 @@ type MemorySwapConfiguration struct {
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials

@@ -455,7 +455,7 @@ type ExternalMetricStatus struct {
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
 type HorizontalPodAutoscaler struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -478,7 +478,7 @@ type HorizontalPodAutoscaler struct {
 
 // HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// metadata is the standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

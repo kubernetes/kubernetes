@@ -34,7 +34,7 @@ import (
 //
 // VolumeAttachment objects are non-namespaced.
 type VolumeAttachment struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -59,7 +59,7 @@ type VolumeAttachment struct {
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -174,7 +174,7 @@ type VolumeError struct {
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 type CSIStorageCapacity struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata. The name has no particular meaning. It must be
 	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
@@ -239,7 +239,7 @@ type CSIStorageCapacity struct {
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

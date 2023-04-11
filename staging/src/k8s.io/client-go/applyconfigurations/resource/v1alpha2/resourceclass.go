@@ -31,7 +31,7 @@ import (
 // ResourceClassApplyConfiguration represents an declarative configuration of the ResourceClass type for use
 // with apply.
 type ResourceClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	DriverName                       *string                                             `json:"driverName,omitempty"`
 	ParametersRef                    *ResourceClassParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`

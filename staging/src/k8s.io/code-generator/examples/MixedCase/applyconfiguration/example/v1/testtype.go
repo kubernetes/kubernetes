@@ -28,7 +28,7 @@ import (
 // TestTypeApplyConfiguration represents an declarative configuration of the TestType type for use
 // with apply.
 type TestTypeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                           *examplev1.TestTypeStatus `json:"status,omitempty"`
 }

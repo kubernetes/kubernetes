@@ -39,7 +39,7 @@ import (
 // (with the "kubernetes.io/kube-apiserver-client" signerName),
 // or to obtain certificates from custom non-Kubernetes signers.
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -265,7 +265,7 @@ type CertificateSigningRequestCondition struct {
 
 // CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

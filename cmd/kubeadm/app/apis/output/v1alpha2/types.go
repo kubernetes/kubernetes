@@ -26,7 +26,7 @@ import (
 
 // BootstrapToken represents information for the bootstrap token output produced by kubeadm
 type BootstrapToken struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	bootstraptokenv1.BootstrapToken
 }
@@ -35,7 +35,7 @@ type BootstrapToken struct {
 
 // Images represents information for the output produced by 'kubeadm config images list'
 type Images struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	Images []string `json:"images"`
 }

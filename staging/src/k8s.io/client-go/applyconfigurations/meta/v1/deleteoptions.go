@@ -25,12 +25,12 @@ import (
 // DeleteOptionsApplyConfiguration represents an declarative configuration of the DeleteOptions type for use
 // with apply.
 type DeleteOptionsApplyConfiguration struct {
-	TypeMetaApplyConfiguration `json:",inline"`
-	GracePeriodSeconds         *int64                           `json:"gracePeriodSeconds,omitempty"`
-	Preconditions              *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
-	OrphanDependents           *bool                            `json:"orphanDependents,omitempty"`
-	PropagationPolicy          *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
-	DryRun                     []string                         `json:"dryRun,omitempty"`
+	TypeMetaApplyConfiguration
+	GracePeriodSeconds *int64                           `json:"gracePeriodSeconds,omitempty"`
+	Preconditions      *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
+	OrphanDependents   *bool                            `json:"orphanDependents,omitempty"`
+	PropagationPolicy  *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
+	DryRun             []string                         `json:"dryRun,omitempty"`
 }
 
 // DeleteOptionsApplyConfiguration constructs an declarative configuration of the DeleteOptions type for use with

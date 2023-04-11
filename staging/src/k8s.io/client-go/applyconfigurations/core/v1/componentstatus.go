@@ -30,7 +30,7 @@ import (
 // ComponentStatusApplyConfiguration represents an declarative configuration of the ComponentStatus type for use
 // with apply.
 type ComponentStatusApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
 }

@@ -30,7 +30,7 @@ import (
 // ResourceClaimTemplateApplyConfiguration represents an declarative configuration of the ResourceClaimTemplate type for use
 // with apply.
 type ResourceClaimTemplateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
 }

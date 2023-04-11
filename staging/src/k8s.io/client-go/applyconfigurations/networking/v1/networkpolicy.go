@@ -30,7 +30,7 @@ import (
 // NetworkPolicyApplyConfiguration represents an declarative configuration of the NetworkPolicy type for use
 // with apply.
 type NetworkPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *NetworkPolicySpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *NetworkPolicyStatusApplyConfiguration `json:"status,omitempty"`

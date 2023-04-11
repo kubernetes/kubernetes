@@ -30,7 +30,7 @@ import (
 // RoleApplyConfiguration represents an declarative configuration of the Role type for use
 // with apply.
 type RoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }

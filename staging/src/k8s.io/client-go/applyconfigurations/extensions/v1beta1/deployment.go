@@ -30,7 +30,7 @@ import (
 // DeploymentApplyConfiguration represents an declarative configuration of the Deployment type for use
 // with apply.
 type DeploymentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *DeploymentStatusApplyConfiguration `json:"status,omitempty"`

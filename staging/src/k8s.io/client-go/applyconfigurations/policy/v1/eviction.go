@@ -30,7 +30,7 @@ import (
 // EvictionApplyConfiguration represents an declarative configuration of the Eviction type for use
 // with apply.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }

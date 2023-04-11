@@ -26,7 +26,7 @@ import (
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials

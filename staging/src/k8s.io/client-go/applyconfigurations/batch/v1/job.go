@@ -30,7 +30,7 @@ import (
 // JobApplyConfiguration represents an declarative configuration of the Job type for use
 // with apply.
 type JobApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *JobSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *JobStatusApplyConfiguration `json:"status,omitempty"`

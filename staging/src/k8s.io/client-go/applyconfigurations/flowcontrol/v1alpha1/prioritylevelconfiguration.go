@@ -30,7 +30,7 @@ import (
 // PriorityLevelConfigurationApplyConfiguration represents an declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
 type PriorityLevelConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`

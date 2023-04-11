@@ -30,7 +30,7 @@ import (
 // NodeApplyConfiguration represents an declarative configuration of the Node type for use
 // with apply.
 type NodeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *NodeSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *NodeStatusApplyConfiguration `json:"status,omitempty"`

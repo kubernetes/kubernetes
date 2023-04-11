@@ -25,15 +25,15 @@ import (
 // PersistentVolumeSpecApplyConfiguration represents an declarative configuration of the PersistentVolumeSpec type for use
 // with apply.
 type PersistentVolumeSpecApplyConfiguration struct {
-	Capacity                                 *v1.ResourceList `json:"capacity,omitempty"`
-	PersistentVolumeSourceApplyConfiguration `json:",inline"`
-	AccessModes                              []v1.PersistentVolumeAccessMode       `json:"accessModes,omitempty"`
-	ClaimRef                                 *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty"`
-	PersistentVolumeReclaimPolicy            *v1.PersistentVolumeReclaimPolicy     `json:"persistentVolumeReclaimPolicy,omitempty"`
-	StorageClassName                         *string                               `json:"storageClassName,omitempty"`
-	MountOptions                             []string                              `json:"mountOptions,omitempty"`
-	VolumeMode                               *v1.PersistentVolumeMode              `json:"volumeMode,omitempty"`
-	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
+	Capacity *v1.ResourceList `json:"capacity,omitempty"`
+	PersistentVolumeSourceApplyConfiguration
+	AccessModes                   []v1.PersistentVolumeAccessMode       `json:"accessModes,omitempty"`
+	ClaimRef                      *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty"`
+	PersistentVolumeReclaimPolicy *v1.PersistentVolumeReclaimPolicy     `json:"persistentVolumeReclaimPolicy,omitempty"`
+	StorageClassName              *string                               `json:"storageClassName,omitempty"`
+	MountOptions                  []string                              `json:"mountOptions,omitempty"`
+	VolumeMode                    *v1.PersistentVolumeMode              `json:"volumeMode,omitempty"`
+	NodeAffinity                  *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
 }
 
 // PersistentVolumeSpecApplyConfiguration constructs an declarative configuration of the PersistentVolumeSpec type for use with

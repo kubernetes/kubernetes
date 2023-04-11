@@ -25,7 +25,7 @@ import (
 
 // Configuration provides configuration for the PodTolerationRestriction admission controller.
 type Configuration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// cluster level default tolerations
 	Default []v1.Toleration `json:"default,omitempty"`

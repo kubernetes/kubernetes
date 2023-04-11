@@ -32,7 +32,7 @@ import (
 // StorageClassApplyConfiguration represents an declarative configuration of the StorageClass type for use
 // with apply.
 type StorageClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Provisioner                      *string                                                            `json:"provisioner,omitempty"`
 	Parameters                       map[string]string                                                  `json:"parameters,omitempty"`

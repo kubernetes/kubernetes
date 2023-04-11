@@ -30,7 +30,7 @@ import (
 // ClusterRoleBindingApplyConfiguration represents an declarative configuration of the ClusterRoleBinding type for use
 // with apply.
 type ClusterRoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Subjects                         []SubjectApplyConfiguration `json:"subjects,omitempty"`
 	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`

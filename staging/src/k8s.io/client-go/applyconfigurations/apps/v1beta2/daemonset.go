@@ -30,7 +30,7 @@ import (
 // DaemonSetApplyConfiguration represents an declarative configuration of the DaemonSet type for use
 // with apply.
 type DaemonSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *DaemonSetSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`

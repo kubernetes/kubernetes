@@ -26,7 +26,7 @@ import (
 
 // Example is a specification for an Example resource
 type Example struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta
 	metav1.ObjectMeta `json:"metadata"`
 
 	Spec   ExampleSpec   `json:"spec"`
@@ -56,7 +56,7 @@ const (
 
 // ExampleList is a list of Example resources
 type ExampleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Example `json:"items"`

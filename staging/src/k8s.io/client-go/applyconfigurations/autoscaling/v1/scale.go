@@ -27,7 +27,7 @@ import (
 // ScaleApplyConfiguration represents an declarative configuration of the Scale type for use
 // with apply.
 type ScaleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ScaleSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ScaleStatusApplyConfiguration `json:"status,omitempty"`

@@ -30,7 +30,7 @@ import (
 // ServiceApplyConfiguration represents an declarative configuration of the Service type for use
 // with apply.
 type ServiceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ServiceStatusApplyConfiguration `json:"status,omitempty"`

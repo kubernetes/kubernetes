@@ -32,7 +32,7 @@ import (
 // StorageClasses are non-namespaced; the name of the storage class
 // according to etcd is in ObjectMeta.Name.
 type StorageClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -81,7 +81,7 @@ type StorageClass struct {
 
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -117,7 +117,7 @@ const (
 //
 // VolumeAttachment objects are non-namespaced.
 type VolumeAttachment struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -139,7 +139,7 @@ type VolumeAttachment struct {
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -233,7 +233,7 @@ type VolumeError struct {
 // Kubelet uses this object to determine whether pod information needs to be passed on mount.
 // CSIDriver objects are non-namespaced.
 type CSIDriver struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object metadata.
 	// metadata.Name indicates the name of the CSI driver that this object
@@ -253,7 +253,7 @@ type CSIDriver struct {
 
 // CSIDriverList is a collection of CSIDriver objects.
 type CSIDriverList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -501,7 +501,7 @@ const (
 // enough that it doesn't create this object.
 // CSINode has an OwnerReference that points to the corresponding node object.
 type CSINode struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// metadata.name must be the Kubernetes node name.
@@ -571,7 +571,7 @@ type VolumeNodeResources struct {
 
 // CSINodeList is a collection of CSINode objects.
 type CSINodeList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -610,7 +610,7 @@ type CSINodeList struct {
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 type CSIStorageCapacity struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard object's metadata.
 	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
@@ -672,7 +672,7 @@ type CSIStorageCapacity struct {
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

@@ -30,7 +30,7 @@ import (
 // CSINodeApplyConfiguration represents an declarative configuration of the CSINode type for use
 // with apply.
 type CSINodeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }

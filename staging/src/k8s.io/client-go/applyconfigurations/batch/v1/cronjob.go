@@ -30,7 +30,7 @@ import (
 // CronJobApplyConfiguration represents an declarative configuration of the CronJob type for use
 // with apply.
 type CronJobApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *CronJobSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *CronJobStatusApplyConfiguration `json:"status,omitempty"`

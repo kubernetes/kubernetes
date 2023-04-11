@@ -320,7 +320,7 @@ type OwnerReference struct {
 
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.
@@ -452,7 +452,7 @@ const (
 
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// resourceVersion sets a constraint on what resource versions a request may be served from.
 	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
 	// details.
@@ -492,7 +492,7 @@ const (
 
 // DeleteOptions may be provided when deleting an API object.
 type DeleteOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
@@ -548,7 +548,7 @@ const (
 
 // CreateOptions may be provided when creating an API object.
 type CreateOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -592,7 +592,7 @@ type CreateOptions struct {
 // PatchOptions may be provided when patching an API object.
 // PatchOptions is meant to be a superset of UpdateOptions.
 type PatchOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -643,7 +643,7 @@ type PatchOptions struct {
 // ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation
 // that speaks specifically to how the options fields relate to apply.
 type ApplyOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -675,7 +675,7 @@ func (o ApplyOptions) ToPatchOptions() PatchOptions {
 // UpdateOptions may be provided when updating an API object.
 // All fields in UpdateOptions should also be present in PatchOptions.
 type UpdateOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -726,7 +726,7 @@ type Preconditions struct {
 
 // Status is a return value for calls that don't return other objects.
 type Status struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1011,7 +1011,7 @@ const (
 
 // List holds a list of objects, which may not be known by the server.
 type List struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1027,7 +1027,7 @@ type List struct {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type APIVersions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// versions are the api versions that are available.
 	Versions []string `json:"versions" protobuf:"bytes,1,rep,name=versions"`
 	// a map of client CIDR to server address that is serving this group.
@@ -1045,7 +1045,7 @@ type APIVersions struct {
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
 // /apis.
 type APIGroupList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// groups is a list of APIGroup.
 	Groups []APIGroup `json:"groups" protobuf:"bytes,1,rep,name=groups"`
 }
@@ -1055,7 +1055,7 @@ type APIGroupList struct {
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
 type APIGroup struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// name is the name of the group.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// versions are the versions supported in this group.
@@ -1146,7 +1146,7 @@ func (vs Verbs) String() string {
 // resources supported in a specific group and version, and if the resource
 // is namespaced.
 type APIResourceList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// groupVersion is the group and version this APIResourceList is for.
 	GroupVersion string `json:"groupVersion" protobuf:"bytes,1,opt,name=groupVersion"`
 	// resources contains the name of the resources and if they are namespaced.
@@ -1311,7 +1311,7 @@ func (f FieldsV1) String() string {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=false
 type Table struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1426,7 +1426,7 @@ const (
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 
 	// NoHeaders is only exposed for internal callers. It is not included in our OpenAPI definitions
 	// and may be removed as a field in a future release.
@@ -1443,7 +1443,7 @@ type TableOptions struct {
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadata struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -1453,7 +1453,7 @@ type PartialObjectMetadata struct {
 // PartialObjectMetadataList contains a list of objects containing only their metadata
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadataList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional

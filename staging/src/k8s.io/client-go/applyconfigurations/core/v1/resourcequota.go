@@ -30,7 +30,7 @@ import (
 // ResourceQuotaApplyConfiguration represents an declarative configuration of the ResourceQuota type for use
 // with apply.
 type ResourceQuotaApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ResourceQuotaSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`

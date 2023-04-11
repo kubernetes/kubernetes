@@ -26,7 +26,7 @@ import (
 
 // Storage version of a specific resource.
 type StorageVersion struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// The name is <group>.<resource>.
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -120,7 +120,7 @@ type StorageVersionCondition struct {
 
 // A list of StorageVersions.
 type StorageVersionList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

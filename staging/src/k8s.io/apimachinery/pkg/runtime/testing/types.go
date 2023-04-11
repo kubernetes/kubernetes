@@ -34,10 +34,10 @@ type EmbeddedTest struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type EmbeddedTestExternal struct {
-	runtime.TypeMeta `json:",inline"`
-	ID               string               `json:"id,omitempty"`
-	Object           runtime.RawExtension `json:"object,omitempty"`
-	EmptyObject      runtime.RawExtension `json:"emptyObject,omitempty"`
+	runtime.TypeMeta
+	ID          string               `json:"id,omitempty"`
+	Object      runtime.RawExtension `json:"object,omitempty"`
+	EmptyObject runtime.RawExtension `json:"emptyObject,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -50,7 +50,7 @@ type ObjectTest struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ObjectTestExternal struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
+	runtime.TypeMeta `yaml:",inline"`
 
 	ID    string                 `json:"id,omitempty"`
 	Items []runtime.RawExtension `json:"items,omitempty"`
@@ -58,50 +58,50 @@ type ObjectTestExternal struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalSimple struct {
-	runtime.TypeMeta `json:",inline"`
-	TestString       string `json:"testString"`
+	runtime.TypeMeta
+	TestString string `json:"testString"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalSimple struct {
-	runtime.TypeMeta `json:",inline"`
-	TestString       string `json:"testString"`
+	runtime.TypeMeta
+	TestString string `json:"testString"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExtensionA struct {
-	runtime.TypeMeta `json:",inline"`
-	TestString       string `json:"testString"`
+	runtime.TypeMeta
+	TestString string `json:"testString"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExtensionB struct {
-	runtime.TypeMeta `json:",inline"`
-	TestString       string `json:"testString"`
+	runtime.TypeMeta
+	TestString string `json:"testString"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalExtensionType struct {
-	runtime.TypeMeta `json:",inline"`
-	Extension        runtime.RawExtension `json:"extension"`
+	runtime.TypeMeta
+	Extension runtime.RawExtension `json:"extension"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalExtensionType struct {
-	runtime.TypeMeta `json:",inline"`
-	Extension        runtime.Object `json:"extension"`
+	runtime.TypeMeta
+	Extension runtime.Object `json:"extension"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalOptionalExtensionType struct {
-	runtime.TypeMeta `json:",inline"`
-	Extension        runtime.RawExtension `json:"extension,omitempty"`
+	runtime.TypeMeta
+	Extension runtime.RawExtension `json:"extension,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalOptionalExtensionType struct {
-	runtime.TypeMeta `json:",inline"`
-	Extension        runtime.Object `json:"extension,omitempty"`
+	runtime.TypeMeta
+	Extension runtime.Object `json:"extension,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -116,12 +116,12 @@ type InternalComplex struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalComplex struct {
-	runtime.TypeMeta `json:",inline"`
-	String           string `json:"string" description:"testing"`
-	Integer          int    `json:"int"`
-	Integer64        int64  `json:",omitempty"`
-	Int64            int64
-	Bool             bool `json:"bool"`
+	runtime.TypeMeta
+	String    string `json:"string" description:"testing"`
+	Integer   int    `json:"int"`
+	Integer64 int64  `json:",omitempty"`
+	Int64     int64
+	Bool      bool `json:"bool"`
 }
 
 // Test a weird version/kind embedding format.
@@ -136,23 +136,23 @@ type MyWeirdCustomEmbeddedVersionKindField struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType1 struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
-	A                                     string               `json:"A,omitempty"`
-	B                                     int                  `json:"B,omitempty"`
-	C                                     int8                 `json:"C,omitempty"`
-	D                                     int16                `json:"D,omitempty"`
-	E                                     int32                `json:"E,omitempty"`
-	F                                     int64                `json:"F,omitempty"`
-	G                                     uint                 `json:"G,omitempty"`
-	H                                     uint8                `json:"H,omitempty"`
-	I                                     uint16               `json:"I,omitempty"`
-	J                                     uint32               `json:"J,omitempty"`
-	K                                     uint64               `json:"K,omitempty"`
-	L                                     bool                 `json:"L,omitempty"`
-	M                                     map[string]int       `json:"M,omitempty"`
-	N                                     map[string]TestType2 `json:"N,omitempty"`
-	O                                     *TestType2           `json:"O,omitempty"`
-	P                                     []TestType2          `json:"Q,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField
+	A string               `json:"A,omitempty"`
+	B int                  `json:"B,omitempty"`
+	C int8                 `json:"C,omitempty"`
+	D int16                `json:"D,omitempty"`
+	E int32                `json:"E,omitempty"`
+	F int64                `json:"F,omitempty"`
+	G uint                 `json:"G,omitempty"`
+	H uint8                `json:"H,omitempty"`
+	I uint16               `json:"I,omitempty"`
+	J uint32               `json:"J,omitempty"`
+	K uint64               `json:"K,omitempty"`
+	L bool                 `json:"L,omitempty"`
+	M map[string]int       `json:"M,omitempty"`
+	N map[string]TestType2 `json:"N,omitempty"`
+	O *TestType2           `json:"O,omitempty"`
+	P []TestType2          `json:"Q,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -169,41 +169,41 @@ type ExternalTestType2 struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalTestType1 struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
-	A                                     string                       `json:"A,omitempty"`
-	B                                     int                          `json:"B,omitempty"`
-	C                                     int8                         `json:"C,omitempty"`
-	D                                     int16                        `json:"D,omitempty"`
-	E                                     int32                        `json:"E,omitempty"`
-	F                                     int64                        `json:"F,omitempty"`
-	G                                     uint                         `json:"G,omitempty"`
-	H                                     uint8                        `json:"H,omitempty"`
-	I                                     uint16                       `json:"I,omitempty"`
-	J                                     uint32                       `json:"J,omitempty"`
-	K                                     uint64                       `json:"K,omitempty"`
-	L                                     bool                         `json:"L,omitempty"`
-	M                                     map[string]int               `json:"M,omitempty"`
-	N                                     map[string]ExternalTestType2 `json:"N,omitempty"`
-	O                                     *ExternalTestType2           `json:"O,omitempty"`
-	P                                     []ExternalTestType2          `json:"Q,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField
+	A string                       `json:"A,omitempty"`
+	B int                          `json:"B,omitempty"`
+	C int8                         `json:"C,omitempty"`
+	D int16                        `json:"D,omitempty"`
+	E int32                        `json:"E,omitempty"`
+	F int64                        `json:"F,omitempty"`
+	G uint                         `json:"G,omitempty"`
+	H uint8                        `json:"H,omitempty"`
+	I uint16                       `json:"I,omitempty"`
+	J uint32                       `json:"J,omitempty"`
+	K uint64                       `json:"K,omitempty"`
+	L bool                         `json:"L,omitempty"`
+	M map[string]int               `json:"M,omitempty"`
+	N map[string]ExternalTestType2 `json:"N,omitempty"`
+	O *ExternalTestType2           `json:"O,omitempty"`
+	P []ExternalTestType2          `json:"Q,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalInternalSame struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
-	A                                     TestType2 `json:"A,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField
+	A TestType2 `json:"A,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type UnversionedType struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
-	A                                     string `json:"A,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField
+	A string `json:"A,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type UnknownType struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
-	A                                     string `json:"A,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField
+	A string `json:"A,omitempty"`
 }
 
 func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() schema.ObjectKind { return obj }

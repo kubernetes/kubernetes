@@ -27,7 +27,7 @@ import (
 
 // CloudControllerManagerConfiguration contains elements describing cloud-controller manager.
 type CloudControllerManagerConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Generic holds configuration for a generic controller-manager
 	Generic cmconfigv1alpha1.GenericControllerManagerConfiguration

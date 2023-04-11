@@ -25,7 +25,7 @@ import (
 
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Plugins allows specifying a configuration per admission control plugin.
 	// +optional

@@ -30,7 +30,7 @@ import (
 // RoleBindingApplyConfiguration represents an declarative configuration of the RoleBinding type for use
 // with apply.
 type RoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Subjects                         []SubjectApplyConfiguration `json:"subjects,omitempty"`
 	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`

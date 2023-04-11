@@ -30,7 +30,7 @@ import (
 // ServiceAccountApplyConfiguration represents an declarative configuration of the ServiceAccount type for use
 // with apply.
 type ServiceAccountApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
 	ImagePullSecrets                 []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
