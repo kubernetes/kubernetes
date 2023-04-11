@@ -38,7 +38,7 @@ func TestWebhookEnableDisable(t *testing.T) {
 		desc            string
 		webhookConfigs  map[string]WebhookConfig
 		completedConfig *config.CompletedConfig
-		expected        map[string]WebhookHandler
+		expected        map[string]webhookHandler
 	}{
 		{
 			"Webhooks Enabled",
@@ -47,9 +47,9 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a", "webhook-b"}}),
-			map[string]WebhookHandler{
-				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
-				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
+			map[string]webhookHandler{
+				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
+				"webhook-b": {path: "/path/b", admissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -59,8 +59,8 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a"}}),
-			map[string]WebhookHandler{
-				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
+			map[string]webhookHandler{
+				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -70,8 +70,8 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a", "-webhook-b"}}),
-			map[string]WebhookHandler{
-				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
+			map[string]webhookHandler{
+				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"-webhook-b"}}),
-			map[string]WebhookHandler{},
+			map[string]webhookHandler{},
 		},
 		{
 			"Webhooks Enabled Glob",
@@ -90,15 +90,15 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"*"}}),
-			map[string]WebhookHandler{
-				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
-				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
+			map[string]webhookHandler{
+				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
+				"webhook-b": {path: "/path/b", admissionHandler: noOpAdmissionHandler},
 			},
 		},
 	}
 	for _, tc := range cases {
 		t.Logf("Running %q", tc.desc)
-		actual := NewWebhookHandlers(tc.webhookConfigs, tc.completedConfig, cloud)
+		actual := newWebhookHandlers(tc.webhookConfigs, tc.completedConfig, cloud)
 		if !webhookHandlersEqual(actual, tc.expected) {
 			t.Fatalf(
 				"FAILED: %q\n---\nActual:\n%s\nExpected:\n%s\ntc.webhookConfigs:\n%s\ntc.completedConfig:\n%s\n",
@@ -121,7 +121,7 @@ func newConfig(webhookConfig cpconfig.WebhookConfiguration) *config.CompletedCon
 	return cfg.Complete()
 }
 
-func webhookHandlersEqual(actual, expected map[string]WebhookHandler) bool {
+func webhookHandlersEqual(actual, expected map[string]webhookHandler) bool {
 	if len(actual) != len(expected) {
 		return false
 	}

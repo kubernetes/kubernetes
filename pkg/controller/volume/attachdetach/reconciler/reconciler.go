@@ -345,12 +345,12 @@ func (rc *reconciler) attachDesiredVolumes(logger klog.Logger) {
 		logger.V(5).Info("Starting attacherDetacher.AttachVolume", "volume", volumeToAttach)
 		err := rc.attacherDetacher.AttachVolume(logger, volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 		if err == nil {
-			logger.Info("attacherDetacher.AttachVolume started", "volumeName", volumeToAttach.VolumeName, "nodeName", volumeToAttach.NodeName, "scheduledPods", klog.KObjSlice(volumeToAttach.ScheduledPods))
+			logger.Info("attacherDetacher.AttachVolume started", "volume", volumeToAttach)
 		}
 		if err != nil && !exponentialbackoff.IsExponentialBackoff(err) {
 			// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
 			// Log all other errors.
-			logger.Error(err, "attacherDetacher.AttachVolume failed to start", "volumeName", volumeToAttach.VolumeName, "nodeName", volumeToAttach.NodeName, "scheduledPods", klog.KObjSlice(volumeToAttach.ScheduledPods))
+			logger.Error(err, "attacherDetacher.AttachVolume failed to start", "volume", volumeToAttach)
 		}
 	}
 }
