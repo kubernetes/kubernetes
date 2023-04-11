@@ -19,6 +19,9 @@ package rollout
 import (
 	"bytes"
 	"io"
+	"net/http"
+	"testing"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
@@ -26,8 +29,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cgtesting "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	"net/http"
-	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -85,6 +86,58 @@ func TestRolloutStatus(t *testing.T) {
 	cmd.Run(cmd, []string{deploymentName})
 
 	expectedMsg := "deployment \"deployment/nginx-deployment\" successfully rolled out\n"
+	if buf.String() != expectedMsg {
+		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+}
+
+func TestRolloutStatusNoResources(t *testing.T) {
+	deploymentName := "deployment/nginx-deployment"
+	ns := scheme.Codecs.WithoutConversion()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutStatusGroupVersionEncoder)
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         rolloutStatusGroupVersionEncoder,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			dep := &appsv1.ReplicaSet{}
+			dep.Name = deploymentName
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+		}),
+	}
+
+	tf.FakeDynamicClient.WatchReactionChain = nil
+	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
+		fw := watch.NewFake()
+		dep := &appsv1.ReplicaSet{}
+		dep.Name = deploymentName
+		dep.Status = appsv1.ReplicaSetStatus{
+			Replicas:          1,
+			ReadyReplicas:     1,
+			AvailableReplicas: 1,
+			Conditions: []appsv1.ReplicaSetCondition{{
+				Type: "Available",
+			}},
+		}
+		c, err := runtime.DefaultUnstructuredConverter.ToUnstructured(dep.DeepCopyObject())
+		if err != nil {
+			t.Errorf("unexpected err %s", err)
+		}
+		u := &unstructured.Unstructured{}
+		u.SetUnstructuredContent(c)
+		go fw.Add(u)
+		return true, fw, nil
+	})
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdRolloutStatus(tf, streams)
+	cmd.Run(cmd, []string{"deployment"})
+
+	expectedMsg := "no resources found in test namespace.\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
 	}
