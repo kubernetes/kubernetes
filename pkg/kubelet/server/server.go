@@ -218,18 +218,19 @@ type PodResourcesProviders struct {
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, providers podresources.PodResourcesProviders) {
+func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
 	server := grpc.NewServer(podresourcesgrpc.WithRateLimiter(podresourcesgrpc.DefaultQPS, podresourcesgrpc.DefaultBurstTokens))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers))
 
-	l, err := util.CreateListener(socket)
+	l, err := util.CreateListener(endpoint)
 	if err != nil {
 		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
 		os.Exit(1)
 	}
 
+	klog.InfoS("Starting to serve the podresources API", "endpoint", endpoint)
 	if err := server.Serve(l); err != nil {
 		klog.ErrorS(err, "Failed to serve")
 		os.Exit(1)
