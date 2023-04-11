@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
-	"k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
 type csrRecognizer struct {
@@ -63,12 +62,12 @@ func recognizers() []csrRecognizer {
 	recognizers := []csrRecognizer{
 		{
 			recognize:      isSelfNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: util.AllVersion},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: "*"},
 			successMessage: "Auto approving self kubelet client certificate after SubjectAccessReview.",
 		},
 		{
 			recognize:      isNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: util.AllVersion},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
 	}

@@ -19,11 +19,9 @@ package subjectaccessreview
 import (
 	"context"
 	"errors"
-	"fmt"
+	"reflect"
 	"strings"
 	"testing"
-
-	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -211,7 +209,6 @@ func TestCreate(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(auth.attrs, tc.expectedAttrs) {
-			fmt.Println(k)
 			t.Errorf("%s: expected\n%#v\ngot\n%#v", k, tc.expectedAttrs, auth.attrs)
 		}
 		status := result.(*authorizationapi.SubjectAccessReview).Status
