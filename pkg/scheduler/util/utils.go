@@ -67,13 +67,15 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	maxPriority := corev1helpers.PodPriority(victims.Pods[0])
 
 	for _, pod := range victims.Pods {
-		if corev1helpers.PodPriority(pod) == maxPriority {
-			if GetPodStartTime(pod).Before(earliestPodStartTime) {
-				earliestPodStartTime = GetPodStartTime(pod)
+		earliestPodStartTimeTmp := GetPodStartTime(pod)
+		maxPriorityTmp := corev1helpers.PodPriority(pod)
+		if maxPriorityTmp == maxPriority {
+			if earliestPodStartTimeTmp.Before(earliestPodStartTime) {
+				earliestPodStartTime = earliestPodStartTimeTmp
 			}
-		} else if corev1helpers.PodPriority(pod) > maxPriority {
-			maxPriority = corev1helpers.PodPriority(pod)
-			earliestPodStartTime = GetPodStartTime(pod)
+		} else if maxPriorityTmp > maxPriority {
+			maxPriority = maxPriorityTmp
+			earliestPodStartTime = earliestPodStartTimeTmp
 		}
 	}
 
@@ -120,7 +122,7 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, n
 		return fmt.Errorf("failed to create merge patch for pod %q/%q: %v", old.Namespace, old.Name, err)
 	}
 
-	if "{}" == string(patchBytes) {
+	if string(patchBytes) == "{}" {
 		return nil
 	}
 
