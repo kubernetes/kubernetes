@@ -12,6 +12,7 @@ reviewers:
   - lavalamp
   - liggitt
   - mikedanese
+  - pohly
   - SataQiu
   - smarterclayton
   - spiffxp
@@ -28,6 +29,7 @@ approvers:
   - lavalamp
   - liggitt
   - mikedanese
+  - pohly # for logging and linting
   - pwittrock
   - SataQiu
   - smarterclayton
