@@ -506,8 +506,8 @@ func TestWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), nil, tc.template, &api.PodTemplateSpec{})...)
-			expected := sets.New[string](tc.expected...)
+			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, &api.PodTemplateSpec{})...)
+			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)
 			}
@@ -524,8 +524,8 @@ func TestWarnings(t *testing.T) {
 					Spec:       tc.template.Spec,
 				}
 			}
-			actual := sets.New[string](GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
-			expected := sets.New[string](tc.expected...)
+			actual := sets.NewString(GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
+			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)
 			}
