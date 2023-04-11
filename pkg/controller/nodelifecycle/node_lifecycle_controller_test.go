@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -231,7 +232,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -253,7 +254,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone2",
@@ -357,7 +358,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -379,7 +380,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -401,7 +402,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node2",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -423,7 +424,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node3",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -445,7 +446,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node4",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -484,7 +485,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -506,7 +507,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -528,7 +529,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node2",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -568,7 +569,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -590,7 +591,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone2",
@@ -628,7 +629,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -650,7 +651,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node1",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region2",
 							v1.LabelTopologyZone:            "zone2",
@@ -689,7 +690,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -727,7 +728,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -749,7 +750,7 @@ func TestMonitorNodeHealth(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "node-master",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						CreationTimestamp: fakeNow,
 						Labels: map[string]string{
 							v1.LabelTopologyRegion:          "region1",
 							v1.LabelTopologyZone:            "zone1",
@@ -816,13 +817,8 @@ func TestMonitorNodeHealth(t *testing.T) {
 			if err := nodeController.monitorNodeHealth(ctx); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if len(nodeController.zoneStates) != len(tt.expectedInitialStates) {
-				t.Errorf("unexpected length of initial zone state map: got %d instead of %d", len(nodeController.zoneStates), len(tt.expectedInitialStates))
-			}
-			for zone, state := range tt.expectedInitialStates {
-				if state != nodeController.zoneStates[zone] {
-					t.Errorf("unexpected initial zone state: %v: got %v instead of %v", zone, nodeController.zoneStates[zone], state)
-				}
+			if diff := cmp.Diff(tt.expectedInitialStates, nodeController.zoneStates); diff != "" {
+				t.Errorf("unexpected initial zone state (-want +got):\n%s", diff)
 			}
 
 			// following zone state
@@ -836,13 +832,8 @@ func TestMonitorNodeHealth(t *testing.T) {
 			if err := nodeController.monitorNodeHealth(ctx); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if len(nodeController.zoneStates) != len(tt.expectedFollowingStates) {
-				t.Errorf("unexpected length of following zone state map: got %d instead of %d", len(nodeController.zoneStates), len(tt.expectedFollowingStates))
-			}
-			for zone, state := range tt.expectedFollowingStates {
-				if state != nodeController.zoneStates[zone] {
-					t.Errorf("unexpected following zone state: %v: got %v instead of %v", zone, nodeController.zoneStates[zone], state)
-				}
+			if diff := cmp.Diff(tt.expectedFollowingStates, nodeController.zoneStates); diff != "" {
+				t.Errorf("unexpected following zone state (-want +got):\n%s", diff)
 			}
 		})
 	}
