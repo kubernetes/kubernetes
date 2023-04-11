@@ -809,32 +809,28 @@ func TestMonitorNodeHealth(t *testing.T) {
 				return testRateLimiterQPS
 			}
 
+			syncAndDiffZoneState := func(wanted map[string]ZoneState) {
+				if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if err := nodeController.monitorNodeHealth(ctx); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if diff := cmp.Diff(wanted, nodeController.zoneStates); diff != "" {
+					t.Errorf("unexpected zone state (-want +got):\n%s", diff)
+				}
+			}
+
 			// initial zone state
 			nodeController.now = func() metav1.Time { return fakeNow }
-			if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if err := nodeController.monitorNodeHealth(ctx); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tt.expectedInitialStates, nodeController.zoneStates); diff != "" {
-				t.Errorf("unexpected initial zone state (-want +got):\n%s", diff)
-			}
+			syncAndDiffZoneState(tt.expectedInitialStates)
 
 			// following zone state
 			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(timeToPass)} }
 			for i := range tt.updatedNodeStatuses {
 				fakeNodeHandler.Existing[i].Status = tt.updatedNodeStatuses[i]
 			}
-			if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if err := nodeController.monitorNodeHealth(ctx); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tt.expectedFollowingStates, nodeController.zoneStates); diff != "" {
-				t.Errorf("unexpected following zone state (-want +got):\n%s", diff)
-			}
+			syncAndDiffZoneState(tt.expectedFollowingStates)
 		})
 	}
 }
