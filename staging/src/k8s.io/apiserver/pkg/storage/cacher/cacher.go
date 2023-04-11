@@ -795,24 +795,30 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return err
 	}
 	span.AddEvent("Listed items from cache", attribute.Int("count", len(objs)))
-	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
-		// Resize the slice appropriately, since we already know that none
-		// of the elements will be filtered out.
-		listVal.Set(reflect.MakeSlice(reflect.SliceOf(c.objectType.Elem()), 0, len(objs)))
-		span.AddEvent("Resized result")
-	}
+	// store pointer of eligible objects,
+	// Why not directly put object in the items of listObj?
+	//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
+	//   so we try to delay this action as much as possible
+	var selectedObjects []runtime.Object
 	for _, obj := range objs {
 		elem, ok := obj.(*storeElement)
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields) {
-			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
+			selectedObjects = append(selectedObjects, elem.Object)
 		}
 	}
-	if listVal.IsNil() {
+	if len(selectedObjects) == 0 {
 		// Ensure that we never return a nil Items pointer in the result for consistency.
 		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+	} else {
+		// Resize the slice appropriately, since we already know that size of result set
+		listVal.Set(reflect.MakeSlice(listVal.Type(), len(selectedObjects), len(selectedObjects)))
+		span.AddEvent("Resized result")
+		for i, o := range selectedObjects {
+			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+		}
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
