@@ -133,11 +133,11 @@ func TestRolloutStatusNoResources(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, _, buf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Run(cmd, []string{"deployment"})
 
-	expectedMsg := "no resources found in test namespace.\n"
+	expectedMsg := "No resources found in test namespace.\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
 	}

@@ -172,7 +172,7 @@ func (o *RolloutStatusOptions) Run() error {
 	info, _ := r.Infos()
 
 	if len(info) == 0 {
-		fmt.Fprintf(o.Out, "no resources found in %s namespace.\n", o.Namespace)
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		return nil
 	}
 
