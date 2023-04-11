@@ -118,7 +118,7 @@ type Type struct {
 	// processing set.
 	queue []t
 
-	// dirty defines all of the items that need to be processed.
+	// dirty defines all the items that need to be processed.
 	dirty set
 
 	// Things that are currently being processed are in the processing set.
@@ -247,7 +247,7 @@ func (q *Type) ShutDown() {
 // Done on all existing items in the queue; they will be instructed to exit and
 // ShutDownWithDrain will return. Hence: a strict requirement for using this is;
 // your workers must ensure that Done is called on all items in the queue once
-// the shut down has been initiated, if that is not the case: this will block
+// the shuttingDown has been initiated, if that is not the case: this will block
 // indefinitely. It is, however, safe to call ShutDown after having called
 // ShutDownWithDrain, as to force the queue shut down to terminate immediately
 // without waiting for the drainage.
