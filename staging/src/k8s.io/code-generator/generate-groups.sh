@@ -53,7 +53,7 @@ if [ "${GENS}" = "all" ] || grep -qw "all" <<<"${GENS}"; then
     ALL="applyconfiguration,client,deepcopy,informer,lister"
     echo "WARNING: Specifying \"all\" as a generator is deprecated."
     echo "WARNING: Please list the specific generators needed."
-    echo "WARNING: \"all\" is now an alias for \"${ALL}\""
+    echo "WARNING: \"all\" is now an alias for \"${ALL}\"; new code generators WILL NOT be added to this set"
     echo
     GENS="${ALL}"
 fi
