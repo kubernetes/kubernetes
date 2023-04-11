@@ -168,6 +168,13 @@ func (o *RolloutStatusOptions) Run() error {
 		Flatten().
 		Do()
 
+	info, _ := r.Infos()
+
+	if len(info) == 0 {
+		fmt.Fprintf(o.Out, "no resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
 	err := r.Err()
 	if err != nil {
 		return err
