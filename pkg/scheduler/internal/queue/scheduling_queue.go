@@ -553,9 +553,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			klog.ErrorS(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			break
 		}
-		if err := p.activeQ.Add(pInfo); err != nil {
-			klog.ErrorS(err, "Error adding pod to the active queue", "pod", klog.KObj(pInfo.Pod))
-		} else {
+		if added, _ := p.addToActiveQ(pInfo); added {
 			klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", BackoffComplete, "queue", activeQName)
 			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
 			activated = true
