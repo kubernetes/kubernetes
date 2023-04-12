@@ -110,7 +110,7 @@ func TestRolloutStatusNoResources(t *testing.T) {
 		}),
 	}
 
-	streams, _, _, buf := genericclioptions.NewTestIOStreams()
+	streams, _, _, buf := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Run(cmd, []string{"deployment"})
 
