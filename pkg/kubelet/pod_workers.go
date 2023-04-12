@@ -1086,6 +1086,10 @@ func (p *podWorkers) cleanupUnstartedPod(pod *v1.Pod, status *podSyncStatus) {
 // or can be started, and updates the cached pod state so that downstream components can observe what the
 // pod worker goroutine is currently attempting to do. If ok is false, there is no available event. If any
 // of the boolean values is false, ensure the appropriate cleanup happens before returning.
+//
+// This method should ensure that either status.pendingUpdate is cleared and merged into status.activeUpdate,
+// or when a pod cannot be started status.pendingUpdate remains the same. Pods that have not been started
+// should never have an activeUpdate because that is exposed to downstream components on started pods.
 func (p *podWorkers) startPodSync(podUID types.UID) (ctx context.Context, update podWork, canStart, canEverStart, ok bool) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
@@ -1159,6 +1163,8 @@ func (p *podWorkers) startPodSync(podUID types.UID) (ctx context.Context, update
 		klog.V(4).InfoS("Pod cannot start ever", "pod", klog.KObj(update.Options.Pod), "podUID", podUID, "updateType", update.WorkType)
 		return ctx, update, canStart, canEverStart, true
 	case !canStart:
+		// this is the only path we don't start the pod, so we need to put the change back in pendingUpdate
+		status.pendingUpdate = &update.Options
 		status.working = false
 		klog.V(4).InfoS("Pod cannot start yet", "pod", klog.KObj(update.Options.Pod), "podUID", podUID)
 		return ctx, update, canStart, canEverStart, true
@@ -1545,9 +1551,17 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorke
 			State:  status.WorkType(),
 			Orphan: orphan,
 		}
-		if status.activeUpdate != nil && status.activeUpdate.Pod != nil {
-			sync.HasConfig = true
-			sync.Static = kubetypes.IsStaticPod(status.activeUpdate.Pod)
+		switch {
+		case status.activeUpdate != nil:
+			if status.activeUpdate.Pod != nil {
+				sync.HasConfig = true
+				sync.Static = kubetypes.IsStaticPod(status.activeUpdate.Pod)
+			}
+		case status.pendingUpdate != nil:
+			if status.pendingUpdate.Pod != nil {
+				sync.HasConfig = true
+				sync.Static = kubetypes.IsStaticPod(status.pendingUpdate.Pod)
+			}
 		}
 		workers[uid] = sync
 	}

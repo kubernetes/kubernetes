@@ -5083,6 +5083,71 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			},
 		},
 		{
+			name:    "pod that could not start still has a pending update and is tracked in metrics",
+			wantErr: false,
+			pods: []*v1.Pod{
+				staticPod(),
+			},
+			prepareWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				// send a create of a static pod
+				pod := staticPod()
+				// block startup of the static pod due to full name collision
+				w.startedStaticPodsByFullname[kubecontainer.GetPodFullName(pod)] = types.UID("2")
+
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					StartTime:  time.Unix(1, 0).UTC(),
+					Pod:        pod,
+				})
+				drainAllWorkers(w)
+
+				if _, ok := records[pod.UID]; ok {
+					t.Fatalf("unexpected records: %#v", records)
+				}
+				// pod worker is unaware of pod1 yet
+			},
+			wantWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				uid := types.UID("1")
+				if len(w.podSyncStatuses) != 1 {
+					t.Fatalf("unexpected sync statuses: %#v", w.podSyncStatuses)
+				}
+				s, ok := w.podSyncStatuses[uid]
+				if !ok || s.IsTerminationRequested() || s.IsTerminationStarted() || s.IsFinished() || s.IsWorking() || s.IsDeleted() || s.restartRequested || s.activeUpdate != nil || s.pendingUpdate == nil {
+					t.Errorf("unexpected requested pod termination: %#v", s)
+				}
+
+				// expect that no sync calls are made, since the pod doesn't ever start
+				if actual, expected := records[uid], []syncPodRecord(nil); !reflect.DeepEqual(expected, actual) {
+					t.Fatalf("unexpected pod sync records: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
+				}
+			},
+			expectMetrics: map[string]string{
+				metrics.DesiredPodCount.FQName(): `# HELP kubelet_desired_pods [ALPHA] The number of pods the kubelet is being instructed to run. static is true if the pod is not from the apiserver.
+				# TYPE kubelet_desired_pods gauge
+				kubelet_desired_pods{static=""} 0
+				kubelet_desired_pods{static="true"} 1
+				`,
+				metrics.WorkingPodCount.FQName(): `# HELP kubelet_working_pods [ALPHA] Number of pods the kubelet is actually running, broken down by lifecycle phase, whether the pod is desired, orphaned, or runtime only (also orphaned), and whether the pod is static. An orphaned pod has been removed from local configuration or force deleted in the API and consumes resources that are not otherwise visible.
+				# TYPE kubelet_working_pods gauge
+				kubelet_working_pods{config="desired",lifecycle="sync",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="sync",static="true"} 1
+				kubelet_working_pods{config="desired",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="sync",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminated",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminating",static="unknown"} 0
+				`,
+			},
+		},
+		{
 			name:           "pod that could not start and is not in config is force terminated without runtime during pod cleanup",
 			wantErr:        false,
 			terminatingErr: errors.New("unable to terminate"),
