@@ -18,12 +18,12 @@ package policy
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -51,40 +51,49 @@ func CheckHostPorts() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       hostPorts_1_0,
+				CheckPod:       withOptions(hostPortsV1Dot0),
 			},
 		},
 	}
 }
 
-func hostPorts_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badContainers []string
+func hostPortsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	badContainers := NewViolations(opts.withFieldErrors)
 	forbiddenHostPorts := sets.NewString()
-	visitContainers(podSpec, func(container *corev1.Container) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
 		valid := true
-		for _, c := range container.Ports {
+		var errFns []ErrFn
+		for i, c := range container.Ports {
 			if c.HostPort != 0 {
 				valid = false
 				forbiddenHostPorts.Insert(strconv.Itoa(int(c.HostPort)))
+				if opts.withFieldErrors {
+					errFns = append(errFns, forbidden(pathFn.child("ports").index(i).child("hostPort")).withBadValue(int(c.HostPort)))
+				}
 			}
 		}
 		if !valid {
-			badContainers = append(badContainers, container.Name)
+			if opts.withFieldErrors {
+				badContainers.Add(container.Name, errFns...)
+			} else {
+				badContainers.Add(container.Name)
+			}
 		}
 	})
 
-	if len(badContainers) > 0 {
+	if !badContainers.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "hostPort",
 			ForbiddenDetail: fmt.Sprintf(
 				"%s %s %s %s %s",
-				pluralize("container", "containers", len(badContainers)),
-				joinQuote(badContainers),
-				pluralize("uses", "use", len(badContainers)),
+				pluralize("container", "containers", badContainers.Len()),
+				joinQuote(badContainers.Data()),
+				pluralize("uses", "use", badContainers.Len()),
 				pluralize("hostPort", "hostPorts", len(forbiddenHostPorts)),
 				strings.Join(forbiddenHostPorts.List(), ", "),
 			),
+			ErrList: badContainers.Errs(),
 		}
 	}
 	return CheckResult{Allowed: true}

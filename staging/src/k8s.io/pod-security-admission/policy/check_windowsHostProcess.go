@@ -50,20 +50,24 @@ func CheckWindowsHostProcess() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       windowsHostProcess_1_0,
+				CheckPod:       withOptions(windowsHostProcessV1Dot0),
 			},
 		},
 	}
 }
 
-func windowsHostProcess_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func windowsHostProcessV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	var badContainers []string
-	visitContainers(podSpec, func(container *corev1.Container) {
+	var errFns []ErrFn
+	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
 		if container.SecurityContext != nil &&
 			container.SecurityContext.WindowsOptions != nil &&
 			container.SecurityContext.WindowsOptions.HostProcess != nil &&
 			*container.SecurityContext.WindowsOptions.HostProcess {
 			badContainers = append(badContainers, container.Name)
+			if opts.withFieldErrors {
+				errFns = append(errFns, forbidden(pathFn.child("securityContext", "windowsOptions", "hostProcess")).withBadValue(true))
+			}
 		}
 	})
 
@@ -76,25 +80,31 @@ func windowsHostProcess_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodS
 	}
 
 	// pod or containers explicitly set hostProcess=true
-	var forbiddenSetters []string
+	forbiddenSetters := NewViolations(opts.withFieldErrors)
 	if podSpecForbidden {
-		forbiddenSetters = append(forbiddenSetters, "pod")
+		if opts.withFieldErrors {
+			forbiddenSetters.Add("pod", forbidden(hostProcessPath).withBadValue(true))
+		} else {
+			forbiddenSetters.Add("pod")
+		}
+
 	}
 	if len(badContainers) > 0 {
-		forbiddenSetters = append(
-			forbiddenSetters,
+		forbiddenSetters.Add(
 			fmt.Sprintf(
 				"%s %s",
 				pluralize("container", "containers", len(badContainers)),
 				joinQuote(badContainers),
 			),
+			errFns...,
 		)
 	}
-	if len(forbiddenSetters) > 0 {
+	if !forbiddenSetters.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "hostProcess",
-			ForbiddenDetail: fmt.Sprintf("%s must not set securityContext.windowsOptions.hostProcess=true", strings.Join(forbiddenSetters, " and ")),
+			ForbiddenDetail: fmt.Sprintf("%s must not set securityContext.windowsOptions.hostProcess=true", strings.Join(forbiddenSetters.Data(), " and ")),
+			ErrList:         forbiddenSetters.Errs(),
 		}
 	}
 

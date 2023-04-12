@@ -64,7 +64,7 @@ func CheckSELinuxOptions() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       seLinuxOptions_1_0,
+				CheckPod:       withOptions(seLinuxOptionsV1Dot0),
 			},
 		},
 	}
@@ -74,11 +74,12 @@ var (
 	selinux_allowed_types_1_0 = sets.NewString("", "container_t", "container_init_t", "container_kvm_t")
 )
 
-func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func seLinuxOptionsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	var (
 		// sources that set bad seLinuxOptions
-		badSetters []string
-
+		badSetters          = NewViolations(opts.withFieldErrors)
+		badContainersErrFns []ErrFn
+		badPodErrFns        []ErrFn
 		// invalid type values set
 		badTypes = sets.NewString()
 		// was user set?
@@ -87,49 +88,65 @@ func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec)
 		setRole = false
 	)
 
-	validSELinuxOptions := func(opts *corev1.SELinuxOptions) bool {
+	validSELinuxOptions := func(selinuxOpts *corev1.SELinuxOptions, pathFn PathFn, isPodLevel bool) bool {
 		valid := true
-		if !selinux_allowed_types_1_0.Has(opts.Type) {
+		if !selinux_allowed_types_1_0.Has(selinuxOpts.Type) {
 			valid = false
-			badTypes.Insert(opts.Type)
+			badTypes.Insert(selinuxOpts.Type)
+			if pathFn != nil {
+				badContainersErrFns = append(badContainersErrFns, forbidden(pathFn.child("securityContext", "seLinuxOptions", "type")).withBadValue(selinuxOpts.Type))
+			} else if isPodLevel && opts.withFieldErrors {
+				badPodErrFns = append(badPodErrFns, forbidden(seLinuxOptionsTypePath).withBadValue(selinuxOpts.Type))
+			}
 		}
-		if len(opts.User) > 0 {
+		if len(selinuxOpts.User) > 0 {
 			valid = false
 			setUser = true
+			if pathFn != nil {
+				badContainersErrFns = append(badContainersErrFns, forbidden(pathFn.child("securityContext", "seLinuxOptions", "user")).withBadValue(selinuxOpts.User))
+			} else if isPodLevel && opts.withFieldErrors {
+				badPodErrFns = append(badPodErrFns, forbidden(seLinuxOptionsUserPath).withBadValue(selinuxOpts.User))
+			}
 		}
-		if len(opts.Role) > 0 {
+		if len(selinuxOpts.Role) > 0 {
 			valid = false
 			setRole = true
+			if pathFn != nil {
+				badContainersErrFns = append(badContainersErrFns, forbidden(pathFn.child("securityContext", "seLinuxOptions", "role")).withBadValue(selinuxOpts.Role))
+			} else if isPodLevel && opts.withFieldErrors {
+				badPodErrFns = append(badPodErrFns, forbidden(seLinuxOptionsRolePath).withBadValue(selinuxOpts.Role))
+			}
 		}
 		return valid
 	}
 
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.SELinuxOptions != nil {
-		if !validSELinuxOptions(podSpec.SecurityContext.SELinuxOptions) {
-			badSetters = append(badSetters, "pod")
+		if !validSELinuxOptions(podSpec.SecurityContext.SELinuxOptions, nil, true) {
+			badSetters.Add("pod", badPodErrFns...)
 		}
 	}
 
 	var badContainers []string
-	visitContainers(podSpec, func(container *corev1.Container) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
 		if container.SecurityContext != nil && container.SecurityContext.SELinuxOptions != nil {
-			if !validSELinuxOptions(container.SecurityContext.SELinuxOptions) {
+			if !validSELinuxOptions(container.SecurityContext.SELinuxOptions, pathFn, false) {
 				badContainers = append(badContainers, container.Name)
 			}
 		}
 	})
+
 	if len(badContainers) > 0 {
-		badSetters = append(
-			badSetters,
+		badSetters.Add(
 			fmt.Sprintf(
 				"%s %s",
 				pluralize("container", "containers", len(badContainers)),
 				joinQuote(badContainers),
 			),
+			badContainersErrFns...,
 		)
 	}
 
-	if len(badSetters) > 0 {
+	if !badSetters.Empty() {
 		var badData []string
 		if len(badTypes) > 0 {
 			badData = append(badData, fmt.Sprintf(
@@ -150,9 +167,10 @@ func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec)
 			ForbiddenReason: "seLinuxOptions",
 			ForbiddenDetail: fmt.Sprintf(
 				`%s set forbidden securityContext.seLinuxOptions: %s`,
-				strings.Join(badSetters, " and "),
+				strings.Join(badSetters.Data(), " and "),
 				strings.Join(badData, "; "),
 			),
+			ErrList: badSetters.Errs(),
 		}
 	}
 	return CheckResult{Allowed: true}

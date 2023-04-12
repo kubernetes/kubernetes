@@ -49,7 +49,7 @@ func CheckAppArmorProfile() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       appArmorProfile_1_0,
+				CheckPod:       withOptions(appArmorProfileV1Dot0),
 			},
 		},
 	}
@@ -61,19 +61,27 @@ func allowedProfile(profile string) bool {
 		strings.HasPrefix(profile, corev1.AppArmorBetaProfileNamePrefix)
 }
 
-func appArmorProfile_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var forbiddenValues []string
+func appArmorProfileV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	forbiddenAppArmorProfile := NewViolations(opts.withFieldErrors)
+
 	for k, v := range podMetadata.Annotations {
 		if strings.HasPrefix(k, corev1.AppArmorBetaContainerAnnotationKeyPrefix) && !allowedProfile(v) {
-			forbiddenValues = append(forbiddenValues, fmt.Sprintf("%s=%q", k, v))
+			if opts.withFieldErrors {
+				forbiddenAppArmorProfile.Add(fmt.Sprintf("%s=%q", k, v), forbidden(annotationsPath.key(k)).withBadValue(v))
+			} else {
+				forbiddenAppArmorProfile.Add(fmt.Sprintf("%s=%q", k, v))
+			}
 		}
 	}
-	if len(forbiddenValues) > 0 {
+
+	if !forbiddenAppArmorProfile.Empty() {
+		forbiddenValues := forbiddenAppArmorProfile.Data()
 		sort.Strings(forbiddenValues)
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: pluralize("forbidden AppArmor profile", "forbidden AppArmor profiles", len(forbiddenValues)),
 			ForbiddenDetail: strings.Join(forbiddenValues, ", "),
+			ErrList:         forbiddenAppArmorProfile.Errs(),
 		}
 	}
 

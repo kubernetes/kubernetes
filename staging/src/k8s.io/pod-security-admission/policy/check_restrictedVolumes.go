@@ -18,7 +18,6 @@ package policy
 
 import (
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -77,18 +76,18 @@ func CheckRestrictedVolumes() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion:   api.MajorMinorVersion(1, 0),
-				CheckPod:         restrictedVolumes_1_0,
+				CheckPod:         withOptions(restrictedVolumesV1Dot0),
 				OverrideCheckIDs: []CheckID{checkHostPathVolumesID},
 			},
 		},
 	}
 }
 
-func restrictedVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badVolumes []string
+func restrictedVolumesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	badVolumes := NewViolations(opts.withFieldErrors)
 	badVolumeTypes := sets.NewString()
 
-	for _, volume := range podSpec.Volumes {
+	for i, volume := range podSpec.Volumes {
 		switch {
 		case volume.ConfigMap != nil,
 			volume.CSI != nil,
@@ -101,69 +100,141 @@ func restrictedVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			continue
 
 		default:
-			badVolumes = append(badVolumes, volume.Name)
+			var volumesIndexPath PathFn
+			if opts.withFieldErrors {
+				volumesIndexPath = volumesPath.index(i)
+			} else {
+				badVolumes.Add(volume.Name)
+			}
 
 			switch {
 			case volume.HostPath != nil:
 				badVolumeTypes.Insert("hostPath")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("hostPath")))
+				}
 			case volume.GCEPersistentDisk != nil:
 				badVolumeTypes.Insert("gcePersistentDisk")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("gcePersistentDisk")))
+				}
 			case volume.AWSElasticBlockStore != nil:
 				badVolumeTypes.Insert("awsElasticBlockStore")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("awsElasticBlockStore")))
+				}
 			case volume.GitRepo != nil:
 				badVolumeTypes.Insert("gitRepo")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("gitRepo")))
+				}
 			case volume.NFS != nil:
 				badVolumeTypes.Insert("nfs")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("nfs")))
+				}
 			case volume.ISCSI != nil:
 				badVolumeTypes.Insert("iscsi")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("iscsi")))
+				}
 			case volume.Glusterfs != nil:
 				badVolumeTypes.Insert("glusterfs")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("glusterfs")))
+				}
 			case volume.RBD != nil:
 				badVolumeTypes.Insert("rbd")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("rbd")))
+				}
 			case volume.FlexVolume != nil:
 				badVolumeTypes.Insert("flexVolume")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("flexVolume")))
+				}
 			case volume.Cinder != nil:
 				badVolumeTypes.Insert("cinder")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("cinder")))
+				}
 			case volume.CephFS != nil:
 				badVolumeTypes.Insert("cephfs")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("cephfs")))
+				}
 			case volume.Flocker != nil:
 				badVolumeTypes.Insert("flocker")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("flocker")))
+				}
 			case volume.FC != nil:
 				badVolumeTypes.Insert("fc")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("fc")))
+				}
 			case volume.AzureFile != nil:
 				badVolumeTypes.Insert("azureFile")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("azureFile")))
+				}
 			case volume.VsphereVolume != nil:
 				badVolumeTypes.Insert("vsphereVolume")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("vsphereVolume")))
+				}
 			case volume.Quobyte != nil:
 				badVolumeTypes.Insert("quobyte")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("quobyte")))
+				}
 			case volume.AzureDisk != nil:
 				badVolumeTypes.Insert("azureDisk")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("azureDisk")))
+				}
 			case volume.PhotonPersistentDisk != nil:
 				badVolumeTypes.Insert("photonPersistentDisk")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("photonPersistentDisk")))
+				}
 			case volume.PortworxVolume != nil:
 				badVolumeTypes.Insert("portworxVolume")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("portworxVolume")))
+				}
 			case volume.ScaleIO != nil:
 				badVolumeTypes.Insert("scaleIO")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("scaleIO")))
+				}
 			case volume.StorageOS != nil:
 				badVolumeTypes.Insert("storageos")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("storageos")))
+				}
 			default:
 				badVolumeTypes.Insert("unknown")
+				if opts.withFieldErrors {
+					badVolumes.Add(volume.Name, forbidden(volumesIndexPath.child("unknown")))
+				}
 			}
 		}
 	}
 
-	if len(badVolumes) > 0 {
+	if !badVolumes.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "restricted volume types",
 			ForbiddenDetail: fmt.Sprintf(
 				"%s %s %s %s %s",
-				pluralize("volume", "volumes", len(badVolumes)),
-				joinQuote(badVolumes),
-				pluralize("uses", "use", len(badVolumes)),
+				pluralize("volume", "volumes", badVolumes.Len()),
+				joinQuote(badVolumes.Data()),
+				pluralize("uses", "use", badVolumes.Len()),
 				pluralize("restricted volume type", "restricted volume types", len(badVolumeTypes)),
 				joinQuote(badVolumeTypes.List()),
 			),
+			ErrList: badVolumes.Errs(),
 		}
 	}
 
