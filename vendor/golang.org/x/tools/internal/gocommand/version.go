@@ -7,6 +7,7 @@ package gocommand
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -55,4 +56,26 @@ func GoVersion(ctx context.Context, inv Invocation, r *Runner) (int, error) {
 		return version, nil
 	}
 	return 0, fmt.Errorf("no parseable ReleaseTags in %v", tags)
+}
+
+// GoVersionOutput returns the complete output of the go version command.
+func GoVersionOutput(ctx context.Context, inv Invocation, r *Runner) (string, error) {
+	inv.Verb = "version"
+	goVersion, err := r.Run(ctx, inv)
+	if err != nil {
+		return "", err
+	}
+	return goVersion.String(), nil
+}
+
+// ParseGoVersionOutput extracts the Go version string
+// from the output of the "go version" command.
+// Given an unrecognized form, it returns an empty string.
+func ParseGoVersionOutput(data string) string {
+	re := regexp.MustCompile(`^go version (go\S+|devel \S+)`)
+	m := re.FindStringSubmatch(data)
+	if len(m) != 2 {
+		return "" // unrecognized version
+	}
+	return m[1]
 }

@@ -353,30 +353,50 @@ func isUnitExists(err error) bool {
 	return isDbusError(err, "org.freedesktop.systemd1.UnitExists")
 }
 
-func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Property) error {
+func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Property, ignoreExist bool) error {
 	statusChan := make(chan string, 1)
+	retry := true
+
+retry:
 	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
 		_, err := c.StartTransientUnitContext(context.TODO(), unitName, "replace", properties, statusChan)
 		return err
 	})
-	if err == nil {
-		timeout := time.NewTimer(30 * time.Second)
-		defer timeout.Stop()
-
-		select {
-		case s := <-statusChan:
-			close(statusChan)
-			// Please refer to https://pkg.go.dev/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
-			if s != "done" {
-				resetFailedUnit(cm, unitName)
-				return fmt.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
-			}
-		case <-timeout.C:
-			resetFailedUnit(cm, unitName)
-			return errors.New("Timeout waiting for systemd to create " + unitName)
+	if err != nil {
+		if !isUnitExists(err) {
+			return err
 		}
-	} else if !isUnitExists(err) {
+		if ignoreExist {
+			// TODO: remove this hack.
+			// This is kubelet making sure a slice exists (see
+			// https://github.com/opencontainers/runc/pull/1124).
+			return nil
+		}
+		if retry {
+			// In case a unit with the same name exists, this may
+			// be a leftover failed unit. Reset it, so systemd can
+			// remove it, and retry once.
+			resetFailedUnit(cm, unitName)
+			retry = false
+			goto retry
+		}
 		return err
+	}
+
+	timeout := time.NewTimer(30 * time.Second)
+	defer timeout.Stop()
+
+	select {
+	case s := <-statusChan:
+		close(statusChan)
+		// Please refer to https://pkg.go.dev/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
+		if s != "done" {
+			resetFailedUnit(cm, unitName)
+			return fmt.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
+		}
+	case <-timeout.C:
+		resetFailedUnit(cm, unitName)
+		return errors.New("Timeout waiting for systemd to create " + unitName)
 	}
 
 	return nil
