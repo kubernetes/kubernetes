@@ -20,13 +20,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/tools/cache"
 )
 
 // UsageStatsOptions is an options structs that describes how stats should be calculated
 type UsageStatsOptions struct {
-	// Namespace where stats should be calculate
+	// Namespace where stats should be calculated
 	Namespace string
 	// Scopes that must match counted objects
 	Scopes []corev1.ResourceQuotaScope
@@ -67,7 +68,7 @@ type Evaluator interface {
 // Configuration defines how the quota system is configured.
 type Configuration interface {
 	// IgnoredResources are ignored by quota.
-	IgnoredResources() map[schema.GroupResource]struct{}
+	IgnoredResources() sets.Set[schema.GroupResource]
 	// Evaluators for quota evaluation.
 	Evaluators() []Evaluator
 }

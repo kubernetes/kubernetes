@@ -22,18 +22,18 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -89,7 +89,7 @@ type QuotaMonitor struct {
 	informerFactory informerfactory.InformerFactory
 
 	// list of resources to ignore
-	ignoredResources map[schema.GroupResource]struct{}
+	ignoredResources sets.Set[schema.GroupResource]
 
 	// The period that should be used to re-sync the monitored resource
 	resyncPeriod controller.ResyncPeriodFunc
@@ -170,7 +170,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 // instead of immediately exiting on an error. It may be called before or after
 // Run. Monitors are NOT started as part of the sync. To ensure all existing
 // monitors are started, call StartMonitors.
-func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.GroupVersionResource]struct{}) error {
+func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources sets.Set[schema.GroupVersionResource]) error {
 	logger := klog.FromContext(ctx)
 
 	qm.monitorLock.Lock()

@@ -90,8 +90,8 @@ func ServerSupportsVersion(client DiscoveryInterface, requiredGV schema.GroupVer
 }
 
 // GroupVersionResources converts APIResourceLists to the GroupVersionResources.
-func GroupVersionResources(rls []*metav1.APIResourceList) (map[schema.GroupVersionResource]struct{}, error) {
-	gvrs := map[schema.GroupVersionResource]struct{}{}
+func GroupVersionResources(rls []*metav1.APIResourceList) (sets.Set[schema.GroupVersionResource], error) {
+	gvrs := sets.Set[schema.GroupVersionResource]{}
 	for _, rl := range rls {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
