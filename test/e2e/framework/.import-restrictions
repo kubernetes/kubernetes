@@ -1,13 +1,6 @@
 rules:
   # The core E2E framework is meant to be a normal Kubernetes client,
-  # which means that it shouldn't depend on internal
-  # code. But we are not there yet, so some exceptions
-  # have to be allowed. Over time the list of allowed
-  # packages should get shorter, not longer.
-  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/
-    allowedPrefixes:
-    - k8s.io/kubernetes/pkg/kubelet/apis/
-
+  # which means that it shouldn't depend on internal code.
   # The following packages are okay to use:
   #
   # public API

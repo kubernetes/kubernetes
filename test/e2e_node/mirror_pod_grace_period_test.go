@@ -48,7 +48,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			staticPodName = "graceful-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = kubeletCfg.StaticPodPath
 
 			ginkgo.By("create the static pod")
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
