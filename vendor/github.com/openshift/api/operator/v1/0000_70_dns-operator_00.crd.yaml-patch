@@ -1,0 +1,21 @@
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/upstreamResolvers/default
+  value: {}
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/upstreamResolvers/properties/upstreams/items/properties/address/anyOf
+  value:
+    - format: ipv4
+    - format: ipv6
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/upstreamResolvers/properties/upstreams/items/anyOf
+  value:
+  - properties:
+      type:
+        enum: [ "","SystemResolvConf" ] # empty string because client-side validation will not see the default value
+    not:
+      required: [ "address", "port" ]
+  - properties:
+      type:
+        enum: [ "Network" ]
+    required: [ "address" ]
+    optional: [ "port" ]

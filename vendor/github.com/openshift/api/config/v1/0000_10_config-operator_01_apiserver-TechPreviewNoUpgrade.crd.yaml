@@ -1,0 +1,179 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/470
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: TechPreviewNoUpgrade
+  name: apiservers.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: APIServer
+    listKind: APIServerList
+    plural: apiservers
+    singular: apiserver
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "APIServer holds configuration (like serving certificates, client CA and CORS domains) shared by all API servers in the system, among them especially kube-apiserver and openshift-apiserver. The canonical name of an instance is 'cluster'. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec holds user settable values for configuration
+              type: object
+              properties:
+                additionalCORSAllowedOrigins:
+                  description: additionalCORSAllowedOrigins lists additional, user-defined regular expressions describing hosts for which the API server allows access using the CORS headers. This may be needed to access the API and the integrated OAuth server from JavaScript applications. The values are regular expressions that correspond to the Golang regular expression language.
+                  type: array
+                  items:
+                    type: string
+                audit:
+                  description: audit specifies the settings for audit configuration to be applied to all OpenShift-provided API servers in the cluster.
+                  type: object
+                  default:
+                    profile: Default
+                  properties:
+                    customRules:
+                      description: customRules specify profiles per group. These profile take precedence over the top-level profile field if they apply. They are evaluation from top to bottom and the first one that matches, applies.
+                      type: array
+                      items:
+                        description: AuditCustomRule describes a custom rule for an audit profile that takes precedence over the top-level profile.
+                        type: object
+                        required:
+                          - group
+                          - profile
+                        properties:
+                          group:
+                            description: group is a name of group a request user must be member of in order to this profile to apply.
+                            type: string
+                            minLength: 1
+                          profile:
+                            description: "profile specifies the name of the desired audit policy configuration to be deployed to all OpenShift-provided API servers in the cluster. \n The following profiles are provided: - Default: the existing default policy. - WriteRequestBodies: like 'Default', but logs request and response HTTP payloads for write requests (create, update, patch). - AllRequestBodies: like 'WriteRequestBodies', but also logs request and response HTTP payloads for read requests (get, list). - None: no requests are logged at all, not even oauthaccesstokens and oauthauthorizetokens. \n If unset, the 'Default' profile is used as the default."
+                            type: string
+                            enum:
+                              - Default
+                              - WriteRequestBodies
+                              - AllRequestBodies
+                              - None
+                      x-kubernetes-list-map-keys:
+                        - group
+                      x-kubernetes-list-type: map
+                    profile:
+                      description: "profile specifies the name of the desired top-level audit profile to be applied to all requests sent to any of the OpenShift-provided API servers in the cluster (kube-apiserver, openshift-apiserver and oauth-apiserver), with the exception of those requests that match one or more of the customRules. \n The following profiles are provided: - Default: default policy which means MetaData level logging with the exception of events (not logged at all), oauthaccesstokens and oauthauthorizetokens (both logged at RequestBody level). - WriteRequestBodies: like 'Default', but logs request and response HTTP payloads for write requests (create, update, patch). - AllRequestBodies: like 'WriteRequestBodies', but also logs request and response HTTP payloads for read requests (get, list). - None: no requests are logged at all, not even oauthaccesstokens and oauthauthorizetokens. \n Warning: It is not recommended to disable audit logging by using the `None` profile unless you are fully aware of the risks of not logging data that can be beneficial when troubleshooting issues. If you disable audit logging and a support situation arises, you might need to enable audit logging and reproduce the issue in order to troubleshoot properly. \n If unset, the 'Default' profile is used as the default."
+                      type: string
+                      default: Default
+                      enum:
+                        - Default
+                        - WriteRequestBodies
+                        - AllRequestBodies
+                        - None
+                clientCA:
+                  description: 'clientCA references a ConfigMap containing a certificate bundle for the signers that will be recognized for incoming client certificates in addition to the operator managed signers. If this is empty, then only operator managed signers are valid. You usually only have to set this if you have your own PKI you wish to honor client certificates from. The ConfigMap must exist in the openshift-config namespace and contain the following required fields: - ConfigMap.Data["ca-bundle.crt"] - CA bundle.'
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      description: name is the metadata.name of the referenced config map
+                      type: string
+                encryption:
+                  description: encryption allows the configuration of encryption of resources at the datastore layer.
+                  type: object
+                  properties:
+                    type:
+                      description: "type defines what encryption type should be used to encrypt resources at the datastore layer. When this field is unset (i.e. when it is set to the empty string), identity is implied. The behavior of unset can and will change over time.  Even if encryption is enabled by default, the meaning of unset may change to a different encryption type based on changes in best practices. \n When encryption is enabled, all sensitive resources shipped with the platform are encrypted. This list of sensitive resources can and will change over time.  The current authoritative list is: \n 1. secrets 2. configmaps 3. routes.route.openshift.io 4. oauthaccesstokens.oauth.openshift.io 5. oauthauthorizetokens.oauth.openshift.io"
+                      type: string
+                      enum:
+                        - ""
+                        - identity
+                        - aescbc
+                        - aesgcm
+                servingCerts:
+                  description: servingCert is the TLS cert info for serving secure traffic. If not specified, operator managed certificates will be used for serving secure traffic.
+                  type: object
+                  properties:
+                    namedCertificates:
+                      description: namedCertificates references secrets containing the TLS cert info for serving secure traffic to specific hostnames. If no named certificates are provided, or no named certificates match the server name as understood by a client, the defaultServingCertificate will be used.
+                      type: array
+                      items:
+                        description: APIServerNamedServingCert maps a server DNS name, as understood by a client, to a certificate.
+                        type: object
+                        properties:
+                          names:
+                            description: names is a optional list of explicit DNS names (leading wildcards allowed) that should use this certificate to serve secure traffic. If no names are provided, the implicit names will be extracted from the certificates. Exact names trump over wildcard names. Explicit names defined here trump over extracted implicit names.
+                            type: array
+                            items:
+                              type: string
+                          servingCertificate:
+                            description: 'servingCertificate references a kubernetes.io/tls type secret containing the TLS cert info for serving secure traffic. The secret must exist in the openshift-config namespace and contain the following required fields: - Secret.Data["tls.key"] - TLS private key. - Secret.Data["tls.crt"] - TLS certificate.'
+                            type: object
+                            required:
+                              - name
+                            properties:
+                              name:
+                                description: name is the metadata.name of the referenced secret
+                                type: string
+                tlsSecurityProfile:
+                  description: "tlsSecurityProfile specifies settings for TLS connections for externally exposed servers. \n If unset, a default (which may change between releases) is chosen. Note that only Old, Intermediate and Custom profiles are currently supported, and the maximum available MinTLSVersions is VersionTLS12."
+                  type: object
+                  properties:
+                    custom:
+                      description: "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic. An example custom profile looks like this: \n ciphers: - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 minTLSVersion: TLSv1.1"
+                      type: object
+                      properties:
+                        ciphers:
+                          description: "ciphers is used to specify the cipher algorithms that are negotiated during the TLS handshake.  Operators may remove entries their operands do not support.  For example, to use DES-CBC3-SHA  (yaml): \n ciphers: - DES-CBC3-SHA"
+                          type: array
+                          items:
+                            type: string
+                        minTLSVersion:
+                          description: "minTLSVersion is used to specify the minimal version of the TLS protocol that is negotiated during the TLS handshake. For example, to use TLS versions 1.1, 1.2 and 1.3 (yaml): \n minTLSVersion: TLSv1.1 \n NOTE: currently the highest minTLSVersion allowed is VersionTLS12"
+                          type: string
+                          enum:
+                            - VersionTLS10
+                            - VersionTLS11
+                            - VersionTLS12
+                            - VersionTLS13
+                      nullable: true
+                    intermediate:
+                      description: "intermediate is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29 \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 minTLSVersion: TLSv1.2"
+                      type: object
+                      nullable: true
+                    modern:
+                      description: "modern is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 minTLSVersion: TLSv1.3 \n NOTE: Currently unsupported."
+                      type: object
+                      nullable: true
+                    old:
+                      description: "old is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 - DHE-RSA-CHACHA20-POLY1305 - ECDHE-ECDSA-AES128-SHA256 - ECDHE-RSA-AES128-SHA256 - ECDHE-ECDSA-AES128-SHA - ECDHE-RSA-AES128-SHA - ECDHE-ECDSA-AES256-SHA384 - ECDHE-RSA-AES256-SHA384 - ECDHE-ECDSA-AES256-SHA - ECDHE-RSA-AES256-SHA - DHE-RSA-AES128-SHA256 - DHE-RSA-AES256-SHA256 - AES128-GCM-SHA256 - AES256-GCM-SHA384 - AES128-SHA256 - AES256-SHA256 - AES128-SHA - AES256-SHA - DES-CBC3-SHA minTLSVersion: TLSv1.0"
+                      type: object
+                      nullable: true
+                    type:
+                      description: "type is one of Old, Intermediate, Modern or Custom. Custom provides the ability to specify individual TLS security profile parameters. Old, Intermediate and Modern are TLS security profiles based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Recommended_configurations \n The profiles are intent based, so they may change over time as new ciphers are developed and existing ciphers are found to be insecure.  Depending on precisely which ciphers are available to a process, the list may be reduced. \n Note that the Modern profile is currently not supported because it is not yet well adopted by common software libraries."
+                      type: string
+                      enum:
+                        - Old
+                        - Intermediate
+                        - Modern
+                        - Custom
+            status:
+              description: status holds observed values from the cluster. They may not be overridden.
+              type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

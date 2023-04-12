@@ -1,0 +1,313 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Infrastructure"
+crd: 0000_10_config-operator_01_infrastructure-Default.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Infrastructure
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {} # No spec is required for a Infrastructure
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+  onUpdate:
+    - name: Should be able to change External platformName from unknown to something else
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: Unknown
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+    - name: Should not be able to change External platformName once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: SomeOtherCoolplatformName
+      expectedError: " spec.platformSpec.external.platformName: Invalid value: \"string\": platform name cannot be changed once set"
+    - name: Should not be able to modify an existing Azure ResourceTags Tag
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "changed"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to add a Tag to an existing Azure ResourceTags
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+                - {key: "new", value: "entry"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to remove a Tag from an existing Azure ResourceTags
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+                - {key: "new", value: "entry"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to add Azure ResourceTags to an empty platformStatus.azure
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      expectedStatusError: "status.platformStatus.azure: Invalid value: \"object\": resourceTags may only be configured during installation"
+    - name: Should not be able to remove Azure ResourceTags from platformStatus.azure
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure: {}
+      expectedStatusError: "status.platformStatus.azure: Invalid value: \"object\": resourceTags may only be configured during installation"
+    - name: Should be able to modify the ResourceGroupName while Azure ResourceTags are present
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceGroupName: foo
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceGroupName: bar
+              resourceTags:
+                - {key: "key", value: "value"}
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceGroupName: bar
+              resourceTags:
+                - {key: "key", value: "value"}
+    - name: PowerVS platform status's resourceGroup length should not exceed the max length set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group-should-not-accept-the-string-that-exceeds-max-length-set
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Too long: may not be longer than 40"
+    - name: PowerVS platform status's resourceGroup should match the regex configured
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: re$ource-group
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup in body should match '^[a-zA-Z0-9-_ ]+$'"
+    - name: Should not be able to change PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: other-resource-group-name
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Invalid value: \"string\": resourceGroup is immutable once set"
+    - name: Should not be able to unset PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+      expectedStatusError: "status.platformStatus.powervs: Invalid value: \"object\": cannot unset resourceGroup once set"

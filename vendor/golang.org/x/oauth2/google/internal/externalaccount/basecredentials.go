@@ -175,6 +175,7 @@ type CredentialSource struct {
 	RegionURL                   string `json:"region_url"`
 	RegionalCredVerificationURL string `json:"regional_cred_verification_url"`
 	CredVerificationURL         string `json:"cred_verification_url"`
+	IMDSv2SessionTokenURL       string `json:"imdsv2_session_token_url"`
 	Format                      format `json:"format"`
 }
 
@@ -185,14 +186,20 @@ func (c *Config) parse(ctx context.Context) (baseCredentialSource, error) {
 			if awsVersion != 1 {
 				return nil, fmt.Errorf("oauth2/google: aws version '%d' is not supported in the current build", awsVersion)
 			}
-			return awsCredentialSource{
+
+			awsCredSource := awsCredentialSource{
 				EnvironmentID:               c.CredentialSource.EnvironmentID,
 				RegionURL:                   c.CredentialSource.RegionURL,
 				RegionalCredVerificationURL: c.CredentialSource.RegionalCredVerificationURL,
 				CredVerificationURL:         c.CredentialSource.URL,
 				TargetResource:              c.Audience,
 				ctx:                         ctx,
-			}, nil
+			}
+			if c.CredentialSource.IMDSv2SessionTokenURL != "" {
+				awsCredSource.IMDSv2SessionTokenURL = c.CredentialSource.IMDSv2SessionTokenURL
+			}
+
+			return awsCredSource, nil
 		}
 	} else if c.CredentialSource.File != "" {
 		return fileCredentialSource{File: c.CredentialSource.File, Format: c.CredentialSource.Format}, nil
