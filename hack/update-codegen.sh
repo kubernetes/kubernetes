@@ -35,7 +35,7 @@ UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS:-}"
 
 OUT_DIR="_output"
 PRJ_SRC_PATH="k8s.io/kubernetes"
-BOILERPLATE_FILENAME="vendor/k8s.io/code-generator/hack/boilerplate.go.txt"
+BOILERPLATE_FILENAME="hack/boilerplate/boilerplate.generatego.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
 
 # Any time we call sort, we want it in the same locale.
@@ -885,21 +885,31 @@ function codegen::informers() {
     fi
 }
 
+function indent() {
+    while read -r X; do
+        echo "    ${X}"
+    done
+}
+
 function codegen::subprojects() {
     # Call generation on sub-projects.
-    # TODO(thockin): make these take a list of codegens and flags
     local subs=(
-        vendor/k8s.io/code-generator/hack/update-codegen.sh
-        vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
-        vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
-        vendor/k8s.io/sample-controller/hack/update-codegen.sh
-        vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
-        vendor/k8s.io/metrics/hack/update-codegen.sh
-        vendor/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
+        vendor/k8s.io/code-generator/examples
+        vendor/k8s.io/kube-aggregator
+        vendor/k8s.io/sample-apiserver
+        vendor/k8s.io/sample-controller
+        vendor/k8s.io/apiextensions-apiserver
+        vendor/k8s.io/metrics
+        vendor/k8s.io/apiextensions-apiserver/examples/client-go
     )
 
-    for s in "${subs[@]}"; do 
-        CODEGEN_PKG=./vendor/k8s.io/code-generator "$s"
+    local codegen
+    codegen="$(pwd)/vendor/k8s.io/code-generator"
+    for sub in "${subs[@]}"; do
+        kube::log::status "Generating code for subproject ${sub}"
+        pushd "${sub}" >/dev/null
+        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
+        popd >/dev/null
     done
 }
 
