@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericclioptions
+package genericiooptions
 
 import (
 	"bytes"
-	"io/ioutil"
-
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"io"
 )
 
 // IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
 // Inconsistent and different names make it hard to read and review code
-// DEPRECATED: use genericiooptions.IOStreams
-type IOStreams = genericiooptions.IOStreams
+type IOStreams struct {
+	// In think, os.Stdin
+	In io.Reader
+	// Out think, os.Stdout
+	Out io.Writer
+	// ErrOut think, os.Stderr
+	ErrOut io.Writer
+}
 
 // NewTestIOStreams returns a valid IOStreams and in, out, errout buffers for unit tests
-// DEPRECATED: use genericiooptions.NewTestIOStreams
-func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
+func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -43,12 +46,11 @@ func NewTestIOStreams() (genericiooptions.IOStreams, *bytes.Buffer, *bytes.Buffe
 }
 
 // NewTestIOStreamsDiscard returns a valid IOStreams that just discards
-// DEPRECATED: use genericiooptions.NewTestIOStreamsDiscard
-func NewTestIOStreamsDiscard() genericiooptions.IOStreams {
+func NewTestIOStreamsDiscard() IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{
 		In:     in,
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
+		Out:    io.Discard,
+		ErrOut: io.Discard,
 	}
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -74,7 +75,7 @@ type APIResourceOptions struct {
 
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -85,7 +86,7 @@ type groupResource struct {
 }
 
 // NewAPIResourceOptions creates the options for APIResource
-func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOptions {
+func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOptions {
 	return &APIResourceOptions{
 		IOStreams:  ioStreams,
 		Namespaced: true,
@@ -93,7 +94,7 @@ func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOp
 }
 
 // NewCmdAPIResources creates the `api-resources` command
-func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
@@ -80,11 +81,11 @@ type AutoscaleOptions struct {
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewAutoscaleOptions creates the options for autoscale
-func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
+func NewAutoscaleOptions(ioStreams genericiooptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("autoscaled").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
@@ -96,7 +97,7 @@ func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOption
 }
 
 // NewCmdAutoscale returns the autoscale Cobra command
-func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAutoscaleOptions(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}

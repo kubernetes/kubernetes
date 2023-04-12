@@ -27,13 +27,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(KubectlOptions{IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
+	root := NewKubectlCommand(KubectlOptions{IOStreams: genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")
@@ -132,7 +133,7 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 				pluginsHandler := &testPluginHandler{
 					pluginsDirectory: "plugin/testdata",
 				}
-				ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+				ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 
 				root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
 				if err := root.Execute(); err != nil {
@@ -236,7 +237,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			pluginsHandler := &testPluginHandler{
 				pluginsDirectory: "plugin/testdata",
 			}
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 
 			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
 			if err := root.Execute(); err != nil {

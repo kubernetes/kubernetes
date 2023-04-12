@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -67,11 +68,11 @@ type RoleBindingOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewRoleBindingOptions creates a new *RoleBindingOptions with sane defaults
-func NewRoleBindingOptions(ioStreams genericclioptions.IOStreams) *RoleBindingOptions {
+func NewRoleBindingOptions(ioStreams genericiooptions.IOStreams) *RoleBindingOptions {
 	return &RoleBindingOptions{
 		Users:           []string{},
 		Groups:          []string{},
@@ -82,7 +83,7 @@ func NewRoleBindingOptions(ioStreams genericclioptions.IOStreams) *RoleBindingOp
 }
 
 // NewCmdCreateRoleBinding returns an initialized Command instance for 'create rolebinding' sub command
-func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRoleBindingOptions(ioStreams)
 
 	cmd := &cobra.Command{

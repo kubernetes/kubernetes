@@ -28,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -48,7 +49,7 @@ type DrainCmdOptions struct {
 	drainer   *drain.Helper
 	nodeInfos []*resource.Info
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 }
 
@@ -61,7 +62,7 @@ var (
 		kubectl cordon foo`))
 )
 
-func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -90,7 +91,7 @@ var (
 		kubectl uncordon foo`))
 )
 
-func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdUncordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -144,7 +145,7 @@ var (
 		kubectl drain foo --grace-period=900`))
 )
 
-func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
+func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *DrainCmdOptions {
 	o := &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -176,7 +177,7 @@ func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction b
 	}
 }
 
-func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDrain(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{

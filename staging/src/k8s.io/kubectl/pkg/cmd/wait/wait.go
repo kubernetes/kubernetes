@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -92,11 +93,11 @@ type WaitFlags struct {
 	Timeout      time.Duration
 	ForCondition string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewWaitFlags returns a default WaitFlags
-func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
+func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
@@ -115,7 +116,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 }
 
 // NewCmdWait returns a cobra command for waiting
-func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
@@ -276,7 +277,7 @@ type WaitOptions struct {
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ConditionFunc is the interface for providing condition checks

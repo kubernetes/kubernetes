@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -133,7 +134,7 @@ func TestCreateRole(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdCreateRole(tf, ioStreams)
 			cmd.Flags().Set("dry-run", "client")
 			cmd.Flags().Set("output", "yaml")
@@ -341,7 +342,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.roleOptions.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+		test.roleOptions.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 
 		var err error
 		test.roleOptions.Mapper, err = tf.ToRESTMapper()
@@ -645,7 +646,7 @@ func TestComplete(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		cmd := NewCmdCreateRole(tf, genericclioptions.NewTestIOStreamsDiscard())
+		cmd := NewCmdCreateRole(tf, genericiooptions.NewTestIOStreamsDiscard())
 		cmd.Flags().Set("resource", test.resources)
 
 		err := test.roleOptions.Complete(tf, cmd, test.params)

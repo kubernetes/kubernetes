@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -131,12 +132,12 @@ type ExposeServiceOptions struct {
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	Recorder genericclioptions.Recorder
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewExposeServiceOptions creates a new ExposeServiceOptions and return a pointer to the
 // struct
-func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
+func NewExposeServiceOptions(ioStreams genericiooptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme),
@@ -147,7 +148,7 @@ func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServi
 }
 
 // NewCmdExposeService is a command to expose the service from user's input
-func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdExposeService(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewExposeServiceOptions(streams)
 
 	validArgs := []string{}

@@ -33,7 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -299,7 +299,7 @@ status:
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, stdout, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdCreateToken(tf, ioStreams)
 			if test.output != "" {
 				cmd.Flags().Set("output", test.output)

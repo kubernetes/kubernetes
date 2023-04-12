@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	authenticationv1alpha1client "k8s.io/client-go/kubernetes/typed/authentication/v1alpha1"
 	authenticationv1beta1client "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
@@ -45,11 +46,11 @@ type WhoAmIFlags struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 	PrintFlags       *genericclioptions.PrintFlags
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewWhoAmIFlags returns a default WhoAmIFlags.
-func NewWhoAmIFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WhoAmIFlags {
+func NewWhoAmIFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *WhoAmIFlags {
 	return &WhoAmIFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
@@ -107,7 +108,7 @@ type WhoAmIOptions struct {
 
 	resourcePrinterFunc printers.ResourcePrinterFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -129,7 +130,7 @@ var (
 )
 
 // NewCmdWhoAmI returns an initialized Command for 'auth whoami' sub command. Experimental.
-func NewCmdWhoAmI(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdWhoAmI(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewWhoAmIFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{

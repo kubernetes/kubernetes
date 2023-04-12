@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cgtesting "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -30,7 +31,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
@@ -80,7 +80,7 @@ func TestRolloutStatus(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Run(cmd, []string{deploymentName})
 
@@ -138,7 +138,7 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("selector", "app=api")
 	cmd.Run(cmd, []string{deploymentName})
@@ -193,7 +193,7 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("watch", "false")
 	cmd.Run(cmd, []string{deploymentName})
@@ -248,7 +248,7 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("watch", "false")
 	cmd.Run(cmd, []string{deploymentName})
