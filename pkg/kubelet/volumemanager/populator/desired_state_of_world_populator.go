@@ -171,6 +171,7 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
 	dswp.findAndAddNewPods()
 	dswp.findAndRemoveDeletedPods()
+	dswp.findPodsNeedSyncVolumes()
 }
 
 // Iterate through all pods and add to desired state of world if they don't
@@ -261,6 +262,14 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		if _, podExists := dswp.podManager.GetPodByUID(types.UID(podName)); !podExists {
 			dswp.desiredStateOfWorld.PopPodErrors(podName)
 		}
+	}
+}
+
+// findPodsNeedSyncVolumes get pods that needs reprocess volumes from volume host, and mark
+// them unprocessed.
+func (dswp *desiredStateOfWorldPopulator) findPodsNeedSyncVolumes() {
+	for _, podUID := range dswp.volumePluginMgr.Host.GetPodsNeedSyncVolumes() {
+		dswp.markPodProcessingFailed(volumetypes.UniquePodName(podUID))
 	}
 }
 

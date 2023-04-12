@@ -923,6 +923,10 @@ func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredD
 	return adc.filteredDialOptions
 }
 
+func (adc *attachDetachController) GetPodsNeedSyncVolumes() []types.UID {
+	return nil
+}
+
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {
 	return adc.csiDriverLister
 }

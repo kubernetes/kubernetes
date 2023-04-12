@@ -29,6 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/clock"
@@ -49,6 +50,9 @@ type Manager interface {
 	// UnregisterPod unregisters secrets from a given pod that are not
 	// used by any other registered pod.
 	UnregisterPod(pod *v1.Pod)
+
+	// GetPodsNeedSyncObjects gets pods that need syncing objects.
+	GetPodsNeedSyncObjects() []types.UID
 }
 
 // simpleSecretManager implements SecretManager interfaces with
@@ -70,6 +74,10 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 }
 
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
+}
+
+func (s *simpleSecretManager) GetPodsNeedSyncObjects() []types.UID {
+	return nil
 }
 
 // secretManager keeps a store with secrets necessary
@@ -97,6 +105,10 @@ func (s *secretManager) RegisterPod(pod *v1.Pod) {
 
 func (s *secretManager) UnregisterPod(pod *v1.Pod) {
 	s.manager.UnregisterPod(pod)
+}
+
+func (s *secretManager) GetPodsNeedSyncObjects() []types.UID {
+	return s.manager.GetPodsNeedSyncObjects()
 }
 
 func getSecretNames(pod *v1.Pod) sets.String {

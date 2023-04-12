@@ -489,3 +489,7 @@ func (expc *expandController) GetSubpather() subpath.Interface {
 func (expc *expandController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
 	return expc.filteredDialOptions
 }
+
+func (exec *expandController) GetPodsNeedSyncVolumes() []types.UID {
+	return nil
+}

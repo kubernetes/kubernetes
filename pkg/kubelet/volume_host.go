@@ -28,6 +28,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -304,4 +305,16 @@ func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
 	return kvh.exec
+}
+
+func (kvh *kubeletVolumeHost) GetPodsNeedSyncVolumes() []types.UID {
+	podUIDs := sets.New[types.UID]()
+	// Merge the unprocessed pods from configMapManager and secretManager.
+	for _, podUID := range kvh.configMapManager.GetPodsNeedSyncObjects() {
+		podUIDs.Insert(podUID)
+	}
+	for _, podUID := range kvh.secretManager.GetPodsNeedSyncObjects() {
+		podUIDs.Insert(podUID)
+	}
+	return podUIDs.UnsortedList()
 }

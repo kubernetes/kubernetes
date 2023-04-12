@@ -29,6 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/clock"
@@ -48,6 +49,9 @@ type Manager interface {
 	// UnregisterPod unregisters configmaps from a given pod that are not
 	// used by any other registered pod.
 	UnregisterPod(pod *v1.Pod)
+
+	// GetPodsNeedSyncObjects gets pods that need syncing objects.
+	GetPodsNeedSyncObjects() []types.UID
 }
 
 // simpleConfigMapManager implements ConfigMap Manager interface with
@@ -69,6 +73,10 @@ func (s *simpleConfigMapManager) RegisterPod(pod *v1.Pod) {
 }
 
 func (s *simpleConfigMapManager) UnregisterPod(pod *v1.Pod) {
+}
+
+func (s *simpleConfigMapManager) GetPodsNeedSyncObjects() []types.UID {
+	return nil
 }
 
 // configMapManager keeps a cache of all configmaps necessary
@@ -96,6 +104,10 @@ func (c *configMapManager) RegisterPod(pod *v1.Pod) {
 
 func (c *configMapManager) UnregisterPod(pod *v1.Pod) {
 	c.manager.UnregisterPod(pod)
+}
+
+func (c *configMapManager) GetPodsNeedSyncObjects() []types.UID {
+	return c.manager.GetPodsNeedSyncObjects()
 }
 
 func getConfigMapNames(pod *v1.Pod) sets.String {

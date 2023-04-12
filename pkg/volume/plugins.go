@@ -446,6 +446,9 @@ type VolumeHost interface {
 
 	// Returns options to pass for proxyutil filtered dialers.
 	GetFilteredDialOptions() *proxyutil.FilteredDialOptions
+
+	// Returns pods that need syncing volumes.
+	GetPodsNeedSyncVolumes() []types.UID
 }
 
 // VolumePluginMgr tracks registered plugins.

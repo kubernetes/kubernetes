@@ -244,6 +244,10 @@ func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
 	return nil
 }
 
+func (f *fakeVolumeHost) GetPodsNeedSyncVolumes() []types.UID {
+	return nil
+}
+
 func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {
 	ScriptCommands(f.exec, scripts)
 }

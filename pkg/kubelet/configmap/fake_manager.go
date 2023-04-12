@@ -16,7 +16,10 @@ limitations under the License.
 
 package configmap
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // fakeManager implements Manager interface for testing purposes.
 // simple operations to apiserver.
@@ -36,4 +39,8 @@ func (s *fakeManager) RegisterPod(pod *v1.Pod) {
 }
 
 func (s *fakeManager) UnregisterPod(pod *v1.Pod) {
+}
+
+func (s *fakeManager) GetPodsNeedSyncObjects() []types.UID {
+	return nil
 }

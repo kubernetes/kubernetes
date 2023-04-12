@@ -16,7 +16,10 @@ limitations under the License.
 
 package secret
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // fakeManager implements Manager interface for testing purposes.
 // simple operations to apiserver.
@@ -39,4 +42,9 @@ func (s *fakeManager) RegisterPod(pod *v1.Pod) {
 
 // UnregisterPod implements the UnregisterPod method for testing purposes.
 func (s *fakeManager) UnregisterPod(pod *v1.Pod) {
+}
+
+// GetPodsNeedSyncObjects implements the GetPodsNeedSyncObjects method for testing purposes.
+func (s *fakeManager) GetPodsNeedSyncObjects() []types.UID {
+	return nil
 }

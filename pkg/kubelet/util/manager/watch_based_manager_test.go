@@ -23,11 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -64,14 +66,15 @@ func isSecretImmutable(object runtime.Object) bool {
 
 func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
-		listObject:    listSecret(fakeClient),
-		watchObject:   watchSecret(fakeClient),
-		newObject:     func() runtime.Object { return &v1.Secret{} },
-		isImmutable:   isSecretImmutable,
-		groupResource: corev1.Resource("secret"),
-		clock:         fakeClock,
-		maxIdleTime:   maxIdleTime,
-		items:         make(map[objectKey]*objectCacheItem),
+		listObject:         listSecret(fakeClient),
+		watchObject:        watchSecret(fakeClient),
+		newObject:          func() runtime.Object { return &v1.Secret{} },
+		isImmutable:        isSecretImmutable,
+		groupResource:      corev1.Resource("secret"),
+		clock:              fakeClock,
+		maxIdleTime:        maxIdleTime,
+		podsNeedSyncObject: make(sets.Set[types.UID]),
+		items:              make(map[objectKey]*objectCacheItem),
 	}
 }
 
@@ -93,7 +96,7 @@ func TestSecretCache(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("Expected NotFound error, got: %v", err)
@@ -138,7 +141,7 @@ func TestSecretCache(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err = store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -163,7 +166,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	// This should trigger List and Watch actions eventually.
 	actionsFn := func() (bool, error) {
 		actions := fakeClient.Actions()
@@ -184,14 +187,14 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 
 	// Next registrations shouldn't trigger any new actions.
 	for i := 0; i < 20; i++ {
-		store.AddReference("ns", "name")
-		store.DeleteReference("ns", "name")
+		store.AddReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
+		store.DeleteReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	actions := fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 
 	// Final delete also doesn't trigger any action.
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -287,7 +290,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			}
 
 			// AddReference should start reflector.
-			store.AddReference("ns", "name")
+			store.AddReference("ns", "name", "pod")
 			if err := wait.Poll(10*time.Millisecond, time.Second, itemExists); err != nil {
 				t.Errorf("item wasn't added to cache")
 			}
@@ -375,7 +378,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -467,7 +470,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -497,4 +500,97 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 
 	obj, _ := store.Get("ns", "name")
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
+}
+
+func TestSecretUpdatesReflectsQuickly(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+
+	secret := func(name, rv string) *v1.Secret {
+		result := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       "ns",
+				ResourceVersion: rv,
+			},
+		}
+		return result
+	}
+	contains := func(s []types.UID, e types.UID) bool {
+		for _, a := range s {
+			if a == e {
+				return true
+			}
+		}
+		return false
+	}
+
+	secretA := secret("secret-A", "100")
+	secretB := secret("secret-B", "100")
+	listReactor := func(a core.Action) (bool, runtime.Object, error) {
+		result := &v1.SecretList{
+			Items: []v1.Secret{*secretA, *secretB},
+		}
+		return true, result, nil
+	}
+	fakeClient.AddReactor("list", "secrets", listReactor)
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+	// newGetFn generates a function that check if the reference completed.
+	newGetFn := func(name string) func() (bool, error) {
+		return func() (bool, error) {
+			object, err := store.Get("ns", name)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			secret := object.(*v1.Secret)
+			if secret == nil || secret.Name != name || secret.Namespace != "ns" {
+				return false, fmt.Errorf("unexpected secret: %v", secret)
+			}
+			return true, nil
+		}
+	}
+
+	store.AddReference("ns", "secret-A", "pod-1")
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, newGetFn("secret-A")); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	store.AddReference("ns", "secret-A", "pod-2")
+
+	store.AddReference("ns", "secret-B", "pod-1")
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, newGetFn("secret-B")); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	store.AddReference("ns", "secret-B", "pod-3")
+
+	var podUIDs []types.UID
+	assginPodUIDs := func() (bool, error) {
+		podUIDs = store.GetPodsNeedSyncObjects()
+		if len(podUIDs) == 0 {
+			return false, nil
+		}
+		return true, nil
+	}
+
+	// clear changes triggered by first registration.
+	wait.PollImmediate(10*time.Millisecond, time.Second, assginPodUIDs)
+
+	// Add watch event on secret-A.
+	fakeWatch.Add(secret("secret-A", "200"))
+	wait.PollImmediate(10*time.Millisecond, time.Second, assginPodUIDs)
+	if len(podUIDs) != 2 || !contains(podUIDs, "pod-1") || !contains(podUIDs, "pod-2") {
+		t.Errorf("pod list is not as expected")
+	}
+	// Add watch event on secret-B.
+	fakeWatch.Add(secret("secret-B", "200"))
+	wait.PollImmediate(10*time.Millisecond, time.Second, assginPodUIDs)
+	if len(podUIDs) != 2 || !contains(podUIDs, "pod-1") || !contains(podUIDs, "pod-3") {
+		t.Errorf("pod list is not as expected")
+	}
 }

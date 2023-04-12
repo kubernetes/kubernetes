@@ -147,3 +147,7 @@ func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
 func (ctrl *PersistentVolumeController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
 	return ctrl.filteredDialOptions
 }
+
+func (ctrl *PersistentVolumeController) GetPodsNeedSyncVolumes() []types.UID {
+	return nil
+}
