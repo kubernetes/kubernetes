@@ -270,6 +270,9 @@ func (t *TopologyCache) HasPopulatedHints(serviceKey string) bool {
 // it is not possible to provide allocations that are below the overload
 // threshold, a nil value will be returned.
 func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]Allocation, *EventBuilder) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	// it is similar to checking !t.sufficientNodeInfo
 	if t.cpuRatiosByZone == nil {
 		return nil, &EventBuilder{
@@ -292,9 +295,6 @@ func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]Allocation,
 			Message:   fmt.Sprintf("%s (%d endpoints, %d zones)", InsufficientNumberOfEndpoints, numEndpoints, len(t.cpuRatiosByZone)),
 		}
 	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	remainingMinEndpoints := numEndpoints
 	minTotal := 0
