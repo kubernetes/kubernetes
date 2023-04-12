@@ -110,29 +110,6 @@ func TestRolloutStatusNoResources(t *testing.T) {
 		}),
 	}
 
-	tf.FakeDynamicClient.WatchReactionChain = nil
-	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
-		fw := watch.NewFake()
-		dep := &appsv1.ReplicaSet{}
-		dep.Name = deploymentName
-		dep.Status = appsv1.ReplicaSetStatus{
-			Replicas:          1,
-			ReadyReplicas:     1,
-			AvailableReplicas: 1,
-			Conditions: []appsv1.ReplicaSetCondition{{
-				Type: "Available",
-			}},
-		}
-		c, err := runtime.DefaultUnstructuredConverter.ToUnstructured(dep.DeepCopyObject())
-		if err != nil {
-			t.Errorf("unexpected err %s", err)
-		}
-		u := &unstructured.Unstructured{}
-		u.SetUnstructuredContent(c)
-		go fw.Add(u)
-		return true, fw, nil
-	})
-
 	streams, _, _, buf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Run(cmd, []string{"deployment"})
