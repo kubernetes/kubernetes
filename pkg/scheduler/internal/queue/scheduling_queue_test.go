@@ -350,6 +350,17 @@ func TestPriorityQueue_Update(t *testing.T) {
 	if p, err := q.Pop(); err != nil || p.Pod != updatedPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", updatedPod.Name, p.Pod.Name)
 	}
+
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(medPriorityPodInfo.Pod), q.SchedulingCycle())
+	if len(q.unschedulablePods.podInfoMap) != 1 {
+		t.Error("Expected unschedulablePods to be 1.")
+	}
+
+	updatedPod = medPriorityPodInfo.Pod.DeepCopy()
+	q.Update(medPriorityPodInfo.Pod, updatedPod)
+	if len(q.unschedulablePods.podInfoMap) != 1 {
+		t.Error("Expected unschedulablePods to be 1.")
+	}
 }
 
 func TestPriorityQueue_Delete(t *testing.T) {
