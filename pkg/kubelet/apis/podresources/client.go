@@ -42,7 +42,7 @@ func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSiz
 		return nil, nil, err
 	}
 
-	// 创建TransportCredentials实例
+	// create TransportCredentials
 	creds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
 
 	connOptions := []grpc.DialOption{
