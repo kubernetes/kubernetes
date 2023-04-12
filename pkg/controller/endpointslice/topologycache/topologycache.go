@@ -232,13 +232,13 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 // it is not possible to provide allocations that are below the overload
 // threshold, a nil value will be returned.
 func (t *TopologyCache) getAllocations(numEndpoints int) map[string]Allocation {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	if t.cpuRatiosByZone == nil || len(t.cpuRatiosByZone) < 2 || len(t.cpuRatiosByZone) > numEndpoints {
 		klog.V(2).Infof("Insufficient info to allocate endpoints (%d endpoints, %d zones)", numEndpoints, len(t.cpuRatiosByZone))
 		return nil
 	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	remainingMinEndpoints := numEndpoints
 	minTotal := 0
