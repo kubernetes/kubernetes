@@ -386,11 +386,18 @@ func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupV
 	}
 	resource, name := seg[0], seg[1]
 
-	var gvr schema.GroupVersionResource
-	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
-	if err != nil {
-		return
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
+	gvr := schema.GroupVersionResource{}
+	if fullySpecifiedGVR != nil {
+		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
 	}
+	if gvr.Empty() {
+		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
+		if err != nil {
+			return
+		}
+	}
+
 	gvk, err = mapper.KindFor(gvr)
 	if err != nil {
 		return
