@@ -18,6 +18,7 @@ package egressselector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -31,6 +32,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	testingclock "k8s.io/utils/clock/testing"
+	clientmetrics "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics"
+	ccmetrics "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics"
+	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
 
 type fakeEgressSelection struct {
@@ -201,6 +205,16 @@ func TestMetrics(t *testing.T) {
 		metrics      []string
 		want         string
 	}{
+		"connect to proxy server start": {
+			connectorErr: true,
+			proxierErr:   true,
+			metrics:      []string{"apiserver_egress_dialer_dial_start_total"},
+			want: `
+	# HELP apiserver_egress_dialer_dial_start_total [ALPHA] Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).
+	# TYPE apiserver_egress_dialer_dial_start_total counter
+	apiserver_egress_dialer_dial_start_total{protocol="fake_protocol",transport="fake_transport"} 1
+`,
+		},
 		"connect to proxy server error": {
 			connectorErr: true,
 			proxierErr:   false,
@@ -262,5 +276,70 @@ func TestMetrics(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestKonnectivityClientMetrics(t *testing.T) {
+	testcases := []struct {
+		name    string
+		metrics []string
+		trigger func()
+		want    string
+	}{
+		{
+			name:    "stream packets",
+			metrics: []string{"konnectivity_network_proxy_client_stream_packets_total"},
+			trigger: func() {
+				clientmetrics.Metrics.ObservePacket(ccmetrics.SegmentFromClient, client.PacketType_DIAL_REQ)
+			},
+			want: `
+# HELP konnectivity_network_proxy_client_stream_packets_total Count of packets processed, by segment and packet type (example: from_client, DIAL_REQ)
+# TYPE konnectivity_network_proxy_client_stream_packets_total counter
+konnectivity_network_proxy_client_stream_packets_total{packet_type="DIAL_REQ",segment="from_client"} 1
+`,
+		},
+		{
+			name:    "stream errors",
+			metrics: []string{"konnectivity_network_proxy_client_stream_errors_total"},
+			trigger: func() {
+				clientmetrics.Metrics.ObserveStreamError(ccmetrics.SegmentToClient, errors.New("example"), client.PacketType_DIAL_RSP)
+			},
+			want: `
+# HELP konnectivity_network_proxy_client_stream_errors_total Count of gRPC stream errors, by segment, grpc Code, packet type. (example: from_agent, Code.Unavailable, DIAL_RSP)
+# TYPE konnectivity_network_proxy_client_stream_errors_total counter
+konnectivity_network_proxy_client_stream_errors_total{code="Unknown",packet_type="DIAL_RSP",segment="to_client"} 1
+`,
+		},
+		{
+			name:    "dial failure",
+			metrics: []string{"konnectivity_network_proxy_client_dial_failure_total"},
+			trigger: func() {
+				clientmetrics.Metrics.ObserveDialFailure(clientmetrics.DialFailureTimeout)
+			},
+			want: `
+# HELP konnectivity_network_proxy_client_dial_failure_total Number of dial failures observed, by reason (example: remote endpoint error)
+# TYPE konnectivity_network_proxy_client_dial_failure_total counter
+konnectivity_network_proxy_client_dial_failure_total{reason="timeout"} 1
+`,
+		},
+		{
+			name:    "client connections",
+			metrics: []string{"konnectivity_network_proxy_client_client_connections"},
+			trigger: func() {
+				clientmetrics.Metrics.GetClientConnectionsMetric().WithLabelValues("dialing").Inc()
+			},
+			want: `
+# HELP konnectivity_network_proxy_client_client_connections Number of open client connections, by status (Example: dialing)
+# TYPE konnectivity_network_proxy_client_client_connections gauge
+konnectivity_network_proxy_client_client_connections{status="dialing"} 1
+`,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.trigger()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
+				t.Errorf("GatherAndCompare error: %v", err)
+			}
+		})
+	}
 }

@@ -153,6 +153,11 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 		return false
 	}
 
+	if restReq.body != nil {
+		// we have an opaque reader, we can't safely reset it
+		return false
+	}
+
 	r.attempts++
 	r.retryAfter = &RetryAfter{Attempt: r.attempts}
 	if r.attempts > r.maxRetries {
@@ -209,18 +214,6 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return nil
 	}
 
-	// At this point we've made atleast one attempt, post which the response
-	// body should have been fully read and closed in order for it to be safe
-	// to reset the request body before we reconnect, in order for us to reuse
-	// the same TCP connection.
-	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
-		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-			err = fmt.Errorf("failed to reset the request body while retrying a request: %v", err)
-			r.trackPreviousError(err)
-			return err
-		}
-	}
-
 	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
 		delay := request.backoff.CalculateBackoff(url)
@@ -249,7 +242,19 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 	// parameters calculated from the (response, err) tuple from
 	// attempt N-1, so r.retryAfter is outdated and should not be
 	// referred to here.
+	isRetry := r.retryAfter != nil
 	r.retryAfter = nil
+
+	// the client finishes a single request after N attempts (1..N)
+	//  - all attempts (1..N) are counted to the rest_client_requests_total
+	//    metric (current behavior).
+	//  - every attempt after the first (2..N) are counted to the
+	//    rest_client_request_retries_total metric.
+	updateRequestResultMetric(ctx, request, resp, err)
+	if isRetry {
+		// this is attempt 2 or later
+		updateRequestRetryMetric(ctx, request, resp, err)
+	}
 
 	if request.c.base != nil {
 		if err != nil {
@@ -353,8 +358,12 @@ func retryAfterResponse() *http.Response {
 }
 
 func retryAfterResponseWithDelay(delay string) *http.Response {
+	return retryAfterResponseWithCodeAndDelay(http.StatusInternalServerError, delay)
+}
+
+func retryAfterResponseWithCodeAndDelay(code int, delay string) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusInternalServerError,
+		StatusCode: code,
 		Header:     http.Header{"Retry-After": []string{delay}},
 	}
 }

@@ -140,6 +140,7 @@ eval "testargs=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
+goflags=()
 # The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then

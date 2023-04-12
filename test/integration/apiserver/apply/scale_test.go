@@ -29,12 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	deploymentstorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
 	replicasetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	statefulsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
@@ -49,8 +46,6 @@ type scaleTest struct {
 }
 
 func TestScaleAllResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	client, closeFn := setup(t)
 	defer closeFn()
 
@@ -239,8 +234,6 @@ func TestScaleAllResources(t *testing.T) {
 }
 
 func TestScaleUpdateOnlyStatus(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	client, closeFn := setup(t)
 	defer closeFn()
 
@@ -286,7 +279,7 @@ func TestScaleUpdateOnlyStatus(t *testing.T) {
 func TestAllKnownVersionsAreInMappings(t *testing.T) {
 	cases := []struct {
 		groupKind schema.GroupKind
-		mappings  fieldmanager.ResourcePathMappings
+		mappings  managedfields.ResourcePathMappings
 	}{
 		{
 			groupKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},

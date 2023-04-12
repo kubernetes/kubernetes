@@ -42,6 +42,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.PodTopologySpread},
 				{Name: names.InterPodAffinity},
 				{Name: names.VolumeBinding},
+				{Name: names.VolumeZone},
 				{Name: names.NodeAffinity},
 			},
 		},
@@ -75,6 +76,8 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.PodTopologySpread},
 				{Name: names.TaintToleration},
 				{Name: names.NodeAffinity},
+				{Name: names.NodeResourcesFit},
+				{Name: names.NodeResourcesBalancedAllocation},
 			},
 		},
 		Score: v1beta2.PluginSet{
@@ -116,6 +119,9 @@ func applyFeatureGates(config *v1beta2.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32(1)})
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
+		config.PreEnqueue.Enabled = append(config.PreEnqueue.Enabled, v1beta2.Plugin{Name: names.SchedulingGates})
+	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
@@ -144,7 +150,7 @@ type pluginIndex struct {
 }
 
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta2.PluginSet) v1beta2.PluginSet {
-	disabledPlugins := sets.NewString()
+	disabledPlugins := sets.New[string]()
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
 	replacedPluginIndex := sets.NewInt()

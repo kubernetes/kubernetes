@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestNewNodeLease(t *testing.T) {
@@ -59,6 +60,7 @@ func TestNewNodeLease(t *testing.T) {
 			desc: "nil base without node",
 			controller: &controller{
 				client:               fake.NewSimpleClientset(),
+				leaseName:            node.Name,
 				holderIdentity:       node.Name,
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,
@@ -80,6 +82,7 @@ func TestNewNodeLease(t *testing.T) {
 			desc: "nil base with node",
 			controller: &controller{
 				client:               fake.NewSimpleClientset(node),
+				leaseName:            node.Name,
 				holderIdentity:       node.Name,
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,
@@ -268,6 +271,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			cl := fake.NewSimpleClientset(node)
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -285,7 +289,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
 				newLeasePostProcessFunc:    setNodeOwnerFunc(cl, node.Name),
 			}
-			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
+			if err := c.retryUpdateLease(ctx, nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
 			}
 		})
@@ -403,6 +407,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			cl := fake.NewSimpleClientset(tc.existingObjs...)
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -424,7 +429,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				newLeasePostProcessFunc: setNodeOwnerFunc(cl, node.Name),
 			}
 
-			c.sync()
+			c.sync(ctx)
 
 			if tc.expectLatestLease {
 				if tc.expectLeaseResourceVersion != c.latestLease.ResourceVersion {

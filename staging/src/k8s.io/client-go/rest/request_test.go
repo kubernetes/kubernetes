@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -265,6 +266,26 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 		"timeoutSeconds":  []string{"10"},
 	}) {
 		t.Errorf("should have set a param: %#v %v", r.params, r.err)
+	}
+}
+
+func TestRequestVersionedParamsWithInvalidScheme(t *testing.T) {
+	parameterCodec := runtime.NewParameterCodec(runtime.NewScheme())
+	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}})
+	r.VersionedParams(&v1.PodExecOptions{Stdin: false, Stdout: true},
+		parameterCodec)
+
+	if r.Error() == nil {
+		t.Errorf("should have recorded an error: %#v", r.params)
+	}
+}
+
+func TestRequestError(t *testing.T) {
+	// Invalid body, see TestRequestBody()
+	r := (&Request{}).Body([]string{"test"})
+
+	if r.Error() != r.err {
+		t.Errorf("getter should be identical to reference: %#v %#v", r.Error(), r.err)
 	}
 }
 
@@ -1123,42 +1144,6 @@ func TestRequestWatch(t *testing.T) {
 			Empty: true,
 		},
 		{
-			name: "max retries 1, server returns a retry-after response, request body seek error",
-			Request: &Request{
-				body: &readSeeker{err: io.EOF},
-				c: &RESTClient{
-					base: &url.URL{},
-				},
-			},
-			maxRetries:       1,
-			attemptsExpected: 1,
-			serverReturns: []responseErr{
-				{response: retryAfterResponse(), err: nil},
-			},
-			Err: true,
-			ErrFn: func(err error) bool {
-				return !apierrors.IsInternalError(err) && strings.Contains(err.Error(), "failed to reset the request body while retrying a request: EOF")
-			},
-		},
-		{
-			name: "max retries 1, server returns a retryable error, request body seek error",
-			Request: &Request{
-				body: &readSeeker{err: io.EOF},
-				c: &RESTClient{
-					base: &url.URL{},
-				},
-			},
-			maxRetries:       1,
-			attemptsExpected: 1,
-			serverReturns: []responseErr{
-				{response: nil, err: io.EOF},
-			},
-			Err: true,
-			ErrFn: func(err error) bool {
-				return !apierrors.IsInternalError(err)
-			},
-		},
-		{
 			name: "max retries 2, server always returns a response with Retry-After header",
 			Request: &Request{
 				c: &RESTClient{
@@ -1319,7 +1304,7 @@ func TestRequestStream(t *testing.T) {
 			},
 		},
 		{
-			name: "max retries 1, server returns a retry-after response, request body seek error",
+			name: "max retries 1, server returns a retry-after response, non-bytes request, no retry",
 			Request: &Request{
 				body: &readSeeker{err: io.EOF},
 				c: &RESTClient{
@@ -1332,9 +1317,6 @@ func TestRequestStream(t *testing.T) {
 				{response: retryAfterResponse(), err: nil},
 			},
 			Err: true,
-			ErrFn: func(err error) bool {
-				return !apierrors.IsInternalError(err) && strings.Contains(err.Error(), "failed to reset the request body while retrying a request: EOF")
-			},
 		},
 		{
 			name: "max retries 2, server always returns a response with Retry-After header",
@@ -2016,20 +1998,24 @@ func TestBody(t *testing.T) {
 			}
 		}
 
-		if r.body == nil {
+		req, err := r.newHTTPRequest(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.Body == nil {
 			if len(tt.expected) != 0 {
-				t.Errorf("%d: r.body = %q; want %q", i, r.body, tt.expected)
+				t.Errorf("%d: req.Body = %q; want %q", i, req.Body, tt.expected)
 			}
 			continue
 		}
 		buf := make([]byte, len(tt.expected))
-		if _, err := r.body.Read(buf); err != nil {
-			t.Errorf("%d: r.body.Read error: %v", i, err)
+		if _, err := req.Body.Read(buf); err != nil {
+			t.Errorf("%d: req.Body.Read error: %v", i, err)
 			continue
 		}
 		body := string(buf)
 		if body != tt.expected {
-			t.Errorf("%d: r.body = %q; want %q", i, body, tt.expected)
+			t.Errorf("%d: req.Body = %q; want %q", i, body, tt.expected)
 		}
 	}
 }
@@ -2640,6 +2626,7 @@ func TestRequestWithRetry(t *testing.T) {
 	tests := []struct {
 		name                         string
 		body                         io.Reader
+		bodyBytes                    []byte
 		serverReturns                responseErr
 		errExpected                  error
 		errContains                  string
@@ -2647,52 +2634,52 @@ func TestRequestWithRetry(t *testing.T) {
 		roundTripInvokedExpected     int
 	}{
 		{
-			name:                         "server returns retry-after response, request body is not io.Seeker, retry goes ahead",
-			body:                         io.NopCloser(bytes.NewReader([]byte{})),
+			name:                         "server returns retry-after response, no request body, retry goes ahead",
+			bodyBytes:                    nil,
 			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
 			errExpected:                  nil,
 			transformFuncInvokedExpected: 1,
 			roundTripInvokedExpected:     2,
 		},
 		{
-			name:                         "server returns retry-after response, request body Seek returns error, retry aborted",
-			body:                         &readSeeker{err: io.EOF},
-			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
-			errExpected:                  nil,
-			transformFuncInvokedExpected: 0,
-			roundTripInvokedExpected:     1,
-		},
-		{
-			name:                         "server returns retry-after response, request body Seek returns no error, retry goes ahead",
-			body:                         &readSeeker{err: nil},
+			name:                         "server returns retry-after response, bytes request body, retry goes ahead",
+			bodyBytes:                    []byte{},
 			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
 			errExpected:                  nil,
 			transformFuncInvokedExpected: 1,
 			roundTripInvokedExpected:     2,
 		},
 		{
-			name:                         "server returns retryable err, request body is not io.Seek, retry goes ahead",
-			body:                         io.NopCloser(bytes.NewReader([]byte{})),
-			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
-			transformFuncInvokedExpected: 0,
-			roundTripInvokedExpected:     2,
-		},
-		{
-			name:                         "server returns retryable err, request body Seek returns error, retry aborted",
-			body:                         &readSeeker{err: io.EOF},
-			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errContains:                  "failed to reset the request body while retrying a request: EOF",
-			transformFuncInvokedExpected: 0,
+			name:                         "server returns retry-after response, opaque request body, retry aborted",
+			body:                         &readSeeker{},
+			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
+			errExpected:                  nil,
+			transformFuncInvokedExpected: 1,
 			roundTripInvokedExpected:     1,
 		},
 		{
-			name:                         "server returns retryable err, request body Seek returns no err, retry goes ahead",
-			body:                         &readSeeker{err: nil},
+			name:                         "server returns retryable err, no request body, retry goes ahead",
+			bodyBytes:                    nil,
 			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
 			errExpected:                  io.ErrUnexpectedEOF,
 			transformFuncInvokedExpected: 0,
 			roundTripInvokedExpected:     2,
+		},
+		{
+			name:                         "server returns retryable err, bytes request body, retry goes ahead",
+			bodyBytes:                    []byte{},
+			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			errExpected:                  io.ErrUnexpectedEOF,
+			transformFuncInvokedExpected: 0,
+			roundTripInvokedExpected:     2,
+		},
+		{
+			name:                         "server returns retryable err, opaque request body, retry aborted",
+			body:                         &readSeeker{},
+			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			errExpected:                  io.ErrUnexpectedEOF,
+			transformFuncInvokedExpected: 0,
+			roundTripInvokedExpected:     1,
 		},
 	}
 
@@ -2864,7 +2851,8 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 	tests := []struct {
 		name          string
 		verb          string
-		body          func() io.Reader
+		body          io.Reader
+		bodyBytes     []byte
 		maxRetries    int
 		serverReturns []responseErr
 
@@ -2874,7 +2862,7 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 		{
 			name:       "server always returns retry-after response",
 			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			bodyBytes:  []byte{},
 			maxRetries: 2,
 			serverReturns: []responseErr{
 				{response: retryAfterResponse(), err: nil},
@@ -2902,7 +2890,7 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 		{
 			name:       "server always returns retryable error",
 			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			bodyBytes:  []byte{},
 			maxRetries: 2,
 			serverReturns: []responseErr{
 				{response: nil, err: io.EOF},
@@ -2931,7 +2919,7 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 		{
 			name:       "server returns success on the final retry",
 			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			bodyBytes:  []byte{},
 			maxRetries: 2,
 			serverReturns: []responseErr{
 				{response: retryAfterResponse(), err: nil},
@@ -2978,13 +2966,10 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 				return resp, test.serverReturns[attempts].err
 			})
 
-			reqCountGot := newCount()
-			reqRecorder := newReadTracker(reqCountGot)
-			reqRecorder.delegated = test.body()
-
 			req := &Request{
-				verb: test.verb,
-				body: reqRecorder,
+				verb:      test.verb,
+				body:      test.body,
+				bodyBytes: test.bodyBytes,
 				c: &RESTClient{
 					content: defaultContentConfig(),
 					Client:  client,
@@ -3004,9 +2989,6 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 				t.Errorf("Expected retries: %d, but got: %d", expected.attempts, attempts)
 			}
 
-			if !reflect.DeepEqual(expected.reqCount.seeks, reqCountGot.seeks) {
-				t.Errorf("Expected request body to have seek invocation: %v, but got: %v", expected.reqCount.seeks, reqCountGot.seeks)
-			}
 			if expected.respCount.closes != respCountGot.getCloseCount() {
 				t.Errorf("Expected response body Close to be invoked %d times, but got: %d", expected.respCount.closes, respCountGot.getCloseCount())
 			}
@@ -3029,6 +3011,7 @@ type withRateLimiterBackoffManagerAndMetrics struct {
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
+	metrics.RetryMetric
 
 	invokeOrderGot []string
 	sleepsGot      []string
@@ -3061,6 +3044,14 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Increment(ctx context.Context
 	// we are interested in the request context that is marked by this test
 	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
 		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestResult.Increment")
+		lb.statusCodesGot = append(lb.statusCodesGot, code)
+	}
+}
+
+func (lb *withRateLimiterBackoffManagerAndMetrics) IncrementRetry(ctx context.Context, code, _, _ string) {
+	// we are interested in the request context that is marked by this test
+	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
+		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestRetry.IncrementRetry")
 		lb.statusCodesGot = append(lb.statusCodesGot, code)
 	}
 }
@@ -3110,13 +3101,17 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		"Client.Do",
 
 		// it's a success, so do the following:
-		//  - call metrics and update backoff parameters
+		// count the result metric, and since it's a retry,
+		// count the retry metric, and then update backoff parameters.
 		"RequestResult.Increment",
+		"RequestRetry.IncrementRetry",
 		"BackoffManager.UpdateBackoff",
 	}
 	statusCodesWant := []string{
+		// first attempt (A): we count the result metric only
 		"500",
-		"200",
+		// final attempt (B): we count the result metric, and the retry metric
+		"200", "200",
 	}
 
 	tests := []struct {
@@ -3230,10 +3225,13 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 			//  to override as well, and we want tests to be able to run in
 			//  parallel then we will need to provide a way for tests to
 			//  register/deregister their own metric inerfaces.
-			old := metrics.RequestResult
+			oldRequestResult := metrics.RequestResult
+			oldRequestRetry := metrics.RequestRetry
 			metrics.RequestResult = interceptor
+			metrics.RequestRetry = interceptor
 			defer func() {
-				metrics.RequestResult = old
+				metrics.RequestResult = oldRequestResult
+				metrics.RequestRetry = oldRequestRetry
 			}()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -3263,8 +3261,8 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb: "GET",
-				body: bytes.NewReader([]byte{}),
+				verb:      "GET",
+				bodyBytes: []byte{},
 				c: &RESTClient{
 					base:        base,
 					content:     defaultContentConfig(),
@@ -3399,8 +3397,8 @@ func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb: "GET",
-				body: bytes.NewReader([]byte{}),
+				verb:      "GET",
+				bodyBytes: []byte{},
 				c: &RESTClient{
 					base:    base,
 					content: defaultContentConfig(),
@@ -3574,8 +3572,8 @@ func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r 
 				t.Fatalf("Failed to create new HTTP request - %v", err)
 			}
 			req := &Request{
-				verb: "GET",
-				body: bytes.NewReader([]byte{}),
+				verb:      "GET",
+				bodyBytes: []byte{},
 				c: &RESTClient{
 					base:    base,
 					content: defaultContentConfig(),
@@ -3811,103 +3809,265 @@ func TestTransportConcurrency(t *testing.T) {
 	}
 }
 
-// TODO: see if we can consolidate the other trackers into one.
-type requestBodyTracker struct {
-	io.ReadSeeker
-	f func(string)
-}
-
-func (t *requestBodyTracker) Read(p []byte) (int, error) {
-	t.f("Request.Body.Read")
-	return t.ReadSeeker.Read(p)
-}
-
-func (t *requestBodyTracker) Seek(offset int64, whence int) (int64, error) {
-	t.f("Request.Body.Seek")
-	return t.ReadSeeker.Seek(offset, whence)
-}
-
-type responseBodyTracker struct {
-	io.ReadCloser
-	f func(string)
-}
-
-func (t *responseBodyTracker) Read(p []byte) (int, error) {
-	t.f("Response.Body.Read")
-	return t.ReadCloser.Read(p)
-}
-
-func (t *responseBodyTracker) Close() error {
-	t.f("Response.Body.Close")
-	return t.ReadCloser.Close()
-}
-
-type recorder struct {
-	order []string
-}
-
-func (r *recorder) record(call string) {
-	r.order = append(r.order, call)
-}
-
-func TestRequestBodyResetOrder(t *testing.T) {
-	recorder := &recorder{}
-	respBodyTracker := &responseBodyTracker{
-		ReadCloser: nil, // the server will fill it
-		f:          recorder.record,
-	}
-
-	var attempts int
-	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-		defer func() {
-			attempts++
-		}()
-
-		// read the request body.
-		io.ReadAll(req.Body)
-
-		// first attempt, we send a retry-after
-		if attempts == 0 {
-			resp := retryAfterResponse()
-			respBodyTracker.ReadCloser = io.NopCloser(bytes.NewReader([]byte{}))
-			resp.Body = respBodyTracker
-			return resp, nil
+func TestRetryableConditions(t *testing.T) {
+	var (
+		methods = map[string]func(ctx context.Context, r *Request){
+			"Do": func(ctx context.Context, r *Request) {
+				r.Do(ctx)
+			},
+			"DoRaw": func(ctx context.Context, r *Request) {
+				r.DoRaw(ctx)
+			},
+			"Stream": func(ctx context.Context, r *Request) {
+				r.Stream(ctx)
+			},
+			"Watch": func(ctx context.Context, r *Request) {
+				w, err := r.Watch(ctx)
+				if err == nil {
+					// we need to wait here to avoid race condition.
+					<-w.ResultChan()
+				}
+			},
 		}
 
-		return &http.Response{StatusCode: http.StatusOK}, nil
+		alwaysRetry = map[string]bool{
+			"Do":     true,
+			"DoRaw":  true,
+			"Watch":  true,
+			"Stream": true,
+		}
+
+		neverRetry = map[string]bool{
+			"Do":     false,
+			"DoRaw":  false,
+			"Watch":  false,
+			"Stream": false,
+		}
+
+		alwaysRetryExceptStream = map[string]bool{
+			"Do":     true,
+			"DoRaw":  true,
+			"Watch":  true,
+			"Stream": false,
+		}
+	)
+
+	tests := []struct {
+		name             string
+		verbs            []string
+		serverReturns    responseErr
+		retryExpectation map[string]bool
+	}{
+		// {429, Retry-After: N} - we expect retry
+		{
+			name:             "server returns {429, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusTooManyRequests, "0"), err: nil},
+			retryExpectation: alwaysRetry,
+		},
+		// {5xx, Retry-After: N} - we expect retry
+		{
+			name:             "server returns {503, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusServiceUnavailable, "0"), err: nil},
+			retryExpectation: alwaysRetry,
+		},
+		// 5xx, but Retry-After: N is missing - no retry is expected
+		{
+			name:             "server returns 5xx, but no Retry-After",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusInternalServerError}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		// 429, but Retry-After: N is missing - no retry is expected
+		{
+			name:             "server returns 429 but no Retry-After",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusTooManyRequests}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		// response is nil, but error is set
+		{
+			name:             "server returns connection reset error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNRESET},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns EOF error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: io.EOF},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns unexpected EOF error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns broken connection error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("http: can't write HTTP request on broken connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns GOAWAY error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("http2: server sent GOAWAY and closed the connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns connection reset by peer error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("connection reset by peer")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns use of closed network connection error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("use of closed network connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		// connection refused error never gets retried
+		{
+			name:             "server returns connection refused error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:             "server returns connection refused error",
+			verbs:            []string{"POST"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:          "server returns EOF error",
+			verbs:         []string{"POST"},
+			serverReturns: responseErr{response: nil, err: io.EOF},
+			retryExpectation: map[string]bool{
+				"Do":     false,
+				"DoRaw":  false,
+				"Watch":  true, // not applicable, Watch should always be GET only
+				"Stream": false,
+			},
+		},
+		// Timeout error gets retries by watch only
+		{
+			name:          "server returns net.Timeout() == true error",
+			verbs:         []string{"GET"},
+			serverReturns: responseErr{response: nil, err: &net.DNSError{IsTimeout: true}},
+			retryExpectation: map[string]bool{
+				"Do":     false,
+				"DoRaw":  false,
+				"Watch":  true,
+				"Stream": false,
+			},
+		},
+		{
+			name:             "server returns OK, never retry",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:             "server returns {3xx, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusMovedPermanently, Header: http.Header{"Retry-After": []string{"0"}}}, err: nil},
+			retryExpectation: neverRetry,
+		},
+	}
+
+	for _, test := range tests {
+		for method, retryExpected := range test.retryExpectation {
+			fn, ok := methods[method]
+			if !ok {
+				t.Fatalf("Wrong test setup, unknown method: %s", method)
+			}
+
+			for _, verb := range test.verbs {
+				t.Run(fmt.Sprintf("%s/%s/%s", test.name, method, verb), func(t *testing.T) {
+					var attemptsGot int
+					client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+						attemptsGot++
+						return test.serverReturns.response, test.serverReturns.err
+					})
+
+					u, _ := url.Parse("http://localhost:123" + "/apis")
+					req := &Request{
+						verb: verb,
+						c: &RESTClient{
+							base:    u,
+							content: defaultContentConfig(),
+							Client:  client,
+						},
+						backoff:    &noSleepBackOff{},
+						maxRetries: 2,
+						retryFn:    defaultRequestRetryFn,
+					}
+
+					fn(context.Background(), req)
+
+					if retryExpected {
+						if attemptsGot != 3 {
+							t.Errorf("Expected attempt count: %d, but got: %d", 3, attemptsGot)
+						}
+						return
+					}
+					// we don't expect retry, so we should see the first attempt only.
+					if attemptsGot > 1 {
+						t.Errorf("Expected no retry, but got %d attempts", attemptsGot)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestRequestConcurrencyWithRetry(t *testing.T) {
+	var attempts int32
+	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+		defer func() {
+			atomic.AddInt32(&attempts, 1)
+		}()
+
+		// always send a retry-after response
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Header:     http.Header{"Retry-After": []string{"1"}},
+		}, nil
 	})
 
-	reqBodyTracker := &requestBodyTracker{
-		ReadSeeker: bytes.NewReader([]byte{}), // empty body ensures one Read operation at most.
-		f:          recorder.record,
-	}
 	req := &Request{
 		verb: "POST",
-		body: reqBodyTracker,
 		c: &RESTClient{
 			content: defaultContentConfig(),
 			Client:  client,
 		},
 		backoff:    &noSleepBackOff{},
-		maxRetries: 1,
+		maxRetries: 9, // 10 attempts in total, including the first
 		retryFn:    defaultRequestRetryFn,
 	}
 
-	req.Do(context.Background())
-
-	expected := []string{
-		// 1st attempt: the server handler reads the request body
-		"Request.Body.Read",
-		// the server sends a retry-after, client reads the
-		// response body, and closes it
-		"Response.Body.Read",
-		"Response.Body.Close",
-		// client retry logic seeks to the beginning of the request body
-		"Request.Body.Seek",
-		// 2nd attempt: the server reads the request body
-		"Request.Body.Read",
+	concurrency := 20
+	wg := sync.WaitGroup{}
+	wg.Add(concurrency)
+	startCh := make(chan struct{})
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			<-startCh
+			req.Do(context.Background())
+		}()
 	}
-	if !reflect.DeepEqual(expected, recorder.order) {
-		t.Errorf("Expected invocation request and response body operations for retry do not match: %s", cmp.Diff(expected, recorder.order))
+
+	close(startCh)
+	wg.Wait()
+
+	// we expect (concurrency*req.maxRetries+1) attempts to be recorded
+	expected := concurrency * (req.maxRetries + 1)
+	if atomic.LoadInt32(&attempts) != int32(expected) {
+		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
 	}
 }

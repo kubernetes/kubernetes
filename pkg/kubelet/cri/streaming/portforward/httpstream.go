@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -240,6 +241,7 @@ Loop:
 // portForward invokes the httpStreamHandler's forwarder.PortForward
 // function for the given stream pair.
 func (h *httpStreamHandler) portForward(p *httpStreamPair) {
+	ctx := context.Background()
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
@@ -247,7 +249,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
+	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
 	if err != nil {

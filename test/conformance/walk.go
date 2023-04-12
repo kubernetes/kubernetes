@@ -58,7 +58,7 @@ var (
 	confDoc = flag.Bool("docs", false, "write a conformance document")
 	version = flag.String("version", "v1.9", "version of this conformance document")
 
-	// If a test name contains any of these tags, it is ineligble for promotion to conformance
+	// If a test name contains any of these tags, it is ineligible for promotion to conformance
 	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Feature:[^\]]+|Flaky)\]`)
 
 	// Conformance comments should be within this number of lines to the call itself.

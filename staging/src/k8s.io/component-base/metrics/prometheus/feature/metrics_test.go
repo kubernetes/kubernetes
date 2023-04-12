@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	testedMetrics = []string{"kubernetes_feature_info"}
+	testedMetrics = []string{"kubernetes_feature_enabled"}
 )
 
 func TestObserveHealthcheck(t *testing.T) {
@@ -46,9 +46,9 @@ func TestObserveHealthcheck(t *testing.T) {
 			stage:   "ALPHA",
 			enabled: true,
 			want: `
-       	# HELP kubernetes_feature_info [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
-        # TYPE kubernetes_feature_info gauge
-        kubernetes_feature_info{enabled="true",name="feature-a",stage="ALPHA"} 1
+       	# HELP kubernetes_feature_enabled [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+        # TYPE kubernetes_feature_enabled gauge
+        kubernetes_feature_enabled{name="feature-a",stage="ALPHA"} 1
 `,
 		},
 		{
@@ -57,9 +57,9 @@ func TestObserveHealthcheck(t *testing.T) {
 			stage:   "BETA",
 			enabled: false,
 			want: `
-       	# HELP kubernetes_feature_info [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
-        # TYPE kubernetes_feature_info gauge
-        kubernetes_feature_info{enabled="false",name="feature-b",stage="BETA"} 1
+       	# HELP kubernetes_feature_enabled [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+        # TYPE kubernetes_feature_enabled gauge
+        kubernetes_feature_enabled{name="feature-b",stage="BETA"} 0
 `,
 		},
 	}

@@ -41,7 +41,10 @@ import (
 )
 
 var (
-	fetchEvent = func(recorder *record.FakeRecorder) string {
+	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
+	testHostNameserver = "8.8.8.8"
+	testHostDomain     = "host.domain"
+	fetchEvent         = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -91,7 +94,11 @@ func TestParseResolvConf(t *testing.T) {
 		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}, []string{}, false},
 		{"options ", []string{}, []string{}, []string{}, false},
 		{"options ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}, false},
+		{"options ndots:1 ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}, false},
+		{"options ndots:1 edns0 attempts:2 single-request-reopen", []string{}, []string{}, []string{"edns0", "attempts:2", "single-request-reopen", "ndots:1"}, false},
 		{"options ndots:1\noptions ndots:5 attempts:3", []string{}, []string{}, []string{"ndots:5", "attempts:3"}, false},
+		{"options ndots:1 timeout:3 timeout:1 attempts:3\noptions ndots:5", []string{}, []string{}, []string{"ndots:5", "timeout:1", "attempts:3"}, false},
+		{"options ndots:1 attempts:3\noptions ndots:1 attempts:3 ndots:5", []string{}, []string{}, []string{"ndots:5", "attempts:3"}, false},
 		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},
 	}
 	for i, tc := range testCases {
@@ -100,7 +107,7 @@ func TestParseResolvConf(t *testing.T) {
 			require.NoError(t, err)
 			assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
 			assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
-			assert.EqualValues(t, tc.options, opts, "test case [%d] options", i)
+			assert.EqualValues(t, sets.NewString(tc.options...), sets.NewString(opts...), "test case [%d] options", i)
 		} else {
 			require.Error(t, err, "tc.searches %v", tc.searches)
 		}
@@ -529,8 +536,8 @@ func testGetPodDNS(t *testing.T) {
 		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
 	}
 
-	testResolverConfig := "/etc/resolv.conf"
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
+	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -587,8 +594,6 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
-	testHostNameserver := "8.8.8.8"
-	testHostDomain := "host.domain"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

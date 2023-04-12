@@ -18,6 +18,7 @@ package ttrpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math/rand"
 	"net"
@@ -25,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

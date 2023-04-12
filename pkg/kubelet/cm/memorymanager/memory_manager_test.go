@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -121,7 +122,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -1981,7 +1982,7 @@ func TestNewManager(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			stateFileDirectory, err := os.MkdirTemp("/tmp/", "memory_manager_tests")
+			stateFileDirectory, err := os.MkdirTemp("", "memory_manager_tests")
 			if err != nil {
 				t.Errorf("Cannot create state file: %s", err.Error())
 			}
@@ -2436,7 +2437,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "test name", testCase.description)
+			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(testCase),
 				state:        state.NewMemoryState(),

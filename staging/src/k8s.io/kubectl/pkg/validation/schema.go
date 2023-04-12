@@ -26,7 +26,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog/v2"
-	schemavalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 )
 
 // Schema is an interface that knows how to validate an API object serialized to a byte array.
@@ -127,12 +126,12 @@ type paramVerifyingSchema struct {
 
 // ValidateBytes validates bytes per a ParamVerifyingSchema
 func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
-	obj, err := schemavalidation.Parse(data)
+	obj, err := parse(data)
 	if err != nil {
 		return err
 	}
 
-	gvk, errs := schemavalidation.GetObjectKind(obj)
+	gvk, errs := getObjectKind(obj)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}

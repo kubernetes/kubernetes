@@ -146,6 +146,7 @@ func TestMetrics(t *testing.T) {
 					close(done)
 				}),
 				tt.apiAudience,
+				nil,
 			)
 
 			auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})

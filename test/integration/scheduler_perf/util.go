@@ -75,7 +75,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
@@ -85,6 +85,12 @@ func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration)
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
 		},
 	})
+	b.Cleanup(tearDownFn)
+
+	// Cleanup will be in reverse order: first the clients get cancelled,
+	// then the apiserver is torn down.
+	ctx, cancel := context.WithCancel(ctx)
+	b.Cleanup(cancel)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -97,7 +103,7 @@ func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration)
 		var err error
 		config, err = newDefaultComponentConfig()
 		if err != nil {
-			klog.Fatalf("Error creating default component config: %v", err)
+			b.Fatalf("Error creating default component config: %v", err)
 		}
 	}
 
@@ -106,16 +112,10 @@ func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, podInformer, schedulerShutdown := util.StartScheduler(client, cfg, config)
-	fakePVControllerShutdown := util.StartFakePVController(client)
+	_, podInformer := util.StartScheduler(ctx, client, cfg, config)
+	util.StartFakePVController(ctx, client)
 
-	shutdownFn := func() {
-		fakePVControllerShutdown()
-		schedulerShutdown()
-		tearDownFn()
-	}
-
-	return shutdownFn, podInformer, client, dynClient
+	return podInformer, client, dynClient
 }
 
 // Returns the list of scheduled pods in the specified namespaces.
@@ -126,7 +126,7 @@ func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...strin
 		return nil, err
 	}
 
-	s := sets.NewString(namespaces...)
+	s := sets.New(namespaces...)
 	scheduled := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]

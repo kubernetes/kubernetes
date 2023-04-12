@@ -17,6 +17,8 @@ limitations under the License.
 package metrics
 
 import (
+	"time"
+
 	"k8s.io/component-base/metrics"
 )
 
@@ -56,6 +58,13 @@ func NewBackoffPodsRecorder() *PendingPodsRecorder {
 	}
 }
 
+// NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
+func NewGatedPodsRecorder() *PendingPodsRecorder {
+	return &PendingPodsRecorder{
+		recorder: GatedPods(),
+	}
+}
+
 // Inc increases a metric counter by 1, in an atomic way
 func (r *PendingPodsRecorder) Inc() {
 	r.recorder.Inc()
@@ -69,4 +78,80 @@ func (r *PendingPodsRecorder) Dec() {
 // Clear set a metric counter to 0, in an atomic way
 func (r *PendingPodsRecorder) Clear() {
 	r.recorder.Set(float64(0))
+}
+
+// metric is the data structure passed in the buffer channel between the main framework thread
+// and the metricsRecorder goroutine.
+type metric struct {
+	metric      *metrics.HistogramVec
+	labelValues []string
+	value       float64
+}
+
+// MetricAsyncRecorder records metric in a separate goroutine to avoid overhead in the critical path.
+type MetricAsyncRecorder struct {
+	// bufferCh is a channel that serves as a metrics buffer before the metricsRecorder goroutine reports it.
+	bufferCh chan *metric
+	// if bufferSize is reached, incoming metrics will be discarded.
+	bufferSize int
+	// how often the recorder runs to flush the metrics.
+	interval time.Duration
+
+	// stopCh is used to stop the goroutine which periodically flushes metrics.
+	stopCh <-chan struct{}
+	// IsStoppedCh indicates whether the goroutine is stopped. It's used in tests only to make sure
+	// the metric flushing goroutine is stopped so that tests can collect metrics for verification.
+	IsStoppedCh chan struct{}
+}
+
+func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
+	recorder := &MetricAsyncRecorder{
+		bufferCh:    make(chan *metric, bufferSize),
+		bufferSize:  bufferSize,
+		interval:    interval,
+		stopCh:      stopCh,
+		IsStoppedCh: make(chan struct{}),
+	}
+	go recorder.run()
+	return recorder
+}
+
+// ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.
+// The metric will be flushed to Prometheus asynchronously.
+func (r *MetricAsyncRecorder) ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64) {
+	newMetric := &metric{
+		metric:      PluginExecutionDuration,
+		labelValues: []string{pluginName, extensionPoint, status},
+		value:       value,
+	}
+	select {
+	case r.bufferCh <- newMetric:
+	default:
+	}
+}
+
+// run flushes buffered metrics into Prometheus every second.
+func (r *MetricAsyncRecorder) run() {
+	for {
+		select {
+		case <-r.stopCh:
+			close(r.IsStoppedCh)
+			return
+		default:
+		}
+		r.FlushMetrics()
+		time.Sleep(r.interval)
+	}
+}
+
+// FlushMetrics tries to clean up the bufferCh by reading at most bufferSize metrics.
+func (r *MetricAsyncRecorder) FlushMetrics() {
+	for i := 0; i < r.bufferSize; i++ {
+		select {
+		case m := <-r.bufferCh:
+			m.metric.WithLabelValues(m.labelValues...).Observe(m.value)
+		default:
+			return
+		}
+	}
 }

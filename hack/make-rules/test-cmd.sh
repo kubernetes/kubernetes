@@ -62,7 +62,7 @@ function run_kube_apiserver() {
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
 
   # Enable features
-  ENABLE_FEATURE_GATES="ServerSideApply=true"
+  ENABLE_FEATURE_GATES=""
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --bind-address="127.0.0.1" \

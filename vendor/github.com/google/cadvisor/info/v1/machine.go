@@ -44,6 +44,7 @@ type Node struct {
 	HugePages []HugePagesInfo `json:"hugepages"`
 	Cores     []Core          `json:"cores"`
 	Caches    []Cache         `json:"caches"`
+	Distances []uint64        `json:"distances"`
 }
 
 type Core struct {
@@ -195,6 +196,9 @@ type MachineInfo struct {
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
+
+	// The amount of swap (in bytes) in this machine
+	SwapCapacity uint64 `json:"swap_capacity"`
 
 	// Memory capacity and number of DIMMs by memory type
 	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`

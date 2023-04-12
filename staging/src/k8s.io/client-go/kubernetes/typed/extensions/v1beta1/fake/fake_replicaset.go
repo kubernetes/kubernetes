@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
@@ -39,9 +38,9 @@ type FakeReplicaSets struct {
 	ns   string
 }
 
-var replicasetsResource = schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}
+var replicasetsResource = v1beta1.SchemeGroupVersion.WithResource("replicasets")
 
-var replicasetsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}
+var replicasetsKind = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
 func (c *FakeReplicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {

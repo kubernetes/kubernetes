@@ -19,7 +19,8 @@ package edit
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -70,7 +71,7 @@ var (
 )
 
 // NewCmdEdit creates the `edit` command
-func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdEdit(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "edit (RESOURCE/NAME | -f FILENAME)",

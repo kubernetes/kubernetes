@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -24,18 +26,26 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	appconfig "k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
+	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	componentbaseconfig "k8s.io/component-base/config"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	netutils "k8s.io/utils/net"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultFlags(t *testing.T) {
-	s, _ := NewCloudControllerManagerOptions()
+	s, err := NewCloudControllerManagerOptions()
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
@@ -43,6 +53,7 @@ func TestDefaultFlags(t *testing.T) {
 				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  "",
 					ContentType: "application/vnd.kubernetes.protobuf",
 					QPS:         20.0,
 					Burst:       30,
@@ -84,9 +95,25 @@ func TestDefaultFlags(t *testing.T) {
 				},
 			},
 		},
+		NodeController: &NodeControllerOptions{
+			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs: 1,
+			},
+		},
 		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
+			},
+		},
+		Webhook: &WebhookOptions{},
+		WebhookServing: &WebhookServingOptions{
+			SecureServingOptions: &apiserveroptions.SecureServingOptions{
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "",
+					PairName:      "cloud-controller-manager-webhook",
+				},
+				BindPort:    10260,
+				BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -119,7 +146,6 @@ func TestDefaultFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Kubeconfig:                "",
 		Master:                    "",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
@@ -130,12 +156,13 @@ func TestDefaultFlags(t *testing.T) {
 
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+
 	s, err := NewCloudControllerManagerOptions()
 	if err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
 
-	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}, []string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -169,6 +196,8 @@ func TestAddFlags(t *testing.T) {
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
+		"--concurrent-node-syncs=5",
+		"--webhooks=foo,bar,-baz",
 	}
 	err = fs.Parse(args)
 	if err != nil {
@@ -181,6 +210,7 @@ func TestAddFlags(t *testing.T) {
 				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  "/kubeconfig",
 					ContentType: "application/vnd.kubernetes.protobuf",
 					QPS:         50.0,
 					Burst:       100,
@@ -222,9 +252,27 @@ func TestAddFlags(t *testing.T) {
 				},
 			},
 		},
+		NodeController: &NodeControllerOptions{
+			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
+				ConcurrentNodeSyncs: 5,
+			},
+		},
 		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
+			},
+		},
+		Webhook: &WebhookOptions{
+			Webhooks: []string{"foo", "bar", "-baz"},
+		},
+		WebhookServing: &WebhookServingOptions{
+			SecureServingOptions: &apiserveroptions.SecureServingOptions{
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "",
+					PairName:      "cloud-controller-manager-webhook",
+				},
+				BindPort:    10260,
+				BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -257,11 +305,145 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{},
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Kubeconfig:                "/kubeconfig",
 		Master:                    "192.168.4.20",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+	}
+}
+
+func TestCreateConfig(t *testing.T) {
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+
+	s, err := NewCloudControllerManagerOptions()
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+
+	for _, f := range s.Flags([]string{""}, []string{""}, []string{""}, []string{""}).FlagSets {
+		fs.AddFlagSet(f)
+	}
+
+	tmpdir, err := os.MkdirTemp("", "options_test")
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	args := []string{
+		"--webhooks=foo,bar,-baz",
+		"--allocate-node-cidrs=true",
+		"--authorization-always-allow-paths=",
+		"--bind-address=0.0.0.0",
+		"--secure-port=10200",
+		fmt.Sprintf("--cert-dir=%s/certs", tmpdir),
+		"--cloud-provider=aws",
+		"--cluster-cidr=1.2.3.4/24",
+		"--cluster-name=k8s",
+		"--configure-cloud-routes=false",
+		"--contention-profiling=true",
+		"--controller-start-interval=2m",
+		"--controllers=foo,bar",
+		"--concurrent-node-syncs=1",
+		"--http2-max-streams-per-connection=47",
+		"--kube-api-burst=101",
+		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
+		"--kube-api-qps=50.0",
+		"--leader-elect=false",
+		"--leader-elect-lease-duration=30s",
+		"--leader-elect-renew-deadline=15s",
+		"--leader-elect-resource-lock=configmap",
+		"--leader-elect-retry-period=5s",
+		"--master=192.168.4.20",
+		"--min-resync-period=100m",
+		"--node-status-update-frequency=10m",
+		"--profiling=false",
+		"--route-reconciliation-period=30s",
+		"--use-service-account-credentials=false",
+		"--webhook-bind-address=0.0.0.0",
+		"--webhook-secure-port=10300",
+	}
+	err = fs.Parse(args)
+	assert.Nil(t, err, "unexpected error: %s", err)
+
+	fs.VisitAll(func(f *pflag.Flag) {
+		fmt.Printf("%s: %s\n", f.Name, f.Value)
+	})
+
+	c, err := s.Config([]string{"foo", "bar"}, []string{}, []string{"foo", "bar", "baz"}, []string{})
+	assert.Nil(t, err, "unexpected error: %s", err)
+
+	expected := &appconfig.Config{
+		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
+			Generic: cmconfig.GenericControllerManagerConfiguration{
+				Address:         "0.0.0.0",
+				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					ContentType: "application/vnd.kubernetes.protobuf",
+					QPS:         50.0,
+					Burst:       101,
+				},
+				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					ResourceLock:      "configmap",
+					LeaderElect:       false,
+					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+					ResourceName:      "cloud-controller-manager",
+					ResourceNamespace: "kube-system",
+				},
+				Controllers: []string{"foo", "bar"},
+				Debugging: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           false,
+					EnableContentionProfiling: true,
+				},
+				LeaderMigration: cmconfig.LeaderMigrationConfiguration{},
+			},
+			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
+				CloudProvider: cpconfig.CloudProviderConfiguration{
+					Name:            "aws",
+					CloudConfigFile: "",
+				},
+			},
+			ServiceController: serviceconfig.ServiceControllerConfiguration{
+				ConcurrentServiceSyncs: 1,
+			},
+			NodeController:            nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 1},
+			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
+			Webhook: cpconfig.WebhookConfiguration{
+				Webhooks: []string{"foo", "bar", "-baz"},
+			},
+		},
+		SecureServing:        nil,
+		WebhookSecureServing: nil,
+		Authentication:       apiserver.AuthenticationInfo{},
+		Authorization:        apiserver.AuthorizationInfo{},
+	}
+
+	// Don't check
+	c.SecureServing = nil
+	c.WebhookSecureServing = nil
+	c.Authentication = apiserver.AuthenticationInfo{}
+	c.Authorization = apiserver.AuthorizationInfo{}
+	c.SharedInformers = nil
+	c.VersionedClient = nil
+	c.ClientBuilder = nil
+	c.EventRecorder = nil
+	c.EventBroadcaster = nil
+	c.Kubeconfig = nil
+	c.Client = nil
+	c.LoopbackClientConfig = nil
+
+	if !reflect.DeepEqual(expected, c) {
+		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, c))
 	}
 }

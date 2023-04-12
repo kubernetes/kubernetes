@@ -261,6 +261,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
+	if in.TopologyManagerPolicyOptions != nil {
+		in, out := &in.TopologyManagerPolicyOptions, &out.TopologyManagerPolicyOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.QOSReserved != nil {
 		in, out := &in.QOSReserved, &out.QOSReserved
 		*out = make(map[string]string, len(*in))
@@ -302,6 +309,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	if in.SerializeImagePulls != nil {
 		in, out := &in.SerializeImagePulls, &out.SerializeImagePulls
 		*out = new(bool)
+		**out = **in
+	}
+	if in.MaxParallelImagePulls != nil {
+		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls
+		*out = new(int32)
 		**out = **in
 	}
 	if in.EvictionHard != nil {
@@ -398,6 +410,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnableSystemLogQuery != nil {
+		in, out := &in.EnableSystemLogQuery, &out.EnableSystemLogQuery
 		*out = new(bool)
 		**out = **in
 	}

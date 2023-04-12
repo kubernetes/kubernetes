@@ -29,13 +29,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -384,7 +384,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"file_mode=0777"},
-			fsGroup: to.Int64Ptr(0),
+			fsGroup: pointer.Int64(0),
 			expected: []string{"file_mode=0777",
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				fmt.Sprintf("%s=%s", vers, defaultVers),
@@ -395,7 +395,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"vers=2.1"},
-			fsGroup: to.Int64Ptr(1000),
+			fsGroup: pointer.Int64(1000),
 			expected: []string{"vers=2.1",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
@@ -424,7 +424,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"gid=2000"},
-			fsGroup: to.Int64Ptr(1000),
+			fsGroup: pointer.Int64(1000),
 			expected: []string{"gid=2000",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),

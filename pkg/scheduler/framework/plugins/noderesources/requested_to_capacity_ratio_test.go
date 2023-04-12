@@ -36,11 +36,6 @@ import (
 )
 
 func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
-	defaultResources := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-	}
-
 	shape := []config.UtilizationShapePoint{
 		{Utilization: 0, Score: 10},
 		{Utilization: 100, Score: 0},
@@ -134,9 +129,13 @@ func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}
@@ -208,7 +207,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
-				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%f", test.points, assertion.p)
+				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
 			}
 		})
 	}
@@ -326,9 +325,13 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
+				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: n.Name, Score: score})
 			}
@@ -547,11 +550,16 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
+			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+			if !status.IsSuccess() {
+				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+			}
+
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}

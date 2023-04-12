@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -60,9 +60,9 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 		if exists {
 			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
 			if quantity.Cmp(limitQuantity) != 0 && !v1helper.IsOvercommitAllowed(resourceName) {
-				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s limit", resourceName)))
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s limit of %s", resourceName, limitQuantity.String())))
 			} else if quantity.Cmp(limitQuantity) > 0 {
-				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit of %s", resourceName, limitQuantity.String())))
 			}
 		}
 	}

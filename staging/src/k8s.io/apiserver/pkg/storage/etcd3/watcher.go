@@ -18,13 +18,15 @@ package etcd3
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +38,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	"k8s.io/klog/v2"
 )
 
@@ -47,16 +50,6 @@ const (
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
 var fatalOnDecodeError = false
-
-// errTestingDecode is the only error that testingDeferOnDecodeError catches during a panic
-var errTestingDecode = errors.New("sentinel error only used during testing to indicate watch decoding error")
-
-// testingDeferOnDecodeError is used during testing to recover from a panic caused by errTestingDecode, all other values continue to panic
-func testingDeferOnDecodeError() {
-	if r := recover(); r != nil && r != errTestingDecode {
-		panic(r)
-	}
-}
 
 func init() {
 	// check to see if we are running in a test environment
@@ -76,12 +69,12 @@ type watcher struct {
 	objectType    string
 	groupResource schema.GroupResource
 	versioner     storage.Versioner
-	transformer   value.Transformer
 }
 
 // watchChan implements watch.Interface.
 type watchChan struct {
 	watcher           *watcher
+	transformer       value.Transformer
 	key               string
 	initialRev        int64
 	recursive         bool
@@ -94,14 +87,13 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner) *watcher {
 	res := &watcher{
 		client:        client,
 		codec:         codec,
 		groupResource: groupResource,
 		newFunc:       newFunc,
 		versioner:     versioner,
-		transformer:   transformer,
 	}
 	if newFunc == nil {
 		res.objectType = "<unknown>"
@@ -118,11 +110,11 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource sche
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // pred must be non-nil. Only if pred matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, pred)
+	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, transformer, pred)
 	go wc.run()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -135,9 +127,10 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, p
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
+		transformer:       transformer,
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
@@ -163,6 +156,31 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 	return wc
 }
 
+type etcdError interface {
+	Code() grpccodes.Code
+	Error() string
+}
+
+type grpcError interface {
+	GRPCStatus() *grpcstatus.Status
+}
+
+func isCancelError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err == context.Canceled {
+		return true
+	}
+	if etcdErr, ok := err.(etcdError); ok && etcdErr.Code() == grpccodes.Canceled {
+		return true
+	}
+	if grpcErr, ok := err.(grpcError); ok && grpcErr.GRPCStatus().Code() == grpccodes.Canceled {
+		return true
+	}
+	return false
+}
+
 func (wc *watchChan) run() {
 	watchClosedCh := make(chan struct{})
 	go wc.startWatching(watchClosedCh)
@@ -173,7 +191,7 @@ func (wc *watchChan) run() {
 
 	select {
 	case err := <-wc.errChan:
-		if err == context.Canceled {
+		if isCancelError(err) {
 			break
 		}
 		errResult := transformErrorToEvent(err)
@@ -224,12 +242,15 @@ func (wc *watchChan) sync() error {
 	return nil
 }
 
-// logWatchChannelErr checks whether the error is about mvcc revision compaction which is regarded as warning
 func logWatchChannelErr(err error) {
-	if !strings.Contains(err.Error(), "mvcc: required revision has been compacted") {
-		klog.Errorf("watch chan error: %v", err)
-	} else {
+	switch {
+	case strings.Contains(err.Error(), "mvcc: required revision has been compacted"):
+		// mvcc revision compaction which is regarded as warning, not error
 		klog.Warningf("watch chan error: %v", err)
+	case isCancelError(err):
+		// expected when watches close, no need to log
+	default:
+		klog.Errorf("watch chan error: %v", err)
 	}
 }
 
@@ -267,6 +288,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		}
 
 		for _, e := range wres.Events {
+			metrics.RecordEtcdEvent(wc.watcher.groupResource.String())
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
 				logWatchChannelErr(err)
@@ -429,7 +451,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
+		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -444,7 +466,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -462,9 +484,6 @@ func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, re
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
 		if fatalOnDecodeError {
-			// catch watch decode error iff we caused it on
-			// purpose during a unit test
-			defer testingDeferOnDecodeError()
 			// we are running in a test environment and thus an
 			// error here is due to a coder mistake if the defer
 			// does not catch it

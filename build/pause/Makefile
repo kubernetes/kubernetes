@@ -17,15 +17,15 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.8
+TAG ?= 3.9
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 20H2, ltsc2022
-OSVERSION ?= 1809 20H2 ltsc2022
+# OS Version for the Windows images: 1809, ltsc2022
+OSVERSION ?= 1809 ltsc2022
 
 # The output type could either be docker (local), or registry.
 # If it is registry, it will also allow us to push the Windows images.
@@ -35,7 +35,7 @@ ALL_OS = linux windows
 ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
-ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
+ALL_OSVERSIONS.windows := 1809 ltsc2022
 ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-$(arch)-${osversion}))
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
@@ -89,7 +89,7 @@ push-manifest:
 	# to the kernel version for that OS release (ex: 20348 for Windows Server 2022). This is needed to fetch the servicing revision from the
 	# pause base image manifest (which containers an entry for each Windows Server version) so we can add the approrite 'os.version'
 	# field to the pause image manifest.
-	declare -A tagToKernelVersionMap=( ['1809']='17763' ['20H2']='19042' ['ltsc2022']='20348' );\
+	declare -A tagToKernelVersionMap=( ['1809']='17763' ['ltsc2022']='20348' );\
 	for arch in $(ALL_ARCH.windows);  do \
 		for osversion in ${ALL_OSVERSIONS.windows}; do \
 			full_version=`docker manifest inspect ${BASE.windows} | grep "10.0.$${tagToKernelVersionMap[$$osversion]}" | head -n 1 | awk -F\" '{print $$4}'` || true; \

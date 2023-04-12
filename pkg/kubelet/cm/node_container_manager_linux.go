@@ -155,7 +155,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		Name:               cName,
 		ResourceParameters: rp,
 	}
-	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CpuShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
+	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CPUShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
 	if err := cgroupManager.Validate(cgroupConfig.Name); err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	if q, exists := rl[v1.ResourceCPU]; exists {
 		// CPU is defined in milli-cores.
 		val := MilliCPUToShares(q.MilliValue())
-		rc.CpuShares = &val
+		rc.CPUShares = &val
 	}
 	if q, exists := rl[pidlimit.PIDs]; exists {
 		val := q.Value()

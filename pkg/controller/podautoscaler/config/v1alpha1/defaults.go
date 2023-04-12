@@ -34,6 +34,9 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultHPAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.HPAControllerConfiguration) {
 	zero := metav1.Duration{}
+	if obj.ConcurrentHorizontalPodAutoscalerSyncs == 0 {
+		obj.ConcurrentHorizontalPodAutoscalerSyncs = 5
+	}
 	if obj.HorizontalPodAutoscalerSyncPeriod == zero {
 		obj.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}

@@ -18,12 +18,16 @@ package auth
 
 import (
 	"bytes"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	authfake "k8s.io/client-go/kubernetes/fake"
@@ -34,12 +38,14 @@ import (
 
 func TestWhoAmIRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		o         *WhoAmIOptions
-		args      []string
-		allowed   bool
-		serverErr error
+		name          string
+		o             *WhoAmIOptions
+		args          []string
+		serverErr     error
+		alphaDisabled bool
+		betaDisabled  bool
 
+		expectedError       error
 		expectedBodyStrings []string
 	}{
 		{
@@ -64,6 +70,116 @@ func TestWhoAmIRun(t *testing.T) {
 				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
 			},
 			args: []string{},
+			expectedBodyStrings: []string{
+				`{
+    "kind": "SelfSubjectReview",
+    "apiVersion": "authentication.k8s.io/v1beta1",
+    "metadata": {
+        "creationTimestamp": null
+    },
+    "status": {
+        "userInfo": {
+            "username": "jane.doe",
+            "uid": "uniq-id",
+            "groups": [
+                "students",
+                "teachers"
+            ],
+            "extra": {
+                "skills": [
+                    "reading",
+                    "learning"
+                ],
+                "subjects": [
+                    "math",
+                    "sports"
+                ]
+            }
+        }
+    }
+}
+`,
+			},
+		},
+		{
+			name: "success test no alpha",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:          []string{},
+			alphaDisabled: true,
+			expectedBodyStrings: []string{
+				`ATTRIBUTE         VALUE`,
+				`Username          jane.doe`,
+				`UID               uniq-id`,
+				`Groups            [students teachers]`,
+				`Extra: skills     [reading learning]`,
+				`Extra: subjects   [math sports]`,
+				``,
+			},
+		},
+		{
+			name: "JSON test no alpha",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
+			},
+			args:          []string{},
+			alphaDisabled: true,
+			expectedBodyStrings: []string{
+				`{
+    "kind": "SelfSubjectReview",
+    "apiVersion": "authentication.k8s.io/v1beta1",
+    "metadata": {
+        "creationTimestamp": null
+    },
+    "status": {
+        "userInfo": {
+            "username": "jane.doe",
+            "uid": "uniq-id",
+            "groups": [
+                "students",
+                "teachers"
+            ],
+            "extra": {
+                "skills": [
+                    "reading",
+                    "learning"
+                ],
+                "subjects": [
+                    "math",
+                    "sports"
+                ]
+            }
+        }
+    }
+}
+`,
+			},
+		},
+		{
+			name: "success test no beta",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:         []string{},
+			betaDisabled: true,
+			expectedBodyStrings: []string{
+				`ATTRIBUTE         VALUE`,
+				`Username          jane.doe`,
+				`UID               uniq-id`,
+				`Groups            [students teachers]`,
+				`Extra: skills     [reading learning]`,
+				`Extra: subjects   [math sports]`,
+				``,
+			},
+		},
+		{
+			name: "JSON test no beta",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
+			},
+			args:         []string{},
+			betaDisabled: true,
 			expectedBodyStrings: []string{
 				`{
     "kind": "SelfSubjectReview",
@@ -95,6 +211,48 @@ func TestWhoAmIRun(t *testing.T) {
 `,
 			},
 		},
+		{
+			name: "both API disabled",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:          []string{},
+			betaDisabled:  true,
+			alphaDisabled: true,
+			expectedError: notEnabledErr,
+		},
+		{
+			name: "Forbidden error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args: []string{},
+			serverErr: errors.NewForbidden(
+				corev1.Resource("selfsubjectreviews"), "foo", fmt.Errorf("error"),
+			),
+			expectedError:       forbiddenErr,
+			expectedBodyStrings: []string{},
+		},
+		{
+			name: "NotFound error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:                []string{},
+			serverErr:           errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo"),
+			expectedError:       notEnabledErr,
+			expectedBodyStrings: []string{},
+		},
+		{
+			name: "Server error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:                []string{},
+			serverErr:           fmt.Errorf("a random server-side error"),
+			expectedError:       fmt.Errorf("a random server-side error"),
+			expectedBodyStrings: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -102,7 +260,7 @@ func TestWhoAmIRun(t *testing.T) {
 			var b bytes.Buffer
 
 			test.o.Out = &b
-			test.o.ErrOut = ioutil.Discard
+			test.o.ErrOut = io.Discard
 
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
@@ -111,31 +269,56 @@ func TestWhoAmIRun(t *testing.T) {
 
 			fakeAuthClientSet.AddReactor("create", "selfsubjectreviews",
 				func(action core.Action) (handled bool, ret runtime.Object, err error) {
-					res := &authenticationv1alpha1.SelfSubjectReview{
-						Status: authenticationv1alpha1.SelfSubjectReviewStatus{
-							UserInfo: authenticationv1.UserInfo{
-								Username: "jane.doe",
-								UID:      "uniq-id",
-								Groups:   []string{"students", "teachers"},
-								Extra: map[string]authenticationv1.ExtraValue{
-									"subjects": {"math", "sports"},
-									"skills":   {"reading", "learning"},
-								},
-							},
+					if test.serverErr != nil {
+						return true, nil, test.serverErr
+					}
+
+					ui := authenticationv1.UserInfo{
+						Username: "jane.doe",
+						UID:      "uniq-id",
+						Groups:   []string{"students", "teachers"},
+						Extra: map[string]authenticationv1.ExtraValue{
+							"subjects": {"math", "sports"},
+							"skills":   {"reading", "learning"},
 						},
 					}
-					return true, res, nil
+
+					switch action.GetResource().GroupVersion().String() {
+					case "authentication.k8s.io/v1alpha1":
+						if test.alphaDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1alpha1.SelfSubjectReview{
+							Status: authenticationv1alpha1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
+					case "authentication.k8s.io/v1beta1":
+						if test.betaDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1beta1.SelfSubjectReview{
+							Status: authenticationv1beta1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
+					default:
+						return false, nil, fmt.Errorf("unknown API")
+					}
 				})
-			test.o.authClient = fakeAuthClientSet.AuthenticationV1alpha1()
+			test.o.authV1beta1Client = fakeAuthClientSet.AuthenticationV1beta1()
+			test.o.authV1alpha1Client = fakeAuthClientSet.AuthenticationV1alpha1()
 
 			err := test.o.Run()
 			switch {
-			case test.serverErr == nil && err == nil:
+			case test.expectedError == nil && err == nil:
 				// pass
-			case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
+			case err != nil && test.expectedError != nil && strings.Contains(err.Error(), test.expectedError.Error()):
 				// pass
 			default:
-				t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
+				t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
 				return
 			}
 

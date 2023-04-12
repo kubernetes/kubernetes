@@ -104,6 +104,11 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 	return kl.getPodDir(podUID)
 }
 
+// ListPodsFromDisk gets a list of pods that have data directories.
+func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
+	return kl.listPodsFromDisk()
+}
+
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
@@ -191,8 +196,8 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 // container runtime cache. This function converts kubecontainer.Pod to
 // v1.Pod, so only the fields that exist in both kubecontainer.Pod and
 // v1.Pod are considered meaningful.
-func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
-	pods, err := kl.runtimeCache.GetPods()
+func (kl *Kubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
+	pods, err := kl.runtimeCache.GetPods(ctx)
 	if err != nil {
 		return nil, err
 	}

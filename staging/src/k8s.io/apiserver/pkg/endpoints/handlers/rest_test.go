@@ -52,7 +52,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	utiltrace "k8s.io/utils/trace"
 )
 
 var (
@@ -537,8 +536,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patch,
-
-			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, time.Second)

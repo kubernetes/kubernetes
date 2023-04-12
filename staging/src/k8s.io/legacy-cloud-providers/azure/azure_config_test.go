@@ -23,13 +23,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -50,7 +50,7 @@ func getTestConfig() *Config {
 		PrimaryAvailabilitySetName:  "PrimaryAvailabilitySetName",
 		PrimaryScaleSetName:         "PrimaryScaleSetName",
 		LoadBalancerSku:             "LoadBalancerSku",
-		ExcludeMasterFromStandardLB: to.BoolPtr(true),
+		ExcludeMasterFromStandardLB: pointer.Bool(true),
 	}
 }
 

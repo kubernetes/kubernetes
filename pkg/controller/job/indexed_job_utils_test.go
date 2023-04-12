@@ -22,10 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -33,12 +29,11 @@ const noIndex = "-"
 
 func TestCalculateSucceededIndexes(t *testing.T) {
 	cases := map[string]struct {
-		prevSucceeded          string
-		pods                   []indexPhase
-		completions            int32
-		trackingWithFinalizers bool
-		wantStatusIntervals    orderedIntervals
-		wantIntervals          orderedIntervals
+		prevSucceeded       string
+		pods                []indexPhase
+		completions         int32
+		wantStatusIntervals orderedIntervals
+		wantIntervals       orderedIntervals
 	}{
 		"one index": {
 			pods:          []indexPhase{{"1", v1.PodSucceeded}},
@@ -69,19 +64,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			completions:   8,
 			wantIntervals: []interval{{2, 3}, {5, 7}},
 		},
-		"one interval, ignore previous": {
-			prevSucceeded: "3-5",
-			pods: []indexPhase{
-				{"0", v1.PodSucceeded},
-				{"1", v1.PodFailed},
-				{"1", v1.PodSucceeded},
-				{"2", v1.PodSucceeded},
-				{"2", v1.PodSucceeded},
-				{"3", v1.PodFailed},
-			},
-			completions:   4,
-			wantIntervals: []interval{{0, 2}},
-		},
 		"one index and one interval": {
 			pods: []indexPhase{
 				{"0", v1.PodSucceeded},
@@ -111,18 +93,16 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			wantIntervals: []interval{{0, 2}, {4, 4}},
 		},
 		"prev interval out of range": {
-			prevSucceeded:          "0-5,8-10",
-			completions:            8,
-			trackingWithFinalizers: true,
-			wantStatusIntervals:    []interval{{0, 5}},
-			wantIntervals:          []interval{{0, 5}},
+			prevSucceeded:       "0-5,8-10",
+			completions:         8,
+			wantStatusIntervals: []interval{{0, 5}},
+			wantIntervals:       []interval{{0, 5}},
 		},
 		"prev interval partially out of range": {
-			prevSucceeded:          "0-5,8-10",
-			completions:            10,
-			trackingWithFinalizers: true,
-			wantStatusIntervals:    []interval{{0, 5}, {8, 9}},
-			wantIntervals:          []interval{{0, 5}, {8, 9}},
+			prevSucceeded:       "0-5,8-10",
+			completions:         10,
+			wantStatusIntervals: []interval{{0, 5}, {8, 9}},
+			wantIntervals:       []interval{{0, 5}, {8, 9}},
 		},
 		"prev and new separate": {
 			prevSucceeded: "0,4,5,10-12",
@@ -131,8 +111,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"7", v1.PodSucceeded},
 				{"8", v1.PodSucceeded},
 			},
-			completions:            13,
-			trackingWithFinalizers: true,
+			completions: 13,
 			wantStatusIntervals: []interval{
 				{0, 0},
 				{4, 5},
@@ -153,8 +132,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"7", v1.PodSucceeded},
 				{"8", v1.PodSucceeded},
 			},
-			completions:            9,
-			trackingWithFinalizers: true,
+			completions: 9,
 			wantStatusIntervals: []interval{
 				{3, 4},
 				{6, 6},
@@ -171,8 +149,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"4", v1.PodSucceeded},
 				{"6", v1.PodSucceeded},
 			},
-			completions:            9,
-			trackingWithFinalizers: true,
+			completions: 9,
 			wantStatusIntervals: []interval{
 				{2, 2},
 				{7, 8},
@@ -190,8 +167,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"5", v1.PodSucceeded},
 				{"9", v1.PodSucceeded},
 			},
-			completions:            10,
-			trackingWithFinalizers: true,
+			completions: 10,
 			wantStatusIntervals: []interval{
 				{2, 7},
 			},
@@ -206,8 +182,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			pods: []indexPhase{
 				{"3", v1.PodSucceeded},
 			},
-			completions:            4,
-			trackingWithFinalizers: true,
+			completions: 4,
 			wantStatusIntervals: []interval{
 				{0, 0},
 			},
@@ -219,18 +194,12 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizers)()
 			job := &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
 				Status: batch.JobStatus{
 					CompletedIndexes: tc.prevSucceeded,
 				},
 				Spec: batch.JobSpec{
-					Completions: pointer.Int32Ptr(tc.completions),
+					Completions: pointer.Int32(tc.completions),
 				},
 			}
 			pods := hollowPodsWithIndexPhase(tc.pods)

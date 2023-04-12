@@ -123,7 +123,7 @@ func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 		return errors.Wrap(err, "couldn't read from standard input")
 	}
 	answer := scanner.Text()
-	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
+	if strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes") {
 		return nil
 	}
 

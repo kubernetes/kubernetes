@@ -20,6 +20,8 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -36,7 +39,7 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("with SeccompDefault enabled", func() {
-		tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {
 			cfg.SeccompDefault = true
 		})
 
@@ -58,14 +61,14 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 			}
 		}
 
-		ginkgo.It("should use the default seccomp profile when unspecified", func() {
+		ginkgo.It("should use the default seccomp profile when unspecified", func(ctx context.Context) {
 			pod := newPod(nil)
-			f.TestContainerOutput("SeccompDefault", pod, 0, []string{"2"})
+			e2eoutput.TestContainerOutput(ctx, f, "SeccompDefault", pod, 0, []string{"2"})
 		})
 
-		ginkgo.It("should use unconfined when specified", func() {
+		ginkgo.It("should use unconfined when specified", func(ctx context.Context) {
 			pod := newPod(&v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}})
-			f.TestContainerOutput("SeccompDefault-unconfined", pod, 0, []string{"0"})
+			e2eoutput.TestContainerOutput(ctx, f, "SeccompDefault-unconfined", pod, 0, []string{"0"})
 		})
 	})
 })

@@ -1,0 +1,2 @@
+# gofmt always uses LF, whereas Git uses CRLF on Windows.
+*.go text eol=lf

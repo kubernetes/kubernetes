@@ -18,7 +18,10 @@ package spec3
 
 import (
 	"encoding/json"
+
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -44,6 +47,9 @@ func (m *MediaType) MarshalJSON() ([]byte, error) {
 }
 
 func (m *MediaType) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, m)
+	}
 	if err := json.Unmarshal(data, &m.MediaTypeProps); err != nil {
 		return err
 	}
@@ -53,10 +59,24 @@ func (m *MediaType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (m *MediaType) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		MediaTypeProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	m.Extensions = internal.SanitizeExtensions(x.Extensions)
+	m.MediaTypeProps = x.MediaTypeProps
+
+	return nil
+}
+
 // MediaTypeProps a struct that allows you to specify content format, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#mediaTypeObject
 type MediaTypeProps struct {
 	// Schema holds the schema defining the type used for the media type
-	Schema    *spec.Schema `json:"schema,omitempty"`
+	Schema *spec.Schema `json:"schema,omitempty"`
 	// Example of the media type
 	Example interface{} `json:"example,omitempty"`
 	// Examples of the media type. Each example object should match the media type and specific schema if present

@@ -5,12 +5,16 @@ system.
 
 [![GoDoc](https://godoc.org/github.com/karrick/godirwalk?status.svg)](https://godoc.org/github.com/karrick/godirwalk) [![Build Status](https://dev.azure.com/microsoft0235/microsoft/_apis/build/status/karrick.godirwalk?branchName=master)](https://dev.azure.com/microsoft0235/microsoft/_build/latest?definitionId=1&branchName=master)
 
-In short, why do I use this library?
+In short, why did I create this library?
 
 1. It's faster than `filepath.Walk`.
 1. It's more correct on Windows than `filepath.Walk`.
 1. It's more easy to use than `filepath.Walk`.
 1. It's more flexible than `filepath.Walk`.
+
+Depending on your specific circumstances, [you might no longer need a
+library for file walking in
+Go](https://engineering.kablamo.com.au/posts/2021/quick-comparison-between-go-file-walk-implementations).
 
 ## Usage Example
 

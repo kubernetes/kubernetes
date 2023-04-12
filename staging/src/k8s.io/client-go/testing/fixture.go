@@ -181,7 +181,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				if err := json.Unmarshal(modified, obj); err != nil {
 					return true, nil, err
 				}
-			case types.StrategicMergePatchType:
+			case types.StrategicMergePatchType, types.ApplyPatchType:
 				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
 				if err != nil {
 					return true, nil, err

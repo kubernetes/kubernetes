@@ -18,24 +18,6 @@ package ioutils
 
 import "io"
 
-// writeCloserWrapper represents a WriteCloser whose closer operation is noop.
-type writeCloserWrapper struct {
-	Writer io.Writer
-}
-
-func (w *writeCloserWrapper) Write(buf []byte) (int, error) {
-	return w.Writer.Write(buf)
-}
-
-func (w *writeCloserWrapper) Close() error {
-	return nil
-}
-
-// WriteCloserWrapper returns a writeCloserWrapper.
-func WriteCloserWrapper(w io.Writer) io.WriteCloser {
-	return &writeCloserWrapper{w}
-}
-
 // LimitWriter is a copy of the standard library ioutils.LimitReader,
 // applied to the writer interface.
 // LimitWriter returns a Writer that writes to w

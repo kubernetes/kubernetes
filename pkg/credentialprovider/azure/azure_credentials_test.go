@@ -25,8 +25,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,27 +39,27 @@ func Test(t *testing.T) {
     }`
 	result := []containerregistry.Registry{
 		{
-			Name: to.StringPtr("foo"),
+			Name: pointer.String("foo"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.io"),
+				LoginServer: pointer.String("*.azurecr.io"),
 			},
 		},
 		{
-			Name: to.StringPtr("bar"),
+			Name: pointer.String("bar"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.cn"),
+				LoginServer: pointer.String("*.azurecr.cn"),
 			},
 		},
 		{
-			Name: to.StringPtr("baz"),
+			Name: pointer.String("baz"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.de"),
+				LoginServer: pointer.String("*.azurecr.de"),
 			},
 		},
 		{
-			Name: to.StringPtr("bus"),
+			Name: pointer.String("bus"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.us"),
+				LoginServer: pointer.String("*.azurecr.us"),
 			},
 		},
 	}

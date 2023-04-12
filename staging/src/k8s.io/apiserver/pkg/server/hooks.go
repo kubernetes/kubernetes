@@ -233,13 +233,13 @@ func (h postStartHookHealthz) Name() string {
 	return h.name
 }
 
-var hookNotFinished = errors.New("not finished")
+var errHookNotFinished = errors.New("not finished")
 
 func (h postStartHookHealthz) Check(req *http.Request) error {
 	select {
 	case <-h.done:
 		return nil
 	default:
-		return hookNotFinished
+		return errHookNotFinished
 	}
 }

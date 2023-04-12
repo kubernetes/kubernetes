@@ -22,24 +22,24 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestAPIResourcesComplete(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	cmd := NewCmdAPIResources(tf, genericclioptions.NewTestIOStreamsDiscard())
+	cmd := NewCmdAPIResources(tf, genericiooptions.NewTestIOStreamsDiscard())
 	parentCmd := &cobra.Command{Use: "kubectl"}
 	parentCmd.AddCommand(cmd)
-	o := NewAPIResourceOptions(genericclioptions.NewTestIOStreamsDiscard())
+	o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
 
-	err := o.Complete(cmd, []string{})
+	err := o.Complete(tf, cmd, []string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	err = o.Complete(cmd, []string{"foo"})
+	err = o.Complete(tf, cmd, []string{"foo"})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
@@ -79,7 +79,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			o := NewAPIResourceOptions(genericclioptions.NewTestIOStreamsDiscard())
+			o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
 			tc.optionSetupFn(o)
 			err := o.Validate()
 			if tc.expectedError == "" {
@@ -110,6 +110,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Foo",
 					Verbs:      []string{"get", "list"},
 					ShortNames: []string{"f", "fo"},
+					Categories: []string{"some-category"},
 				},
 				{
 					Name:       "bars",
@@ -117,6 +118,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Bar",
 					Verbs:      []string{"get", "list", "create"},
 					ShortNames: []string{},
+					Categories: []string{},
 				},
 			},
 		},
@@ -129,6 +131,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Baz",
 					Verbs:      []string{"get", "list", "create", "delete"},
 					ShortNames: []string{"b"},
+					Categories: []string{"some-category", "another-category"},
 				},
 				{
 					Name:       "NoVerbs",
@@ -136,6 +139,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "NoVerbs",
 					Verbs:      []string{},
 					ShortNames: []string{"b"},
+					Categories: []string{},
 				},
 			},
 		},
@@ -189,10 +193,10 @@ bazzes   b            somegroup/v1   true         Baz
 			commandSetupFn: func(cmd *cobra.Command) {
 				cmd.Flags().Set("output", "wide")
 			},
-			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND   VERBS
-bars                  v1             true         Bar    [get list create]
-foos     f,fo         v1             false        Foo    [get list]
-bazzes   b            somegroup/v1   true         Baz    [get list create delete]
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND   VERBS                    CATEGORIES
+bars                  v1             true         Bar    get,list,create          
+foos     f,fo         v1             false        Foo    get,list                 some-category
+bazzes   b            somegroup/v1   true         Baz    get,list,create,delete   some-category,another-category
 `,
 			expectedInvalidations: 1,
 		},
@@ -240,6 +244,27 @@ bazzes   b            somegroup/v1   true         Baz
 			expectedInvalidations: 1,
 		},
 		{
+			name: "single category",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("categories", "some-category")
+			},
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND
+foos     f,fo         v1             false        Foo
+bazzes   b            somegroup/v1   true         Baz
+`,
+			expectedInvalidations: 1,
+		},
+		{
+			name: "multiple categories",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("categories", "some-category,another-category")
+			},
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND
+bazzes   b            somegroup/v1   true         Baz
+`,
+			expectedInvalidations: 1,
+		},
+		{
 			name: "sort by name",
 			commandSetupFn: func(cmd *cobra.Command) {
 				cmd.Flags().Set("sort-by", "name")
@@ -280,7 +305,7 @@ bazzes   b            somegroup/v1   true         Baz
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
 			dc.Invalidations = 0
-			ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdAPIResources(tf, ioStreams)
 			tc.commandSetupFn(cmd)
 			cmd.Run(cmd, []string{})

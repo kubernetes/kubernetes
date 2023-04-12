@@ -112,12 +112,13 @@ func (p pluginHandlerWithMetrics) Validate(ctx context.Context, a admission.Attr
 
 // AdmissionMetrics instruments admission with prometheus metrics.
 type AdmissionMetrics struct {
-	step             *metricSet
-	controller       *metricSet
-	webhook          *metricSet
-	webhookRejection *metrics.CounterVec
-	webhookFailOpen  *metrics.CounterVec
-	webhookRequest   *metrics.CounterVec
+	step                     *metricSet
+	controller               *metricSet
+	webhook                  *metricSet
+	webhookRejection         *metrics.CounterVec
+	webhookFailOpen          *metrics.CounterVec
+	webhookRequest           *metrics.CounterVec
+	matchConditionEvalErrors *metrics.CounterVec
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -178,7 +179,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 				Subsystem:      subsystem,
 				Name:           "webhook_admission_duration_seconds",
 				Help:           "Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
-				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5, 10, 25},
 				StabilityLevel: metrics.STABLE,
 			},
 			[]string{"name", "type", "operation", "rejected"},
@@ -217,13 +218,24 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
 
+	matchConditionEvalError := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "admission_match_condition_evaluation_errors_total",
+			Help:           "Admission match condition evaluation errors count, identified by name of resource containing the match condition and broken out for each admission type (validating or mutating).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "type"})
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
 	legacyregistry.MustRegister(webhookRejection)
 	legacyregistry.MustRegister(webhookFailOpen)
 	legacyregistry.MustRegister(webhookRequest)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest}
+	legacyregistry.MustRegister(matchConditionEvalError)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -265,6 +277,11 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, st
 // ObserveWebhookFailOpen records validating or mutating webhook that fail open.
 func (m *AdmissionMetrics) ObserveWebhookFailOpen(ctx context.Context, name, stepType string) {
 	m.webhookFailOpen.WithContext(ctx).WithLabelValues(name, stepType).Inc()
+}
+
+// ObserveMatchConditionEvalError records validating or mutating webhook that are not called due to match conditions
+func (m *AdmissionMetrics) ObserveMatchConditionEvalError(ctx context.Context, name, stepType string) {
+	m.matchConditionEvalErrors.WithContext(ctx).WithLabelValues(name, stepType).Inc()
 }
 
 type metricSet struct {

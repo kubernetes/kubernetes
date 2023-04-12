@@ -25,11 +25,12 @@ type Timer struct {
 // NewTimer creates a new Timer. The provided Observer is used to observe a
 // duration in seconds. Timer is usually used to time a function call in the
 // following way:
-//    func TimeMe() {
-//        timer := NewTimer(myHistogram)
-//        defer timer.ObserveDuration()
-//        // Do actual work.
-//    }
+//
+//	func TimeMe() {
+//	    timer := NewTimer(myHistogram)
+//	    defer timer.ObserveDuration()
+//	    // Do actual work.
+//	}
 func NewTimer(o Observer) *Timer {
 	return &Timer{
 		begin:    time.Now(),

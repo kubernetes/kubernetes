@@ -18,6 +18,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -26,7 +27,7 @@ import (
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -39,18 +40,18 @@ type Provider interface {
 	// The following stats are provided by either CRI or cAdvisor.
 	//
 	// ListPodStats returns the stats of all the containers managed by pods.
-	ListPodStats() ([]statsapi.PodStats, error)
+	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
 	// the containers and returns the stats for all the pod-managed containers.
-	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
+	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
 	// ListPodStatsAndUpdateCPUNanoCoreUsage returns the stats of all the
 	// containers managed by pods and force update the cpu usageNanoCores.
 	// This is a workaround for CRI runtimes that do not integrate with
 	// cadvisor. See https://github.com/kubernetes/kubernetes/issues/72788
 	// for more details.
-	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats() (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
 
 	// The following stats are provided by cAdvisor.
 	//
@@ -67,7 +68,7 @@ type Provider interface {
 	//
 	// GetContainerInfo returns the information of the container with the
 	// containerName managed by the pod with the uid.
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	// GetRawContainerInfo returns the information of the container with the
 	// containerName. If subcontainers is true, this function will return the
 	// information of all the sub-containers as well.
@@ -140,6 +141,7 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 // Handles stats summary requests to /stats/summary
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
 	onlyCPUAndMemory := false
 	err := request.Request.ParseForm()
 	if err != nil {
@@ -152,11 +154,11 @@ func (h *handler) handleSummary(request *restful.Request, response *restful.Resp
 	}
 	var summary *statsapi.Summary
 	if onlyCPUAndMemory {
-		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
+		summary, err = h.summaryProvider.GetCPUAndMemoryStats(ctx)
 	} else {
 		// external calls to the summary API use cached stats
 		forceStatsUpdate := false
-		summary, err = h.summaryProvider.Get(forceStatsUpdate)
+		summary, err = h.summaryProvider.Get(ctx, forceStatsUpdate)
 	}
 	if err != nil {
 		handleError(response, "/stats/summary", err)

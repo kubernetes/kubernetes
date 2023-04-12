@@ -40,8 +40,7 @@ var (
 
 // IsListType returns true if the provided Object has a slice called Items.
 // TODO: Replace the code in this check with an interface comparison by
-//
-//	creating and enforcing that lists implement a list accessor.
+// creating and enforcing that lists implement a list accessor.
 func IsListType(obj runtime.Object) bool {
 	switch t := obj.(type) {
 	case runtime.Unstructured:

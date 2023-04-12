@@ -228,7 +228,7 @@ func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podU
 	}}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *gcePersistentDiskPlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &GCEDiskUtil{})
 }
 
@@ -245,7 +245,7 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 		}}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *gcePersistentDiskPlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	return plugin.newProvisionerInternal(options, &GCEDiskUtil{})
 }
 
@@ -299,17 +299,17 @@ func (plugin *gcePersistentDiskPlugin) NodeExpand(resizeOptions volume.NodeResiz
 
 var _ volume.NodeExpandableVolumePlugin = &gcePersistentDiskPlugin{}
 
-func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 	if !ok {
-		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
 	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	gceVolume := &v1.Volume{
 		Name: volumeName,
@@ -319,7 +319,9 @@ func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(gceVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(gceVolume),
+	}, nil
 }
 
 // Abstract interface to PD operations.
@@ -428,7 +430,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 
 	klog.V(4).Infof("mount of disk %s succeeded", dir)
 	if !b.readOnly {
-		if err := volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil)); err != nil {
+		if err := volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil)); err != nil {
 			klog.Errorf("SetVolumeOwnership returns error %v", err)
 		}
 	}

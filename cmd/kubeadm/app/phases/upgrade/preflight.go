@@ -54,7 +54,7 @@ func (c CoreDNSCheck) Check() (warnings, errors []error) {
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.String) error {
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
 			name:   "CoreDNSUnsupportedPlugins",
@@ -81,7 +81,11 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	}
 
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
-	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, currentInstalledCoreDNSversion, corefile)
+	targetCoreDNSVersion := strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v")
+	if currentInstalledCoreDNSversion == targetCoreDNSVersion {
+		return nil
+	}
+	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, targetCoreDNSVersion, corefile)
 	if err != nil {
 		return err
 	}

@@ -118,6 +118,42 @@ func TestSELinuxOptions(t *testing.T) {
 			expectReason: `seLinuxOptions`,
 			expectDetail: `containers "d", "e", "f" set forbidden securityContext.seLinuxOptions: type "bar"; user may not be set; role may not be set`,
 		},
+		{
+			name: "bad type",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					SELinuxOptions: &corev1.SELinuxOptions{
+						Type: "bad",
+					},
+				},
+			}},
+			expectReason: `seLinuxOptions`,
+			expectDetail: `pod set forbidden securityContext.seLinuxOptions: type "bad"`,
+		},
+		{
+			name: "bad user",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					SELinuxOptions: &corev1.SELinuxOptions{
+						User: "bad",
+					},
+				},
+			}},
+			expectReason: `seLinuxOptions`,
+			expectDetail: `pod set forbidden securityContext.seLinuxOptions: user may not be set`,
+		},
+		{
+			name: "bad role",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					SELinuxOptions: &corev1.SELinuxOptions{
+						Role: "bad",
+					},
+				},
+			}},
+			expectReason: `seLinuxOptions`,
+			expectDetail: `pod set forbidden securityContext.seLinuxOptions: role may not be set`,
+		},
 	}
 
 	for _, tc := range tests {

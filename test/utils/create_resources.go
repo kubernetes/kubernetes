@@ -65,7 +65,7 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v ", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v ", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }

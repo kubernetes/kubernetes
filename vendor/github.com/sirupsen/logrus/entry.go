@@ -232,6 +232,7 @@ func (entry *Entry) log(level Level, msg string) {
 
 	newEntry.Logger.mu.Lock()
 	reportCaller := newEntry.Logger.ReportCaller
+	bufPool := newEntry.getBufferPool()
 	newEntry.Logger.mu.Unlock()
 
 	if reportCaller {
@@ -239,11 +240,11 @@ func (entry *Entry) log(level Level, msg string) {
 	}
 
 	newEntry.fireHooks()
-
-	buffer = getBuffer()
+	buffer = bufPool.Get()
 	defer func() {
 		newEntry.Buffer = nil
-		putBuffer(buffer)
+		buffer.Reset()
+		bufPool.Put(buffer)
 	}()
 	buffer.Reset()
 	newEntry.Buffer = buffer
@@ -258,6 +259,13 @@ func (entry *Entry) log(level Level, msg string) {
 	if level <= PanicLevel {
 		panic(newEntry)
 	}
+}
+
+func (entry *Entry) getBufferPool() (pool BufferPool) {
+	if entry.Logger.BufferPool != nil {
+		return entry.Logger.BufferPool
+	}
+	return bufferPool
 }
 
 func (entry *Entry) fireHooks() {
@@ -276,18 +284,21 @@ func (entry *Entry) fireHooks() {
 }
 
 func (entry *Entry) write() {
+	entry.Logger.mu.Lock()
+	defer entry.Logger.mu.Unlock()
 	serialized, err := entry.Logger.Formatter.Format(entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to obtain reader, %v\n", err)
 		return
 	}
-	entry.Logger.mu.Lock()
-	defer entry.Logger.mu.Unlock()
 	if _, err := entry.Logger.Out.Write(serialized); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write to log, %v\n", err)
 	}
 }
 
+// Log will log a message at the level given as parameter.
+// Warning: using Log at Panic or Fatal level will not respectively Panic nor Exit.
+// For this behaviour Entry.Panic or Entry.Fatal should be used instead.
 func (entry *Entry) Log(level Level, args ...interface{}) {
 	if entry.Logger.IsLevelEnabled(level) {
 		entry.log(level, fmt.Sprint(args...))

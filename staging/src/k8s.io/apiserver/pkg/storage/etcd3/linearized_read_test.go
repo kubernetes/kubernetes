@@ -37,7 +37,8 @@ func TestLinearizedReadRevisionInvariant(t *testing.T) {
 	// [1] https://etcd.io/docs/v3.5/learning/api_guarantees/#isolation-level-and-consistency-of-replicas
 	ctx, store, etcdClient := testSetup(t)
 
-	key := "/testkey"
+	dir := "/testing"
+	key := dir + "/testkey"
 	out := &example.Pod{}
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
 
@@ -53,7 +54,7 @@ func TestLinearizedReadRevisionInvariant(t *testing.T) {
 	}
 
 	list := &example.PodList{}
-	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, list); err != nil {
+	if err := store.GetList(ctx, dir, storage.ListOptions{Predicate: storage.Everything, Recursive: true}, list); err != nil {
 		t.Errorf("Unexpected List error: %v", err)
 	}
 	finalRevision := list.ResourceVersion

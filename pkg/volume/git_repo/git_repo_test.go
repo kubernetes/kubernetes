@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -415,12 +415,12 @@ func doTestSetUp(scenario struct {
 		})
 
 	}
-	fake := fakeexec.FakeExec{
+	fake := &fakeexec.FakeExec{
 		CommandScript: fakeAction,
 	}
 
 	g := mounter.(*gitRepoVolumeMounter)
-	g.exec = &fake
+	g.exec = fake
 
 	g.SetUp(volume.MounterArgs{})
 

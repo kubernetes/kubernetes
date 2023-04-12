@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/internal"
 	internalbackoff "google.golang.org/grpc/internal/backoff"
+	"google.golang.org/grpc/internal/binarylog"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/resolver"
@@ -36,12 +37,13 @@ import (
 )
 
 func init() {
-	internal.AddExtraDialOptions = func(opt ...DialOption) {
+	internal.AddGlobalDialOptions = func(opt ...DialOption) {
 		extraDialOptions = append(extraDialOptions, opt...)
 	}
-	internal.ClearExtraDialOptions = func() {
+	internal.ClearGlobalDialOptions = func() {
 		extraDialOptions = nil
 	}
+	internal.WithBinaryLogger = withBinaryLogger
 }
 
 // dialOptions configure a Dial call. dialOptions are set by the DialOption
@@ -61,6 +63,7 @@ type dialOptions struct {
 	timeout                     time.Duration
 	scChan                      <-chan ServiceConfig
 	authority                   string
+	binaryLogger                binarylog.Logger
 	copts                       transport.ConnectOptions
 	callOptions                 []CallOption
 	channelzParentID            *channelz.Identifier
@@ -398,6 +401,14 @@ func WithStatsHandler(h stats.Handler) DialOption {
 			return
 		}
 		o.copts.StatsHandlers = append(o.copts.StatsHandlers, h)
+	})
+}
+
+// withBinaryLogger returns a DialOption that specifies the binary logger for
+// this ClientConn.
+func withBinaryLogger(bl binarylog.Logger) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.binaryLogger = bl
 	})
 }
 

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 type numaPodResources struct {
@@ -85,7 +86,7 @@ func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cpus.ToSlice(), nil
+	return cpus.List(), nil
 }
 
 func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string, numaNodes int) (map[int]int, error) {
@@ -98,7 +99,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 			if err != nil {
 				return nil, err
 			}
-			cpuIDs = cpus.ToSlice()
+			cpuIDs = cpus.List()
 		}
 	}
 	if len(cpuIDs) == 0 {
@@ -107,14 +108,14 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 
 	cpusPerNUMA := make(map[int][]int)
 	for numaNode := 0; numaNode < numaNodes; numaNode++ {
-		nodeCPUList := f.ExecCommandInContainer(pod.Name, cnt.Name,
+		nodeCPUList := e2epod.ExecCommandInContainer(f, pod.Name, cnt.Name,
 			"/bin/cat", fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", numaNode))
 
 		cpus, err := cpuset.Parse(nodeCPUList)
 		if err != nil {
 			return nil, err
 		}
-		cpusPerNUMA[numaNode] = cpus.ToSlice()
+		cpusPerNUMA[numaNode] = cpus.List()
 	}
 
 	// CPU IDs -> NUMA Node ID
@@ -152,7 +153,7 @@ func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *
 		// a single plugin can allocate more than a single device
 		pciDevs := strings.Split(value, ",")
 		for _, pciDev := range pciDevs {
-			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, cnt.Name,
+			pciDevNUMANode := e2epod.ExecCommandInContainer(f, pod.Name, cnt.Name,
 				"/bin/cat", fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", pciDev))
 			NUMAPerDev[pciDev] = numaNodeFromSysFsEntry(pciDevNUMANode)
 		}

@@ -88,30 +88,30 @@ run_cluster_management_tests() {
 
   # taint/untaint
   # Pre-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
   # Dry-run
   kubectl taint node 127.0.0.1 --dry-run=client dedicated=foo:PreferNoSchedule
   kubectl taint node 127.0.0.1 --dry-run=server dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
   # taint can add a taint (<key>=<value>:<effect>)
   kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=foo:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
   # taint can add a taint (<key>:<effect>)
   kubectl taint node 127.0.0.1 dedicated:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=<no value>:PreferNoSchedule"
   # Node has field manager for kubectl taint
   output_message=$(kubectl get node 127.0.0.1 --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-taint'
   # Dry-run remove a taint
   kubectl taint node 127.0.0.1 --dry-run=client dedicated-
   kubectl taint node 127.0.0.1 --dry-run=server dedicated-
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "dedicated=<no value>:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
   # Post-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}" "" # expect no output
 
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable

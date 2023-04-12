@@ -60,8 +60,8 @@ func (n *noopExpandableVolumePluginInstance) NewUnmounter(name string, podUID ty
 	return nil, nil
 }
 
-func (n *noopExpandableVolumePluginInstance) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
-	return n.spec, nil
+func (n *noopExpandableVolumePluginInstance) ConstructVolumeSpec(volumeName, mountPath string) (ReconstructedVolume, error) {
+	return ReconstructedVolume{Spec: n.spec}, nil
 }
 
 func (n *noopExpandableVolumePluginInstance) SupportsMountOption() bool {

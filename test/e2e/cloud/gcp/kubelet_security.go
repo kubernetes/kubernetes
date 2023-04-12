@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -39,24 +40,24 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	var node *v1.Node
 	var nodeName string
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
-		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
-	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
-		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
+	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func(ctx context.Context) {
+		result, err := e2ekubelet.ProxyRequest(ctx, f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
 		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
 		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
-	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
-		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
+	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func(ctx context.Context) {
+		result, err := e2ekubelet.ProxyRequest(ctx, f.ClientSet, nodeName, "containers/", 4194)
 		framework.ExpectNoError(err)
 
 		var statusCode int
@@ -68,7 +69,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	disabledPorts := []int{ports.KubeletReadOnlyPort, 4194}
 	for _, port := range disabledPorts {
 		port := port
-		ginkgo.It(fmt.Sprintf("should not have port %d open on its all public IP addresses", port), func() {
+		ginkgo.It(fmt.Sprintf("should not have port %d open on its all public IP addresses", port), func(ctx context.Context) {
 			portClosedTest(f, node, port)
 		})
 	}

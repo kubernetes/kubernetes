@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -128,8 +129,10 @@ func rmSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.Repli
 	}
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "rs-informers")), resyncPeriod)
+	logger, _ := ktesting.NewTestContext(t)
 
 	rm := replicaset.NewReplicaSetController(
+		logger,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
@@ -678,7 +681,7 @@ func TestPodDeletionCost(t *testing.T) {
 			// Change RS's number of replics to 1
 			rsClient := c.AppsV1().ReplicaSets(ns.Name)
 			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
-				rs.Spec.Replicas = pointer.Int32Ptr(1)
+				rs.Spec.Replicas = pointer.Int32(1)
 			})
 
 			// Poll until ReplicaSet is downscaled to 1.
@@ -781,16 +784,17 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		if err != nil {
 			// If the pod is not found, it means the RS picks the pod for deletion (it is extra)
 			// Verify there is only one pod in namespace and it has ControllerRef to the RS
-			if apierrors.IsNotFound(err) {
-				pods := getPods(t, podClient, labelMap())
-				if len(pods.Items) != 1 {
-					return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
-				}
-				// Set the pod accordingly
-				pod = &pods.Items[0]
-				return true, nil
+			if !apierrors.IsNotFound(err) {
+				return false, err
 			}
-			return false, err
+
+			pods := getPods(t, podClient, labelMap())
+			if len(pods.Items) != 1 {
+				return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
+			}
+			// Set the pod accordingly
+			pod = &pods.Items[0]
+			return true, nil
 		}
 		// Always update the pod so that we can save a GET call to API server later
 		pod = newPod

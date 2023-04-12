@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
@@ -124,8 +123,8 @@ func newIngress(pathMap map[string]string) *networking.Ingress {
 			TLS: defaultTLS,
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{IP: defaultLoadBalancer},
 				},
 			},

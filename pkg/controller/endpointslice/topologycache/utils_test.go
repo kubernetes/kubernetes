@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	discovery "k8s.io/api/discovery/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func Test_redistributeHints(t *testing.T) {
@@ -41,9 +41,9 @@ func Test_redistributeHints(t *testing.T) {
 		name: "single endpoint",
 		slices: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		givingZones:             map[string]int{"zone-a": 1},
@@ -53,17 +53,17 @@ func Test_redistributeHints(t *testing.T) {
 		name: "endpoints from 1 zone redistributed to 2 other zones",
 		slices: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		givingZones:             map[string]int{"zone-a": 2},
@@ -215,9 +215,9 @@ func Test_getHintsByZone(t *testing.T) {
 		name: "single zone hint",
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{{
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		},
 		allocations: map[string]Allocation{
@@ -231,15 +231,15 @@ func Test_getHintsByZone(t *testing.T) {
 		name: "single zone hint with 1 unready endpoint and 1 unknown endpoint",
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{{
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
 			}, {
-				Zone:  utilpointer.StringPtr("zone-a"),
+				Zone:  pointer.String("zone-a"),
 				Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
 			}},
 		},
@@ -255,19 +255,19 @@ func Test_getHintsByZone(t *testing.T) {
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 				{
-					Zone:       utilpointer.StringPtr("zone-b"),
+					Zone:       pointer.String("zone-b"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 			},
 		},
@@ -286,9 +286,9 @@ func Test_getHintsByZone(t *testing.T) {
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-non-existent"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 			},
 		},
@@ -302,9 +302,9 @@ func Test_getHintsByZone(t *testing.T) {
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      nil,
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 			},
 		},
@@ -318,9 +318,9 @@ func Test_getHintsByZone(t *testing.T) {
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 			},
 		},
@@ -334,14 +334,14 @@ func Test_getHintsByZone(t *testing.T) {
 		slice: discovery.EndpointSlice{
 			Endpoints: []discovery.Endpoint{
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 				{
-					Zone:       utilpointer.StringPtr("zone-a"),
+					Zone:       pointer.String("zone-a"),
 					Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				},
 			},
 		},

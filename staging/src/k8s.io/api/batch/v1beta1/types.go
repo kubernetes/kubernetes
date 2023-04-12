@@ -22,24 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.8
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
-
-// JobTemplate describes a template for creating copies of a predefined pod.
-type JobTemplate struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Defines jobs that will be created from this template.
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Template JobTemplateSpec `json:"template,omitempty" protobuf:"bytes,2,opt,name=template"`
-}
-
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
@@ -113,7 +95,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
@@ -124,6 +105,7 @@ type CronJobSpec struct {
 
 	// Specifies how to treat concurrent executions of a Job.
 	// Valid values are:
+	//
 	// - "Allow" (default): allows CronJobs to run concurrently;
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one

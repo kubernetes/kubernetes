@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -37,8 +38,8 @@ var _ = SIGDescribe("crictl", func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
-	ginkgo.It("should be able to run crictl on the node", func() {
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+	ginkgo.It("should be able to run crictl on the node", func(ctx context.Context) {
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err)
 
 		testCases := []string{
@@ -52,7 +53,7 @@ var _ = SIGDescribe("crictl", func() {
 			for _, node := range nodes.Items {
 				ginkgo.By(fmt.Sprintf("Testing %q on node %q ", testCase, node.GetName()))
 
-				res, err := hostExec.Execute(testCase, &node)
+				res, err := hostExec.Execute(ctx, testCase, &node)
 				framework.ExpectNoError(err)
 
 				if res.Stdout == "" && res.Stderr == "" {

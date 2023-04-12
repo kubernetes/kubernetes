@@ -46,10 +46,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestSchedulerCreation(t *testing.T) {
-	t.Parallel()
 	invalidRegistry := map[string]frameworkruntime.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
 	}
@@ -167,9 +167,7 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -234,41 +232,34 @@ func TestSchedulerCreation(t *testing.T) {
 }
 
 func TestFailureHandler(t *testing.T) {
-	t.Parallel()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	testPodUpdated := testPod.DeepCopy()
 	testPodUpdated.Labels = map[string]string{"foo": ""}
 
 	tests := []struct {
 		name                       string
-		injectErr                  error
 		podUpdatedDuringScheduling bool // pod is updated during a scheduling cycle
 		podDeletedDuringScheduling bool // pod is deleted during a scheduling cycle
 		expect                     *v1.Pod
 	}{
 		{
 			name:                       "pod is updated during a scheduling cycle",
-			injectErr:                  nil,
 			podUpdatedDuringScheduling: true,
 			expect:                     testPodUpdated,
 		},
 		{
-			name:      "pod is not updated during a scheduling cycle",
-			injectErr: nil,
-			expect:    testPod,
+			name:   "pod is not updated during a scheduling cycle",
+			expect: testPod,
 		},
 		{
 			name:                       "pod is deleted during a scheduling cycle",
-			injectErr:                  nil,
 			podDeletedDuringScheduling: true,
 			expect:                     nil,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -298,8 +289,8 @@ func TestFailureHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil)
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
@@ -320,7 +311,6 @@ func TestFailureHandler(t *testing.T) {
 }
 
 func TestFailureHandler_NodeNotFound(t *testing.T) {
-	t.Parallel()
 	nodeFoo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	nodeBar := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
@@ -329,27 +319,25 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 		nodes            []v1.Node
 		nodeNameToDelete string
 		injectErr        error
-		expectNodeNames  sets.String
+		expectNodeNames  sets.Set[string]
 	}{
 		{
 			name:             "node is deleted during a scheduling cycle",
 			nodes:            []v1.Node{*nodeFoo, *nodeBar},
 			nodeNameToDelete: "foo",
 			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames:  sets.NewString("bar"),
+			expectNodeNames:  sets.New("bar"),
 		},
 		{
 			name:            "node is not deleted but NodeNotFound is received incorrectly",
 			nodes:           []v1.Node{*nodeFoo, *nodeBar},
 			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames: sets.NewString("foo", "bar"),
+			expectNodeNames: sets.New("foo", "bar"),
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -376,11 +364,11 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil)
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
 
 			gotNodes := schedulerCache.Dump().Nodes
-			gotNodeNames := sets.NewString()
+			gotNodeNames := sets.New[string]()
 			for _, nodeInfo := range gotNodes {
 				gotNodeNames.Insert(nodeInfo.Node().Name)
 			}
@@ -392,7 +380,6 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 }
 
 func TestFailureHandler_PodAlreadyBound(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -416,12 +403,56 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-	s.FailureHandler(ctx, fwk, testPodInfo, fmt.Errorf("binding rejected: timeout"), v1.PodReasonUnschedulable, nil)
+	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+	s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
 	pod := getPodFromPriorityQueue(queue, testPod)
 	if pod != nil {
 		t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
+	}
+}
+
+// TestWithPercentageOfNodesToScore tests scheduler's PercentageOfNodesToScore is set correctly.
+func TestWithPercentageOfNodesToScore(t *testing.T) {
+	tests := []struct {
+		name                           string
+		percentageOfNodesToScoreConfig *int32
+		wantedPercentageOfNodesToScore int32
+	}{
+		{
+			name:                           "percentageOfNodesScore is nil",
+			percentageOfNodesToScoreConfig: nil,
+			wantedPercentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		},
+		{
+			name:                           "percentageOfNodesScore is not nil",
+			percentageOfNodesToScoreConfig: pointer.Int32(10),
+			wantedPercentageOfNodesToScore: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			sched, err := New(
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				stopCh,
+				WithPercentageOfNodesToScore(tt.percentageOfNodesToScoreConfig),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+			if sched.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
+				t.Errorf("scheduler.percercentageOfNodesToScore = %v, want %v", sched.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			}
+		})
 	}
 }
 
@@ -470,23 +501,19 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 		return nil, nil, err
 	}
 
-	s := newScheduler(
-		cache,
-		nil,
-		nil,
-		stop,
-		queue,
-		profile.Map{testSchedulerName: fwk},
-		client,
-		nil,
-		0,
-	)
+	s := &Scheduler{
+		Cache:           cache,
+		client:          client,
+		StopEverything:  stop,
+		SchedulingQueue: queue,
+		Profiles:        profile.Map{testSchedulerName: fwk},
+	}
+	s.applyDefaultHandlers()
 
 	return s, fwk, nil
 }
 
 func TestInitPluginsWithIndexers(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		// the plugin registration ordering must not matter, being map traversal random
@@ -549,9 +576,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second)
 
 			var registerPluginFuncs []st.RegisterPluginFunc

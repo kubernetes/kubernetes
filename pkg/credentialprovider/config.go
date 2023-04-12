@@ -223,15 +223,6 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 	return contents, nil
 }
 
-// ReadDockerConfigFileFromURL read a docker config file from the given url
-func ReadDockerConfigFileFromURL(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
-	if contents, err := ReadURL(url, client, header); err == nil {
-		return ReadDockerConfigFileFromBytes(contents)
-	}
-
-	return nil, err
-}
-
 // ReadDockerConfigFileFromBytes read a docker config file from the given bytes
 func ReadDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	if err = json.Unmarshal(contents, &cfg); err != nil {

@@ -18,7 +18,7 @@ package proxy
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -361,12 +361,12 @@ func TestFileServing(t *testing.T) {
 		fname = "test.txt"
 		data  = "This is test data"
 	)
-	dir, err := ioutil.TempDir("", "data")
+	dir, err := os.MkdirTemp("", "data")
 	if err != nil {
 		t.Fatalf("error creating tmp dir: %v", err)
 	}
 	defer os.RemoveAll(dir)
-	if err := ioutil.WriteFile(filepath.Join(dir, fname), []byte(data), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, fname), []byte(data), 0755); err != nil {
 		t.Fatalf("error writing tmp file: %v", err)
 	}
 
@@ -385,7 +385,7 @@ func TestFileServing(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("res.StatusCode = %d; want %d", res.StatusCode, http.StatusOK)
 	}
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("error reading resp body: %v", err)
 	}
@@ -402,7 +402,7 @@ func newProxy(target *url.URL) http.Handler {
 
 func TestAPIRequests(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -487,7 +487,7 @@ func TestPathHandling(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%#v: %v", tt, err)
 			}
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			r.Body.Close()
 			if err != nil {
 				t.Fatalf("%#v: %v", tt, err)

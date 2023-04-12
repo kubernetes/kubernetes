@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -359,6 +360,7 @@ func TestMarker(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndList(t *testing.T) {
+	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
@@ -387,7 +389,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(5, nil, nil)
+	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -406,7 +408,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -425,7 +427,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -443,7 +445,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -459,6 +461,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndGet(t *testing.T) {
+	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 
 	// In background, update the store.
@@ -467,7 +470,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(5, "prefix/ns/bar", nil)
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -484,6 +487,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
+	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 	fc := store.clock.(*testingclock.FakeClock)
 
@@ -501,7 +505,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	_, _, _, err := store.WaitUntilFreshAndList(5, nil, nil)
+	_, _, _, err := store.WaitUntilFreshAndList(ctx, 5, nil)
 	if !errors.IsTimeout(err) {
 		t.Errorf("expected timeout error but got: %v", err)
 	}
@@ -523,10 +527,11 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 }
 
 func TestReflectorForWatchCache(t *testing.T) {
+	ctx := context.Background()
 	store := newTestWatchCache(5, &cache.Indexers{})
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(0, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -549,7 +554,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(10, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

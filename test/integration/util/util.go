@@ -66,13 +66,16 @@ import (
 type ShutdownFunc func()
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
+// and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
+// will keep running until the context is canceled.
+func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer) {
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
+	go func() {
+		<-ctx.Done()
+		evtBroadcaster.Shutdown()
+	}()
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
@@ -97,24 +100,16 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 	informerFactory.WaitForCacheSync(ctx.Done())
 	go sched.Run(ctx)
 
-	shutdownFunc := func() {
-		klog.Infof("destroying scheduler")
-		cancel()
-		klog.Infof("destroyed scheduler")
-	}
-	return sched, informerFactory.Core().V1().Pods(), shutdownFunc
+	return sched, informerFactory.Core().V1().Pods()
 }
 
 // StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
 // TODO(mborsz): Use a real PV controller here.
-func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
-	ctx, cancel := context.WithCancel(context.Background())
-
+func StartFakePVController(ctx context.Context, clientSet clientset.Interface) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
-		ctx := context.Background()
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
@@ -145,7 +140,6 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 	})
 
 	informerFactory.Start(ctx.Done())
-	return ShutdownFunc(cancel)
 }
 
 // TestContext store necessary context info
@@ -505,7 +499,7 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
 		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &v1beta3.Plugins{
 				PostFilter: v1beta3.PluginSet{
 					Disabled: []v1beta3.Plugin{
@@ -610,6 +604,7 @@ type PausePodConfig struct {
 	Priority                          *int32
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
+	Volumes                           []v1.Volume
 }
 
 // InitPausePod initializes a pod API object from the given config. It is used
@@ -637,6 +632,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 			Priority:          conf.Priority,
 			PreemptionPolicy:  conf.PreemptionPolicy,
 			PriorityClassName: conf.PriorityClassName,
+			Volumes:           conf.Volumes,
 		},
 	}
 	if conf.Resources != nil {
@@ -672,6 +668,28 @@ func CreatePausePodWithResource(cs clientset.Interface, podName string,
 		}
 	}
 	return CreatePausePod(cs, InitPausePod(&conf))
+}
+
+// CreatePVC creates a PersistentVolumeClaim with the given config and returns
+// its pointer and error status.
+func CreatePVC(cs clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	return cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+}
+
+// CreatePV creates a PersistentVolume with the given config and returns its
+// pointer and error status.
+func CreatePV(cs clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return cs.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
+}
+
+// DeletePVC deletes the given PVC in the given namespace.
+func DeletePVC(cs clientset.Interface, pvcName string, nsName string) error {
+	return cs.CoreV1().PersistentVolumeClaims(nsName).Delete(context.TODO(), pvcName, *metav1.NewDeleteOptions(0))
+}
+
+// DeletePV deletes the given PV in the given namespace.
+func DeletePV(cs clientset.Interface, pvName string) error {
+	return cs.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, *metav1.NewDeleteOptions(0))
 }
 
 // RunPausePod creates a pod with "Pause" image and the given config and waits
@@ -762,7 +780,7 @@ func PodScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNam
 }
 
 // PodUnschedulable returns a condition function that returns true if the given pod
-// gets unschedulable status.
+// gets unschedulable status of reason 'Unschedulable'.
 func PodUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
@@ -792,16 +810,37 @@ func PodSchedulingError(c clientset.Interface, podNamespace, podName string) wai
 	}
 }
 
-// waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
+// PodSchedulingGated returns a condition function that returns true if the given pod
+// gets unschedulable status of reason 'SchedulingGated'.
+func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil && cond.Status == v1.ConditionFalse &&
+			cond.Reason == v1.PodReasonSchedulingGated && pod.Spec.NodeName == "", nil
+	}
+}
+
+// WaitForPodUnschedulableWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
 func WaitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
 	return wait.Poll(100*time.Millisecond, timeout, PodUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
-// waitForPodUnschedule waits for a pod to fail scheduling and returns
+// WaitForPodUnschedulable waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the timeout duration (30 seconds).
 func WaitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return WaitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+}
+
+// WaitForPodSchedulingGated waits for a pod to be in scheduling gated state
+// and returns an error if it does not fall into this state within the given timeout.
+func WaitForPodSchedulingGated(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.Poll(100*time.Millisecond, timeout, PodSchedulingGated(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
@@ -885,7 +924,7 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 	done := make(chan struct{})
 	go func() {
 		f()
-		done <- struct{}{}
+		close(done)
 	}()
 
 	select {

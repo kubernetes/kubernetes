@@ -133,7 +133,6 @@ type joinOptions struct {
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1.JoinConfiguration
-	joinControlPlane      *kubeadmapiv1.JoinControlPlane
 	patchesDir            string
 	dryRun                bool
 }
@@ -148,7 +147,7 @@ type joinData struct {
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
 	client                clientset.Interface
-	ignorePreflightErrors sets.String
+	ignorePreflightErrors sets.Set[string]
 	outputWriter          io.Writer
 	patchesDir            string
 	dryRun                bool
@@ -157,8 +156,7 @@ type joinData struct {
 
 // newCmdJoin returns "kubeadm join" command.
 // NB. joinOptions is exposed as parameter for allowing unit testing of
-//
-//	the newJoinData method, that implements all the command options validation logic
+// the newJoinData method, that implements all the command options validation logic
 func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	if joinOptions == nil {
 		joinOptions = newJoinOptions()
@@ -210,7 +208,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 	}
 
-	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg, joinOptions.joinControlPlane)
+	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
 	addJoinOtherFlags(cmd.Flags(), joinOptions)
 
 	joinRunner.AppendPhase(phases.NewPreflightPhase())
@@ -222,6 +220,11 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			joinOptions.externalcfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+		}
 		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
 		if err != nil {
 			return nil, err
@@ -241,22 +244,22 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 }
 
 // addJoinConfigFlags adds join flags bound to the config to the specified flagset
-func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfiguration, jcp *kubeadmapiv1.JoinControlPlane) {
+func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfiguration) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
-		&jcp.CertificateKey, options.CertificateKey, jcp.CertificateKey,
+		&cfg.ControlPlane.CertificateKey, options.CertificateKey, cfg.ControlPlane.CertificateKey,
 		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
-		&jcp.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, jcp.LocalAPIEndpoint.AdvertiseAddress,
+		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
 		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
 	)
 	flagSet.Int32Var(
-		&jcp.LocalAPIEndpoint.BindPort, options.APIServerBindPort, jcp.LocalAPIEndpoint.BindPort,
+		&cfg.ControlPlane.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.ControlPlane.LocalAPIEndpoint.BindPort,
 		"If the node should host a new control plane instance, the port for the API Server to bind to.",
 	)
 	// adds bootstrap token specific discovery flags to the specified flagset
@@ -325,8 +328,7 @@ func newJoinOptions() *joinOptions {
 	kubeadmapiv1.SetDefaults_JoinControlPlane(joinControlPlane)
 
 	return &joinOptions{
-		externalcfg:      externalcfg,
-		joinControlPlane: joinControlPlane,
+		externalcfg: externalcfg,
 	}
 }
 
@@ -371,9 +373,6 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 	}
 
-	// Include the JoinControlPlane with user flags
-	opt.externalcfg.ControlPlane = opt.joinControlPlane
-
 	// If not passing --control-plane, unset the ControlPlane object
 	if !opt.controlPlane {
 		// Use a defaulted JoinControlPlane object to detect if the user has passed
@@ -388,7 +387,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 			options.APIServerBindPort,
 		}
 
-		if *opt.joinControlPlane != *defaultJCP {
+		if *opt.externalcfg.ControlPlane != *defaultJCP {
 			klog.Warningf("[preflight] WARNING: --%s is also required when passing control-plane "+
 				"related flags such as [%s]", options.ControlPlane, strings.Join(joinControlPlaneFlags, ", "))
 		}
@@ -437,7 +436,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name and CRI socket from the command line opt
 	if opt.externalcfg.NodeRegistration.Name != "" {
@@ -563,7 +562,7 @@ func (j *joinData) Client() (clientset.Interface, error) {
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
-func (j *joinData) IgnorePreflightErrors() sets.String {
+func (j *joinData) IgnorePreflightErrors() sets.Set[string] {
 	return j.ignorePreflightErrors
 }
 
@@ -594,7 +593,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 	}
 
 	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
-	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
+	_, clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
 	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
 		initConfiguration.ClusterName: clusterinfo,
 	}

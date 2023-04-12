@@ -18,6 +18,7 @@ package nodevolumelimits
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -58,6 +59,8 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case azureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case cinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}
@@ -303,6 +306,16 @@ func TestCSILimits(t *testing.T) {
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
+			newPod:           inTreeInlineVolPod,
+			existingPods:     []*v1.Pod{inTreeTwoVolPod},
+			filterName:       "csi",
+			maxVols:          2,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: true,
+			limitSource:      "node",
+			test:             "nil csi node",
+		},
+		{
 			newPod:           pendingVolumePod,
 			existingPods:     []*v1.Pod{inTreeTwoVolPod},
 			filterName:       "csi",
@@ -395,7 +408,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume missing",
-			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`)),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -404,7 +417,7 @@ func TestCSILimits(t *testing.T) {
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
+			wantStatus:       framework.AsStatus(errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -538,8 +551,8 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 			}
 			pvLister = append(pvLister, pv)
 		}
-
 	}
+
 	return pvLister
 }
 
@@ -578,9 +591,9 @@ func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 		nodeInfoAnnotations = map[string]string{}
 	}
 
-	newAnnotationSet := sets.NewString()
+	newAnnotationSet := sets.New[string]()
 	newAnnotationSet.Insert(pluginName)
-	nas := strings.Join(newAnnotationSet.List(), ",")
+	nas := strings.Join(sets.List(newAnnotationSet), ",")
 	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 
 	csiNode.Annotations = nodeInfoAnnotations
@@ -596,10 +609,11 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.
 }
 
 func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeLister {
+	csiNodeLister := fakeframework.CSINodeLister{}
 	if csiNode != nil {
-		return fakeframework.CSINodeLister(*csiNode)
+		csiNodeLister = append(csiNodeLister, *csiNode.DeepCopy())
 	}
-	return fakeframework.CSINodeLister{}
+	return csiNodeLister
 }
 
 func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
@@ -620,7 +634,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	initCSINode := func() {
 		csiNode = &storagev1.CSINode{
-			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 			Spec: storagev1.CSINodeSpec{
 				Drivers: []storagev1.CSINodeDriver{},
 			},

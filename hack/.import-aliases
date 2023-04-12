@@ -1,5 +1,6 @@
 {
   "k8s.io/api/admissionregistration/v1": "admissionregistrationv1",
+  "k8s.io/api/admissionregistration/v1alpha1": "admissionregistrationv1alpha1",
   "k8s.io/api/admissionregistration/v1beta1": "admissionregistrationv1beta1",
   "k8s.io/api/admission/v1beta1": "admissionv1beta1",
   "k8s.io/api/admission/v1": "admissionv1",
@@ -25,6 +26,7 @@
   "k8s.io/api/imagepolicy/v1alpha1": "imagepolicyv1alpha1",
   "k8s.io/api/networking/v1": "networkingv1",
   "k8s.io/api/networking/v1beta1": "networkingv1beta1",
+  "k8s.io/api/networking/v1alpha1": "networkingv1alpha1",
   "k8s.io/api/node/v1alpha1": "nodev1alpha1",
   "k8s.io/api/node/v1beta1": "nodev1beta1",
   "k8s.io/api/node/v1": "nodev1",
@@ -45,6 +47,7 @@
   "k8s.io/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1": "controllerconfigv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1": "kubeletconfigv1beta1",
+  "k8s.io/kubernetes/pkg/kubelet/apis/config/v1": "kubeletconfigv1",
   "k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha": "kubeletdevicepluginv1alpha",
   "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1": "kubeletdevicepluginv1beta1",
   "k8s.io/kubelet/pkg/apis/pluginregistration/v1": "kubeletpluginregistrationv1",

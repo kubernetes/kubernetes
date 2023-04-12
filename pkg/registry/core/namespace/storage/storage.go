@@ -59,10 +59,11 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
-		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
-		PredicateFunc:            namespace.MatchNamespace,
-		DefaultQualifiedResource: api.Resource("namespaces"),
+		NewFunc:                   func() runtime.Object { return &api.Namespace{} },
+		NewListFunc:               func() runtime.Object { return &api.NamespaceList{} },
+		PredicateFunc:             namespace.MatchNamespace,
+		DefaultQualifiedResource:  api.Resource("namespaces"),
+		SingularQualifiedResource: api.Resource("namespace"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
@@ -92,6 +93,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 func (r *REST) NamespaceScoped() bool {
 	return r.store.NamespaceScoped()
+}
+
+var _ rest.SingularNameProvider = &REST{}
+
+func (r *REST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 func (r *REST) New() runtime.Object {

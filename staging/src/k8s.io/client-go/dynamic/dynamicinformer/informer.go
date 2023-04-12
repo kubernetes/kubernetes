@@ -61,6 +61,12 @@ type dynamicSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
+
+	// wg tracks how many goroutines were started.
+	wg sync.WaitGroup
+	// shuttingDown is true when Shutdown has been called. It may still be running
+	// because it needs to wait for goroutines.
+	shuttingDown bool
 }
 
 var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
@@ -86,9 +92,21 @@ func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.shuttingDown {
+		return
+	}
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Informer().Run(stopCh)
+			f.wg.Add(1)
+			// We need a new variable in each loop iteration,
+			// otherwise the goroutine would use the loop variable
+			// and that keeps changing.
+			informer := informer.Informer()
+			go func() {
+				defer f.wg.Done()
+				informer.Run(stopCh)
+			}()
 			f.startedInformers[informerType] = true
 		}
 	}
@@ -116,11 +134,20 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 	return res
 }
 
+func (f *dynamicSharedInformerFactory) Shutdown() {
+	// Will return immediately if there is nothing to wait for.
+	defer f.wg.Wait()
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.shuttingDown = true
+}
+
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
 func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
 	return &dynamicInformer{
 		gvr: gvr,
-		informer: cache.NewSharedIndexInformer(
+		informer: cache.NewSharedIndexInformerWithOptions(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
@@ -136,8 +163,11 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 				},
 			},
 			&unstructured.Unstructured{},
-			resyncPeriod,
-			indexers,
+			cache.SharedIndexInformerOptions{
+				ResyncPeriod:      resyncPeriod,
+				Indexers:          indexers,
+				ObjectDescription: gvr.String(),
+			},
 		),
 	}
 }

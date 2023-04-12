@@ -18,13 +18,13 @@ package auth
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // NewCmdAuth returns an initialized Command instance for 'auth' sub command
-func NewCmdAuth(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAuth(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "auth",
@@ -35,6 +35,7 @@ func NewCmdAuth(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	cmds.AddCommand(NewCmdCanI(f, streams))
 	cmds.AddCommand(NewCmdReconcile(f, streams))
+	cmds.AddCommand(NewCmdWhoAmI(f, streams))
 
 	return cmds
 }

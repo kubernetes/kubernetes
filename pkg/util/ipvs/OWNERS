@@ -1,11 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - thockin
-  - andrewsykim
+  - sig-network-reviewers
+  - uablrek
 approvers:
-  - thockin
-  - andrewsykim
+  - sig-network-approvers
+  - uablrek
 labels:
   - sig/network
   - area/ipvs

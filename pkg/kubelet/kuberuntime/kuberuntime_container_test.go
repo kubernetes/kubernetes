@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,10 +28,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -38,6 +45,7 @@ import (
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
+	ctx := context.Background()
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := &v1.Pod{
@@ -65,6 +73,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.GlobFn = func(pattern, path string) bool {
 		pattern = strings.Replace(pattern, "*", ".*", -1)
+		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
@@ -74,7 +83,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(containerID)
+	err = m.removeContainer(ctx, containerID)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -84,7 +93,7 @@ func TestRemoveContainer(t *testing.T) {
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
+	containers, err := fakeRuntime.ListContainers(ctx, &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -117,7 +126,8 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
+		ctx := context.Background()
+		err := m.killContainer(ctx, test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
@@ -221,6 +231,111 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
+// TestToKubeContainerStatusWithResources tests the converting the CRI container status to
+// the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
+func TestToKubeContainerStatusWithResources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	var (
+		createdAt int64 = 327
+		startedAt int64 = 999
+	)
+
+	for desc, test := range map[string]struct {
+		input    *runtimeapi.ContainerStatus
+		expected *kubecontainer.Status
+	}{
+		"container reporting cpu and memory": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:           25000,
+						CpuPeriod:          100000,
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit:    resource.NewMilliQuantity(250, resource.DecimalSI),
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+		"container reporting cpu only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:  50000,
+						CpuPeriod: 100000,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit: resource.NewMilliQuantity(500, resource.DecimalSI),
+				},
+			},
+		},
+		"container reporting memory only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			actual := toKubeContainerStatus(test.input, cid.Type)
+			assert.Equal(t, test.expected, actual, desc)
+		})
+	}
+}
+
 func TestLifeCycleHook(t *testing.T) {
 
 	// Setup
@@ -276,18 +391,30 @@ func TestLifeCycleHook(t *testing.T) {
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
+	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+		return &kubecontainer.PodStatus{
+			ID:        uid,
+			Name:      name,
+			Namespace: namespace,
+			IPs: []string{
+				"127.0.0.1",
+			},
+		}, nil
+	})
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
 		fakeRunner,
+		fakePodStatusProvider,
 		nil)
 
 	m.runner = lcHanlder
 
 	// Configured and works as expected
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
+		ctx := context.Background()
 		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
@@ -295,32 +422,49 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.url = "" }()
-		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		t.Run("inconsistent", func(t *testing.T) {
+			ctx := context.Background()
+			defer func() { fakeHTTP.req = nil }()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Prestop hook was not invoked")
-		}
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
+		t.Run("consistent", func(t *testing.T) {
+			ctx := context.Background()
+			defer func() { fakeHTTP.req = nil }()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
+
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
 	})
 
 	// When there is no time to run PreStopHook
 	t.Run("PreStop-NoTimeToRun", func(t *testing.T) {
+		ctx := context.Background()
 		gracePeriodLocal := int64(0)
 
 		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
 		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
 
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
+		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Should not execute when gracePeriod is 0")
+		if fakeHTTP.req != nil {
+			t.Errorf("HTTP Prestop hook Should not execute when gracePeriod is 0")
 		}
 	})
 
 	// Post Start script
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
-
+		ctx := context.Background()
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
@@ -341,7 +485,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
+		_, err := m.startContainer(ctx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}
@@ -438,6 +582,48 @@ func TestRestartCountByLogDir(t *testing.T) {
 			filenames:    []string{"5.log.rotated", "6.log", "7.log"},
 			restartCount: 8,
 		},
+		// no restart count log files
+		{
+			filenames:    []string{},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"a.log.rotated", "b.log.rotated", "12log.rotated"},
+			restartCount: 0,
+		},
+		// log extension twice
+		{
+			filenames:    []string{"145.log.log.rotated"},
+			restartCount: 146,
+		},
+		// too big of the integer
+		{
+			filenames:    []string{"92233720368547758089223372036854775808.log.rotated"},
+			restartCount: 0,
+		},
+		// mix of log files
+		{
+			filenames:    []string{"9223372036854775808.log.rotated", "23.log", "23a.log", "1aaa.log.rotated", "2.log", "3.log.rotated"},
+			restartCount: 24,
+		},
+		// prefixed
+		{
+			filenames:    []string{"rotated.23.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"mylog42.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"-42.log"},
+			restartCount: 0,
+		},
+		// same restart count multiple times
+		{
+			filenames:    []string{"6.log", "6.log.rotated", "6.log.rotated.rotated"},
+			restartCount: 7,
+		},
 	} {
 		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
@@ -446,8 +632,10 @@ func TestRestartCountByLogDir(t *testing.T) {
 			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
 			assert.NoError(t, err, "could not write log file")
 		}
-		count, _ := calcRestartCountByLogDir(tempDirPath)
-		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		count, err := calcRestartCountByLogDir(tempDirPath)
+		if assert.NoError(t, err) {
+			assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		}
 	}
 }
 
@@ -613,4 +801,41 @@ func TestKillContainerGracePeriod(t *testing.T) {
 			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
 		})
 	}
+}
+
+// TestUpdateContainerResources tests updating a container in a Pod.
+func TestUpdateContainerResources(t *testing.T) {
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
+	require.NoError(t, errCreate)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	assert.Equal(t, len(fakeContainers), 1)
+
+	ctx := context.Background()
+	cStatus, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	containerID := cStatus[0].ID
+
+	err = m.updateContainerResources(pod, &pod.Spec.Containers[0], containerID)
+	assert.NoError(t, err)
+
+	// Verify container is updated
+	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
 }

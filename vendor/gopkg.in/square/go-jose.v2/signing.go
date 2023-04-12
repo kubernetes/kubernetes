@@ -17,6 +17,7 @@
 package jose
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/base64"
@@ -75,6 +76,27 @@ func (so *SignerOptions) WithContentType(contentType ContentType) *SignerOptions
 // WithType adds a type ("typ") header and returns the updated SignerOptions.
 func (so *SignerOptions) WithType(typ ContentType) *SignerOptions {
 	return so.WithHeader(HeaderType, typ)
+}
+
+// WithCritical adds the given names to the critical ("crit") header and returns
+// the updated SignerOptions.
+func (so *SignerOptions) WithCritical(names ...string) *SignerOptions {
+	if so.ExtraHeaders[headerCritical] == nil {
+		so.WithHeader(headerCritical, make([]string, 0, len(names)))
+	}
+	crit := so.ExtraHeaders[headerCritical].([]string)
+	so.ExtraHeaders[headerCritical] = append(crit, names...)
+	return so
+}
+
+// WithBase64 adds a base64url-encode payload ("b64") header and returns the updated
+// SignerOptions. When the "b64" value is "false", the payload is not base64 encoded.
+func (so *SignerOptions) WithBase64(b64 bool) *SignerOptions {
+	if !b64 {
+		so.WithHeader(headerB64, b64)
+		so.WithCritical(headerB64)
+	}
+	return so
 }
 
 type payloadSigner interface {
@@ -233,7 +255,10 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 			if ctx.embedJWK {
 				protected[headerJWK] = recipient.publicKey()
 			} else {
-				protected[headerKeyID] = recipient.publicKey().KeyID
+				keyID := recipient.publicKey().KeyID
+				if keyID != "" {
+					protected[headerKeyID] = keyID
+				}
 			}
 		}
 
@@ -250,12 +275,26 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 		}
 
 		serializedProtected := mustSerializeJSON(protected)
+		needsBase64 := true
 
-		input := []byte(fmt.Sprintf("%s.%s",
-			base64.RawURLEncoding.EncodeToString(serializedProtected),
-			base64.RawURLEncoding.EncodeToString(payload)))
+		if b64, ok := protected[headerB64]; ok {
+			if needsBase64, ok = b64.(bool); !ok {
+				return nil, errors.New("square/go-jose: Invalid b64 header parameter")
+			}
+		}
 
-		signatureInfo, err := recipient.signer.signPayload(input, recipient.sigAlg)
+		var input bytes.Buffer
+
+		input.WriteString(base64.RawURLEncoding.EncodeToString(serializedProtected))
+		input.WriteByte('.')
+
+		if needsBase64 {
+			input.WriteString(base64.RawURLEncoding.EncodeToString(payload))
+		} else {
+			input.Write(payload)
+		}
+
+		signatureInfo, err := recipient.signer.signPayload(input.Bytes(), recipient.sigAlg)
 		if err != nil {
 			return nil, err
 		}
@@ -324,12 +363,18 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 	if err != nil {
 		return err
 	}
-	if len(critical) > 0 {
-		// Unsupported crit header
+
+	for _, name := range critical {
+		if !supportedCritical[name] {
+			return ErrCryptoFailure
+		}
+	}
+
+	input, err := obj.computeAuthData(payload, &signature)
+	if err != nil {
 		return ErrCryptoFailure
 	}
 
-	input := obj.computeAuthData(payload, &signature)
 	alg := headers.getSignatureAlgorithm()
 	err = verifier.verifyPayload(input, signature.Signature, alg)
 	if err == nil {
@@ -366,18 +411,25 @@ func (obj JSONWebSignature) DetachedVerifyMulti(payload []byte, verificationKey 
 		return -1, Signature{}, err
 	}
 
+outer:
 	for i, signature := range obj.Signatures {
 		headers := signature.mergedHeaders()
 		critical, err := headers.getCritical()
 		if err != nil {
 			continue
 		}
-		if len(critical) > 0 {
-			// Unsupported crit header
+
+		for _, name := range critical {
+			if !supportedCritical[name] {
+				continue outer
+			}
+		}
+
+		input, err := obj.computeAuthData(payload, &signature)
+		if err != nil {
 			continue
 		}
 
-		input := obj.computeAuthData(payload, &signature)
 		alg := headers.getSignatureAlgorithm()
 		err = verifier.verifyPayload(input, signature.Signature, alg)
 		if err == nil {

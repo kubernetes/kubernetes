@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - klueska
+  - pohly
+reviewers:
+  - klueska
+  - pohly
+  - bart0sh
+labels:
+  - sig/node

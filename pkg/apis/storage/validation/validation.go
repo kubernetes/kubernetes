@@ -27,10 +27,12 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -436,6 +438,7 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateFSGroupPolicy(spec.FSGroupPolicy, fldPath.Child("fsGroupPolicy"))...)
 	allErrs = append(allErrs, validateTokenRequests(spec.TokenRequests, fldPath.Child("tokenRequests"))...)
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
+	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
 	return allErrs
 }
 
@@ -533,14 +536,29 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 	return allErrs
 }
 
+// validateSELinuxMount tests if seLinuxMount is set for CSIDriver.
+func validateSELinuxMount(seLinuxMount *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if seLinuxMount == nil && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
 // ValidateStorageCapacityName checks that a name is appropriate for a
 // CSIStorageCapacity object.
 var ValidateStorageCapacityName = apimachineryvalidation.NameIsDNSSubdomain
 
+type CSIStorageCapacityValidateOptions struct {
+	AllowInvalidLabelValueInSelector bool
+}
+
 // ValidateCSIStorageCapacity validates a CSIStorageCapacity.
-func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity) field.ErrorList {
+func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity, opts CSIStorageCapacityValidateOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&capacity.ObjectMeta, true, ValidateStorageCapacityName, field.NewPath("metadata"))
-	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, field.NewPath("nodeTopology"))...)
+	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
+	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, field.NewPath("nodeTopology"))...)
 	for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
 	}

@@ -35,8 +35,7 @@ type Interface interface {
 	WardleV1beta1() wardlev1beta1.WardleV1beta1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	wardleV1alpha1 *wardlev1alpha1.WardleV1alpha1Client

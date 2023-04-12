@@ -33,8 +33,7 @@ type Interface interface {
 	SamplecontrollerV1alpha1() samplecontrollerv1alpha1.SamplecontrollerV1alpha1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	samplecontrollerV1alpha1 *samplecontrollerv1alpha1.SamplecontrollerV1alpha1Client

@@ -18,8 +18,10 @@ package v1beta3
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -52,8 +54,15 @@ func getDefaultPlugins() *v1beta3.Plugins {
 			},
 		},
 	}
+	applyFeatureGates(plugins)
 
 	return plugins
+}
+
+func applyFeatureGates(config *v1beta3.Plugins) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1beta3.Plugin{Name: names.SchedulingGates})
+	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
@@ -83,7 +92,7 @@ type pluginIndex struct {
 }
 
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3.PluginSet {
-	disabledPlugins := sets.NewString()
+	disabledPlugins := sets.New[string]()
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
 	replacedPluginIndex := sets.NewInt()

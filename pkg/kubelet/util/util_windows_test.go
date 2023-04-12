@@ -22,8 +22,6 @@ package util
 import (
 	"fmt"
 	"math/rand"
-	"net"
-	"os"
 	"reflect"
 	"runtime"
 	"sync"
@@ -182,7 +180,7 @@ func TestParseEndpoint(t *testing.T) {
 
 }
 
-func testPipe(t *testing.T, label string) {
+func TestIsUnixDomainSocketPipe(t *testing.T) {
 	generatePipeName := func(suffixLen int) string {
 		rand.Seed(time.Now().UnixNano())
 		letter := []rune("abcdef0123456789")
@@ -196,52 +194,22 @@ func testPipe(t *testing.T, label string) {
 	pipeln, err := winio.ListenPipe(testFile, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;BA)(A;;GA;;;SY)"})
 	defer pipeln.Close()
 
-	require.NoErrorf(t, err, "Failed to listen on named pipe for test purposes: %v while setting up: %s", err, label)
+	require.NoErrorf(t, err, "Failed to listen on named pipe for test purposes: %v", err)
 	result, err := IsUnixDomainSocket(testFile)
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.False(t, result, "Unexpected result: true from IsUnixDomainSocket: %v for %s", result, label)
-}
-
-func testRegularFile(t *testing.T, label string, exists bool) {
-	f, err := os.CreateTemp("", "test-file")
-	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
-	testFile := f.Name()
-	if !exists {
-		testFile = testFile + ".absent"
-	}
-	f.Close()
-	result, err := IsUnixDomainSocket(testFile)
-	os.Remove(f.Name())
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.False(t, result, "Unexpected result: true from IsUnixDomainSocket: %v for %s", result, label)
-}
-
-func testUnixDomainSocket(t *testing.T, label string) {
-	f, err := os.CreateTemp("", "test-domain-socket")
-	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
-	testFile := f.Name()
-	f.Close()
-	os.Remove(testFile)
-	ta, err := net.ResolveUnixAddr("unix", testFile)
-	require.NoErrorf(t, err, "Failed to ResolveUnixAddr: %v while setting up: %s", err, label)
-	unixln, err := net.ListenUnix("unix", ta)
-	require.NoErrorf(t, err, "Failed to ListenUnix: %v while setting up: %s", err, label)
-	result, err := IsUnixDomainSocket(testFile)
-	unixln.Close()
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket: %v for %s", result, label)
+	assert.NoError(t, err, "Unexpected error from IsUnixDomainSocket.")
+	assert.False(t, result, "Unexpected result: true from IsUnixDomainSocket.")
 }
 
 // This is required as on Windows it's possible for the socket file backing a Unix domain socket to
 // exist but not be ready for socket communications yet as per
 // https://github.com/kubernetes/kubernetes/issues/104584
-func testPendingUnixDomainSocket(t *testing.T, label string) {
+func TestPendingUnixDomainSocket(t *testing.T) {
 	// Create a temporary file that will simulate the Unix domain socket file in a
 	// not-yet-ready state. We need this because the Kubelet keeps an eye on file
 	// changes and acts on them, leading to potential race issues as described in
 	// the referenced issue above
 	f, err := os.CreateTemp("", "test-domain-socket")
-	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
+	require.NoErrorf(t, err, "Failed to create file for test purposes: %v", err)
 	testFile := f.Name()
 	f.Close()
 
@@ -250,8 +218,8 @@ func testPendingUnixDomainSocket(t *testing.T, label string) {
 	wg.Add(1)
 	go func() {
 		result, err := IsUnixDomainSocket(testFile)
-		assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-		assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket: %v for %s", result, label)
+		assert.Nil(t, err, "Unexpected error from IsUnixDomainSocket: %v", err)
+		assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket.")
 		wg.Done()
 	}()
 
@@ -261,21 +229,13 @@ func testPendingUnixDomainSocket(t *testing.T, label string) {
 	// Replace the temporary file with an actual Unix domain socket file
 	os.Remove(testFile)
 	ta, err := net.ResolveUnixAddr("unix", testFile)
-	require.NoErrorf(t, err, "Failed to ResolveUnixAddr: %v while setting up: %s", err, label)
+	require.NoError(t, err, "Failed to ResolveUnixAddr.")
 	unixln, err := net.ListenUnix("unix", ta)
-	require.NoErrorf(t, err, "Failed to ListenUnix: %v while setting up: %s", err, label)
+	require.NoError(t, err, "Failed to ListenUnix.")
 
 	// Wait for the goroutine to finish, then close the socket
 	wg.Wait()
 	unixln.Close()
-}
-
-func TestIsUnixDomainSocket(t *testing.T) {
-	testPipe(t, "Named Pipe")
-	testRegularFile(t, "Regular File that Exists", true)
-	testRegularFile(t, "Regular File that Does Not Exist", false)
-	testUnixDomainSocket(t, "Unix Domain Socket File")
-	testPendingUnixDomainSocket(t, "Pending Unix Domain Socket File")
 }
 
 func TestNormalizePath(t *testing.T) {
@@ -316,4 +276,49 @@ func TestNormalizePath(t *testing.T) {
 	for _, test := range tests {
 		assert.Equal(t, test.normalizedPath, NormalizePath(test.originalpath))
 	}
+}
+
+func TestLocalEndpoint(t *testing.T) {
+	tests := []struct {
+		path             string
+		file             string
+		expectError      bool
+		expectedFullPath string
+	}{
+		{
+			path:             "/var/lib/kubelet/pod-resources",
+			file:             "kube.sock", // this is not the default, but it's not relevant here
+			expectError:      false,
+			expectedFullPath: `npipe://\\.\pipe\kubelet-pod-resources`,
+		},
+	}
+	for _, test := range tests {
+		fullPath, err := LocalEndpoint(test.path, test.file)
+		if test.expectError {
+			assert.NotNil(t, err, "expected error")
+			continue
+		}
+		assert.Nil(t, err, "expected no error")
+		assert.Equal(t, test.expectedFullPath, fullPath)
+	}
+}
+
+func TestLocalEndpointRoundTrip(t *testing.T) {
+	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
+	expectedDialerName := runtime.FuncForPC(npipeDialPointer).Name()
+	expectedAddress := "//./pipe/kubelet-pod-resources"
+
+	fullPath, err := LocalEndpoint(`pod-resources`, "kubelet")
+	require.NoErrorf(t, err, "Failed to create the local endpoint path")
+
+	address, dialer, err := GetAddressAndDialer(fullPath)
+	require.NoErrorf(t, err, "Failed to parse the endpoint path and get back address and dialer (path=%q)", fullPath)
+
+	dialerPointer := reflect.ValueOf(dialer).Pointer()
+	actualDialerName := runtime.FuncForPC(dialerPointer).Name()
+
+	assert.Equalf(t, npipeDialPointer, dialerPointer,
+		"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
+
+	assert.Equal(t, expectedAddress, address)
 }

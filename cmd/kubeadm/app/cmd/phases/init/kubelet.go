@@ -49,6 +49,7 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.NodeCRISocket,
 			options.NodeName,
 			options.Patches,
+			options.DryRun,
 		},
 	}
 }

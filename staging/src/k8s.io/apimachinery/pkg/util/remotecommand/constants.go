@@ -27,8 +27,8 @@ const (
 
 	// The SPDY subprotocol "channel.k8s.io" is used for remote command
 	// attachment/execution. This represents the initial unversioned subprotocol,
-	// which has the known bugs http://issues.k8s.io/13394 and
-	// http://issues.k8s.io/13395.
+	// which has the known bugs https://issues.k8s.io/13394 and
+	// https://issues.k8s.io/13395.
 	StreamProtocolV1Name = "channel.k8s.io"
 
 	// The SPDY subprotocol "v2.channel.k8s.io" is used for remote command

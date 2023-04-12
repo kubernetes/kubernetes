@@ -198,7 +198,7 @@ func Header(md *metadata.MD) CallOption {
 // HeaderCallOption is a CallOption for collecting response header metadata.
 // The metadata field will be populated *after* the RPC completes.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -220,7 +220,7 @@ func Trailer(md *metadata.MD) CallOption {
 // TrailerCallOption is a CallOption for collecting response trailer metadata.
 // The metadata field will be populated *after* the RPC completes.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -242,7 +242,7 @@ func Peer(p *peer.Peer) CallOption {
 // PeerCallOption is a CallOption for collecting the identity of the remote
 // peer. The peer field will be populated *after* the RPC completes.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -282,7 +282,7 @@ func FailFast(failFast bool) CallOption {
 // FailFastCallOption is a CallOption for indicating whether an RPC should fail
 // fast or not.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -305,7 +305,7 @@ func MaxCallRecvMsgSize(bytes int) CallOption {
 // MaxRecvMsgSizeCallOption is a CallOption that indicates the maximum message
 // size in bytes the client can receive.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -328,7 +328,7 @@ func MaxCallSendMsgSize(bytes int) CallOption {
 // MaxSendMsgSizeCallOption is a CallOption that indicates the maximum message
 // size in bytes the client can send.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -351,7 +351,7 @@ func PerRPCCredentials(creds credentials.PerRPCCredentials) CallOption {
 // PerRPCCredsCallOption is a CallOption that indicates the per-RPC
 // credentials to use for the call.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -369,7 +369,7 @@ func (o PerRPCCredsCallOption) after(c *callInfo, attempt *csAttempt) {}
 // sending the request.  If WithCompressor is also set, UseCompressor has
 // higher priority.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -379,7 +379,7 @@ func UseCompressor(name string) CallOption {
 
 // CompressorCallOption is a CallOption that indicates the compressor to use.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -416,7 +416,7 @@ func CallContentSubtype(contentSubtype string) CallOption {
 // ContentSubtypeCallOption is a CallOption that indicates the content-subtype
 // used for marshaling messages.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -444,7 +444,7 @@ func (o ContentSubtypeCallOption) after(c *callInfo, attempt *csAttempt) {}
 // This function is provided for advanced users; prefer to use only
 // CallContentSubtype to select a registered codec instead.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -455,7 +455,7 @@ func ForceCodec(codec encoding.Codec) CallOption {
 // ForceCodecCallOption is a CallOption that indicates the codec used for
 // marshaling messages.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -480,7 +480,7 @@ func CallCustomCodec(codec Codec) CallOption {
 // CustomCodecCallOption is a CallOption that indicates the codec used for
 // marshaling messages.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -497,7 +497,7 @@ func (o CustomCodecCallOption) after(c *callInfo, attempt *csAttempt) {}
 // MaxRetryRPCBufferSize returns a CallOption that limits the amount of memory
 // used for buffering this RPC's requests for retry purposes.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -508,7 +508,7 @@ func MaxRetryRPCBufferSize(bytes int) CallOption {
 // MaxRetryRPCBufferSizeCallOption is a CallOption indicating the amount of
 // memory to be used for caching this RPC for retry purposes.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -548,10 +548,11 @@ type parser struct {
 // format. The caller owns the returned msg memory.
 //
 // If there is an error, possible values are:
-//   * io.EOF, when no messages remain
-//   * io.ErrUnexpectedEOF
-//   * of type transport.ConnectionError
-//   * an error from the status package
+//   - io.EOF, when no messages remain
+//   - io.ErrUnexpectedEOF
+//   - of type transport.ConnectionError
+//   - an error from the status package
+//
 // No other error values or types must be returned, which also means
 // that the underlying io.Reader must not return an incompatible
 // error.

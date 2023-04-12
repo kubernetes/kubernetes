@@ -86,10 +86,11 @@ func NewREST(
 	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Service{} },
-		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
-		DefaultQualifiedResource: api.Resource("services"),
-		ReturnDeletedObject:      true,
+		NewFunc:                   func() runtime.Object { return &api.Service{} },
+		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
+		DefaultQualifiedResource:  api.Resource("services"),
+		SingularQualifiedResource: api.Resource("service"),
+		ReturnDeletedObject:       true,
 
 		CreateStrategy:      svcreg.Strategy,
 		UpdateStrategy:      svcreg.Strategy,
@@ -464,7 +465,7 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 				// but in the expected case we'll only make one.
 				for try := 0; try < len(ss.Addresses); try++ {
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
-					// TODO(thockin): do we really need this check?
+					// We only proxy to addresses that are actually pods.
 					if err := isValidAddress(ctx, &addr, r.pods); err != nil {
 						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
 						continue
@@ -652,7 +653,7 @@ func needsHCNodePort(svc *api.Service) bool {
 	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
-	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyLocal {
 		return false
 	}
 	return true

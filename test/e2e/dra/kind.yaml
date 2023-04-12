@@ -1,0 +1,37 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    scheduler:
+        extraArgs:
+          v: "5"
+    controllerManager:
+        extraArgs:
+          v: "5"
+    apiServer:
+        extraArgs:
+          runtime-config: "resource.k8s.io/v1alpha2=true"
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+featureGates:
+  DynamicResourceAllocation: true

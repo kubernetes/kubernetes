@@ -17,63 +17,25 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
-type Rule struct {
-	// APIGroups is the API groups the resources belong to. '*' is all groups.
-	// If '*' is present, the length of the slice must be one.
-	// Required.
-	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,1,rep,name=apiGroups"`
-
-	// APIVersions is the API versions the resources belong to. '*' is all versions.
-	// If '*' is present, the length of the slice must be one.
-	// Required.
-	APIVersions []string `json:"apiVersions,omitempty" protobuf:"bytes,2,rep,name=apiVersions"`
-
-	// Resources is a list of resources this rule applies to.
-	//
-	// For example:
-	// 'pods' means pods.
-	// 'pods/log' means the log subresource of pods.
-	// '*' means all resources, but not subresources.
-	// 'pods/*' means all subresources of pods.
-	// '*/scale' means all scale subresources.
-	// '*/*' means all resources and their subresources.
-	//
-	// If wildcard is present, the validation rule will ensure resources do not
-	// overlap with each other.
-	//
-	// Depending on the enclosing object, subresources might not be allowed.
-	// Required.
-	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
-
-	// scope specifies the scope of this rule.
-	// Valid values are "Cluster", "Namespaced", and "*"
-	// "Cluster" means that only cluster-scoped resources will match this rule.
-	// Namespace API objects are cluster-scoped.
-	// "Namespaced" means that only namespaced resources will match this rule.
-	// "*" means that there are no scope restrictions.
-	// Subresources match the scope of their parent resource.
-	// Default is "*".
-	//
-	// +optional
-	Scope *ScopeType `json:"scope,omitempty" protobuf:"bytes,4,rep,name=scope"`
-}
+type Rule = v1.Rule
 
 // ScopeType specifies a scope for a Rule.
-type ScopeType string
+type ScopeType = v1.ScopeType
 
 const (
 	// ClusterScope means that scope is limited to cluster-scoped objects.
 	// Namespace objects are cluster-scoped.
-	ClusterScope ScopeType = "Cluster"
+	ClusterScope ScopeType = v1.ClusterScope
 	// NamespacedScope means that scope is limited to namespaced objects.
-	NamespacedScope ScopeType = "Namespaced"
+	NamespacedScope ScopeType = v1.NamespacedScope
 	// AllScopes means that all scopes are included.
-	AllScopes ScopeType = "*"
+	AllScopes ScopeType = v1.AllScopes
 )
 
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
@@ -321,6 +283,28 @@ type ValidatingWebhook struct {
 	// Default to `['v1beta1']`.
 	// +optional
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// webhook. Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the webhook is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
+	//
+	// This is an alpha feature and managed by the AdmissionWebhookMatchConditions feature gate.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=AdmissionWebhookMatchConditions
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,11,rep,name=matchConditions"`
 }
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
@@ -471,6 +455,28 @@ type MutatingWebhook struct {
 	// Defaults to "Never".
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// webhook. Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the webhook is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
+	//
+	// This is an alpha feature and managed by the AdmissionWebhookMatchConditions feature gate.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=AdmissionWebhookMatchConditions
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,12,rep,name=matchConditions"`
 }
 
 // ReinvocationPolicyType specifies what type of policy the admission hook uses.
@@ -488,27 +494,19 @@ const (
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
-type RuleWithOperations struct {
-	// Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
-	// for all of those operations and any future admission operations that are added.
-	// If '*' is present, the length of the slice must be one.
-	// Required.
-	Operations []OperationType `json:"operations,omitempty" protobuf:"bytes,1,rep,name=operations,casttype=OperationType"`
-	// Rule is embedded, it describes other criteria of the rule, like
-	// APIGroups, APIVersions, Resources, etc.
-	Rule `json:",inline" protobuf:"bytes,2,opt,name=rule"`
-}
+type RuleWithOperations = v1.RuleWithOperations
 
 // OperationType specifies an operation for a request.
-type OperationType string
+// +enum
+type OperationType = v1.OperationType
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
 const (
-	OperationAll OperationType = "*"
-	Create       OperationType = "CREATE"
-	Update       OperationType = "UPDATE"
-	Delete       OperationType = "DELETE"
-	Connect      OperationType = "CONNECT"
+	OperationAll OperationType = v1.OperationAll
+	Create       OperationType = v1.Create
+	Update       OperationType = v1.Update
+	Delete       OperationType = v1.Delete
+	Connect      OperationType = v1.Connect
 )
 
 // WebhookClientConfig contains the information to make a TLS
@@ -576,4 +574,33 @@ type ServiceReference struct {
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
+}
+
+// MatchCondition represents a condition which must be fulfilled for a request to be sent to a webhook.
+type MatchCondition struct {
+	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// as well as providing an identifier for logging purposes. A good name should be descriptive of
+	// the associated expression.
+	// Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
+	// must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or
+	// '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an
+	// optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
+	//
+	// Required.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+	// CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
+	//
+	// 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// 'oldObject' - The existing object. The value is null for CREATE requests.
+	// 'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).
+	// 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
+	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+	//
+	// Required.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=expression"`
 }

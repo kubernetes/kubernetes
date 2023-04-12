@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -71,7 +72,8 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 
 	// Assert
 	if err != nil {
@@ -115,7 +117,8 @@ func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.
 	volumeName := v1.UniqueVolumeName("this-would-never-be-a-volume-name")
 
 	// Act
-	err := asw.MarkVolumeAsAttached(volumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err := asw.MarkVolumeAsAttached(logger, volumeName, volumeSpec, "" /* nodeName */, devicePath)
 
 	// Assert
 	if err != nil {
@@ -159,14 +162,14 @@ func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 
 	// Assert
 	if err != nil {
@@ -210,8 +213,8 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -286,8 +289,8 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -394,8 +397,8 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 			generatedVolumeName1,
 			generatedVolumeName2, volumeSpec1, volumeSpec2)
 	}
-
-	err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -534,8 +537,8 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 				plugin, volumeSpec1)
 			require.NoError(t, err)
-
-			err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+			logger, _ := ktesting.NewTestContext(t)
+			err = asw.MarkVolumeAsAttached(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 			if err != nil {
 				t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -585,6 +588,74 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Call MarkVolumeAsDetached() on a volume which mounted by pod(s) should be skipped
+func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
+	devicePath := "fake/device/path"
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	logger, _ := ktesting.NewTestContext(t)
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	err := asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	podName := util.GetUniquePodName(pod)
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	asw.MarkVolumeAsDetached(generatedVolumeName, "" /* nodeName */)
+
+	// Assert
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
 func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
@@ -734,8 +805,8 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -787,8 +858,8 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -825,7 +896,8 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	verifyVolumeExistsAswWithSELinux(t, generatedVolumeName, "system_u:object_r:container_file_t:s0:c0,c1", asw)
 	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
-	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+	verifyPodExistsInVolumeAswWithSELinux(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, "system_u:object_r:container_file_t:s0:c0,c1", asw)
+	verifyPodExistsInVolumeSELinuxMismatch(t, podName, generatedVolumeName, "" /* wrong SELinux label */, asw)
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
 }
@@ -865,8 +937,8 @@ func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
-
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -912,8 +984,8 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec1)
 	require.NoError(t, err)
-
-	err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -1087,8 +1159,18 @@ func verifyPodExistsInVolumeAsw(
 	expectedVolumeName v1.UniqueVolumeName,
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
+	verifyPodExistsInVolumeAswWithSELinux(t, expectedPodName, expectedVolumeName, expectedDevicePath, "", asw)
+}
+
+func verifyPodExistsInVolumeAswWithSELinux(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeName v1.UniqueVolumeName,
+	expectedDevicePath string,
+	expectedSELinuxLabel string,
+	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, "")
+		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1151,6 +1233,26 @@ func verifyPodDoesntExistInVolumeAsw(
 		t.Fatalf(
 			"Invalid devicePath. Expected: <\"\"> Actual: <%q> ",
 			devicePath)
+	}
+}
+
+func verifyPodExistsInVolumeSELinuxMismatch(
+	t *testing.T,
+	podToCheck volumetypes.UniquePodName,
+	volumeToCheck v1.UniqueVolumeName,
+	unexpectedSELinuxLabel string,
+	asw ActualStateOfWorld) {
+
+	podExistsInVolume, _, err := asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
+	if podExistsInVolume {
+		t.Errorf("expected Pod %s not to exists, but it does", podToCheck)
+	}
+	if err == nil {
+		t.Error("expected PodExistsInVolume to return error, but it returned nil")
+	}
+
+	if !IsSELinuxMountMismatchError(err) {
+		t.Errorf("expected PodExistsInVolume to return SELinuxMountMismatchError, got %s", err)
 	}
 }
 

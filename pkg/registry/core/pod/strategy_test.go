@@ -25,8 +25,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,11 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
+
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -258,6 +261,72 @@ func TestGetPodQOS(t *testing.T) {
 		if actual != testCase.expected {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
+	}
+}
+
+func TestWaitingForGatesCondition(t *testing.T) {
+	tests := []struct {
+		name           string
+		pod            *api.Pod
+		featureEnabled bool
+		want           api.PodCondition
+	}{
+		{
+			name:           "pod without .spec.schedulingGates, feature disabled",
+			pod:            &api.Pod{},
+			featureEnabled: false,
+			want:           api.PodCondition{},
+		},
+		{
+			name:           "pod without .spec.schedulingGates, feature enabled",
+			pod:            &api.Pod{},
+			featureEnabled: true,
+			want:           api.PodCondition{},
+		},
+		{
+			name: "pod with .spec.schedulingGates, feature disabled",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			featureEnabled: false,
+			want:           api.PodCondition{},
+		},
+		{
+			name: "pod with .spec.schedulingGates, feature enabled",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			featureEnabled: true,
+			want: api.PodCondition{
+				Type:    api.PodScheduled,
+				Status:  api.ConditionFalse,
+				Reason:  api.PodReasonSchedulingGated,
+				Message: "Scheduling is blocked due to non-empty scheduling gates",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod)
+			var got api.PodCondition
+			for _, condition := range tt.pod.Status.Conditions {
+				if condition.Type == api.PodScheduled {
+					got = condition
+					break
+				}
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -723,316 +792,6 @@ func TestPodIndexFunc(t *testing.T) {
 
 	}
 }
-func TestApplySeccompVersionSkew(t *testing.T) {
-	const containerName = "container"
-	testProfile := "test"
-
-	for _, test := range []struct {
-		description string
-		pod         *api.Pod
-		validation  func(*testing.T, *api.Pod)
-	}{
-		{
-			description: "Security context nil",
-			pod:         &api.Pod{},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.NotNil(t, pod)
-			},
-		},
-		{
-			description: "Security context not nil",
-			pod: &api.Pod{
-				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.NotNil(t, pod)
-			},
-		},
-		{
-			description: "Field set and no annotation present",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						SeccompProfile: &api.SeccompProfile{
-							Type: api.SeccompProfileTypeUnconfined,
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 0)
-			},
-		},
-		{
-			description: "Annotation 'unconfined' and no field present",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-					},
-				},
-				Spec: api.PodSpec{},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeUnconfined, pod.Spec.SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'runtime/default' and no field present",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-					},
-				},
-				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'docker/default' and no field present",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-					},
-				},
-				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'localhost/test' and no field present",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompPodAnnotationKey: v1.SeccompLocalhostProfileNamePrefix + testProfile,
-					},
-				},
-				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.SecurityContext.SeccompProfile.Type)
-				require.Equal(t, testProfile, *pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'localhost/' has zero length",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompPodAnnotationKey: v1.SeccompLocalhostProfileNamePrefix,
-					},
-				},
-				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile)
-			},
-		},
-		{
-			description: "Security context nil (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{{}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.NotNil(t, pod)
-			},
-		},
-		{
-			description: "Security context not nil (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						SecurityContext: &api.SecurityContext{},
-					}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.NotNil(t, pod)
-			},
-		},
-		{
-			description: "Field set and no annotation present (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: containerName,
-							SecurityContext: &api.SecurityContext{
-								SeccompProfile: &api.SeccompProfile{
-									Type: api.SeccompProfileTypeUnconfined,
-								},
-							},
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 0)
-			},
-		},
-		{
-			description: "Multiple containers with fields (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: containerName + "1",
-							SecurityContext: &api.SecurityContext{
-								SeccompProfile: &api.SeccompProfile{
-									Type: api.SeccompProfileTypeUnconfined,
-								},
-							},
-						},
-						{
-							Name: containerName + "2",
-						},
-						{
-							Name: containerName + "3",
-							SecurityContext: &api.SecurityContext{
-								SeccompProfile: &api.SeccompProfile{
-									Type: api.SeccompProfileTypeRuntimeDefault,
-								},
-							},
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 0)
-			},
-		},
-		{
-			description: "Annotation 'unconfined' and no field present (container)",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompProfileNameUnconfined,
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Name: containerName,
-					}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'runtime/default' and no field present (container)",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompProfileRuntimeDefault,
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Name:            containerName,
-						SecurityContext: &api.SecurityContext{},
-					}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Annotation 'docker/default' and no field present (container)",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.DeprecatedSeccompProfileDockerDefault,
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Name:            containerName,
-						SecurityContext: &api.SecurityContext{},
-					}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
-				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-		{
-			description: "Multiple containers by annotations (container)",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompContainerAnnotationKeyPrefix + containerName + "1": v1.SeccompLocalhostProfileNamePrefix + testProfile,
-						v1.SeccompContainerAnnotationKeyPrefix + containerName + "3": v1.SeccompProfileRuntimeDefault,
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{Name: containerName + "1"},
-						{Name: containerName + "2"},
-						{Name: containerName + "3"},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
-				require.Equal(t, testProfile, *pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
-				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[2].SecurityContext.SeccompProfile.Type)
-			},
-		},
-		{
-			description: "Annotation 'localhost/test' and no field present (container)",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompLocalhostProfileNamePrefix + testProfile,
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Name:            containerName,
-						SecurityContext: &api.SecurityContext{},
-					}},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
-				require.Equal(t, testProfile, *pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
-			},
-		},
-	} {
-		output := &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
-		}
-		for i, ctr := range test.pod.Spec.Containers {
-			output.Spec.Containers = append(output.Spec.Containers, api.Container{})
-			if ctr.SecurityContext != nil && ctr.SecurityContext.SeccompProfile != nil {
-				output.Spec.Containers[i].SecurityContext = &api.SecurityContext{
-					SeccompProfile: &api.SeccompProfile{
-						Type:             api.SeccompProfileType(ctr.SecurityContext.SeccompProfile.Type),
-						LocalhostProfile: ctr.SecurityContext.SeccompProfile.LocalhostProfile,
-					},
-				}
-			}
-		}
-		applySeccompVersionSkew(test.pod)
-		test.validation(t, test.pod)
-	}
-}
 
 func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *api.Pod {
 	return &api.Pod{
@@ -1066,13 +825,16 @@ func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quant
 
 func TestPodStrategyValidate(t *testing.T) {
 	const containerName = "container"
-	errTest := []struct {
-		name string
-		pod  *api.Pod
+
+	tests := []struct {
+		name    string
+		pod     *api.Pod
+		wantErr bool
 	}{
 		{
-			name: "a new pod setting container with indivisible hugepages values",
-			pod:  newPodWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+			name:    "a new pod setting container with indivisible hugepages values",
+			pod:     newPodWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+			wantErr: true,
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values",
@@ -1100,6 +862,7 @@ func TestPodStrategyValidate(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values while container with divisible hugepages values",
@@ -1141,21 +904,8 @@ func TestPodStrategyValidate(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
 		},
-	}
-
-	for _, tc := range errTest {
-		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) == 0 {
-				t.Error("expected failure")
-			}
-		})
-	}
-
-	tests := []struct {
-		name string
-		pod  *api.Pod
-	}{
 		{
 			name: "a new pod setting container with divisible hugepages values",
 			pod: &api.Pod{
@@ -1189,8 +939,268 @@ func TestPodStrategyValidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
+			errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod)
+			if tc.wantErr && len(errs) == 0 {
+				t.Errorf("expected errors but got none")
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Errorf("unexpected errors: %v", errs.ToAggregate())
+			}
+		})
+	}
+}
+
+func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
+
+	test := []struct {
+		name   string
+		newPod *api.Pod
+		oldPod *api.Pod
+	}{
+		{
+			name: "add ephemeral container to regular pod and expect success",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// expect no errors
+	for _, tc := range test {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := EphemeralContainersStrategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
 				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+
+	test = []struct {
+		name   string
+		newPod *api.Pod
+		oldPod *api.Pod
+	}{
+		{
+			name: "add ephemeral container to static pod and expect failure",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					NodeName: "example.com",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+					NodeName: "example.com",
+				},
+			},
+		},
+		{
+			name: "remove ephemeral container from regular pod and expect failure",
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "change ephemeral container from regular pod and expect failure",
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image2",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// expect one error
+	for _, tc := range test {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := EphemeralContainersStrategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			if len(errs) == 0 {
+				t.Errorf("unexpected success:ephemeral containers are not supported for static pods")
+			} else if len(errs) != 1 {
+				t.Errorf("unexpected errors:expected one error about ephemeral containers are not supported for static pods:got:%v:", errs)
 			}
 		})
 	}
@@ -1433,5 +1443,184 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 				t.Errorf("unexpected diff when dropping fields (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
+	var (
+		honor            = api.NodeInclusionPolicyHonor
+		ignore           = api.NodeInclusionPolicyIgnore
+		emptyConstraints = []api.TopologySpreadConstraint{
+			{
+				WhenUnsatisfiable: api.DoNotSchedule,
+				TopologyKey:       "kubernetes.io/hostname",
+				MaxSkew:           1,
+			},
+		}
+		defaultConstraints = []api.TopologySpreadConstraint{
+			{
+				NodeAffinityPolicy: &honor,
+				NodeTaintsPolicy:   &ignore,
+				WhenUnsatisfiable:  api.DoNotSchedule,
+				TopologyKey:        "kubernetes.io/hostname",
+				MaxSkew:            1,
+			},
+		}
+	)
+
+	tests := []struct {
+		name                          string
+		topologySpreadConstraints     []api.TopologySpreadConstraint
+		wantTopologySpreadConstraints []api.TopologySpreadConstraint
+		enableNodeInclusionPolicy     bool
+	}{
+		{
+			name:                          "nodeInclusionPolicy enabled with topology unset",
+			topologySpreadConstraints:     emptyConstraints,
+			wantTopologySpreadConstraints: emptyConstraints,
+			enableNodeInclusionPolicy:     true,
+		},
+		{
+			name:                          "nodeInclusionPolicy enabled with topology configured",
+			topologySpreadConstraints:     defaultConstraints,
+			wantTopologySpreadConstraints: defaultConstraints,
+			enableNodeInclusionPolicy:     true,
+		},
+		{
+			name:                          "nodeInclusionPolicy disabled with topology configured",
+			topologySpreadConstraints:     defaultConstraints,
+			wantTopologySpreadConstraints: emptyConstraints,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)()
+
+			pod := &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			}
+			wantPod := pod.DeepCopy()
+			pod.Spec.TopologySpreadConstraints = append(pod.Spec.TopologySpreadConstraints, tc.topologySpreadConstraints...)
+
+			errs := Strategy.Validate(genericapirequest.NewContext(), pod)
+			if len(errs) != 0 {
+				t.Errorf("Unexpected error: %v", errs.ToAggregate())
+			}
+
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+			wantPod.Spec.TopologySpreadConstraints = append(wantPod.Spec.TopologySpreadConstraints, tc.wantTopologySpreadConstraints...)
+			if diff := cmp.Diff(wantPod, pod, cmpopts.IgnoreFields(pod.Status, "Phase", "QOSClass")); diff != "" {
+				t.Errorf("%s unexpected result (-want, +got): %s", tc.name, diff)
+			}
+		})
+	}
+}
+
+func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
+	var (
+		honor  = api.NodeInclusionPolicyHonor
+		ignore = api.NodeInclusionPolicyIgnore
+	)
+
+	// Enable the Feature Gate during the first rule creation
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+	ctx := genericapirequest.NewDefaultContext()
+
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "foo",
+			ResourceVersion: "1",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSDefault,
+			Containers: []api.Container{
+				{
+					Name:                     "container",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			TopologySpreadConstraints: []api.TopologySpreadConstraint{
+				{
+					NodeAffinityPolicy: &ignore,
+					NodeTaintsPolicy:   &honor,
+					WhenUnsatisfiable:  api.DoNotSchedule,
+					TopologyKey:        "kubernetes.io/hostname",
+					MaxSkew:            1,
+				},
+			},
+		},
+	}
+
+	errs := Strategy.Validate(ctx, pod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	createdPod := pod.DeepCopy()
+	Strategy.PrepareForCreate(ctx, createdPod)
+
+	if len(createdPod.Spec.TopologySpreadConstraints) != 1 ||
+		*createdPod.Spec.TopologySpreadConstraints[0].NodeAffinityPolicy != ignore ||
+		*createdPod.Spec.TopologySpreadConstraints[0].NodeTaintsPolicy != honor {
+		t.Error("NodeInclusionPolicy created with unexpected result")
+	}
+
+	// Disable the Feature Gate and expect these fields still exist after updating.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)()
+
+	updatedPod := createdPod.DeepCopy()
+	updatedPod.Labels = map[string]string{"foo": "bar"}
+	updatedPod.ResourceVersion = "2"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod, createdPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod, createdPod)
+
+	if len(updatedPod.Spec.TopologySpreadConstraints) != 1 ||
+		*updatedPod.Spec.TopologySpreadConstraints[0].NodeAffinityPolicy != ignore ||
+		*updatedPod.Spec.TopologySpreadConstraints[0].NodeTaintsPolicy != honor {
+		t.Error("NodeInclusionPolicy updated with unexpected result")
+	}
+
+	// Enable the Feature Gate again to check whether configured fields still exist after updating.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+
+	updatedPod2 := updatedPod.DeepCopy()
+	updatedPod2.Labels = map[string]string{"foo": "fuz"}
+	updatedPod2.ResourceVersion = "3"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod2, updatedPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod2, updatedPod)
+	if len(updatedPod2.Spec.TopologySpreadConstraints) != 1 ||
+		*updatedPod2.Spec.TopologySpreadConstraints[0].NodeAffinityPolicy != ignore ||
+		*updatedPod2.Spec.TopologySpreadConstraints[0].NodeTaintsPolicy != honor {
+		t.Error("NodeInclusionPolicy updated with unexpected result")
 	}
 }

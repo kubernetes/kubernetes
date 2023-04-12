@@ -127,6 +127,7 @@ func getAddonPhaseFlags(name string) []string {
 		options.KubeconfigPath,
 		options.KubernetesVersion,
 		options.ImageRepository,
+		options.DryRun,
 	}
 	if name == "all" || name == "kube-proxy" {
 		flags = append(flags,

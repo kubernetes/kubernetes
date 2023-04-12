@@ -101,3 +101,9 @@ func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	return "", errUnsupported
 }
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *HostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return "", errUnsupported
+}

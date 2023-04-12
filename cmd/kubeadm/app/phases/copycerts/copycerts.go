@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
-	keyutil "k8s.io/client-go/util/keyutil"
+	"k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
 
@@ -233,6 +233,8 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	if err != nil {
 		return errors.Wrap(err, "error decoding secret data with provided key")
 	}
+
+	fmt.Printf("[download-certs] Saving the certificates to the folder: %q\n", cfg.CertificatesDir)
 
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]

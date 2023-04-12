@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -47,7 +48,7 @@ type ViewOptions struct {
 	Context      string
 	OutputFormat string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -60,7 +61,7 @@ var (
 		# Show merged kubeconfig settings
 		kubectl config view
 
-		# Show merged kubeconfig settings and raw certificate data
+		# Show merged kubeconfig settings and raw certificate data and exposed secrets
 		kubectl config view --raw
 
 		# Get the password for the e2e user
@@ -68,7 +69,7 @@ var (
 )
 
 // NewCmdConfigView returns a Command instance for 'config view' sub command
-func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigView(streams genericiooptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
 		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		ConfigAccess: ConfigAccess,
@@ -93,7 +94,7 @@ func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcm
 	o.Merge.Default(true)
 	mergeFlag := cmd.Flags().VarPF(&o.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
 	mergeFlag.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&o.RawByteData, "raw", o.RawByteData, "Display raw byte data")
+	cmd.Flags().BoolVar(&o.RawByteData, "raw", o.RawByteData, "Display raw byte data and sensitive data")
 	cmd.Flags().BoolVar(&o.Flatten, "flatten", o.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
 	cmd.Flags().BoolVar(&o.Minify, "minify", o.Minify, "Remove all information not used by current-context from the output")
 	return cmd
@@ -150,6 +151,9 @@ func (o ViewOptions) Run() error {
 			return err
 		}
 	} else if !o.RawByteData {
+		if err := clientcmdapi.RedactSecrets(config); err != nil {
+			return err
+		}
 		clientcmdapi.ShortenConfig(config)
 	}
 

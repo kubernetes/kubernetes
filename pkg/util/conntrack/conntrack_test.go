@@ -44,7 +44,7 @@ func TestExecConntrackTool(t *testing.T) {
 			},
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -62,7 +62,7 @@ func TestExecConntrackTool(t *testing.T) {
 	expectErr := []bool{false, false, true}
 
 	for i := range testCases {
-		err := Exec(&fexec, testCases[i]...)
+		err := Exec(fexec, testCases[i]...)
 
 		if expectErr[i] {
 			if err == nil {
@@ -94,7 +94,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -116,7 +116,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 
 	svcCount := 0
 	for _, tc := range testCases {
-		if err := ClearEntriesForIP(&fexec, tc.ip, v1.ProtocolUDP); err != nil {
+		if err := ClearEntriesForIP(fexec, tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s test case:, Unexpected error: %v", tc.name, err)
 		}
 		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.ip) + familyParamStr(utilnet.IsIPv6String(tc.ip))
@@ -141,7 +141,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -161,7 +161,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 	svcCount := 0
 	for _, tc := range testCases {
-		err := ClearEntriesForPort(&fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		err := ClearEntriesForPort(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: Unexpected error: %v", tc.name, err)
 		}
@@ -177,7 +177,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 }
 
-func TestDeleteConnections(t *testing.T) {
+func TestDeleteUDPConnections(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
@@ -185,18 +185,10 @@ func TestDeleteConnections(t *testing.T) {
 				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
-			func() ([]byte, []byte, error) {
-				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
-			},
-			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -208,52 +200,30 @@ func TestDeleteConnections(t *testing.T) {
 		name   string
 		origin string
 		dest   string
-		proto  v1.Protocol
 	}{
 		{
-			name:   "UDP IPv4 success",
+			name:   "IPv4 success",
 			origin: "1.2.3.4",
 			dest:   "10.20.30.40",
-			proto:  v1.ProtocolUDP,
 		},
 		{
-			name:   "UDP IPv4 simulated failure",
+			name:   "IPv4 simulated failure",
 			origin: "2.3.4.5",
 			dest:   "20.30.40.50",
-			proto:  v1.ProtocolUDP,
 		},
 		{
-			name:   "UDP IPv6 success",
+			name:   "IPv6 success",
 			origin: "fd00::600d:f00d",
 			dest:   "2001:db8::5",
-			proto:  v1.ProtocolUDP,
-		},
-		{
-			name:   "SCTP IPv4 success",
-			origin: "1.2.3.5",
-			dest:   "10.20.30.50",
-			proto:  v1.ProtocolSCTP,
-		},
-		{
-			name:   "SCTP IPv4 simulated failure",
-			origin: "2.3.4.6",
-			dest:   "20.30.40.60",
-			proto:  v1.ProtocolSCTP,
-		},
-		{
-			name:   "SCTP IPv6 success",
-			origin: "fd00::600d:f00d",
-			dest:   "2001:db8::6",
-			proto:  v1.ProtocolSCTP,
 		},
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForNAT(&fexec, tc.origin, tc.dest, tc.proto)
+		err := ClearEntriesForNAT(fexec, tc.origin, tc.dest, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}
-		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p %s", tc.origin, tc.dest, protoStr(tc.proto)) + familyParamStr(utilnet.IsIPv6String(tc.origin))
+		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.origin, tc.dest) + familyParamStr(utilnet.IsIPv6String(tc.origin))
 		execCommand := strings.Join(fcmd.CombinedOutputLog[i], " ")
 		if expectCommand != execCommand {
 			t.Errorf("%s test case: Expect command: %s, but executed %s", tc.name, expectCommand, execCommand)
@@ -265,46 +235,36 @@ func TestDeleteConnections(t *testing.T) {
 	}
 }
 
-func TestClearConntrackForPortNAT(t *testing.T) {
+func TestClearUDPConntrackForPortNAT(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
 			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	testCases := []struct {
-		name  string
-		port  int
-		dest  string
-		proto v1.Protocol
+		name string
+		port int
+		dest string
 	}{
 		{
-			name:  "UDP IPv4 success",
-			port:  30211,
-			dest:  "1.2.3.4",
-			proto: v1.ProtocolUDP,
-		},
-		{
-			name:  "SCTP IPv4 success",
-			port:  30215,
-			dest:  "1.2.3.5",
-			proto: v1.ProtocolSCTP,
+			name: "IPv4 success",
+			port: 30211,
+			dest: "1.2.3.4",
 		},
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForPortNAT(&fexec, tc.dest, tc.port, tc.proto)
+		err := ClearEntriesForPortNAT(fexec, tc.dest, tc.port, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}
-		expectCommand := fmt.Sprintf("conntrack -D -p %s --dport %d --dst-nat %s", protoStr(tc.proto), tc.port, tc.dest) + familyParamStr(utilnet.IsIPv6String(tc.dest))
+		expectCommand := fmt.Sprintf("conntrack -D -p udp --dport %d --dst-nat %s", tc.port, tc.dest) + familyParamStr(utilnet.IsIPv6String(tc.dest))
 		execCommand := strings.Join(fcmd.CombinedOutputLog[i], " ")
 		if expectCommand != execCommand {
 			t.Errorf("%s test case: Expect command: %s, but executed %s", tc.name, expectCommand, execCommand)

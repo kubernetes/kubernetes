@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -71,14 +71,13 @@ type PodDisruptionBudgetOpts struct {
 
 	Client              *policyv1client.PolicyV1Client
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewPodDisruptionBudgetOpts creates a new *PodDisruptionBudgetOpts with sane defaults
-func NewPodDisruptionBudgetOpts(ioStreams genericclioptions.IOStreams) *PodDisruptionBudgetOpts {
+func NewPodDisruptionBudgetOpts(ioStreams genericiooptions.IOStreams) *PodDisruptionBudgetOpts {
 	return &PodDisruptionBudgetOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -86,7 +85,7 @@ func NewPodDisruptionBudgetOpts(ioStreams genericclioptions.IOStreams) *PodDisru
 }
 
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.
-func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPodDisruptionBudgetOpts(ioStreams)
 
 	cmd := &cobra.Command{
@@ -139,15 +138,6 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -224,9 +214,6 @@ func (o *PodDisruptionBudgetOpts) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(podDisruptionBudget.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		podDisruptionBudget, err = o.Client.PodDisruptionBudgets(o.Namespace).Create(context.TODO(), podDisruptionBudget, createOptions)

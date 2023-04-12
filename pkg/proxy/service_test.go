@@ -33,19 +33,19 @@ import (
 
 const testHostname = "test-hostname"
 
-func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
-	info := &BaseServiceInfo{
+func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServicePortInfo)) *BaseServicePortInfo {
+	bsvcPortInfo := &BaseServicePortInfo{
 		clusterIP: netutils.ParseIPSloppy(clusterIP),
 		port:      port,
 		protocol:  v1.Protocol(protocol),
 	}
 	if healthcheckNodePort != 0 {
-		info.healthCheckNodePort = healthcheckNodePort
+		bsvcPortInfo.healthCheckNodePort = healthcheckNodePort
 	}
 	for _, svcInfoFunc := range svcInfoFuncs {
-		svcInfoFunc(info)
+		svcInfoFunc(bsvcPortInfo)
 	}
-	return info
+	return bsvcPortInfo
 }
 
 func makeTestService(namespace, name string, svcFunc func(*v1.Service)) *v1.Service {
@@ -96,7 +96,7 @@ func TestServiceToServiceMap(t *testing.T) {
 	testCases := []struct {
 		desc     string
 		service  *v1.Service
-		expected map[ServicePortName]*BaseServiceInfo
+		expected map[ServicePortName]*BaseServicePortInfo
 		ipFamily v1.IPFamily
 	}{
 		{
@@ -104,7 +104,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			ipFamily: v1.IPv4Protocol,
 
 			service:  nil,
-			expected: map[ServicePortName]*BaseServiceInfo{},
+			expected: map[ServicePortName]*BaseServicePortInfo{},
 		},
 		{
 			desc:     "headless service",
@@ -115,7 +115,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ClusterIP = v1.ClusterIPNone
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "rpc", "UDP", 1234, 0, 0)
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{},
+			expected: map[ServicePortName]*BaseServicePortInfo{},
 		},
 		{
 			desc:     "headless sctp service",
@@ -126,7 +126,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ClusterIP = v1.ClusterIPNone
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sip", "SCTP", 7777, 0, 0)
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{},
+			expected: map[ServicePortName]*BaseServicePortInfo{},
 		},
 		{
 			desc:     "headless service without port",
@@ -136,7 +136,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Type = v1.ServiceTypeClusterIP
 				svc.Spec.ClusterIP = v1.ClusterIPNone
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{},
+			expected: map[ServicePortName]*BaseServicePortInfo{},
 		},
 		{
 			desc:     "cluster ip service",
@@ -148,7 +148,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{
+			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns2", "cluster-ip", "p1", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0),
 				makeServicePortName("ns2", "cluster-ip", "p2", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.4", 1235, "UDP", 0),
 			},
@@ -163,7 +163,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "UDP", 345, 678, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port2", "TCP", 344, 677, 0)
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{
+			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns2", "node-port", "port1", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.10", 345, "UDP", 0),
 				makeServicePortName("ns2", "node-port", "port2", v1.ProtocolTCP): makeTestServiceInfo("172.16.55.10", 344, "TCP", 0),
 			},
@@ -180,12 +180,12 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
 				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(info *BaseServiceInfo) {
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
 				}),
-				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(info *BaseServiceInfo) {
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
 				}),
 			},
 		},
@@ -200,15 +200,15 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "portx", "UDP", 8677, 30063, 7002)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "porty", "UDP", 8678, 30064, 7003)
 				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 				svc.Spec.HealthCheckNodePort = 345
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("ns1", "only-local-load-balancer", "portx", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345, func(info *BaseServiceInfo) {
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "only-local-load-balancer", "portx", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
 				}),
-				makeServicePortName("ns1", "only-local-load-balancer", "porty", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345, func(info *BaseServiceInfo) {
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
+				makeServicePortName("ns1", "only-local-load-balancer", "porty", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
 				}),
 			},
 		},
@@ -222,7 +222,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ExternalName = "foo2.bar.com"
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "portz", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*BaseServiceInfo{},
+			expected: map[ServicePortName]*BaseServicePortInfo{},
 		},
 		{
 			desc:     "service with ipv6 clusterIP under ipv4 mode, service should be filtered",
@@ -312,11 +312,11 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("test", "validIPv4", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.externalIPs = []string{testExternalIPv4}
-					info.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("test", "validIPv4", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
+					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
 				}),
 			},
 		},
@@ -350,11 +350,11 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("test", "validIPv6", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.externalIPs = []string{testExternalIPv6}
-					info.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("test", "validIPv6", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
+					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
 				}),
 			},
 		},
@@ -388,11 +388,11 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.externalIPs = []string{testExternalIPv4}
-					info.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
+					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
 				}),
 			},
 		},
@@ -426,11 +426,11 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.externalIPs = []string{testExternalIPv6}
-					info.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					info.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
+					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
+					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
 				}),
 			},
 		},
@@ -455,9 +455,9 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*BaseServiceInfo{
-				makeServicePortName("test", "extra-space", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.loadBalancerSourceRanges = []string{"10.1.2.0/28"}
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("test", "extra-space", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerSourceRanges = []string{"10.1.2.0/28"}
 				}),
 			},
 		},
@@ -473,7 +473,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				t.Fatalf("expected %d new, got %d: %v", len(tc.expected), len(newServices), spew.Sdump(newServices))
 			}
 			for svcKey, expectedInfo := range tc.expected {
-				svcInfo, exists := newServices[svcKey].(*BaseServiceInfo)
+				svcInfo, exists := newServices[svcKey].(*BaseServicePortInfo)
 				if !exists {
 					t.Fatalf("[%s] expected to find key %s", tc.desc, svcKey)
 				}
@@ -488,7 +488,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
 				for svcKey, expectedInfo := range tc.expected {
-					svcInfo, _ := newServices[svcKey].(*BaseServiceInfo)
+					svcInfo, _ := newServices[svcKey].(*BaseServicePortInfo)
 					if !svcInfo.clusterIP.Equal(expectedInfo.clusterIP) ||
 						svcInfo.port != expectedInfo.port ||
 						svcInfo.protocol != expectedInfo.protocol ||
@@ -507,25 +507,21 @@ func TestServiceToServiceMap(t *testing.T) {
 type FakeProxier struct {
 	endpointsChanges *EndpointChangeTracker
 	serviceChanges   *ServiceChangeTracker
-	serviceMap       ServiceMap
+	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
 	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 	return &FakeProxier{
-		serviceMap:     make(ServiceMap),
+		svcPortMap:     make(ServicePortMap),
 		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
 		endpointsMap:   make(EndpointsMap),
 		endpointsChanges: &EndpointChangeTracker{
-			hostname:                  testHostname,
-			items:                     make(map[types.NamespacedName]*endpointsChange),
-			makeEndpointInfo:          nil,
-			ipFamily:                  ipFamily,
-			recorder:                  nil,
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,
+			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
 		},
 	}
 }
@@ -536,16 +532,16 @@ func makeServiceMap(fake *FakeProxier, allServices ...*v1.Service) {
 	}
 }
 
-func (fake *FakeProxier) addService(service *v1.Service) {
-	fake.serviceChanges.Update(nil, service)
+func (proxier *FakeProxier) addService(service *v1.Service) {
+	proxier.serviceChanges.Update(nil, service)
 }
 
-func (fake *FakeProxier) updateService(oldService *v1.Service, service *v1.Service) {
-	fake.serviceChanges.Update(oldService, service)
+func (proxier *FakeProxier) updateService(oldService *v1.Service, service *v1.Service) {
+	proxier.serviceChanges.Update(oldService, service)
 }
 
-func (fake *FakeProxier) deleteService(service *v1.Service) {
-	fake.serviceChanges.Update(service, nil)
+func (proxier *FakeProxier) deleteService(service *v1.Service) {
+	proxier.serviceChanges.Update(service, nil)
 }
 
 func TestServiceMapUpdateHeadless(t *testing.T) {
@@ -564,18 +560,23 @@ func TestServiceMapUpdateHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 0 {
-		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
+	}
+	result := fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 0 {
+		t.Errorf("expected service map length 0, got %d", len(fp.svcPortMap))
+	}
+
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %d", len(result.HCServiceNodePorts))
-	}
-
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %d", len(healthCheckNodePorts))
 	}
 }
 
@@ -591,16 +592,22 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 0 {
-		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
 	}
+	result := fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 0 {
+		t.Errorf("expected service map length 0, got %v", fp.svcPortMap)
+	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs)
+	}
+
 	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
-	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP)
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 }
 
@@ -643,7 +650,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.HealthCheckNodePort = 345
 		}),
 	}
@@ -651,24 +658,36 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.addService(services[i])
 	}
-	result := fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 8 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+
+	pending := fp.serviceChanges.PendingChanges()
+	for i := range services {
+		name := services[i].Namespace + "/" + services[i].Name
+		if !pending.Has(name) {
+			t.Errorf("expected pending change for %q", name)
+		}
+	}
+	if pending.Len() != len(services) {
+		t.Errorf("expected %d pending service changes, got %d", len(services), pending.Len())
+	}
+
+	result := fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 8 {
+		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
+	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	// The only-local-loadbalancer ones get added
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected 1 healthcheck port, got %v", result.HCServiceNodePorts)
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected 1 healthcheck port, got %v", healthCheckNodePorts)
 	} else {
 		nsn := makeNSN("ns1", "only-local-load-balancer")
-		if port, found := result.HCServiceNodePorts[nsn]; !found || port != 345 {
-			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, result.HCServiceNodePorts)
+		if port, found := healthCheckNodePorts[nsn]; !found || port != 345 {
+			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, healthCheckNodePorts)
 		}
-	}
-
-	if len(result.UDPStaleClusterIP) != 0 {
-		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
 	}
 
 	// Remove some stuff
@@ -684,24 +703,29 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.deleteService(services[2])
 	fp.deleteService(services[3])
 
-	result = fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 1 {
-		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 4 {
+		t.Errorf("expected 4 pending service changes, got %d", pending.Len())
+	}
+	result = fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 1 {
+		t.Errorf("expected service map length 1, got %v", fp.svcPortMap)
 	}
 
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected 0 healthcheck ports, got %v", result.HCServiceNodePorts)
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected 0 healthcheck ports, got %v", healthCheckNodePorts)
 	}
 
 	// All services but one were deleted. While you'd expect only the ClusterIPs
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
-	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
-	if len(result.UDPStaleClusterIP) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.UDPStaleClusterIP.UnsortedList())
+	expectedDeletedUDPClusterIPs := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
+	if len(result.DeletedUDPClusterIPs) != len(expectedDeletedUDPClusterIPs) {
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedDeletedUDPClusterIPs), result.DeletedUDPClusterIPs.UnsortedList())
 	}
-	for _, ip := range expectedStaleUDPServices {
-		if !result.UDPStaleClusterIP.Has(ip) {
+	for _, ip := range expectedDeletedUDPClusterIPs {
+		if !result.DeletedUDPClusterIPs.Has(ip) {
 			t.Errorf("expected stale UDP service service %s", ip)
 		}
 	}
@@ -727,62 +751,86 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				{IP: "10.1.2.3"},
 			},
 		}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = 345
 	})
 
 	fp.addService(servicev1)
 
-	result := fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
+	result := fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.DeletedUDPClusterIPs) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
+	}
+
+	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 
 	// Change service to load-balancer
 	fp.updateService(servicev1, servicev2)
-	result = fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
+	result = fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", healthCheckNodePorts)
 	}
 
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.updateService(servicev2, servicev2)
-	result = fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
+	result = fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", healthCheckNodePorts)
 	}
 
 	// And back to ClusterIP
 	fp.updateService(servicev2, servicev1)
-	result = fp.serviceMap.Update(fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
+	result = fp.svcPortMap.Update(fp.serviceChanges)
+	if len(fp.svcPortMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.DeletedUDPClusterIPs) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
+	}
+
+	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 }

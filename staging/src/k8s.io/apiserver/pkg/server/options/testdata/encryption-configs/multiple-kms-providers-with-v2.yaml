@@ -1,0 +1,18 @@
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+      - secrets
+    providers:
+      - kms:
+          name: kms-provider-1
+          cachesize: 1000
+          endpoint: unix:///@provider1.sock
+      - kms:
+          name: kms-provider-2
+          cachesize: 1000
+          endpoint: unix:///@provider2.sock
+      - kms:
+          apiVersion: v2
+          name: kms-provider-3
+          endpoint: unix:///@provider2.sock

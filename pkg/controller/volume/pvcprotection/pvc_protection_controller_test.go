@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -399,7 +400,8 @@ func TestPVCProtectionController(t *testing.T) {
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client)
+		logger, _ := ktesting.NewTestContext(t)
+		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -424,15 +426,15 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {
-			ctrl.pvcAddedUpdated(test.updatedPVC)
+			ctrl.pvcAddedUpdated(logger, test.updatedPVC)
 		}
 		switch {
 		case test.deletedPod != nil && test.updatedPod != nil && test.deletedPod.Namespace == test.updatedPod.Namespace && test.deletedPod.Name == test.updatedPod.Name:
-			ctrl.podAddedDeletedUpdated(test.deletedPod, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, test.deletedPod, test.updatedPod, false)
 		case test.updatedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.updatedPod, false)
 		case test.deletedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.deletedPod, true)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.deletedPod, true)
 		}
 
 		// Process the controller queue until we get expected results

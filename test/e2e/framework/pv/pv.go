@@ -135,21 +135,21 @@ type PersistentVolumeClaimConfig struct {
 
 // PVPVCCleanup cleans up a pv and pvc in a single pv/pvc test case.
 // Note: delete errors are appended to []error so that we can attempt to delete both the pvc and pv.
-func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
+func PVPVCCleanup(ctx context.Context, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
 	var errs []error
 
 	if pvc != nil {
-		err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
+		err := DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %v", pvc.Name, err))
+			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %w", pvc.Name, err))
 		}
 	} else {
 		framework.Logf("pvc is nil")
 	}
 	if pv != nil {
-		err := DeletePersistentVolume(c, pv.Name)
+		err := DeletePersistentVolume(ctx, c, pv.Name)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete PV %q: %v", pv.Name, err))
+			errs = append(errs, fmt.Errorf("failed to delete PV %q: %w", pv.Name, err))
 		}
 	} else {
 		framework.Logf("pv is nil")
@@ -160,22 +160,22 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 // PVPVCMapCleanup Cleans up pvs and pvcs in multi-pv-pvc test cases. Entries found in the pv and claim maps are
 // deleted as long as the Delete api call succeeds.
 // Note: delete errors are appended to []error so that as many pvcs and pvs as possible are deleted.
-func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap) []error {
+func PVPVCMapCleanup(ctx context.Context, c clientset.Interface, ns string, pvols PVMap, claims PVCMap) []error {
 	var errs []error
 
 	for pvcKey := range claims {
-		err := DeletePersistentVolumeClaim(c, pvcKey.Name, ns)
+		err := DeletePersistentVolumeClaim(ctx, c, pvcKey.Name, ns)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %v", pvcKey.Name, err))
+			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %w", pvcKey.Name, err))
 		} else {
 			delete(claims, pvcKey)
 		}
 	}
 
 	for pvKey := range pvols {
-		err := DeletePersistentVolume(c, pvKey)
+		err := DeletePersistentVolume(ctx, c, pvKey)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete PV %q: %v", pvKey, err))
+			errs = append(errs, fmt.Errorf("failed to delete PV %q: %w", pvKey, err))
 		} else {
 			delete(pvols, pvKey)
 		}
@@ -184,24 +184,24 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 }
 
 // DeletePersistentVolume deletes the PV.
-func DeletePersistentVolume(c clientset.Interface, pvName string) error {
+func DeletePersistentVolume(ctx context.Context, c clientset.Interface, pvName string) error {
 	if c != nil && len(pvName) > 0 {
 		framework.Logf("Deleting PersistentVolume %q", pvName)
-		err := c.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, metav1.DeleteOptions{})
+		err := c.CoreV1().PersistentVolumes().Delete(ctx, pvName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("PV Delete API error: %v", err)
+			return fmt.Errorf("PV Delete API error: %w", err)
 		}
 	}
 	return nil
 }
 
 // DeletePersistentVolumeClaim deletes the Claim.
-func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) error {
+func DeletePersistentVolumeClaim(ctx context.Context, c clientset.Interface, pvcName string, ns string) error {
 	if c != nil && len(pvcName) > 0 {
 		framework.Logf("Deleting PersistentVolumeClaim %q", pvcName)
-		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
+		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvcName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("PVC Delete API error: %v", err)
+			return fmt.Errorf("PVC Delete API error: %w", err)
 		}
 	}
 	return nil
@@ -210,25 +210,25 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // DeletePVCandValidatePV deletes the PVC and waits for the PV to enter its expected phase. Validate that the PV
 // has been reclaimed (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
-func DeletePVCandValidatePV(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
 	pvname := pvc.Spec.VolumeName
 	framework.Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
-	err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
+	err := DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns)
 	if err != nil {
 		return err
 	}
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
 	framework.Logf("Waiting for reclaim process to complete.")
-	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, framework.Poll, timeouts.PVReclaim)
+	err = WaitForPersistentVolumePhase(ctx, expectPVPhase, c, pv.Name, framework.Poll, timeouts.PVReclaim)
 	if err != nil {
-		return fmt.Errorf("pv %q phase did not become %v: %v", pv.Name, expectPVPhase, err)
+		return fmt.Errorf("pv %q phase did not become %v: %w", pv.Name, expectPVPhase, err)
 	}
 
 	// examine the pv's ClaimRef and UID and compare to expected values
-	pv, err = c.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("PV Get API error: %v", err)
+		return fmt.Errorf("PV Get API error: %w", err)
 	}
 	cr := pv.Spec.ClaimRef
 	if expectPVPhase == v1.VolumeAvailable {
@@ -254,13 +254,13 @@ func DeletePVCandValidatePV(c clientset.Interface, timeouts *framework.TimeoutCo
 // Note: if there are more claims than pvs then some of the remaining claims may bind to just made
 //
 //	available pvs.
-func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePVGroup(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
 	var boundPVs, deletedPVCs int
 
 	for pvName := range pvols {
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("PV Get API error: %v", err)
+			return fmt.Errorf("PV Get API error: %w", err)
 		}
 		cr := pv.Spec.ClaimRef
 		// if pv is bound then delete the pvc it is bound to
@@ -273,13 +273,13 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *framework.Time
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 			// get the pvc for the delete call below
-			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), cr.Name, metav1.GetOptions{})
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, cr.Name, metav1.GetOptions{})
 			if err == nil {
-				if err = DeletePVCandValidatePV(c, timeouts, ns, pvc, pv, expectPVPhase); err != nil {
+				if err = DeletePVCandValidatePV(ctx, c, timeouts, ns, pvc, pv, expectPVPhase); err != nil {
 					return err
 				}
 			} else if !apierrors.IsNotFound(err) {
-				return fmt.Errorf("PVC Get API error: %v", err)
+				return fmt.Errorf("PVC Get API error: %w", err)
 			}
 			// delete pvckey from map even if apierrors.IsNotFound above is true and thus the
 			// claim was not actually deleted here
@@ -294,11 +294,11 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *framework.Time
 }
 
 // create the PV resource. Fails test on error.
-func createPV(c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func createPV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var resultPV *v1.PersistentVolume
 	var lastCreateErr error
-	err := wait.PollImmediate(29*time.Second, timeouts.PVCreate, func() (done bool, err error) {
-		resultPV, lastCreateErr = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
+	err := wait.PollImmediateWithContext(ctx, 29*time.Second, timeouts.PVCreate, func(ctx context.Context) (done bool, err error) {
+		resultPV, lastCreateErr = c.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 		if lastCreateErr != nil {
 			// If we hit a quota problem, we are not done and should retry again.  This happens to be the quota failure string for GCP.
 			// If quota failure strings are found for other platforms, they can be added to improve reliability when running
@@ -316,25 +316,25 @@ func createPV(c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.
 	})
 	// if we have an error from creating the PV, use that instead of a timeout error
 	if lastCreateErr != nil {
-		return nil, fmt.Errorf("PV Create API error: %v", err)
+		return nil, fmt.Errorf("PV Create API error: %w", err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("PV Create API error: %v", err)
+		return nil, fmt.Errorf("PV Create API error: %w", err)
 	}
 
 	return resultPV, nil
 }
 
 // CreatePV creates the PV resource. Fails test on error.
-func CreatePV(c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	return createPV(c, timeouts, pv)
+func CreatePV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return createPV(ctx, c, timeouts, pv)
 }
 
 // CreatePVC creates the PVC resource. Fails test on error.
-func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
+func CreatePVC(ctx context.Context, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(ctx, pvc, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("PVC Create API error: %v", err)
+		return nil, fmt.Errorf("PVC Create API error: %w", err)
 	}
 	return pvc, nil
 }
@@ -346,7 +346,7 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 //
 //	known until after the PVC is instantiated. This is why the pvc is created
 //	before the pv.
-func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVCPV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 	preBindMsg := ""
@@ -358,7 +358,7 @@ func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 	pv := MakePersistentVolume(pvConfig)
 
 	ginkgo.By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
-	pvc, err := CreatePVC(c, ns, pvc)
+	pvc, err := CreatePVC(ctx, c, ns, pvc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -367,7 +367,7 @@ func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 	if preBind {
 		pv.Spec.ClaimRef.Name = pvc.Name
 	}
-	pv, err = createPV(c, timeouts, pv)
+	pv, err = createPV(ctx, c, timeouts, pv)
 	if err != nil {
 		return nil, pvc, err
 	}
@@ -382,7 +382,7 @@ func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 //
 //	known until after the PV is instantiated. This is why the pv is created
 //	before the pvc.
-func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVPVC(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	preBindMsg := ""
 	if preBind {
 		preBindMsg = " pre-bound"
@@ -394,7 +394,7 @@ func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 
 	// instantiate the pv
-	pv, err := createPV(c, timeouts, pv)
+	pv, err := createPV(ctx, c, timeouts, pv)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -402,7 +402,7 @@ func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 	if preBind {
 		pvc.Spec.VolumeName = pv.Name
 	}
-	pvc, err = CreatePVC(c, ns, pvc)
+	pvc, err = CreatePVC(ctx, c, ns, pvc)
 	if err != nil {
 		return pv, nil, err
 	}
@@ -417,7 +417,7 @@ func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 // Note: when the test suite deletes the namespace orphaned pvcs and pods are deleted. However,
 //
 //	orphaned pvs are not deleted and will remain after the suite completes.
-func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
+func CreatePVsPVCs(ctx context.Context, numpvs, numpvcs int, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
 	extraPVCs := 0
@@ -430,7 +430,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framewo
 
 	// create pvs and pvcs
 	for i := 0; i < pvsToCreate; i++ {
-		pv, pvc, err := CreatePVPVC(c, timeouts, pvConfig, pvcConfig, ns, false)
+		pv, pvc, err := CreatePVPVC(ctx, c, timeouts, pvConfig, pvcConfig, ns, false)
 		if err != nil {
 			return pvMap, pvcMap, err
 		}
@@ -441,7 +441,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framewo
 	// create extra pvs or pvcs as needed
 	for i := 0; i < extraPVs; i++ {
 		pv := MakePersistentVolume(pvConfig)
-		pv, err := createPV(c, timeouts, pv)
+		pv, err := createPV(ctx, c, timeouts, pv)
 		if err != nil {
 			return pvMap, pvcMap, err
 		}
@@ -449,7 +449,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framewo
 	}
 	for i := 0; i < extraPVCs; i++ {
 		pvc := MakePersistentVolumeClaim(pvcConfig, ns)
-		pvc, err := CreatePVC(c, ns, pvc)
+		pvc, err := CreatePVC(ctx, c, ns, pvc)
 		if err != nil {
 			return pvMap, pvcMap, err
 		}
@@ -459,29 +459,29 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framewo
 }
 
 // WaitOnPVandPVC waits for the pv and pvc to bind to each other.
-func WaitOnPVandPVC(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
+func WaitOnPVandPVC(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	framework.Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
-	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, framework.Poll, timeouts.ClaimBound)
+	err := WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, pvc.Name, framework.Poll, timeouts.ClaimBound)
 	if err != nil {
-		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
+		return fmt.Errorf("PVC %q did not become Bound: %w", pvc.Name, err)
 	}
 
 	// Wait for PersistentVolume.Status.Phase to be Bound, which it should be
 	// since the PVC is already bound.
-	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, framework.Poll, timeouts.PVBound)
+	err = WaitForPersistentVolumePhase(ctx, v1.VolumeBound, c, pv.Name, framework.Poll, timeouts.PVBound)
 	if err != nil {
-		return fmt.Errorf("PV %q did not become Bound: %v", pv.Name, err)
+		return fmt.Errorf("PV %q did not become Bound: %w", pv.Name, err)
 	}
 
 	// Re-get the pv and pvc objects
-	pv, err = c.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("PV Get API error: %v", err)
+		return fmt.Errorf("PV Get API error: %w", err)
 	}
-	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvc.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("PVC Get API error: %v", err)
+		return fmt.Errorf("PVC Get API error: %w", err)
 	}
 
 	// The pv and pvc are both bound, but to each other?
@@ -508,7 +508,7 @@ func WaitOnPVandPVC(c clientset.Interface, timeouts *framework.TimeoutContext, n
 //	to situations where the maximum wait times are reached several times in succession,
 //	extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
 //	small.
-func WaitAndVerifyBinds(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
+func WaitAndVerifyBinds(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
 	var actualBinds int
 	expectedBinds := len(pvols)
 	if expectedBinds > len(claims) { // want the min of # pvs or #pvcs
@@ -516,19 +516,19 @@ func WaitAndVerifyBinds(c clientset.Interface, timeouts *framework.TimeoutContex
 	}
 
 	for pvName := range pvols {
-		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, framework.Poll, timeouts.PVBound)
+		err := WaitForPersistentVolumePhase(ctx, v1.VolumeBound, c, pvName, framework.Poll, timeouts.PVBound)
 		if err != nil && len(pvols) > len(claims) {
 			framework.Logf("WARN: pv %v is not bound after max wait", pvName)
 			framework.Logf("      This may be ok since there are more pvs than pvcs")
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("PV %q did not become Bound: %v", pvName, err)
+			return fmt.Errorf("PV %q did not become Bound: %w", pvName, err)
 		}
 
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("PV Get API error: %v", err)
+			return fmt.Errorf("PV Get API error: %w", err)
 		}
 		cr := pv.Spec.ClaimRef
 		if cr != nil && len(cr.Name) > 0 {
@@ -539,9 +539,9 @@ func WaitAndVerifyBinds(c clientset.Interface, timeouts *framework.TimeoutContex
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 
-			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, framework.Poll, timeouts.ClaimBound)
+			err := WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, cr.Name, framework.Poll, timeouts.ClaimBound)
 			if err != nil {
-				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
+				return fmt.Errorf("PVC %q did not become Bound: %w", cr.Name, err)
 			}
 			actualBinds++
 		}
@@ -659,10 +659,15 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	}
 }
 
-func createPDWithRetry(zone string) (string, error) {
+func createPDWithRetry(ctx context.Context, zone string) (string, error) {
 	var err error
 	var newDiskName string
-	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
+	for start := time.Now(); ; time.Sleep(pdRetryPollTime) {
+		if time.Since(start) >= pdRetryTimeout ||
+			ctx.Err() != nil {
+			return "", fmt.Errorf("timed out while trying to create PD in zone %q, last error: %w", zone, err)
+		}
+
 		newDiskName, err = createPD(zone)
 		if err != nil {
 			framework.Logf("Couldn't create a new PD in zone %q, sleeping 5 seconds: %v", zone, err)
@@ -671,7 +676,6 @@ func createPDWithRetry(zone string) (string, error) {
 		framework.Logf("Successfully created a new PD in zone %q: %q.", zone, newDiskName)
 		return newDiskName, nil
 	}
-	return "", err
 }
 
 func CreateShare() (string, string, string, error) {
@@ -683,19 +687,23 @@ func DeleteShare(accountName, shareName string) error {
 }
 
 // CreatePDWithRetry creates PD with retry.
-func CreatePDWithRetry() (string, error) {
-	return createPDWithRetry("")
+func CreatePDWithRetry(ctx context.Context) (string, error) {
+	return createPDWithRetry(ctx, "")
 }
 
 // CreatePDWithRetryAndZone creates PD on zone with retry.
-func CreatePDWithRetryAndZone(zone string) (string, error) {
-	return createPDWithRetry(zone)
+func CreatePDWithRetryAndZone(ctx context.Context, zone string) (string, error) {
+	return createPDWithRetry(ctx, zone)
 }
 
 // DeletePDWithRetry deletes PD with retry.
-func DeletePDWithRetry(diskName string) error {
+func DeletePDWithRetry(ctx context.Context, diskName string) error {
 	var err error
-	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
+	for start := time.Now(); ; time.Sleep(pdRetryPollTime) {
+		if time.Since(start) >= pdRetryTimeout ||
+			ctx.Err() != nil {
+			return fmt.Errorf("timed out while trying to delete PD %q, last error: %w", diskName, err)
+		}
 		err = deletePD(diskName)
 		if err != nil {
 			framework.Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, pdRetryPollTime, err)
@@ -704,7 +712,6 @@ func DeletePDWithRetry(diskName string) error {
 		framework.Logf("Successfully deleted PD %q.", diskName)
 		return nil
 	}
-	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
 func createPD(zone string) (string, error) {
@@ -719,33 +726,33 @@ func deletePD(pdName string) error {
 }
 
 // WaitForPVClaimBoundPhase waits until all pvcs phase set to bound
-func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
+func WaitForPVClaimBoundPhase(ctx context.Context, client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
 
 	for index, claim := range pvclaims {
-		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, timeout)
+		err := WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, timeout)
 		if err != nil {
 			return persistentvolumes, err
 		}
 		// Get new copy of the claim
-		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 		if err != nil {
-			return persistentvolumes, fmt.Errorf("PVC Get API error: %v", err)
+			return persistentvolumes, fmt.Errorf("PVC Get API error: %w", err)
 		}
 		// Get the bounded PV
-		persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
+		persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(ctx, claim.Spec.VolumeName, metav1.GetOptions{})
 		if err != nil {
-			return persistentvolumes, fmt.Errorf("PV Get API error: %v", err)
+			return persistentvolumes, fmt.Errorf("PV Get API error: %w", err)
 		}
 	}
 	return persistentvolumes, nil
 }
 
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.Interface, pvName string, poll, timeout time.Duration) error {
+func WaitForPersistentVolumePhase(ctx context.Context, phase v1.PersistentVolumePhase, c clientset.Interface, pvName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, poll, err)
 			continue
@@ -760,13 +767,13 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 }
 
 // WaitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, poll, timeout time.Duration) error {
-	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, poll, timeout, true)
+func WaitForPersistentVolumeClaimPhase(ctx context.Context, phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, poll, timeout time.Duration) error {
+	return WaitForPersistentVolumeClaimsPhase(ctx, phase, c, ns, []string{pvcName}, poll, timeout, true)
 }
 
 // WaitForPersistentVolumeClaimsPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
 // to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, poll, timeout time.Duration, matchAny bool) error {
+func WaitForPersistentVolumeClaimsPhase(ctx context.Context, phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, poll, timeout time.Duration, matchAny bool) error {
 	if len(pvcNames) == 0 {
 		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
 	}
@@ -774,7 +781,7 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		phaseFoundInAllClaims := true
 		for _, pvcName := range pvcNames {
-			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvcName, metav1.GetOptions{})
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, poll, err)
 				phaseFoundInAllClaims = false
@@ -798,24 +805,24 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 }
 
 // CreatePVSource creates a PV source.
-func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
-	diskName, err := CreatePDWithRetryAndZone(zone)
+func CreatePVSource(ctx context.Context, zone string) (*v1.PersistentVolumeSource, error) {
+	diskName, err := CreatePDWithRetryAndZone(ctx, zone)
 	if err != nil {
 		return nil, err
 	}
-	return framework.TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
+	return framework.TestContext.CloudConfig.Provider.CreatePVSource(ctx, zone, diskName)
 }
 
 // DeletePVSource deletes a PV source.
-func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
+func DeletePVSource(ctx context.Context, pvSource *v1.PersistentVolumeSource) error {
+	return framework.TestContext.CloudConfig.Provider.DeletePVSource(ctx, pvSource)
 }
 
 // GetDefaultStorageClassName returns default storageClass or return error
-func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
-	list, err := c.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
+func GetDefaultStorageClassName(ctx context.Context, c clientset.Interface) (string, error) {
+	list, err := c.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("Error listing storage classes: %v", err)
+		return "", fmt.Errorf("Error listing storage classes: %w", err)
 	}
 	var scName string
 	for _, sc := range list.Items {
@@ -834,18 +841,18 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 }
 
 // SkipIfNoDefaultStorageClass skips tests if no default SC can be found.
-func SkipIfNoDefaultStorageClass(c clientset.Interface) {
-	_, err := GetDefaultStorageClassName(c)
+func SkipIfNoDefaultStorageClass(ctx context.Context, c clientset.Interface) {
+	_, err := GetDefaultStorageClassName(ctx, c)
 	if err != nil {
 		e2eskipper.Skipf("error finding default storageClass : %v", err)
 	}
 }
 
 // WaitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, poll, timeout time.Duration) error {
+func WaitForPersistentVolumeDeleted(ctx context.Context, c clientset.Interface, pvName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err == nil {
 			framework.Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
 			continue

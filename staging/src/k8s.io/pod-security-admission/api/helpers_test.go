@@ -117,3 +117,151 @@ func TestPolicyEquals(t *testing.T) {
 	assert.True(t, baseline.Equivalent(&baseline), "baseline policy equals itself")
 	assert.False(t, privileged.Equivalent(&baseline), "privileged != baseline")
 }
+
+func TestPolicyToEvaluate(t *testing.T) {
+	privilegedLV := LevelVersion{
+		Level:   LevelPrivileged,
+		Version: LatestVersion(),
+	}
+	privilegedPolicy := Policy{
+		Enforce: privilegedLV,
+		Warn:    privilegedLV,
+		Audit:   privilegedLV,
+	}
+
+	type testcase struct {
+		desc      string
+		labels    map[string]string
+		defaults  Policy
+		expect    Policy
+		expectErr bool
+	}
+
+	tests := []testcase{{
+		desc:   "simple enforce",
+		labels: makeLabels("enforce", "baseline"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, LatestVersion()},
+			Warn:    LevelVersion{LevelBaseline, LatestVersion()},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "simple warn",
+		labels: makeLabels("warn", "restricted"),
+		expect: Policy{
+			Enforce: privilegedLV,
+			Warn:    LevelVersion{LevelRestricted, LatestVersion()},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "simple audit",
+		labels: makeLabels("audit", "baseline"),
+		expect: Policy{
+			Enforce: privilegedLV,
+			Warn:    privilegedLV,
+			Audit:   LevelVersion{LevelBaseline, LatestVersion()},
+		},
+	}, {
+		desc:   "enforce & warn",
+		labels: makeLabels("enforce", "baseline", "warn", "restricted"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, LatestVersion()},
+			Warn:    LevelVersion{LevelRestricted, LatestVersion()},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "enforce version",
+		labels: makeLabels("enforce", "baseline", "enforce-version", "v1.22"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, MajorMinorVersion(1, 22)},
+			Warn:    LevelVersion{LevelBaseline, MajorMinorVersion(1, 22)},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "enforce version & warn-version",
+		labels: makeLabels("enforce", "baseline", "enforce-version", "v1.22", "warn-version", "latest"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, MajorMinorVersion(1, 22)},
+			Warn:    LevelVersion{LevelBaseline, LatestVersion()},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "enforce & warn-version",
+		labels: makeLabels("enforce", "baseline", "warn-version", "v1.23"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, LatestVersion()},
+			Warn:    LevelVersion{LevelBaseline, MajorMinorVersion(1, 23)},
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc: "fully specd",
+		labels: makeLabels(
+			"enforce", "baseline", "enforce-version", "v1.20",
+			"warn", "restricted", "warn-version", "v1.21",
+			"audit", "restricted", "audit-version", "v1.22"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, MajorMinorVersion(1, 20)},
+			Warn:    LevelVersion{LevelRestricted, MajorMinorVersion(1, 21)},
+			Audit:   LevelVersion{LevelRestricted, MajorMinorVersion(1, 22)},
+		},
+	}, {
+		desc:   "enforce no warn",
+		labels: makeLabels("enforce", "baseline", "warn", "privileged"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, LatestVersion()},
+			Warn:    privilegedLV,
+			Audit:   privilegedLV,
+		},
+	}, {
+		desc:   "enforce warn error",
+		labels: makeLabels("enforce", "baseline", "warn", "foo"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelBaseline, LatestVersion()},
+			Warn:    privilegedLV,
+			Audit:   privilegedLV,
+		},
+		expectErr: true,
+	}, {
+		desc:   "enforce error",
+		labels: makeLabels("enforce", "foo"),
+		expect: Policy{
+			Enforce: LevelVersion{LevelRestricted, LatestVersion()},
+			Warn:    privilegedLV,
+			Audit:   privilegedLV,
+		},
+		expectErr: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if test.defaults == (Policy{}) {
+				test.defaults = privilegedPolicy
+			}
+
+			actual, errs := PolicyToEvaluate(test.labels, test.defaults)
+			if test.expectErr {
+				assert.Error(t, errs.ToAggregate())
+			} else {
+				assert.NoError(t, errs.ToAggregate())
+			}
+
+			assert.Equal(t, test.expect, actual)
+		})
+	}
+}
+
+// makeLabels turns the kev-value pairs into a labels map[string]string.
+func makeLabels(kvs ...string) map[string]string {
+	if len(kvs)%2 != 0 {
+		panic("makeLabels called with mismatched key-values")
+	}
+	labels := map[string]string{
+		"other-label": "foo-bar",
+	}
+	for i := 0; i < len(kvs); i += 2 {
+		key, value := kvs[i], kvs[i+1]
+		key = labelPrefix + key
+		labels[key] = value
+	}
+	return labels
+}

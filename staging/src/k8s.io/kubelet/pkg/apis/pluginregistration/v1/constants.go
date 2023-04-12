@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pluginregistration
+package v1
 
 const (
 	// CSIPlugin identifier for registered CSI plugins
 	CSIPlugin = "CSIPlugin"
 	// DevicePlugin identifier for registered device plugins
 	DevicePlugin = "DevicePlugin"
+	// DRAPlugin identifier for registered Dynamic Resourc Allocation plugins
+	DRAPlugin = "DRAPlugin"
 )

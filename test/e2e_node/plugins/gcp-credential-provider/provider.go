@@ -25,7 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	credentialproviderv1beta1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
+	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 )
 
 const (
@@ -59,8 +59,8 @@ type provider struct {
 	tokenEndpoint string
 }
 
-func (p *provider) Provide(image string) (map[string]credentialproviderv1beta1.AuthConfig, error) {
-	cfg := map[string]credentialproviderv1beta1.AuthConfig{}
+func (p *provider) Provide(image string) (map[string]credentialproviderv1.AuthConfig, error) {
+	cfg := map[string]credentialproviderv1.AuthConfig{}
 
 	tokenJSONBlob, err := readURL(p.tokenEndpoint, p.client)
 	if err != nil {
@@ -72,7 +72,7 @@ func (p *provider) Provide(image string) (map[string]credentialproviderv1beta1.A
 		return cfg, err
 	}
 
-	authConfig := credentialproviderv1beta1.AuthConfig{
+	authConfig := credentialproviderv1.AuthConfig{
 		Username: "_token",
 		Password: parsedBlob.AccessToken,
 	}

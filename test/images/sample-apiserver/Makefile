@@ -28,8 +28,11 @@ bin:
 	docker run --rm -i -v "${TARGET}:${TARGET}:Z" registry.k8s.io/build-image/kube-cross:${KUBE_CROSS_VERSION} \
 		/bin/bash -c "\
 			mkdir -p /go/src /go/bin && \
-			GO111MODULE=on go get -d k8s.io/sample-apiserver@v0.17.0 && \
-			GO111MODULE=on CGO_ENABLED=0 GOARM=${GOARM} GOOS=${OS} GOARCH=${ARCH} go get k8s.io/sample-apiserver@v0.17.0 && \
+			git clone https://github.com/kubernetes/sample-apiserver /go/src/k8s.io/sample-apiserver && \
+			cd /go/src/k8s.io/sample-apiserver && \
+			git checkout tags/v0.17.0 && \
+			go mod tidy && \
+			GO111MODULE=on CGO_ENABLED=0 GOARM=${GOARM} GOOS=${OS} GOARCH=${ARCH} go install . && \
 			find /go/bin -name sample-apiserver* -exec cp {} ${TARGET}/sample-apiserver \;"
 			# for arm, go install uses /go/bin/linux_arm, so just find the file and copy it to the
 			# root so we can copy it out from this throw away container image from a standard location.

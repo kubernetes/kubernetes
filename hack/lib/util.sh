@@ -308,12 +308,24 @@ kube::util::remove-gen-docs() {
 kube::util::group-version-to-pkg-path() {
   local group_version="$1"
 
-  while IFS=$'\n' read -r api; do
-    if [[ "${api}" = "${group_version/.*k8s.io/}" ]]; then
-      echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+  # Make a list of all know APIs by listing their dirs.
+  local apidirs=()
+  kube::util::read-array apidirs < <(
+      cd "${KUBE_ROOT}/staging/src/k8s.io/api" || return 1 # make shellcheck happy
+      find . -name types.go -exec dirname {} \; \
+        | sed "s|\./||g" \
+        | LC_ALL=C sort -u)
+
+  # Compare each API dir against the requested GV, and if we find it, no
+  # special handling needed.
+  for api in "${apidirs[@]}"; do
+    # Change "foo.bar.k8s.io/v1" -> "foo/v1" notation.
+    local simple_gv="${group_version/.*k8s.io/}"
+    if [[ "${api}" = "${simple_gv}" ]]; then
+      echo "vendor/k8s.io/api/${simple_gv}"
       return
     fi
-  done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
+  done
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
@@ -603,11 +615,9 @@ function kube::util::list_staging_repos() {
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
-  IFS=" " read -ra DOCKER <<< "${DOCKER_OPTS}"
-  # Expand ${DOCKER[@]} only if it's not unset. This is to work around
-  # Bash 3 issue with unbound variable.
-  DOCKER=(docker ${DOCKER[@]:+"${DOCKER[@]}"})
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+  DOCKER_OPTS=${DOCKER_OPTS:-""}
+  IFS=" " read -ra docker_opts <<< "${DOCKER_OPTS}"
+  if ! docker "${docker_opts[@]:+"${docker_opts[@]}"}" info > /dev/null 2>&1 ; then
     cat <<'EOF' >&2
 Can't connect to 'docker' daemon.  please fix and retry.
 
@@ -658,6 +668,7 @@ function kube::util::join {
 #  CFSSL_BIN: The path of the installed cfssl binary
 #  CFSSLJSON_BIN: The path of the installed cfssljson binary
 #
+# shellcheck disable=SC2120 # optional parameters
 function kube::util::ensure-cfssl {
   if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
     CFSSL_BIN=$(command -v cfssl)
@@ -670,7 +681,7 @@ function kube::util::ensure-cfssl {
   if [[ "${host_arch}" != "amd64" ]]; then
     echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
     echo "Please install cfssl and cfssljson and verify they are in \$PATH."
-    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
     exit 1
   fi
 
@@ -708,7 +719,7 @@ function kube::util::ensure-cfssl {
     CFSSLJSON_BIN="${cfssldir}/cfssljson"
     if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
       echo "Failed to download 'cfssl'. Please install cfssl and cfssljson and verify they are in \$PATH."
-      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
       exit 1
     fi
   popd > /dev/null || return 1
@@ -718,7 +729,7 @@ function kube::util::ensure-cfssl {
 # Check if we have "docker buildx" commands available
 #
 function kube::util::ensure-docker-buildx {
-  if docker buildx --help >/dev/null 2>&1; then
+  if docker buildx >/dev/null 2>&1; then
     return 0
   else
     echo "ERROR: docker buildx not available. Docker 19.03 or higher is required with experimental features enabled"
@@ -761,6 +772,27 @@ function kube::util::ensure-gnu-sed {
   kube::util::sourced_variable "${SED}"
 }
 
+# kube::util::ensure-gnu-date
+# Determines which date binary is gnu-date on linux/darwin
+#
+# Sets:
+#  DATE: The name of the gnu-date binary
+#
+function kube::util::ensure-gnu-date {
+  # NOTE: the echo below is a workaround to ensure date is executed before the grep.
+  # see: https://github.com/kubernetes/kubernetes/issues/87251
+  date_help="$(LANG=C date --help 2>&1 || true)"
+  if echo "${date_help}" | grep -q "GNU\|BusyBox"; then
+    DATE="date"
+  elif command -v gdate &>/dev/null; then
+    DATE="gdate"
+  else
+    kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
+    return 1
+  fi
+  kube::util::sourced_variable "${DATE}"
+}
+
 # kube::util::check-file-in-alphabetical-order <file>
 # Check that the file is in alphabetical order
 #
@@ -798,19 +830,54 @@ function kube::util::md5() {
 
 # kube::util::read-array
 # Reads in stdin and adds it line by line to the array provided. This can be
-# used instead of "mapfile -t", and is bash 3 compatible.
+# used instead of "mapfile -t", and is bash 3 compatible.  If the named array
+# exists and is an array, it will be used.  Otherwise it will be unset and
+# recreated.
 #
 # Assumed vars:
 #   $1 (name of array to create/modify)
 #
 # Example usage:
-# kube::util::read-array files < <(ls -1)
+#   kube::util::read-array files < <(ls -1)
 #
+# When in doubt:
+#  $ W=abc         # a string
+#  $ X=(a b c)     # an array
+#  $ declare -A Y  # an associative array
+#  $ unset Z       # not set at all
+#  $ declare -p W X Y Z
+#  declare -- W="abc"
+#  declare -a X=([0]="a" [1]="b" [2]="c")
+#  declare -A Y
+#  bash: line 26: declare: Z: not found
+#  $ kube::util::read-array W < <(echo -ne "1 1\n2 2\n3 3\n")
+#  bash: W is defined but isn't an array
+#  $ kube::util::read-array X < <(echo -ne "1 1\n2 2\n3 3\n")
+#  $ kube::util::read-array Y < <(echo -ne "1 1\n2 2\n3 3\n")
+#  bash: Y is defined but isn't an array
+#  $ kube::util::read-array Z < <(echo -ne "1 1\n2 2\n3 3\n")
+#  $ declare -p W X Y Z
+#  declare -- W="abc"
+#  declare -a X=([0]="1 1" [1]="2 2" [2]="3 3")
+#  declare -A Y
+#  declare -a Z=([0]="1 1" [1]="2 2" [2]="3 3")
 function kube::util::read-array {
-  local i=0
-  unset -v "$1"
-  while IFS= read -r "$1[i++]"; do :; done
-  eval "[[ \${$1[--i]} ]]" || unset "$1[i]" # ensures last element isn't empty
+  if [[ -z "$1" ]]; then
+    echo "usage: ${FUNCNAME[0]} <varname>" >&2
+    return 1
+  fi
+  if [[ -n $(declare -p "$1" 2>/dev/null) ]]; then
+    if ! declare -p "$1" 2>/dev/null | grep -q '^declare -a'; then
+      echo "${FUNCNAME[0]}: $1 is defined but isn't an array" >&2
+      return 2
+    fi
+  fi
+  # shellcheck disable=SC2034 # this variable _is_ used
+  local __read_array_i=0
+  while IFS= read -r "$1[__read_array_i++]"; do :; done
+  if ! eval "[[ \${$1[--__read_array_i]} ]]"; then
+    unset "$1[__read_array_i]" # ensures last element isn't empty
+  fi
 }
 
 # Some useful colors.

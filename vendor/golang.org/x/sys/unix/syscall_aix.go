@@ -218,13 +218,62 @@ func Accept(fd int) (nfd int, sa Sockaddr, err error) {
 }
 
 func recvmsgRaw(fd int, iov []Iovec, oob []byte, flags int, rsa *RawSockaddrAny) (n, oobn int, recvflags int, err error) {
-	// Recvmsg not implemented on AIX
-	return -1, -1, -1, ENOSYS
+	var msg Msghdr
+	msg.Name = (*byte)(unsafe.Pointer(rsa))
+	msg.Namelen = uint32(SizeofSockaddrAny)
+	var dummy byte
+	if len(oob) > 0 {
+		// receive at least one normal byte
+		if emptyIovecs(iov) {
+			var iova [1]Iovec
+			iova[0].Base = &dummy
+			iova[0].SetLen(1)
+			iov = iova[:]
+		}
+		msg.Control = (*byte)(unsafe.Pointer(&oob[0]))
+		msg.SetControllen(len(oob))
+	}
+	if len(iov) > 0 {
+		msg.Iov = &iov[0]
+		msg.SetIovlen(len(iov))
+	}
+	if n, err = recvmsg(fd, &msg, flags); n == -1 {
+		return
+	}
+	oobn = int(msg.Controllen)
+	recvflags = int(msg.Flags)
+	return
 }
 
 func sendmsgN(fd int, iov []Iovec, oob []byte, ptr unsafe.Pointer, salen _Socklen, flags int) (n int, err error) {
-	// SendmsgN not implemented on AIX
-	return -1, ENOSYS
+	var msg Msghdr
+	msg.Name = (*byte)(unsafe.Pointer(ptr))
+	msg.Namelen = uint32(salen)
+	var dummy byte
+	var empty bool
+	if len(oob) > 0 {
+		// send at least one normal byte
+		empty = emptyIovecs(iov)
+		if empty {
+			var iova [1]Iovec
+			iova[0].Base = &dummy
+			iova[0].SetLen(1)
+			iov = iova[:]
+		}
+		msg.Control = (*byte)(unsafe.Pointer(&oob[0]))
+		msg.SetControllen(len(oob))
+	}
+	if len(iov) > 0 {
+		msg.Iov = &iov[0]
+		msg.SetIovlen(len(iov))
+	}
+	if n, err = sendmsg(fd, &msg, flags); err != nil {
+		return 0, err
+	}
+	if len(oob) > 0 && empty {
+		n = 0
+	}
+	return n, nil
 }
 
 func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
@@ -243,9 +292,7 @@ func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 				break
 			}
 		}
-
-		bytes := (*[len(pp.Path)]byte)(unsafe.Pointer(&pp.Path[0]))[0:n]
-		sa.Name = string(bytes)
+		sa.Name = string(unsafe.Slice((*byte)(unsafe.Pointer(&pp.Path[0])), n))
 		return sa, nil
 
 	case AF_INET:
@@ -362,6 +409,7 @@ func (w WaitStatus) CoreDump() bool { return w&0x80 == 0x80 }
 func (w WaitStatus) TrapCause() int { return -1 }
 
 //sys	ioctl(fd int, req uint, arg uintptr) (err error)
+//sys	ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) = ioctl
 
 // fcntl must never be called with cmd=F_DUP2FD because it doesn't work on AIX
 // There is no way to create a custom fcntl and to keep //sys fcntl easily,

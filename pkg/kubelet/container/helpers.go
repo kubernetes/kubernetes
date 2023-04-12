@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -39,13 +40,13 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error)
+	Run(ctx context.Context, containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error)
 }
 
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
+	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
 	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
@@ -59,6 +60,12 @@ type RuntimeHelper interface {
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 	GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error)
+
+	// PrepareDynamicResources prepares resources for a pod.
+	PrepareDynamicResources(pod *v1.Pod) error
+
+	// UnprepareDynamicResources unprepares resources for a a pod.
+	UnprepareDynamicResources(pod *v1.Pod) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -108,6 +115,23 @@ func HashContainer(container *v1.Container) uint64 {
 	containerJSON, _ := json.Marshal(container)
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
+}
+
+// HashContainerWithoutResources returns the hash of the container with Resources field zero'd out.
+func HashContainerWithoutResources(container *v1.Container) uint64 {
+	// InPlacePodVerticalScaling enables mutable Resources field.
+	// Changes to this field may not require container restart depending on policy.
+	// Compute hash over fields besides the Resources field
+	// NOTE: This is needed during alpha and beta so that containers using Resources but
+	//       not subject to In-place resize are not unexpectedly restarted when
+	//       InPlacePodVerticalScaling feature-gate is toggled.
+	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
+	hashWithoutResources := fnv.New32a()
+	containerCopy := container.DeepCopy()
+	containerCopy.Resources = v1.ResourceRequirements{}
+	containerJSON, _ := json.Marshal(containerCopy)
+	hashutil.DeepHashObject(hashWithoutResources, containerJSON)
+	return uint64(hashWithoutResources.Sum32())
 }
 
 // envVarsToMap constructs a map of environment name to value from a slice
@@ -245,12 +269,13 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			continue
 		}
 		container := &Container{
-			ID:      containerStatus.ID,
-			Name:    containerStatus.Name,
-			Image:   containerStatus.Image,
-			ImageID: containerStatus.ImageID,
-			Hash:    containerStatus.Hash,
-			State:   containerStatus.State,
+			ID:                   containerStatus.ID,
+			Name:                 containerStatus.Name,
+			Image:                containerStatus.Image,
+			ImageID:              containerStatus.ImageID,
+			Hash:                 containerStatus.Hash,
+			HashWithoutResources: containerStatus.HashWithoutResources,
+			State:                containerStatus.State,
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}

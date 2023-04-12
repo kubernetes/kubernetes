@@ -22,7 +22,7 @@ func BuildWatchCommand() command.Command {
 	if err != nil {
 		panic(err)
 	}
-	interruptHandler := interrupt_handler.NewInterruptHandler(0, nil)
+	interruptHandler := interrupt_handler.NewInterruptHandler(nil)
 	interrupt_handler.SwallowSigQuit()
 
 	return command.Command{
@@ -64,6 +64,8 @@ type SpecWatcher struct {
 
 func (w *SpecWatcher) WatchSpecs(args []string, additionalArgs []string) {
 	suites := internal.FindSuites(args, w.cliConfig, false).WithoutState(internal.TestSuiteStateSkippedByFilter)
+
+	internal.VerifyCLIAndFrameworkVersion(suites)
 
 	if len(suites) == 0 {
 		command.AbortWith("Found no test suites")
@@ -127,7 +129,7 @@ func (w *SpecWatcher) WatchSpecs(args []string, additionalArgs []string) {
 			w.updateSeed()
 			w.computeSuccinctMode(len(suites))
 			for idx := range suites {
-				if w.interruptHandler.Status().Interrupted {
+				if w.interruptHandler.Status().Interrupted() {
 					return
 				}
 				deltaTracker.WillRun(suites[idx])
@@ -156,7 +158,7 @@ func (w *SpecWatcher) compileAndRun(suite internal.TestSuite, additionalArgs []s
 		fmt.Println(suite.CompilationError.Error())
 		return suite
 	}
-	if w.interruptHandler.Status().Interrupted {
+	if w.interruptHandler.Status().Interrupted() {
 		return suite
 	}
 	suite = internal.RunCompiledSuite(suite, w.suiteConfig, w.reporterConfig, w.cliConfig, w.goFlagsConfig, additionalArgs)

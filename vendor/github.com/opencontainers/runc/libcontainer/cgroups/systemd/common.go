@@ -288,14 +288,26 @@ func generateDeviceProperties(r *configs.Resources) ([]systemdDbus.Property, err
 			case devices.CharDevice:
 				entry.Path = fmt.Sprintf("/dev/char/%d:%d", rule.Major, rule.Minor)
 			}
+			// systemd will issue a warning if the path we give here doesn't exist.
+			// Since all of this logic is best-effort anyway (we manually set these
+			// rules separately to systemd) we can safely skip entries that don't
+			// have a corresponding path.
+			if _, err := os.Stat(entry.Path); err != nil {
+				// Also check /sys/dev so that we don't depend on /dev/{block,char}
+				// being populated. (/dev/{block,char} is populated by udev, which
+				// isn't strictly required for systemd). Ironically, this happens most
+				// easily when starting containerd within a runc created container
+				// itself.
+
+				// We don't bother with securejoin here because we create entry.Path
+				// right above here, so we know it's safe.
+				if _, err := os.Stat("/sys" + entry.Path); err != nil {
+					logrus.Warnf("skipping device %s for systemd: %s", entry.Path, err)
+					continue
+				}
+			}
 		}
-		// systemd will issue a warning if the path we give here doesn't exist.
-		// Since all of this logic is best-effort anyway (we manually set these
-		// rules separately to systemd) we can safely skip entries that don't
-		// have a corresponding path.
-		if _, err := os.Stat(entry.Path); err == nil {
-			deviceAllowList = append(deviceAllowList, entry)
-		}
+		deviceAllowList = append(deviceAllowList, entry)
 	}
 
 	properties = append(properties, newProp("DeviceAllow", deviceAllowList))

@@ -25,12 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -53,7 +53,6 @@ type NamespaceOptions struct {
 	Name string
 
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 	CreateAnnotation    bool
 	FieldManager        string
@@ -62,11 +61,11 @@ type NamespaceOptions struct {
 
 	PrintObj func(obj runtime.Object) error
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewNamespaceOptions creates a new *NamespaceOptions with sane defaults
-func NewNamespaceOptions(ioStreams genericclioptions.IOStreams) *NamespaceOptions {
+func NewNamespaceOptions(ioStreams genericiooptions.IOStreams) *NamespaceOptions {
 	return &NamespaceOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -74,7 +73,7 @@ func NewNamespaceOptions(ioStreams genericclioptions.IOStreams) *NamespaceOption
 }
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
-func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 
 	o := NewNamespaceOptions(ioStreams)
 
@@ -123,15 +122,6 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -160,9 +150,6 @@ func (o *NamespaceOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(namespace.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

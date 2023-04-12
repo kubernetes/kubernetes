@@ -19,9 +19,10 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPruneXML(t *testing.T) {
@@ -49,10 +50,10 @@ func TestPruneXML(t *testing.T) {
 		</properties>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000"></testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apiserver" name="TestMaxResourceSize/JSONPatchType_should_handle_a_patch_just_under_the_max_limit" time="0.000000">
-			<skipped message="[... clipped...]ust_under_the_max_limit (0.00s)&#xA;"></skipped>
+			<skipped message="=== RUN   TestMa[...clipped...]x_limit (0.00s)&#xA;"></skipped>
 		</testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestSchedulerInformers" time="-0.000000">
-			<failure message="Failed" type="">[... clipped...]prometheus/client_metrics.go:160</failure>
+			<failure message="Failed" type="">&#xA;&#x9;/home/prow/go/[...clipped...]t_metrics.go:160</failure>
 		</testcase>
 	</testsuite>
 </testsuites>`

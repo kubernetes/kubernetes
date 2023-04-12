@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -540,7 +539,7 @@ func setupSecretEnvFile(lines [][]string) func(*testing.T, *CreateSecretOptions)
 		files := []*os.File{}
 		filenames := secretOptions.EnvFileSources
 		for _, filename := range filenames {
-			file, err := ioutil.TempFile("", filename)
+			file, err := os.CreateTemp("", filename)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -564,11 +563,11 @@ func setupSecretEnvFile(lines [][]string) func(*testing.T, *CreateSecretOptions)
 
 func setupSecretBinaryFile(data []byte) func(*testing.T, *CreateSecretOptions) func() {
 	return func(t *testing.T, secretOptions *CreateSecretOptions) func() {
-		tmp, _ := ioutil.TempDir("", "")
+		tmp, _ := os.MkdirTemp("", "")
 		files := secretOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file
-			ioutil.WriteFile(f, data, 0644)
+			os.WriteFile(f, data, 0644)
 			secretOptions.FileSources[i] = f
 		}
 		return func() {

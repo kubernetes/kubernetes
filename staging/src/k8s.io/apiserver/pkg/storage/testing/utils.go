@@ -17,27 +17,26 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 )
-
-// CreateObj will create a single object using the storage interface.
-func CreateObj(helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
-	return helper.Create(context.TODO(), name, obj, out, ttl)
-}
 
 // CreateObjList will create a list from the array of objects.
 func CreateObjList(prefix string, helper storage.Interface, items []runtime.Object) error {
@@ -47,7 +46,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 		if err != nil {
 			return err
 		}
-		err = CreateObj(helper, path.Join(prefix, meta.GetName()), obj, obj, 0)
+		err = helper.Create(context.Background(), path.Join(prefix, meta.GetName()), obj, obj, 0)
 		if err != nil {
 			return err
 		}
@@ -79,16 +78,16 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-// TestPropogateStore helps propagates store with objects, automates key generation, and returns
-// keys and stored objects.
-func TestPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
-	// Setup store with a key and grab the output for returning.
-	key := "/testkey"
-	return key, TestPropogateStoreWithKey(ctx, t, store, key, obj)
+func computePodKey(obj *example.Pod) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-// TestPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
+// testPropagateStore helps propagates store with objects, automates key generation, and returns
+// keys and stored objects.
+func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
+	// Setup store with a key and grab the output for returning.
+	key := computePodKey(obj)
+
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
@@ -98,7 +97,7 @@ func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.
 	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
-	return setOutput
+	return key, setOutput
 }
 
 func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
@@ -112,9 +111,27 @@ func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
 	}
 }
 
+func ExpectContains(t *testing.T, msg string, expectedList []interface{}, got interface{}) {
+	t.Helper()
+	for _, expected := range expectedList {
+		if reflect.DeepEqual(expected, got) {
+			return
+		}
+	}
+	if len(expectedList) == 0 {
+		t.Errorf("%s: empty expectedList", msg)
+		return
+	}
+	if diff := cmp.Diff(expectedList[0], got); diff != "" {
+		t.Errorf("%s: differs from all items, with first: %s", msg, diff)
+	} else {
+		t.Errorf("%s: differs from all items, first: %#v\ngot: %#v", msg, expectedList[0], got)
+	}
+}
+
 const dummyPrefix = "adapter"
 
-func EncodeContinueOrDie(key string, resourceVersion int64) string {
+func encodeContinueOrDie(key string, resourceVersion int64) string {
 	token, err := storage.EncodeContinue(dummyPrefix+key, dummyPrefix, resourceVersion)
 	if err != nil {
 		panic(err)
@@ -122,7 +139,7 @@ func EncodeContinueOrDie(key string, resourceVersion int64) string {
 	return token
 }
 
-func TestCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -133,21 +150,25 @@ func TestCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func TestCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	TestCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
+func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
 		ExpectNoDiff(t, "incorrect object", expectObj, object)
 		return nil
 	})
 }
 
-func TestCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
+func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
 			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		if err := check(res.Object); err != nil {
+		obj := res.Object
+		if co, ok := obj.(runtime.CacheableObject); ok {
+			obj = co.GetObject()
+		}
+		if err := check(obj); err != nil {
 			t.Error(err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -155,7 +176,7 @@ func TestCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.
 	}
 }
 
-func TestCheckStop(t *testing.T, w watch.Interface) {
+func testCheckStop(t *testing.T, w watch.Interface) {
 	select {
 	case e, ok := <-w.ResultChan():
 		if ok {
@@ -173,10 +194,10 @@ func TestCheckStop(t *testing.T, w watch.Interface) {
 	}
 }
 
-// ResourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
+// resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
 // referring to points in logical time before the sentinel generate an error. All logical times as
 // new as the sentinel or newer generate no error.
-func ResourceVersionNotOlderThan(sentinel string) func(string) error {
+func resourceVersionNotOlderThan(sentinel string) func(string) error {
 	return func(resourceVersion string) error {
 		objectVersioner := storage.APIObjectVersioner{}
 		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
@@ -192,4 +213,130 @@ func ResourceVersionNotOlderThan(sentinel string) func(string) error {
 		}
 		return nil
 	}
+}
+
+// StorageInjectingListErrors injects a dummy error for first N GetList calls.
+type StorageInjectingListErrors struct {
+	storage.Interface
+
+	lock   sync.Mutex
+	Errors int
+}
+
+func (s *StorageInjectingListErrors) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	err := func() error {
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		if s.Errors > 0 {
+			s.Errors--
+			return fmt.Errorf("injected error")
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+	return s.Interface.GetList(ctx, key, opts, listObj)
+}
+
+func (s *StorageInjectingListErrors) ErrorsConsumed() (bool, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.Errors == 0, nil
+}
+
+// PrefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type PrefixTransformer struct {
+	prefix []byte
+	stale  bool
+	err    error
+	reads  uint64
+}
+
+func NewPrefixTransformer(prefix []byte, stale bool) *PrefixTransformer {
+	return &PrefixTransformer{
+		prefix: prefix,
+		stale:  stale,
+	}
+}
+
+func (p *PrefixTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	atomic.AddUint64(&p.reads, 1)
+	if dataCtx == nil {
+		panic("no context provided")
+	}
+	if !bytes.HasPrefix(data, p.prefix) {
+		return nil, false, fmt.Errorf("value does not have expected prefix %q: %s,", p.prefix, string(data))
+	}
+	return bytes.TrimPrefix(data, p.prefix), p.stale, p.err
+}
+func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	if dataCtx == nil {
+		panic("no context provided")
+	}
+	if len(data) > 0 {
+		return append(append([]byte{}, p.prefix...), data...), p.err
+	}
+	return data, p.err
+}
+
+func (p *PrefixTransformer) GetReadsAndReset() uint64 {
+	return atomic.SwapUint64(&p.reads, 0)
+}
+
+// reproducingTransformer is a custom test-only transformer used purely
+// for testing consistency.
+// It allows for creating predefined objects on TransformFromStorage operations,
+// which allows for precise in time injection of new objects in the middle of
+// read operations.
+type reproducingTransformer struct {
+	wrapped value.Transformer
+	store   storage.Interface
+
+	index      uint32
+	nextObject func(uint32) (string, *example.Pod)
+}
+
+func (rt *reproducingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if err := rt.createObject(ctx); err != nil {
+		return nil, false, err
+	}
+	return rt.wrapped.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func (rt *reproducingTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return rt.wrapped.TransformToStorage(ctx, data, dataCtx)
+}
+
+func (rt *reproducingTransformer) createObject(ctx context.Context) error {
+	key, obj := rt.nextObject(atomic.AddUint32(&rt.index, 1))
+	out := &example.Pod{}
+	return rt.store.Create(ctx, key, obj, out, 0)
+}
+
+// failingTransformer is a custom test-only transformer that always returns
+// an error on transforming data from storage.
+type failingTransformer struct {
+}
+
+func (ft *failingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	return nil, false, fmt.Errorf("failed transformation")
+}
+
+func (ft *failingTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return data, nil
+}
+
+type sortablePodList []example.Pod
+
+func (s sortablePodList) Len() int {
+	return len(s)
+}
+
+func (s sortablePodList) Less(i, j int) bool {
+	return computePodKey(&s[i]) < computePodKey(&s[j])
+}
+
+func (s sortablePodList) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }

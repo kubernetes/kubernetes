@@ -258,7 +258,7 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 					Parameters: &networkingv1.IngressClassParametersReference{
 						Kind:  "k",
 						Name:  "n",
-						Scope: utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeCluster),
+						Scope: utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster),
 					},
 				},
 			},
@@ -271,8 +271,8 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 					Parameters: &networkingv1.IngressClassParametersReference{
 						Kind:      "k",
 						Name:      "n",
-						Scope:     utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeNamespace),
-						Namespace: utilpointer.StringPtr("foo-ns"),
+						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: utilpointer.String("foo-ns"),
 					},
 				},
 			},
@@ -282,8 +282,8 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 					Parameters: &networkingv1.IngressClassParametersReference{
 						Kind:      "k",
 						Name:      "n",
-						Scope:     utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeNamespace),
-						Namespace: utilpointer.StringPtr("foo-ns"),
+						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: utilpointer.String("foo-ns"),
 					},
 				},
 			},

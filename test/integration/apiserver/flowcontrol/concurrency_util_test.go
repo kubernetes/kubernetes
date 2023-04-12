@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	requestConcurrencyLimitMetricsName = "apiserver_flowcontrol_request_concurrency_limit"
+	nominalConcurrencyLimitMetricsName = "apiserver_flowcontrol_nominal_limit_seats"
 	requestExecutionSecondsSumName     = "apiserver_flowcontrol_request_execution_seconds_sum"
 	requestExecutionSecondsCountName   = "apiserver_flowcontrol_request_execution_seconds_count"
 	priorityLevelSeatUtilSumName       = "apiserver_flowcontrol_priority_level_seat_utilization_sum"
@@ -350,7 +350,7 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 				entry.seatUtil.Sum = float64(metric.Value)
 			case priorityLevelSeatUtilCountName:
 				entry.seatUtil.Count = int(metric.Value)
-			case requestConcurrencyLimitMetricsName:
+			case nominalConcurrencyLimitMetricsName:
 				entry.availableSeats = int(metric.Value)
 			}
 			snapshot[plLabel] = entry

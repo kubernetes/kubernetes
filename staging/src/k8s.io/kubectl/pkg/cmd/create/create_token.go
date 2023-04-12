@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -66,7 +67,7 @@ type TokenOptions struct {
 	CoreClient corev1client.CoreV1Interface
 
 	// IOStreams are the output streams for the operation. Required.
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -98,7 +99,7 @@ var (
 	}
 )
 
-func NewTokenOpts(ioStreams genericclioptions.IOStreams) *TokenOptions {
+func NewTokenOpts(ioStreams genericiooptions.IOStreams) *TokenOptions {
 	return &TokenOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -106,7 +107,7 @@ func NewTokenOpts(ioStreams genericclioptions.IOStreams) *TokenOptions {
 }
 
 // NewCmdCreateToken returns an initialized Command for 'create token' sub command
-func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewTokenOpts(ioStreams)
 
 	cmd := &cobra.Command{

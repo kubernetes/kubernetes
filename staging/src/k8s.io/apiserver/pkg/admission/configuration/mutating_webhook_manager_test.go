@@ -17,8 +17,10 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,14 +34,13 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	stop := make(chan struct{})
 	defer close(stop)
+
+	manager := NewMutatingWebhookConfigurationManager(informerFactory).(*mutatingWebhookConfigurationManager)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 
-	configManager := NewMutatingWebhookConfigurationManager(informerFactory).(*mutatingWebhookConfigurationManager)
-	configManager.updateConfiguration()
-
 	// no configurations
-	if configurations := configManager.Webhooks(); len(configurations) != 0 {
+	if configurations := manager.Webhooks(); len(configurations) != 0 {
 		t.Errorf("expected empty webhooks, but got %v", configurations)
 	}
 
@@ -48,12 +49,24 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 		Webhooks:   []v1.MutatingWebhook{{Name: "webhook1.1"}},
 	}
 
-	mutatingInformer := informerFactory.Admissionregistration().V1().MutatingWebhookConfigurations()
-	mutatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
-	configManager.updateConfiguration()
+	client.
+		AdmissionregistrationV1().
+		MutatingWebhookConfigurations().
+		Create(context.TODO(), webhookConfiguration, metav1.CreateOptions{})
 
-	// configuration populated
-	configurations := configManager.Webhooks()
+	// Wait up to 10s for the notification to be delivered.
+	// (on my system this takes < 2ms)
+	startTime := time.Now()
+	configurations := manager.Webhooks()
+	for len(configurations) == 0 {
+		if time.Since(startTime) > 10*time.Second {
+			break
+		}
+		time.Sleep(time.Millisecond)
+		configurations = manager.Webhooks()
+	}
+
+	// verify presence
 	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}

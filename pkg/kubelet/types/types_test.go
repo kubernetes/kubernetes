@@ -19,8 +19,10 @@ package types
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 )
 
@@ -135,4 +137,48 @@ func TestSortInitContainerStatuses(t *testing.T) {
 				data.containers, data.sortedStatuses, data.statuses)
 		}
 	}
+}
+
+func TestSortStatusesOfInitContainers(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+	var tests = []struct {
+		containers     []v1.Container
+		statusMap      map[string]*v1.ContainerStatus
+		expectStatuses []v1.ContainerStatus
+	}{
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			expectStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statusMap:      map[string]*v1.ContainerStatus{"first": {Name: "first"}, "second": {Name: "second"}, "third": {Name: "third"}, "fourth": {Name: "fourth"}},
+		},
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			expectStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statusMap:      map[string]*v1.ContainerStatus{"second": {Name: "second"}, "third": {Name: "third"}, "first": {Name: "first"}, "fourth": {Name: "fourth"}},
+		},
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			expectStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "third"}, {Name: "fourth"}},
+			statusMap:      map[string]*v1.ContainerStatus{"third": {Name: "third"}, "first": {Name: "first"}, "fourth": {Name: "fourth"}},
+		},
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			expectStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "third"}, {Name: "fourth"}},
+			statusMap:      map[string]*v1.ContainerStatus{"first": {Name: "first"}, "third": {Name: "third"}, "fourth": {Name: "fourth"}},
+		},
+	}
+	for _, data := range tests {
+		pod.Spec.InitContainers = data.containers
+		result := SortStatusesOfInitContainers(&pod, data.statusMap)
+		require.Equal(t, result, data.expectStatuses, "Unexpected result from SortStatusesOfInitContainers: %v", result)
+	}
+}
+
+func TestNewTimestamp(t *testing.T) {
+	timeStart := time.Now()
+	timestamp := NewTimestamp()
+	timeEnd := time.Now()
+	assert.WithinDuration(t, timestamp.Get(), timeStart, timeEnd.Sub(timeStart))
 }

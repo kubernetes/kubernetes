@@ -102,7 +102,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
+	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func(ctx context.Context) {
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		ginkgo.By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
@@ -112,7 +112,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(context.TODO(), options)
+		pods, err := podClient.List(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -121,13 +121,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(context.TODO(), options)
+		w, err := podClient.Watch(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the pod")
-		pod, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
+		pod, err = podClient.Create(ctx, pod, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
@@ -137,7 +137,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: pod.ResourceVersion,
 		}
-		pods, err = podClient.List(context.TODO(), options)
+		pods, err = podClient.List(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -148,11 +148,11 @@ var _ = SIGDescribe("Generated clientset", func() {
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
-		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
+		if err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
@@ -216,7 +216,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should create v1 cronJobs, delete cronJobs, watch cronJobs", func() {
+	ginkgo.It("should create v1 cronJobs, delete cronJobs, watch cronJobs", func(ctx context.Context) {
 		cronJobClient := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name)
 		ginkgo.By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
@@ -225,7 +225,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err := cronJobClient.List(context.TODO(), options)
+		cronJobs, err := cronJobClient.List(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
@@ -234,13 +234,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
-		w, err := cronJobClient.Watch(context.TODO(), options)
+		w, err := cronJobClient.Watch(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the cronJob")
-		cronJob, err = cronJobClient.Create(context.TODO(), cronJob, metav1.CreateOptions{})
+		cronJob, err = cronJobClient.Create(ctx, cronJob, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create cronJob: %v", err)
 		}
@@ -250,7 +250,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: cronJob.ResourceVersion,
 		}
-		cronJobs, err = cronJobClient.List(context.TODO(), options)
+		cronJobs, err = cronJobClient.List(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
@@ -262,12 +262,12 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("deleting the cronJob")
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
-		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+		if err := cronJobClient.Delete(ctx, cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err = cronJobClient.List(context.TODO(), options)
+		cronJobs, err = cronJobClient.List(ctx, options)
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}

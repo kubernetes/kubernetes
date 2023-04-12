@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -139,7 +139,6 @@ type CreateRoleOptions struct {
 	ResourceNames []string
 
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 	OutputFormat        string
 	Namespace           string
@@ -150,11 +149,11 @@ type CreateRoleOptions struct {
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCreateRoleOptions returns an initialized CreateRoleOptions instance
-func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
+func NewCreateRoleOptions(ioStreams genericiooptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
@@ -163,7 +162,7 @@ func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOpti
 }
 
 // NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
-func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -257,11 +256,6 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
@@ -384,9 +378,6 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(role.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		role, err = o.Client.Roles(o.Namespace).Create(context.TODO(), role, createOptions)

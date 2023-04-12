@@ -25,13 +25,11 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/applyconfiguration-gen/generators"
-	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of applyconfiguration-gen
 	if err := flag.Set("logtostderr", "true"); err != nil {

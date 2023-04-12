@@ -17,6 +17,7 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/component-base/metrics"
@@ -116,11 +117,12 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 // leak metric collectors for containers or pods that no longer exist.  Instead, implement
 // custom collector in a way that only collects metrics for active containers.
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	ctx := context.Background()
 	var errorCount float64
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
 	}()
-	statsSummary, err := rc.provider.GetCPUAndMemoryStats()
+	statsSummary, err := rc.provider.GetCPUAndMemoryStats(ctx)
 	if err != nil {
 		errorCount = 1
 		klog.ErrorS(err, "Error getting summary for resourceMetric prometheus endpoint")

@@ -1,6 +1,7 @@
 package ginkgo
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -12,7 +13,7 @@ import (
 /*
 The EntryDescription decorator allows you to pass a format string to DescribeTable() and Entry().  This format string is used to generate entry names via:
 
-    fmt.Sprintf(formatString, parameters...)
+	fmt.Sprintf(formatString, parameters...)
 
 where parameters are the parameters passed into the entry.
 
@@ -31,19 +32,20 @@ DescribeTable describes a table-driven spec.
 
 For example:
 
-    DescribeTable("a simple table",
-        func(x int, y int, expected bool) {
-            Ω(x > y).Should(Equal(expected))
-        },
-        Entry("x > y", 1, 0, true),
-        Entry("x == y", 0, 0, false),
-        Entry("x < y", 0, 1, false),
-    )
+	DescribeTable("a simple table",
+	    func(x int, y int, expected bool) {
+	        Ω(x > y).Should(Equal(expected))
+	    },
+	    Entry("x > y", 1, 0, true),
+	    Entry("x == y", 0, 0, false),
+	    Entry("x < y", 0, 1, false),
+	)
 
 You can learn more about DescribeTable here: https://onsi.github.io/ginkgo/#table-specs
 And can explore some Table patterns here: https://onsi.github.io/ginkgo/#table-specs-patterns
 */
 func DescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	generateTable(description, args...)
 	return true
 }
@@ -52,6 +54,7 @@ func DescribeTable(description string, args ...interface{}) bool {
 You can focus a table with `FDescribeTable`.  This is equivalent to `FDescribe`.
 */
 func FDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Focus)
 	generateTable(description, args...)
 	return true
@@ -61,6 +64,7 @@ func FDescribeTable(description string, args ...interface{}) bool {
 You can mark a table as pending with `PDescribeTable`.  This is equivalent to `PDescribe`.
 */
 func PDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Pending)
 	generateTable(description, args...)
 	return true
@@ -89,29 +93,34 @@ Subsequent arguments accept any Ginkgo decorators.  These are filtered out and t
 
 Each Entry ends up generating an individual Ginkgo It.  The body of the it is the Table Body function with the Entry parameters passed in.
 
+If you want to generate interruptible specs simply write a Table function that accepts a SpecContext as its first argument.  You can then decorate individual Entrys with the NodeTimeout and SpecTimeout decorators.
+
 You can learn more about Entry here: https://onsi.github.io/ginkgo/#table-specs
 */
 func Entry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can focus a particular entry with FEntry.  This is equivalent to FIt.
 */
 func FEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Focus)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can mark a particular entry as pending with PEntry.  This is equivalent to PIt.
 */
 func PEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Pending)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
@@ -119,12 +128,17 @@ You can mark a particular entry as pending with XEntry.  This is equivalent to X
 */
 var XEntry = PEntry
 
+var contextType = reflect.TypeOf(new(context.Context)).Elem()
+var specContextType = reflect.TypeOf(new(SpecContext)).Elem()
+
 func generateTable(description string, args ...interface{}) {
-	cl := types.NewCodeLocation(2)
+	GinkgoHelper()
+	cl := types.NewCodeLocation(0)
 	containerNodeArgs := []interface{}{cl}
 
 	entries := []TableEntry{}
 	var itBody interface{}
+	var itBodyType reflect.Type
 
 	var tableLevelEntryDescription interface{}
 	tableLevelEntryDescription = func(args ...interface{}) string {
@@ -133,6 +147,10 @@ func generateTable(description string, args ...interface{}) {
 			out = append(out, fmt.Sprint(arg))
 		}
 		return "Entry: " + strings.Join(out, ", ")
+	}
+
+	if len(args) == 1 {
+		exitIfErr(types.GinkgoErrors.MissingParametersForTableFunction(cl))
 	}
 
 	for i, arg := range args {
@@ -152,6 +170,7 @@ func generateTable(description string, args ...interface{}) {
 				exitIfErr(types.GinkgoErrors.MultipleEntryBodyFunctionsForTable(cl))
 			}
 			itBody = arg
+			itBodyType = reflect.TypeOf(itBody)
 		default:
 			containerNodeArgs = append(containerNodeArgs, arg)
 		}
@@ -164,7 +183,7 @@ func generateTable(description string, args ...interface{}) {
 			var description string
 			switch t := reflect.TypeOf(entry.description); {
 			case t == nil:
-				err = validateParameters(tableLevelEntryDescription, entry.parameters, "Entry Description function", entry.codeLocation)
+				err = validateParameters(tableLevelEntryDescription, entry.parameters, "Entry Description function", entry.codeLocation, false)
 				if err == nil {
 					description = invokeFunction(tableLevelEntryDescription, entry.parameters)[0].String()
 				}
@@ -173,7 +192,7 @@ func generateTable(description string, args ...interface{}) {
 			case t == reflect.TypeOf(""):
 				description = entry.description.(string)
 			case t.Kind() == reflect.Func && t.NumOut() == 1 && t.Out(0) == reflect.TypeOf(""):
-				err = validateParameters(entry.description, entry.parameters, "Entry Description function", entry.codeLocation)
+				err = validateParameters(entry.description, entry.parameters, "Entry Description function", entry.codeLocation, false)
 				if err == nil {
 					description = invokeFunction(entry.description, entry.parameters)[0].String()
 				}
@@ -181,17 +200,37 @@ func generateTable(description string, args ...interface{}) {
 				err = types.GinkgoErrors.InvalidEntryDescription(entry.codeLocation)
 			}
 
-			if err == nil {
-				err = validateParameters(itBody, entry.parameters, "Table Body function", entry.codeLocation)
-			}
 			itNodeArgs := []interface{}{entry.codeLocation}
 			itNodeArgs = append(itNodeArgs, entry.decorations...)
-			itNodeArgs = append(itNodeArgs, func() {
-				if err != nil {
-					panic(err)
+
+			hasContext := false
+			if itBodyType.NumIn() > 0. {
+				if itBodyType.In(0).Implements(specContextType) {
+					hasContext = true
+				} else if itBodyType.In(0).Implements(contextType) && (len(entry.parameters) == 0 || !reflect.TypeOf(entry.parameters[0]).Implements(contextType)) {
+					hasContext = true
 				}
-				invokeFunction(itBody, entry.parameters)
-			})
+			}
+
+			if err == nil {
+				err = validateParameters(itBody, entry.parameters, "Table Body function", entry.codeLocation, hasContext)
+			}
+
+			if hasContext {
+				itNodeArgs = append(itNodeArgs, func(c SpecContext) {
+					if err != nil {
+						panic(err)
+					}
+					invokeFunction(itBody, append([]interface{}{c}, entry.parameters...))
+				})
+			} else {
+				itNodeArgs = append(itNodeArgs, func() {
+					if err != nil {
+						panic(err)
+					}
+					invokeFunction(itBody, entry.parameters)
+				})
+			}
 
 			pushNode(internal.NewNode(deprecationTracker, types.NodeTypeIt, description, itNodeArgs...))
 		}
@@ -223,9 +262,14 @@ func invokeFunction(function interface{}, parameters []interface{}) []reflect.Va
 	return reflect.ValueOf(function).Call(inValues)
 }
 
-func validateParameters(function interface{}, parameters []interface{}, kind string, cl types.CodeLocation) error {
+func validateParameters(function interface{}, parameters []interface{}, kind string, cl types.CodeLocation, hasContext bool) error {
 	funcType := reflect.TypeOf(function)
 	limit := funcType.NumIn()
+	offset := 0
+	if hasContext {
+		limit = limit - 1
+		offset = 1
+	}
 	if funcType.IsVariadic() {
 		limit = limit - 1
 	}
@@ -238,13 +282,13 @@ func validateParameters(function interface{}, parameters []interface{}, kind str
 	var i = 0
 	for ; i < limit; i++ {
 		actual := reflect.TypeOf(parameters[i])
-		expected := funcType.In(i)
+		expected := funcType.In(i + offset)
 		if !(actual == nil) && !actual.AssignableTo(expected) {
 			return types.GinkgoErrors.IncorrectParameterTypeToTableFunction(i+1, expected, actual, kind, cl)
 		}
 	}
 	if funcType.IsVariadic() {
-		expected := funcType.In(limit).Elem()
+		expected := funcType.In(limit + offset).Elem()
 		for ; i < len(parameters); i++ {
 			actual := reflect.TypeOf(parameters[i])
 			if !(actual == nil) && !actual.AssignableTo(expected) {

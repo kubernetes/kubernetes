@@ -173,7 +173,7 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 	}, nil
 }
 
-func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	cephfsVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -183,7 +183,9 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(cephfsVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(cephfsVolume),
+	}, nil
 }
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
@@ -366,7 +368,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 			return err
 		}
 
-		err = writer.Write(payload)
+		err = writer.Write(payload, nil /*setPerms*/)
 		if err != nil {
 			klog.Errorf("failed to write payload to dir: %v", err)
 			return err

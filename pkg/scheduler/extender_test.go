@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -41,7 +40,6 @@ import (
 )
 
 func TestSchedulerWithExtenders(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -280,12 +278,13 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "", ctx.Done(),
 				runtime.WithClientSet(client),
@@ -296,18 +295,16 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := newScheduler(
-				cache,
-				extenders,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				emptySnapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         emptySnapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+				Extenders:                extenders,
+			}
+			sched.applyDefaultHandlers()
+
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
@@ -331,9 +328,8 @@ func createNode(name string) *v1.Node {
 }
 
 func TestIsInterested(t *testing.T) {
-	t.Parallel()
 	mem := &HTTPExtender{
-		managedResources: sets.NewString(),
+		managedResources: sets.New[string](),
 	}
 	mem.managedResources.Insert("memory")
 
@@ -346,7 +342,7 @@ func TestIsInterested(t *testing.T) {
 		{
 			label: "Empty managed resources",
 			extender: &HTTPExtender{
-				managedResources: sets.NewString(),
+				managedResources: sets.New[string](),
 			},
 			pod:  &v1.Pod{},
 			want: true,
@@ -358,9 +354,17 @@ func TestIsInterested(t *testing.T) {
 			want:     false,
 		},
 		{
-			label:    "Managed memory, container memory",
+			label:    "Managed memory, container memory with Requests",
 			extender: mem,
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
+			want: true,
+		},
+		{
+			label:    "Managed memory, container memory with Limits",
+			extender: mem,
+			pod: st.MakePod().Lim(map[v1.ResourceName]string{
 				"memory": "0",
 			}).Obj(),
 			want: true,
@@ -374,9 +378,7 @@ func TestIsInterested(t *testing.T) {
 			want: true,
 		},
 	} {
-		tc := tc
 		t.Run(tc.label, func(t *testing.T) {
-			t.Parallel()
 			if got := tc.extender.IsInterested(tc.pod); got != tc.want {
 				t.Fatalf("IsInterested(%v) = %v, wanted %v", tc.pod, got, tc.want)
 			}
@@ -385,7 +387,6 @@ func TestIsInterested(t *testing.T) {
 }
 
 func TestConvertToMetaVictims(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name              string
 		nodeNameToVictims map[string]*extenderv1.Victims
@@ -428,9 +429,7 @@ func TestConvertToMetaVictims(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := convertToMetaVictims(tt.nodeNameToVictims); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("convertToMetaVictims() = %v, want %v", got, tt.want)
 			}
@@ -439,7 +438,6 @@ func TestConvertToMetaVictims(t *testing.T) {
 }
 
 func TestConvertToVictims(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                  string
 		httpExtender          *HTTPExtender
@@ -496,9 +494,7 @@ func TestConvertToVictims(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			// nodeInfos instantiations
 			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
 			for i, nm := range tt.nodeNames {

@@ -32,7 +32,9 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -49,39 +51,39 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 
 	var c clientset.Interface
 	var ns string
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		err := e2eauth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
+		err := e2eauth.BindClusterRoleInNamespace(ctx, c.RbacV1(), "edit", f.Namespace.Name,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 		framework.ExpectNoError(err)
 
-		err = e2eauth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
+		err = e2eauth.WaitForAuthorizationUpdate(ctx, c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
 	})
 
 	ginkgo.Describe("Liveness", func() {
-		ginkgo.It("liveness pods should be automatically restarted", func() {
+		ginkgo.It("liveness pods should be automatically restarted", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/liveness"
 			execYaml := readFile(test, "exec-liveness.yaml.in")
 			httpYaml := readFile(test, "http-liveness.yaml.in")
 
-			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
-			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
+			e2ekubectl.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
+			e2ekubectl.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
-				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, c, podName, ns)
 				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+					pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
@@ -113,7 +115,7 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 	})
 
 	ginkgo.Describe("Secret", func() {
-		ginkgo.It("should create a pod that reads a secret", func() {
+		ginkgo.It("should create a pod that reads a secret", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/secrets"
 			secretYaml := readFile(test, "secret.yaml")
 			podYaml := readFile(test, "secret-pod.yaml.in")
@@ -121,32 +123,32 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 			podName := "secret-test-pod"
 
 			ginkgo.By("creating secret and pod")
-			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			e2ekubectl.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
+			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
-			_, err = framework.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			_, err = e2eoutput.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})
 
 	ginkgo.Describe("Downward API", func() {
-		ginkgo.It("should create a pod that prints his name and namespace", func() {
+		ginkgo.It("should create a pod that prints his name and namespace", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/downward-api"
 			podYaml := readFile(test, "dapi-pod.yaml.in")
 			podName := "dapi-test-pod"
 
 			ginkgo.By("creating the pod")
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
+			_, err = e2eoutput.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
 			framework.ExpectNoError(err)
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
+			_, err = e2eoutput.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})

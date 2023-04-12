@@ -194,7 +194,11 @@ func (cm *corruptionChecker) PeriodicCheck() error {
 			return
 		}
 		alarmed = true
-		cm.hasher.TriggerCorruptAlarm(id)
+		// It isn't clear which member's data is corrupted, so we
+		// intentionally set the memberID as 0. We will identify
+		// the corrupted members using quorum in 3.6. Please see
+		// discussion in https://github.com/etcd-io/etcd/pull/14828.
+		cm.hasher.TriggerCorruptAlarm(types.ID(0))
 	}
 
 	if h2.Hash != h.Hash && rev2 == rev && h.CompactRevision == h2.CompactRevision {
@@ -276,7 +280,11 @@ func (cm *corruptionChecker) CompactHashCheck() {
 
 			// follower's compact revision is leader's old one, then hashes must match
 			if p.resp.Hash != hash.Hash {
-				cm.hasher.TriggerCorruptAlarm(p.id)
+				// It isn't clear which member's data is corrupted, so we
+				// intentionally set the memberID as 0. We will identify
+				// the corrupted members using quorum in 3.6. Please see
+				// discussion in https://github.com/etcd-io/etcd/pull/14828.
+				cm.hasher.TriggerCorruptAlarm(types.ID(0))
 				cm.lg.Error("failed compaction hash check",
 					zap.Int64("revision", hash.Revision),
 					zap.Int64("leader-compact-revision", hash.CompactRevision),

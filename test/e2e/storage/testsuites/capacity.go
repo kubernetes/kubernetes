@@ -33,7 +33,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -81,10 +80,9 @@ func (p *capacityTestSuite) SkipUnsupportedTests(driver storageframework.TestDri
 
 func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
-		dInfo         = driver.GetDriverInfo()
-		dDriver       storageframework.DynamicPVTestDriver
-		driverCleanup func()
-		sc            *storagev1.StorageClass
+		dInfo   = driver.GetDriverInfo()
+		dDriver storageframework.DynamicPVTestDriver
+		sc      *storagev1.StorageClass
 	)
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
@@ -92,32 +90,24 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	f := framework.NewFrameworkWithCustomTimeouts("capacity", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		// Now do the more expensive test initialization.
-		config, cleanup := driver.PrepareTest(f)
-		driverCleanup = cleanup
-		sc = dDriver.GetDynamicProvisionStorageClass(config, pattern.FsType)
+		config := driver.PrepareTest(ctx, f)
+		sc = dDriver.GetDynamicProvisionStorageClass(ctx, config, pattern.FsType)
 		if sc == nil {
 			e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
 	}
 
-	cleanup := func() {
-		err := storageutils.TryFunc(driverCleanup)
-		driverCleanup = nil
-		framework.ExpectNoError(err, "while cleaning up driver")
-	}
-
-	ginkgo.It("provides storage capacity information", func() {
-		init()
-		defer cleanup()
+	ginkgo.It("provides storage capacity information", func(ctx context.Context) {
+		init(ctx)
 
 		timeout := time.Minute
 		pollInterval := time.Second
 		matchSC := HaveCapacitiesForClass(sc.Name)
-		listAll := gomega.Eventually(func() (*storagev1.CSIStorageCapacityList, error) {
-			return f.ClientSet.StorageV1().CSIStorageCapacities("").List(context.Background(), metav1.ListOptions{})
+		listAll := gomega.Eventually(ctx, func() (*storagev1.CSIStorageCapacityList, error) {
+			return f.ClientSet.StorageV1().CSIStorageCapacities("").List(ctx, metav1.ListOptions{})
 		}, timeout, pollInterval)
 
 		// If we have further information about what storage
@@ -137,16 +127,16 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			// drivers with multiple keys might be
 			// possible, too, but is not currently
 			// implemented.
-			matcher = HaveCapacitiesForClassAndNodes(f.ClientSet, sc.Provisioner, sc.Name, dInfo.TopologyKeys[0])
+			matcher = HaveCapacitiesForClassAndNodes(ctx, f.ClientSet, sc.Provisioner, sc.Name, dInfo.TopologyKeys[0])
 		}
 
 		// Create storage class and wait for capacity information.
-		_, clearProvisionedStorageClass := SetupStorageClass(f.ClientSet, sc)
-		defer clearProvisionedStorageClass()
+		sc := SetupStorageClass(ctx, f.ClientSet, sc)
 		listAll.Should(MatchCapacities(matcher), "after creating storage class")
 
 		// Delete storage class again and wait for removal of storage capacity information.
-		clearProvisionedStorageClass()
+		err := f.ClientSet.StorageV1().StorageClasses().Delete(ctx, sc.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "delete storage class")
 		listAll.ShouldNot(MatchCapacities(matchSC), "after deleting storage class")
 	})
 }
@@ -249,8 +239,9 @@ func (h *haveCSIStorageCapacities) NegatedFailureMessage(actual interface{}) (me
 
 // HaveCapacitiesForClassAndNodes matches objects by storage class name. It finds
 // all nodes on which the driver runs and expects one object per node.
-func HaveCapacitiesForClassAndNodes(client kubernetes.Interface, driverName, scName, topologyKey string) CapacityMatcher {
+func HaveCapacitiesForClassAndNodes(ctx context.Context, client kubernetes.Interface, driverName, scName, topologyKey string) CapacityMatcher {
 	return &haveLocalStorageCapacities{
+		ctx:         ctx,
 		client:      client,
 		driverName:  driverName,
 		match:       HaveCapacitiesForClass(scName),
@@ -259,6 +250,7 @@ func HaveCapacitiesForClassAndNodes(client kubernetes.Interface, driverName, scN
 }
 
 type haveLocalStorageCapacities struct {
+	ctx         context.Context
 	client      kubernetes.Interface
 	driverName  string
 	match       CapacityMatcher
@@ -273,6 +265,7 @@ type haveLocalStorageCapacities struct {
 var _ CapacityMatcher = &haveLocalStorageCapacities{}
 
 func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, err error) {
+	ctx := h.ctx
 	h.expectedCapacities = nil
 	h.unexpectedCapacities = nil
 	h.missingTopologyValues = nil
@@ -285,7 +278,7 @@ func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, er
 	}
 
 	// Find all nodes on which the driver runs.
-	csiNodes, err := h.client.StorageV1().CSINodes().List(context.Background(), metav1.ListOptions{})
+	csiNodes, err := h.client.StorageV1().CSINodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -295,7 +288,7 @@ func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, er
 			if driver.Name != h.driverName {
 				continue
 			}
-			node, err := h.client.CoreV1().Nodes().Get(context.Background(), csiNode.Name, metav1.GetOptions{})
+			node, err := h.client.CoreV1().Nodes().Get(ctx, csiNode.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

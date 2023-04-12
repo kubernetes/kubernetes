@@ -37,7 +37,7 @@ type Filesystem interface {
 	ReadFile(filename string) ([]byte, error)
 	TempDir(dir, prefix string) (string, error)
 	TempFile(dir, prefix string) (File, error)
-	ReadDir(dirname string) ([]os.FileInfo, error)
+	ReadDir(dirname string) ([]os.DirEntry, error)
 	Walk(root string, walkFn filepath.WalkFunc) error
 }
 

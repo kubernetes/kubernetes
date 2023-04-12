@@ -39,14 +39,29 @@ type logFormat struct {
 	feature featuregate.Feature
 }
 
+// +k8s:deepcopy-gen=false
+
+// RuntimeControl provides operations that aren't available through the normal
+// Logger or LogSink API.
+type RuntimeControl struct {
+	// Flush ensures that all in-memory data is written.
+	// May be nil.
+	Flush func()
+
+	// SetVerbosityLevel changes the level for all Logger instances
+	// derived from the initial one. May be nil.
+	//
+	// The parameter is intentionally a plain uint32 instead of
+	// VerbosityLevel to enable implementations that don't need to import
+	// the API (helps avoid circular dependencies).
+	SetVerbosityLevel func(v uint32) error
+}
+
 // LogFormatFactory provides support for a certain additional,
 // non-default log format.
 type LogFormatFactory interface {
 	// Create returns a logger with the requested configuration.
-	// Returning a flush function for the logger is optional.
-	// If provided, the caller must ensure that it is called
-	// periodically (if desired) and at program exit.
-	Create(c LoggingConfiguration) (log logr.Logger, flush func())
+	Create(c LoggingConfiguration, o LoggingOptions) (logr.Logger, RuntimeControl)
 }
 
 // RegisterLogFormat registers support for a new logging format. This must be called

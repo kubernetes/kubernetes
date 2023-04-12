@@ -22,13 +22,15 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -43,25 +45,25 @@ type SysctlUpgradeTest struct {
 
 // Setup creates two pods: one with safe sysctls, one with unsafe sysctls. It checks that the former
 // launched and the later is rejected.
-func (t *SysctlUpgradeTest) Setup(f *framework.Framework) {
-	t.validPod = t.verifySafeSysctlWork(f)
-	t.invalidPod = t.verifyUnsafeSysctlsAreRejected(f)
+func (t *SysctlUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
+	t.validPod = t.verifySafeSysctlWork(ctx, f)
+	t.invalidPod = t.verifyUnsafeSysctlsAreRejected(ctx, f)
 }
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the ConfigMap.
-func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *SysctlUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	switch upgrade {
 	case upgrades.MasterUpgrade, upgrades.ClusterUpgrade:
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
-		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(context.TODO(), t.validPod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(ctx, t.validPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
-	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(context.TODO(), t.invalidPod.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(ctx, t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
@@ -69,39 +71,39 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 		framework.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
-	t.verifySafeSysctlWork(f)
-	t.verifyUnsafeSysctlsAreRejected(f)
+	t.verifySafeSysctlWork(ctx, f)
+	t.verifyUnsafeSysctlsAreRejected(ctx, f)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *SysctlUpgradeTest) Teardown(f *framework.Framework) {
+func (t *SysctlUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
-func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod {
+func (t *SysctlUpgradeTest) verifySafeSysctlWork(ctx context.Context, f *framework.Framework) *v1.Pod {
 	ginkgo.By("Creating a pod with safe sysctls")
 	safeSysctl := "net.ipv4.ip_local_port_range"
 	safeSysctlValue := "1024 1042"
 	sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
-	validPod := f.PodClient().Create(t.validPod)
+	validPod := e2epod.NewPodClient(f).Create(ctx, t.validPod)
 
 	ginkgo.By("Making sure the valid pod launches")
-	_, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
+	_, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, t.validPod)
 	framework.ExpectNoError(err)
-	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
+	e2eoutput.TestContainerOutput(ctx, f, "pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
 	return validPod
 }
 
-func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framework) *v1.Pod {
+func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(ctx context.Context, f *framework.Framework) *v1.Pod {
 	ginkgo.By("Creating a pod with unsafe sysctls")
 	invalidPod := sysctlTestPod("valid-sysctls-"+string(uuid.NewUUID()), map[string]string{
 		"fs.mount-max": "1000000",
 	})
-	invalidPod = f.PodClient().Create(invalidPod)
+	invalidPod = e2epod.NewPodClient(f).Create(ctx, invalidPod)
 
 	ginkgo.By("Making sure the invalid pod failed")
-	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
+	ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, invalidPod)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 

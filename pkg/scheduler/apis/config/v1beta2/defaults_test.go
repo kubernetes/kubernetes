@@ -32,6 +32,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -144,7 +145,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(0),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
 				PodInitialBackoffSeconds: pointer.Int64(1),
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta2.KubeSchedulerProfile{
@@ -181,7 +182,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(0),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
 				PodInitialBackoffSeconds: pointer.Int64(1),
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta2.KubeSchedulerProfile{
@@ -237,7 +238,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(0),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
 				PodInitialBackoffSeconds: pointer.Int64(1),
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta2.KubeSchedulerProfile{
@@ -325,6 +326,11 @@ func TestSchedulerDefaults(t *testing.T) {
 					{
 						SchedulerName: pointer.String("custom-scheduler"),
 						Plugins: &v1beta2.Plugins{
+							PreEnqueue: v1beta2.PluginSet{
+								Enabled: []v1beta2.Plugin{
+									{Name: "SchedulingGates"},
+								},
+							},
 							QueueSort: v1beta2.PluginSet{
 								Enabled: []v1beta2.Plugin{
 									{Name: names.PrioritySort},
@@ -338,6 +344,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
+									{Name: names.VolumeZone},
 									{Name: names.NodeAffinity},
 								},
 							},
@@ -371,6 +378,8 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.PodTopologySpread},
 									{Name: names.TaintToleration},
 									{Name: names.NodeAffinity},
+									{Name: names.NodeResourcesFit},
+									{Name: names.NodeResourcesBalancedAllocation},
 								},
 							},
 							Score: v1beta2.PluginSet{
@@ -430,7 +439,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(0),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
 				PodInitialBackoffSeconds: pointer.Int64(1),
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta2.KubeSchedulerProfile{

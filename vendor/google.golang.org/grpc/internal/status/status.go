@@ -164,3 +164,13 @@ func (e *Error) Is(target error) bool {
 	}
 	return proto.Equal(e.s.s, tse.s.s)
 }
+
+// IsRestrictedControlPlaneCode returns whether the status includes a code
+// restricted for control plane usage as defined by gRFC A54.
+func IsRestrictedControlPlaneCode(s *Status) bool {
+	switch s.Code() {
+	case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists, codes.FailedPrecondition, codes.Aborted, codes.OutOfRange, codes.DataLoss:
+		return true
+	}
+	return false
+}

@@ -30,7 +30,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -60,6 +59,26 @@ var (
 	testPodUID  = types.UID("test-pod")
 	testAccount = "test-service-account"
 )
+
+func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, volumeID, driverName, lifecycleMode, seLinuxMountContext string) error {
+	nodeName := string(plug.host.GetNodeName())
+	volData := map[string]string{
+		volDataKey.specVolID:           specVolumeName,
+		volDataKey.volHandle:           volumeID,
+		volDataKey.driverName:          driverName,
+		volDataKey.nodeName:            nodeName,
+		volDataKey.attachmentID:        getAttachmentName(volumeID, driverName, nodeName),
+		volDataKey.volumeLifecycleMode: lifecycleMode,
+		volDataKey.seLinuxMountContext: seLinuxMountContext,
+	}
+	if err := os.MkdirAll(mountPath, 0755); err != nil {
+		return fmt.Errorf("failed to create dir for volume info file: %s", err)
+	}
+	if err := saveVolumeData(mountPath, volDataFileName, volData); err != nil {
+		return fmt.Errorf("failed to save volume info file: %s", err)
+	}
+	return nil
+}
 
 func TestMounterGetPath(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
@@ -178,6 +197,15 @@ func TestMounterSetUp(t *testing.T) {
 			name:                     "should not include selinux mount option, if feature gate is enabled but CSIDriver does not exist",
 			driver:                   "not_found_selinux",
 			seLinuxLabel:             "s0,c0",
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
+		{
+			name:                     "should not include selinux mount options, if feature gate is enabled, driver supports it, but Pod does not have it",
+			driver:                   "supports_selinux",
+			seLinuxLabel:             "",
+			expectedSELinuxContext:   "", // especially make sure the volume plugin does not use -o context="", that is an invalid value
 			volumeContext:            nil,
 			enableSELinuxFeatureGate: true,
 			expectedVolumeContext:    nil,
@@ -301,6 +329,37 @@ func TestMounterSetUp(t *testing.T) {
 			if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
 				t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
 			}
+
+			// ensure data file is created
+			dataDir := filepath.Dir(mounter.GetPath())
+			dataFile := filepath.Join(dataDir, volDataFileName)
+			if _, err := os.Stat(dataFile); err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("data file not created %s", dataFile)
+				} else {
+					t.Fatal(err)
+				}
+			}
+			data, err := loadVolumeData(dataDir, volDataFileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
+				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
+			}
+			if data[volDataKey.volHandle] != csiMounter.volumeID {
+				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
+			}
+			if data[volDataKey.driverName] != string(csiMounter.driverName) {
+				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
+			}
+			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
+				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
+			}
+			if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
+				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
+			}
+
 		})
 	}
 }
@@ -311,20 +370,21 @@ func TestMounterSetUpSimple(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name       string
-		podUID     types.UID
-		mode       storage.VolumeLifecycleMode
-		fsType     string
-		options    []string
-		spec       func(string, []string) *volume.Spec
-		shouldFail bool
+		name                 string
+		podUID               types.UID
+		mode                 storage.VolumeLifecycleMode
+		fsType               string
+		options              []string
+		spec                 func(string, []string) *volume.Spec
+		newMounterShouldFail bool
+		setupShouldFail      bool
 	}{
 		{
-			name:       "setup with ephemeral source",
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:       storage.VolumeLifecycleEphemeral,
-			fsType:     "ext4",
-			shouldFail: true,
+			name:            "setup with ephemeral source",
+			podUID:          types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			mode:            storage.VolumeLifecycleEphemeral,
+			fsType:          "ext4",
+			setupShouldFail: true,
 			spec: func(fsType string, options []string) *volume.Spec {
 				volSrc := makeTestVol("pv1", testDriver)
 				volSrc.CSI.FSType = &fsType
@@ -352,9 +412,9 @@ func TestMounterSetUpSimple(t *testing.T) {
 			},
 		},
 		{
-			name:       "setup with missing spec",
-			shouldFail: true,
-			spec:       func(fsType string, options []string) *volume.Spec { return nil },
+			name:                 "setup with missing spec",
+			newMounterShouldFail: true,
+			spec:                 func(fsType string, options []string) *volume.Spec { return nil },
 		},
 	}
 
@@ -366,11 +426,11 @@ func TestMounterSetUpSimple(t *testing.T) {
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
+			if tc.newMounterShouldFail && err != nil {
 				t.Log(err)
 				return
 			}
-			if !tc.shouldFail && err != nil {
+			if !tc.newMounterShouldFail && err != nil {
 				t.Fatal("unexpected error:", err)
 			}
 			if mounter == nil {
@@ -380,7 +440,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			if csiMounter.volumeLifecycleMode != storage.VolumeLifecyclePersistent {
+			if csiMounter.volumeLifecycleMode != tc.mode {
 				t.Fatal("unexpected volume mode: ", csiMounter.volumeLifecycleMode)
 			}
 
@@ -392,8 +452,13 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
-				t.Fatalf("mounter.Setup failed: %v", err)
+			err = csiMounter.SetUp(volume.MounterArgs{})
+			if tc.setupShouldFail && err != nil {
+				t.Log(err)
+				return
+			}
+			if !tc.setupShouldFail && err != nil {
+				t.Fatal("unexpected error:", err)
 			}
 
 			// ensure call went all the way
@@ -424,6 +489,36 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			if vol.Path != csiMounter.GetPath() {
 				t.Error("csi server may not have received NodePublishVolume call")
+			}
+
+			// ensure data file is created
+			dataDir := filepath.Dir(mounter.GetPath())
+			dataFile := filepath.Join(dataDir, volDataFileName)
+			if _, err := os.Stat(dataFile); err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("data file not created %s", dataFile)
+				} else {
+					t.Fatal(err)
+				}
+			}
+			data, err := loadVolumeData(dataDir, volDataFileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
+				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
+			}
+			if data[volDataKey.volHandle] != csiMounter.volumeID {
+				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
+			}
+			if data[volDataKey.driverName] != string(csiMounter.driverName) {
+				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
+			}
+			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
+				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
+			}
+			if data[volDataKey.volumeLifecycleMode] != string(tc.mode) {
+				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 		})
 	}
@@ -690,7 +785,6 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		fsGroup                        int64
 		driverFSGroupPolicy            bool
 		supportMode                    storage.FSGroupPolicy
-		delegateFSGroupFeatureGate     bool
 		driverSupportsVolumeMountGroup bool
 		expectedFSGroupInNodePublish   string
 	}{
@@ -822,46 +916,32 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			supportMode:         storage.FileFSGroupPolicy,
 		},
 		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodePublishVolume",
+			name:                           "fsgroup provided, driver supports volume mount group; expect fsgroup to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     true,
 			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "3000",
 		},
 		{
-			name:                           "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			name:                           "fsgroup not provided, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     false,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "",
 		},
 		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			name:                           "fsgroup provided, driver does not support volume mount group; expect fsgroup not to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     true,
 			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: false,
-			expectedFSGroupInNodePublish:   "",
-		},
-		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
-			fsType:                         "ext4",
-			setFsGroup:                     true,
-			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     false,
-			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "",
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Logf("Running test %s", tc.name)
-
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -889,9 +969,6 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		}
 
 		csiMounter := mounter.(*csiMountMgr)
-		if tc.driverFSGroupPolicy {
-			csiMounter.fsGroupPolicy = tc.supportMode
-		}
 		csiMounter.csiClient = setupClientWithVolumeMountGroup(t, true /* stageUnstageSet */, tc.driverSupportsVolumeMountGroup)
 
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
@@ -1139,7 +1216,6 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 		plugin              *csiPlugin
 		driverName          csiDriverName
 		volumeLifecycleMode storage.VolumeLifecycleMode
-		fsGroupPolicy       storage.FSGroupPolicy
 		volumeID            string
 		specVolumeID        string
 		readOnly            bool
@@ -1265,7 +1341,6 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				plugin:              tt.fields.plugin,
 				driverName:          tt.fields.driverName,
 				volumeLifecycleMode: tt.fields.volumeLifecycleMode,
-				fsGroupPolicy:       tt.fields.fsGroupPolicy,
 				volumeID:            tt.fields.volumeID,
 				specVolumeID:        tt.fields.specVolumeID,
 				readOnly:            tt.fields.readOnly,
@@ -1281,5 +1356,66 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				t.Errorf("supportsFSGroup() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestMounterGetFSGroupPolicy(t *testing.T) {
+	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	testCases := []struct {
+		name                  string
+		defined               bool
+		expectedFSGroupPolicy storage.FSGroupPolicy
+	}{
+		{
+			name:                  "no FSGroupPolicy defined, expect default",
+			defined:               false,
+			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name:                  "File FSGroupPolicy defined, expect File",
+			defined:               true,
+			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
+		},
+		{
+			name:                  "None FSGroupPolicy defined, expected None",
+			defined:               true,
+			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
+		},
+	}
+	for _, tc := range testCases {
+		t.Logf("testing: %s", tc.name)
+		// Define the driver and set the FSGroupPolicy
+		driver := getTestCSIDriver(testDriver, nil, nil, nil)
+		if tc.defined {
+			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
+		} else {
+			driver.Spec.FSGroupPolicy = &defaultPolicy
+		}
+
+		// Create the client and register the resources
+		fakeClient := fakeclient.NewSimpleClientset(driver)
+		plug, tmpDir := newTestPlugin(t, fakeClient)
+		defer os.RemoveAll(tmpDir)
+		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
+
+		mounter, err := plug.NewMounter(
+			volume.NewSpecFromPersistentVolume(makeTestPV("test.vol.id", 20, testDriver, "testvol-handle1"), true),
+			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: "1", Namespace: testns}},
+			volume.VolumeOptions{},
+		)
+		if err != nil {
+			t.Fatalf("Error creating a new mounter: %s", err)
+		}
+
+		csiMounter := mounter.(*csiMountMgr)
+
+		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
+		fsGroup, err := csiMounter.getFSGroupPolicy()
+		if err != nil {
+			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
+		}
+		if fsGroup != *driver.Spec.FSGroupPolicy {
+			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
+		}
 	}
 }

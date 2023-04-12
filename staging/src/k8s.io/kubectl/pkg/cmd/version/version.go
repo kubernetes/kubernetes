@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/version"
@@ -36,7 +36,7 @@ import (
 )
 
 // TODO(knverey): remove this hardcoding once kubectl being built with module support makes BuildInfo available.
-const kustomizeVersion = "v4.5.7"
+const kustomizeVersion = "v5.0.1"
 
 // Version is a struct for version information
 type Version struct {
@@ -61,11 +61,11 @@ type Options struct {
 
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewOptions returns initialized Options
-func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
+func NewOptions(ioStreams genericiooptions.IOStreams) *Options {
 	return &Options{
 		IOStreams: ioStreams,
 	}
@@ -73,7 +73,7 @@ func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
 }
 
 // NewCmdVersion returns a cobra command for fetching versions
-func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdVersion(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "version",
@@ -195,7 +195,7 @@ func GetKustomizeModVersion() (string, bool) {
 		return "", false
 	}
 	for _, dep := range info.Deps {
-		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
+		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" || dep.Path == "sigs.k8s.io/kustomize/kustomize/v5" {
 			return dep.Version, true
 		}
 	}

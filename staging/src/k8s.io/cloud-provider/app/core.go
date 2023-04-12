@@ -33,7 +33,6 @@ import (
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	controllermanagerapp "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
-	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -48,6 +47,7 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.NodeStatusUpdateFrequency.Duration,
+		completedConfig.ComponentConfig.NodeController.ConcurrentNodeSyncs,
 	)
 	if err != nil {
 		klog.Warningf("failed to start cloud node controller: %s", err)
@@ -116,11 +116,6 @@ func startRouteController(ctx context.Context, initContext ControllerInitContext
 	clusterCIDRs, dualStack, err := processCIDRs(completedConfig.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
-	}
-
-	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
 	// failure: more than one cidr but they are not configured as dual stack

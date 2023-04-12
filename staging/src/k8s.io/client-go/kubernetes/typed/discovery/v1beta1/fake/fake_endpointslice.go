@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/discovery/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	discoveryv1beta1 "k8s.io/client-go/applyconfigurations/discovery/v1beta1"
@@ -39,9 +38,9 @@ type FakeEndpointSlices struct {
 	ns   string
 }
 
-var endpointslicesResource = schema.GroupVersionResource{Group: "discovery.k8s.io", Version: "v1beta1", Resource: "endpointslices"}
+var endpointslicesResource = v1beta1.SchemeGroupVersion.WithResource("endpointslices")
 
-var endpointslicesKind = schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSlice"}
+var endpointslicesKind = v1beta1.SchemeGroupVersion.WithKind("EndpointSlice")
 
 // Get takes name of the endpointSlice, and returns the corresponding endpointSlice object, and an error if there is any.
 func (c *FakeEndpointSlices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.EndpointSlice, err error) {

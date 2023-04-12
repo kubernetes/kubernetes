@@ -24,6 +24,37 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/pointer"
+)
+
+var (
+	validPodTemplateSpec = api.PodTemplateSpec{
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	validCronjobSpec = batch.CronJobSpec{
+		Schedule:          "5 5 * * ?",
+		ConcurrencyPolicy: batch.AllowConcurrent,
+		TimeZone:          pointer.String("Asia/Shanghai"),
+		JobTemplate: batch.JobTemplateSpec{
+			Spec: batch.JobSpec{
+				Template: validPodTemplateSpec,
+			},
+		},
+	}
+	cronjobSpecWithTZinSchedule = batch.CronJobSpec{
+		Schedule:          "CRON_TZ=UTC 5 5 * * ?",
+		ConcurrencyPolicy: batch.AllowConcurrent,
+		TimeZone:          pointer.String("Asia/DoesNotExist"),
+		JobTemplate: batch.JobTemplateSpec{
+			Spec: batch.JobSpec{
+				Template: validPodTemplateSpec,
+			},
+		},
+	}
 )
 
 func TestCronJobStrategy(t *testing.T) {
@@ -35,13 +66,6 @@ func TestCronJobStrategy(t *testing.T) {
 		t.Errorf("CronJob should not allow create on update")
 	}
 
-	validPodTemplateSpec := api.PodTemplateSpec{
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
-	}
 	cronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "mycronjob",
@@ -188,5 +212,219 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	}
 	if newCronJob.ResourceVersion != "9" {
 		t.Errorf("Incoming resource version on update should not be mutated")
+	}
+}
+
+func TestStrategy_ResetFields(t *testing.T) {
+	resetFields := Strategy.GetResetFields()
+	if len(resetFields) != 2 {
+		t.Errorf("ResetFields should have 2 elements, but have %d", len(resetFields))
+	}
+}
+
+func TestJobStatusStrategy_ResetFields(t *testing.T) {
+	resetFields := StatusStrategy.GetResetFields()
+	if len(resetFields) != 2 {
+		t.Errorf("ResetFields should have 2 elements, but have %d", len(resetFields))
+	}
+}
+
+func TestJobStrategy_WarningsOnCreate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	now := metav1.Now()
+
+	testcases := map[string]struct {
+		cronjob           *batch.CronJob
+		wantWarningsCount int32
+	}{
+		"happy path cronjob": {
+			wantWarningsCount: 0,
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+		},
+		"dns invalid name": {
+			wantWarningsCount: 1,
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "my cronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+		},
+		"timezone invalid": {
+			wantWarningsCount: 1,
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+				},
+				Spec: cronjobSpecWithTZinSchedule,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			gotWarnings := Strategy.WarningsOnCreate(ctx, tc.cronjob)
+			if len(gotWarnings) != int(tc.wantWarningsCount) {
+				t.Errorf("%s: got warning length of %d but expected %d", name, len(gotWarnings), tc.wantWarningsCount)
+			}
+		})
+	}
+}
+
+func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	now := metav1.Now()
+
+	cases := map[string]struct {
+		oldCronJob        *batch.CronJob
+		cronjob           *batch.CronJob
+		wantWarningsCount int32
+	}{
+		"generation 0 for both": {
+			wantWarningsCount: 0,
+			oldCronJob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+					Generation:      0,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+					Generation:      0,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+		},
+		"generation 1 for new; force WarningsOnUpdate to check PodTemplate for updates": {
+			wantWarningsCount: 0,
+			oldCronJob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+					Generation:      1,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "9",
+					Generation:      0,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+		},
+		"force validation failure in pod template": {
+			oldCronJob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Generation:      1,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Generation:      0,
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "5 5 * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: api.PodTemplateSpec{
+								Spec: api.PodSpec{Volumes: []api.Volume{{Name: "volume-name"}, {Name: "volume-name"}}},
+							},
+						},
+					},
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			wantWarningsCount: 1,
+		},
+		"timezone invalid failure": {
+			oldCronJob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Generation:      1,
+				},
+				Spec: validCronjobSpec,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			cronjob: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "mycronjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Generation:      0,
+				},
+				Spec: cronjobSpecWithTZinSchedule,
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &now,
+				},
+			},
+			wantWarningsCount: 1,
+		},
+	}
+	for val, tc := range cases {
+		t.Run(val, func(t *testing.T) {
+			gotWarnings := Strategy.WarningsOnUpdate(ctx, tc.cronjob, tc.oldCronJob)
+			if len(gotWarnings) != int(tc.wantWarningsCount) {
+				t.Errorf("%s: got warning length of %d but expected %d", val, len(gotWarnings), tc.wantWarningsCount)
+			}
+		})
 	}
 }

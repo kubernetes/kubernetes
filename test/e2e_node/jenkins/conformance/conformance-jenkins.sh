@@ -24,8 +24,6 @@ set -x
 
 . "${1}"
 
-make generated_files
-
 WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 TIMEOUT=${TIMEOUT:-"45m"}

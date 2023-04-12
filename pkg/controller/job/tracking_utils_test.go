@@ -17,10 +17,16 @@ limitations under the License.
 package job
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
 
 func TestUIDTrackingExpectations(t *testing.T) {
@@ -115,4 +121,109 @@ func TestUIDTrackingExpectations(t *testing.T) {
 			t.Errorf("Wanted expectations for job %s to be cleared, but they were not", track.job)
 		}
 	}
+}
+
+func TestRecordFinishedPodWithTrackingFinalizer(t *testing.T) {
+	metrics.Register()
+	cases := map[string]struct {
+		oldPod     *v1.Pod
+		newPod     *v1.Pod
+		wantAdd    int
+		wantDelete int
+	}{
+		"new non-finished Pod with finalizer": {
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+		},
+		"pod with finalizer fails": {
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			},
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed,
+				},
+			},
+			wantAdd: 1,
+		},
+		"pod with finalizer succeeds": {
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			},
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+				},
+			},
+			wantAdd: 1,
+		},
+		"succeeded pod loses finalizer": {
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{batch.JobTrackingFinalizer},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+				},
+			},
+			newPod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+				},
+			},
+			wantDelete: 1,
+		},
+		"pod without finalizer removed": {
+			oldPod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			metrics.TerminatedPodsTrackingFinalizerTotal.Reset()
+			recordFinishedPodWithTrackingFinalizer(tc.oldPod, tc.newPod)
+			if err := validateTerminatedPodsTrackingFinalizerTotal(metrics.Add, tc.wantAdd); err != nil {
+				t.Errorf("Failed validating terminated_pods_tracking_finalizer_total(add): %v", err)
+			}
+			if err := validateTerminatedPodsTrackingFinalizerTotal(metrics.Delete, tc.wantDelete); err != nil {
+				t.Errorf("Failed validating terminated_pods_tracking_finalizer_total(delete): %v", err)
+			}
+		})
+	}
+}
+
+func validateTerminatedPodsTrackingFinalizerTotal(event string, want int) error {
+	got, err := testutil.GetCounterMetricValue(metrics.TerminatedPodsTrackingFinalizerTotal.WithLabelValues(event))
+	if err != nil {
+		return err
+	}
+	if int(got) != want {
+		return fmt.Errorf("got value %d, want %d", int(got), want)
+	}
+	return nil
 }

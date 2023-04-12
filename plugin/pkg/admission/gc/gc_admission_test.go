@@ -115,7 +115,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil, nil)
+	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil)
 	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
@@ -139,7 +139,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil, nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)

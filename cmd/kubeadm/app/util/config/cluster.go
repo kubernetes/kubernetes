@@ -160,8 +160,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 
 // getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
-//
-//	information in the local kubelet config.yaml
+// information in the local kubelet config.yaml
 func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// loads the kubelet.conf file
 	config, err := clientcmd.LoadFromFile(fileName)

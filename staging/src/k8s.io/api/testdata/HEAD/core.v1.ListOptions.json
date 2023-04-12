@@ -9,5 +9,6 @@
   "resourceVersionMatch": "resourceVersionMatchValue",
   "timeoutSeconds": 5,
   "limit": 7,
-  "continue": "continueValue"
+  "continue": "continueValue",
+  "sendInitialEvents": true
 }

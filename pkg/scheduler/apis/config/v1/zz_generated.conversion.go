@@ -375,6 +375,7 @@ func autoConvert_v1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1.I
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
+	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
 	return nil
 }
 
@@ -387,6 +388,7 @@ func autoConvert_config_InterPodAffinityArgs_To_v1_InterPodAffinityArgs(in *conf
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
+	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
 	return nil
 }
 
@@ -408,9 +410,7 @@ func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigurat
 	if err := v1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
-		return err
-	}
+	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -447,9 +447,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 	if err := v1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
-		return err
-	}
+	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -475,6 +473,7 @@ func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1.K
 	if err := metav1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -507,6 +506,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *conf
 	if err := metav1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(v1.Plugins)
@@ -714,6 +714,9 @@ func Convert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.Plug
 }
 
 func autoConvert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
+		return err
+	}
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.QueueSort, &out.QueueSort, s); err != nil {
 		return err
 	}
@@ -759,6 +762,9 @@ func Convert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s
 }
 
 func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *v1.Plugins, s conversion.Scope) error {
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
+		return err
+	}
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.QueueSort, &out.QueueSort, s); err != nil {
 		return err
 	}

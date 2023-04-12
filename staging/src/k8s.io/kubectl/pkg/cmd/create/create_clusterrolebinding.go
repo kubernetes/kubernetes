@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -61,14 +61,13 @@ type ClusterRoleBindingOptions struct {
 
 	Client              rbacclientv1.RbacV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewClusterRoleBindingOptions creates a new *ClusterRoleBindingOptions with sane defaults
-func NewClusterRoleBindingOptions(ioStreams genericclioptions.IOStreams) *ClusterRoleBindingOptions {
+func NewClusterRoleBindingOptions(ioStreams genericiooptions.IOStreams) *ClusterRoleBindingOptions {
 	return &ClusterRoleBindingOptions{
 		Users:           []string{},
 		Groups:          []string{},
@@ -79,7 +78,7 @@ func NewClusterRoleBindingOptions(ioStreams genericclioptions.IOStreams) *Cluste
 }
 
 // NewCmdCreateClusterRoleBinding returns an initialized command instance of ClusterRoleBinding
-func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewClusterRoleBindingOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -110,7 +109,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"clusterrole",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.CompGetResource(f, cmd, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return completion.CompGetResource(f, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	return cmd
@@ -136,11 +135,6 @@ func (o *ClusterRoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Comma
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -176,9 +170,6 @@ func (o *ClusterRoleBindingOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(clusterRoleBinding.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

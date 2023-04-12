@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -201,14 +203,14 @@ func (o *Options) initFlags() {
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
-func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
+func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		// If the --config arg is not specified, honor the deprecated as well as leader election CLI args.
 		o.ApplyDeprecated()
 		o.ApplyLeaderElectionTo(o.ComponentConfig)
 		c.ComponentConfig = *o.ComponentConfig
 	} else {
-		cfg, err := loadConfigFromFile(o.ConfigFile)
+		cfg, err := loadConfigFromFile(logger, o.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -221,6 +223,15 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 
 		c.ComponentConfig = *cfg
 	}
+
+	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
+	// goroutines (started from initializing secure serving - which underneath
+	// creates a queue which in its constructor starts a goroutine).
+	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
+	if err != nil {
+		return err
+	}
+	c.KubeConfig = kubeConfig
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
@@ -259,7 +270,8 @@ func (o *Options) Validate() []error {
 }
 
 // Config return a scheduler config object
-func (o *Options) Config() (*schedulerappconfig.Config, error) {
+func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error) {
+	logger := klog.FromContext(ctx)
 	if o.SecureServing != nil {
 		if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 			return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -267,18 +279,12 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	c := &schedulerappconfig.Config{}
-	if err := o.ApplyTo(c); err != nil {
-		return nil, err
-	}
-
-	// Prepare kube config.
-	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
-	if err != nil {
+	if err := o.ApplyTo(logger, c); err != nil {
 		return nil, err
 	}
 
 	// Prepare kube clients.
-	client, eventClient, err := createClients(kubeConfig)
+	client, eventClient, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -294,16 +300,15 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
 		}
 		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
-		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
+		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, c.KubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	c.Client = client
-	c.KubeConfig = kubeConfig
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
-	dynClient := dynamic.NewForConfigOrDie(kubeConfig)
+	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
 

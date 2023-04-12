@@ -45,7 +45,7 @@ func TestErrorNew(t *testing.T) {
 		t.Errorf("expected to not be %s", metav1.StatusReasonConflict)
 	}
 	if IsNotFound(err) {
-		t.Errorf(fmt.Sprintf("expected to not be %s", metav1.StatusReasonNotFound))
+		t.Errorf("expected to not be %s", metav1.StatusReasonNotFound)
 	}
 	if IsInvalid(err) {
 		t.Errorf("expected to not be %s", metav1.StatusReasonInvalid)

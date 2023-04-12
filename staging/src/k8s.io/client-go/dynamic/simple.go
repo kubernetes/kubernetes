@@ -31,11 +31,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type dynamicClient struct {
-	client *rest.RESTClient
+type DynamicClient struct {
+	client rest.Interface
 }
 
-var _ Interface = &dynamicClient{}
+var _ Interface = &DynamicClient{}
 
 // ConfigFor returns a copy of the provided config with the
 // appropriate dynamic client defaults set.
@@ -50,9 +50,14 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	return config
 }
 
-// NewForConfigOrDie creates a new Interface for the given config and
+// New creates a new DynamicClient for the given RESTClient.
+func New(c rest.Interface) *DynamicClient {
+	return &DynamicClient{client: c}
+}
+
+// NewForConfigOrDie creates a new DynamicClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) Interface {
+func NewForConfigOrDie(c *rest.Config) *DynamicClient {
 	ret, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -63,7 +68,7 @@ func NewForConfigOrDie(c *rest.Config) Interface {
 // NewForConfig creates a new dynamic client or returns an error.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(inConfig *rest.Config) (Interface, error) {
+func NewForConfig(inConfig *rest.Config) (*DynamicClient, error) {
 	config := ConfigFor(inConfig)
 
 	httpClient, err := rest.HTTPClientFor(config)
@@ -75,7 +80,7 @@ func NewForConfig(inConfig *rest.Config) (Interface, error) {
 
 // NewForConfigAndClient creates a new dynamic client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (Interface, error) {
+func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (*DynamicClient, error) {
 	config := ConfigFor(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
@@ -85,16 +90,16 @@ func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (Interface, er
 	if err != nil {
 		return nil, err
 	}
-	return &dynamicClient{client: restClient}, nil
+	return &DynamicClient{client: restClient}, nil
 }
 
 type dynamicResourceClient struct {
-	client    *dynamicClient
+	client    *DynamicClient
 	namespace string
 	resource  schema.GroupVersionResource
 }
 
-func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
+func (c *DynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 

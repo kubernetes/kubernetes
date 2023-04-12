@@ -61,7 +61,7 @@ type cacheImpl struct {
 	mu sync.RWMutex
 	// a set of assumed pod keys.
 	// The key could further be used to get an entry in podStates.
-	assumedPods sets.String
+	assumedPods sets.Set[string]
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*nodeInfoListItem
@@ -86,7 +86,7 @@ type imageState struct {
 	// Size of the image
 	size int64
 	// A set of node names for nodes having this image present
-	nodes sets.String
+	nodes sets.Set[string]
 }
 
 // createImageStateSummary returns a summarizing snapshot of the given image's state.
@@ -105,7 +105,7 @@ func newCache(ttl, period time.Duration, stop <-chan struct{}) *cacheImpl {
 
 		nodes:       make(map[string]*nodeInfoListItem),
 		nodeTree:    newNodeTree(nil),
-		assumedPods: make(sets.String),
+		assumedPods: sets.New[string](),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
 	}
@@ -293,7 +293,7 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll bool) {
 	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-	snapshot.usedPVCSet = sets.NewString()
+	snapshot.usedPVCSet = sets.New[string]()
 	if updateAll {
 		// Take a snapshot of the nodes order in the tree
 		snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
@@ -537,17 +537,22 @@ func (cache *cacheImpl) UpdatePod(oldPod, newPod *v1.Pod) error {
 	defer cache.mu.Unlock()
 
 	currState, ok := cache.podStates[key]
+	if !ok {
+		return fmt.Errorf("pod %v(%v) is not added to scheduler cache, so cannot be updated", key, klog.KObj(oldPod))
+	}
+
 	// An assumed pod won't have Update/Remove event. It needs to have Add event
 	// before Update event, in which case the state would change from Assumed to Added.
-	if ok && !cache.assumedPods.Has(key) {
-		if currState.pod.Spec.NodeName != newPod.Spec.NodeName {
-			klog.ErrorS(nil, "Pod updated on a different node than previously added to", "podKey", key, "pod", klog.KObj(oldPod))
-			klog.ErrorS(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-		}
-		return cache.updatePod(oldPod, newPod)
+	if cache.assumedPods.Has(key) {
+		return fmt.Errorf("assumed pod %v(%v) should not be updated", key, klog.KObj(oldPod))
 	}
-	return fmt.Errorf("pod %v(%v) is not added to scheduler cache, so cannot be updated", key, klog.KObj(oldPod))
+
+	if currState.pod.Spec.NodeName != newPod.Spec.NodeName {
+		klog.ErrorS(nil, "Pod updated on a different node than previously added to", "podKey", key, "pod", klog.KObj(oldPod))
+		klog.ErrorS(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+	return cache.updatePod(oldPod, newPod)
 }
 
 func (cache *cacheImpl) RemovePod(pod *v1.Pod) error {
@@ -688,7 +693,7 @@ func (cache *cacheImpl) addNodeImageStates(node *v1.Node, nodeInfo *framework.No
 			if !ok {
 				state = &imageState{
 					size:  image.SizeBytes,
-					nodes: sets.NewString(node.Name),
+					nodes: sets.New(node.Name),
 				}
 				cache.imageStates[name] = state
 			} else {

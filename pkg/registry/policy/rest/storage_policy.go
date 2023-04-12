@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
-	pspstore "k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -62,14 +61,6 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		}
 		storage[resource] = poddisruptionbudgetStorage
 		storage[resource+"/status"] = poddisruptionbudgetStatusStorage
-	}
-
-	if resource := "podsecuritypolicies"; apiResourceConfigSource.ResourceEnabled(policyapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
-		rest, err := pspstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return storage, err
-		}
-		storage[resource] = rest
 	}
 
 	return storage, nil

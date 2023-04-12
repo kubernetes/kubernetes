@@ -17,13 +17,22 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -36,13 +45,15 @@ discovery:
     token: abcdef.0123456789abcdef
     apiServerEndpoint: 1.2.3.4:6443
     unsafeSkipCAVerification: true
+controlPlane:
+  certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
-  criSocket: /run/containerd/containerd.sock
+  criSocket: %s
   name: someName
   ignorePreflightErrors:
     - c
     - d
-`, kubeadmapiv1.SchemeGroupVersion.String())
+`, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
@@ -74,6 +85,7 @@ func TestNewJoinData(t *testing.T) {
 		flags       map[string]string
 		validate    func(*testing.T, *joinData)
 		expectError bool
+		expectWarn  bool
 	}{
 		// Join data passed using flags
 		{
@@ -98,7 +110,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that file discovery settings are set into join data
 				if data.cfg.Discovery.File == nil || data.cfg.Discovery.File.KubeConfigPath != "https://foo" {
-					t.Errorf("Invalid data.cfg.Discovery.File")
+					t.Error("Invalid data.cfg.Discovery.File")
 				}
 			},
 		},
@@ -115,7 +127,7 @@ func TestNewJoinData(t *testing.T) {
 					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
-					t.Errorf("Invalid data.cfg.Discovery.BootstrapToken")
+					t.Error("Invalid data.cfg.Discovery.BootstrapToken")
 				}
 			},
 		},
@@ -131,7 +143,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
-					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -149,7 +161,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi" {
-					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -166,7 +178,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.ControlPlane == nil ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.BindPort != 1234 {
-					t.Errorf("Invalid ControlPlane")
+					t.Error("Invalid ControlPlane")
 				}
 			},
 		},
@@ -181,9 +193,10 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that control plane attributes are unset in join data
 				if data.cfg.ControlPlane != nil {
-					t.Errorf("Invalid ControlPlane")
+					t.Error("Invalid ControlPlane")
 				}
 			},
+			expectWarn: true,
 		},
 		{
 			name: "fails if invalid preflight checks are provided",
@@ -199,9 +212,40 @@ func TestNewJoinData(t *testing.T) {
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
 			},
+			validate: func(t *testing.T, data *joinData) {
+				validData := &joinData{
+					cfg: &kubeadmapi.JoinConfiguration{
+						TypeMeta: metav1.TypeMeta{Kind: "", APIVersion: ""},
+						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+							Name:                  "somename",
+							CRISocket:             expectedCRISocket,
+							IgnorePreflightErrors: []string{"c", "d"},
+							ImagePullPolicy:       "IfNotPresent",
+							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},
+						},
+						CACertPath: kubeadmapiv1.DefaultCACertPath,
+						Discovery: kubeadmapi.Discovery{
+							BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+								Token:                    "abcdef.0123456789abcdef",
+								APIServerEndpoint:        "1.2.3.4:6443",
+								UnsafeSkipCAVerification: true,
+							},
+							TLSBootstrapToken: "abcdef.0123456789abcdef",
+							Timeout:           &metav1.Duration{Duration: kubeadmapiv1.DefaultDiscoveryTimeout},
+						},
+						ControlPlane: &kubeadmapi.JoinControlPlane{
+							CertificateKey: "c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd",
+						},
+					},
+					ignorePreflightErrors: sets.New("c", "d"),
+				}
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint")); diff != "" {
+					t.Fatalf("newJoinData returned data (-want,+got):\n%s", diff)
+				}
+			},
 		},
 		{
-			name: "--cri-socket and --node-name flags override config from file",
+			name: "--node-name flags override config from file",
 			flags: map[string]string{
 				options.CfgPath:  configFilePath,
 				options.NodeName: "anotherName",
@@ -209,7 +253,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that node-name is overwritten
 				if data.cfg.NodeRegistration.Name != "anotherName" {
-					t.Errorf("Invalid NodeRegistration.Name")
+					t.Error("Invalid NodeRegistration.Name")
 				}
 			},
 		},
@@ -229,14 +273,14 @@ func TestNewJoinData(t *testing.T) {
 				options.IgnorePreflightErrors: "a,b",
 				options.FileDiscovery:         "https://foo", //required only to pass discovery validation
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b")),
 		},
 		{
 			name: "pre-flights errors from JoinConfiguration only",
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("c", "d")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("c", "d")),
 		},
 		{
 			name: "pre-flights errors from both CLI args and JoinConfiguration",
@@ -244,7 +288,23 @@ func TestNewJoinData(t *testing.T) {
 				options.CfgPath:               configFilePath,
 				options.IgnorePreflightErrors: "a,b",
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b", "c", "d")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b", "c", "d")),
+		},
+		{
+			name: "warn if --control-plane flag is not set",
+			flags: map[string]string{
+				options.APIServerBindPort: "8888",
+				options.FileDiscovery:     "https://foo", //required only to pass discovery validation
+			},
+			expectWarn: true,
+		},
+		{
+			name: "no warn if --control-plane flag is set",
+			flags: map[string]string{
+				options.APIServerBindPort: "8888",
+				options.FileDiscovery:     "https://bar", //required only to pass discovery validation
+				options.ControlPlane:      "true",
+			},
 		},
 	}
 	for _, tc := range testCases {
@@ -253,6 +313,12 @@ func TestNewJoinData(t *testing.T) {
 			joinOptions := newJoinOptions()
 			cmd := newCmdJoin(nil, joinOptions)
 
+			// set klog output destination to bytes.Buffer so that log could be fetched and verified later.
+			var buffer bytes.Buffer
+			klog.SetOutput(&buffer)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)
@@ -260,11 +326,22 @@ func TestNewJoinData(t *testing.T) {
 
 			// test newJoinData method
 			data, err := newJoinData(cmd, tc.args, joinOptions, nil, kubeconfigFilePath)
+			klog.Flush()
+			msg := "WARNING: --control-plane is also required when passing control-plane"
+			if tc.expectWarn {
+				if !strings.Contains(buffer.String(), msg) {
+					t.Errorf("Haven't detected the warning message, expected: %v, actual: %v", msg, buffer.String())
+				}
+			} else {
+				if strings.Contains(buffer.String(), msg) {
+					t.Errorf("Expect no such warning message: %v, but got: %v", msg, buffer.String())
+				}
+			}
 			if err != nil && !tc.expectError {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
 			if err == nil && tc.expectError {
-				t.Fatalf("newJoinData didn't return error when expected")
+				t.Fatal("newJoinData didn't return error when expected")
 			}
 
 			// exec additional validation on the returned value
@@ -275,13 +352,13 @@ func TestNewJoinData(t *testing.T) {
 	}
 }
 
-func expectedJoinIgnorePreflightErrors(expected sets.String) func(t *testing.T, data *joinData) {
+func expectedJoinIgnorePreflightErrors(expected sets.Set[string]) func(t *testing.T, data *joinData) {
 	return func(t *testing.T, data *joinData) {
 		if !expected.Equal(data.ignorePreflightErrors) {
-			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", sets.List(expected), sets.List(data.ignorePreflightErrors))
 		}
 		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
-			t.Errorf("Invalid ignore preflight errors in JoinConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+			t.Errorf("Invalid ignore preflight errors in JoinConfiguration. Expected: %v. Actual: %v", sets.List(expected), data.cfg.NodeRegistration.IgnorePreflightErrors)
 		}
 	}
 }

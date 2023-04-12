@@ -401,6 +401,7 @@ func (r *Lexer) scanToken() {
 // consume resets the current token to allow scanning the next one.
 func (r *Lexer) consume() {
 	r.token.kind = tokenUndef
+	r.token.byteValueCloned = false
 	r.token.delimValue = 0
 }
 
@@ -528,6 +529,7 @@ func (r *Lexer) Skip() {
 func (r *Lexer) SkipRecursive() {
 	r.scanToken()
 	var start, end byte
+	startPos := r.start
 
 	switch r.token.delimValue {
 	case '{':
@@ -553,6 +555,14 @@ func (r *Lexer) SkipRecursive() {
 			level--
 			if level == 0 {
 				r.pos += i + 1
+				if !json.Valid(r.Data[startPos:r.pos]) {
+					r.pos = len(r.Data)
+					r.fatalError = &LexerError{
+						Reason: "skipped array/object json value is invalid",
+						Offset: r.pos,
+						Data:   string(r.Data[r.pos:]),
+					}
+				}
 				return
 			}
 		case c == '\\' && inQuotes:
@@ -699,6 +709,10 @@ func (r *Lexer) Bytes() []byte {
 		r.FetchToken()
 	}
 	if !r.Ok() || r.token.kind != tokenString {
+		r.errInvalidToken("string")
+		return nil
+	}
+	if err := r.unescapeStringToken(); err != nil {
 		r.errInvalidToken("string")
 		return nil
 	}

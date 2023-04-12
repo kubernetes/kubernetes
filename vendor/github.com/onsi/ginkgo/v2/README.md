@@ -4,11 +4,7 @@
 
 ---
 
-# Ginkgo 2.0 is now Generally Available!
-
-You can learn more about 2.0 in the [Migration Guide](https://onsi.github.io/ginkgo/MIGRATING_TO_V2)!
-
----
+# Ginkgo
 
 Ginkgo is a mature testing framework for Go designed to help you write expressive specs.  Ginkgo builds on top of Go's `testing` foundation and is complemented by the [Gomega](https://github.com/onsi/gomega) matcher library.  Together, Ginkgo and Gomega let you express the intent behind your specs clearly:
 
@@ -33,53 +29,53 @@ Describe("Checking books out of the library", Label("library"), func() {
     })
 
     When("the library has the book in question", func() {
-        BeforeEach(func() {
-            Expect(library.Store(book)).To(Succeed())
+        BeforeEach(func(ctx SpecContext) {
+            Expect(library.Store(ctx, book)).To(Succeed())
         })
 
         Context("and the book is available", func() {
-            It("lends it to the reader", func() {
-                Expect(valjean.Checkout(library, "Les Miserables")).To(Succeed())
+            It("lends it to the reader", func(ctx SpecContext) {
+                Expect(valjean.Checkout(ctx, library, "Les Miserables")).To(Succeed())
                 Expect(valjean.Books()).To(ContainElement(book))
-                Expect(library.UserWithBook(book)).To(Equal(valjean))
-            })
+                Expect(library.UserWithBook(ctx, book)).To(Equal(valjean))
+            }, SpecTimeout(time.Second * 5))
         })
 
         Context("but the book has already been checked out", func() {
             var javert *users.User
-            BeforeEach(func() {
+            BeforeEach(func(ctx SpecContext) {
                 javert = users.NewUser("Javert")
-                Expect(javert.Checkout(library, "Les Miserables")).To(Succeed())
+                Expect(javert.Checkout(ctx, library, "Les Miserables")).To(Succeed())
             })
 
-            It("tells the user", func() {
-                err := valjean.Checkout(library, "Les Miserables")
+            It("tells the user", func(ctx SpecContext) {
+                err := valjean.Checkout(ctx, library, "Les Miserables")
                 Expect(error).To(MatchError("Les Miserables is currently checked out"))
-            })
+            }, SpecTimeout(time.Second * 5))
 
-            It("lets the user place a hold and get notified later", func() {
-                Expect(valjean.Hold(library, "Les Miserables")).To(Succeed())
-                Expect(valjean.Holds()).To(ContainElement(book))
+            It("lets the user place a hold and get notified later", func(ctx SpecContext) {
+                Expect(valjean.Hold(ctx, library, "Les Miserables")).To(Succeed())
+                Expect(valjean.Holds(ctx)).To(ContainElement(book))
 
                 By("when Javert returns the book")
-                Expect(javert.Return(library, book)).To(Succeed())
+                Expect(javert.Return(ctx, library, book)).To(Succeed())
 
                 By("it eventually informs Valjean")
                 notification := "Les Miserables is ready for pick up"
-                Eventually(valjean.Notifications).Should(ContainElement(notification))
+                Eventually(ctx, valjean.Notifications).Should(ContainElement(notification))
 
-                Expect(valjean.Checkout(library, "Les Miserables")).To(Succeed())
-                Expect(valjean.Books()).To(ContainElement(book))
-                Expect(valjean.Holds()).To(BeEmpty())
-            })
+                Expect(valjean.Checkout(ctx, library, "Les Miserables")).To(Succeed())
+                Expect(valjean.Books(ctx)).To(ContainElement(book))
+                Expect(valjean.Holds(ctx)).To(BeEmpty())
+            }, SpecTimeout(time.Second * 10))
         })  
     })
 
     When("the library does not have the book in question", func() {
-        It("tells the reader the book is unavailable", func() {
-            err := valjean.Checkout(library, "Les Miserables")
+        It("tells the reader the book is unavailable", func(ctx SpecContext) {
+            err := valjean.Checkout(ctx, library, "Les Miserables")
             Expect(error).To(MatchError("Les Miserables is not in the library catalog"))
-        })
+        }, SpecTimeout(time.Second * 5))
     })
 })
 ```
@@ -90,9 +86,9 @@ If you have a question, comment, bug report, feature request, etc. please open a
 
 ## Capabilities
 
-Whether writing basic unit specs, complex integration specs, or even performance specs - Ginkgo gives you an expressive Domain-Specific Language (DSL) that will be familiar to users coming from frameworks such as [Quick](https://github.com/Quick/Quick), [RSpec](https://rspec.info), [Jasmine](https://jasmine.github.io), and [Busted](https://olivinelabs.com/busted/).  This style of testing is sometimes referred to as "Behavior-Driven Development" (BDD) though Ginkgo's utility extends beyond acceptance-level testing.
+Whether writing basic unit specs, complex integration specs, or even performance specs - Ginkgo gives you an expressive Domain-Specific Language (DSL) that will be familiar to users coming from frameworks such as [Quick](https://github.com/Quick/Quick), [RSpec](https://rspec.info), [Jasmine](https://jasmine.github.io), and [Busted](https://lunarmodules.github.io/busted/).  This style of testing is sometimes referred to as "Behavior-Driven Development" (BDD) though Ginkgo's utility extends beyond acceptance-level testing.
 
-With Ginkgo's DSL you can use nestable [`Describe`, `Context` and `When` container nodes](https://onsi.github.io/ginkgo/#organizing-specs-with-container-nodes) to help you organize your specs.  [`BeforeEach` and `AfterEach` setup nodes](https://onsi.github.io/ginkgo/#extracting-common-setup-beforeeach) for setup and cleanup.  [`It` and `Specify` subject nodes](https://onsi.github.io/ginkgo/#spec-subjects-it) that hold your assertions. [`BeforeSuite` and `AfterSuite` nodes](https://onsi.github.io/ginkgo/#suite-setup-and-cleanup-beforesuite-and-aftersuite) to prep for and cleanup after a suite... and [much more!](https://onsi.github.io/ginkgo/#writing-specs)
+With Ginkgo's DSL you can use nestable [`Describe`, `Context` and `When` container nodes](https://onsi.github.io/ginkgo/#organizing-specs-with-container-nodes) to help you organize your specs.  [`BeforeEach` and `AfterEach` setup nodes](https://onsi.github.io/ginkgo/#extracting-common-setup-beforeeach) for setup and cleanup.  [`It` and `Specify` subject nodes](https://onsi.github.io/ginkgo/#spec-subjects-it) that hold your assertions. [`BeforeSuite` and `AfterSuite` nodes](https://onsi.github.io/ginkgo/#suite-setup-and-cleanup-beforesuite-and-aftersuite) to prep for and cleanup after a suite... and [much more!](https://onsi.github.io/ginkgo/#writing-specs).
 
 At runtime, Ginkgo can run your specs in reproducibly [random order](https://onsi.github.io/ginkgo/#spec-randomization) and has sophisticated support for [spec parallelization](https://onsi.github.io/ginkgo/#spec-parallelization).  In fact, running specs in parallel is as easy as
 
@@ -100,7 +96,7 @@ At runtime, Ginkgo can run your specs in reproducibly [random order](https://ons
 ginkgo -p
 ```
 
-By following [established patterns for writing parallel specs](https://onsi.github.io/ginkgo/#patterns-for-parallel-integration-specs) you can build even large, complex integration suites that parallelize cleanly and run performantly.
+By following [established patterns for writing parallel specs](https://onsi.github.io/ginkgo/#patterns-for-parallel-integration-specs) you can build even large, complex integration suites that parallelize cleanly and run performantly.  And you don't have to worry about your spec suite hanging or leaving a mess behind - Ginkgo provides a per-node `context.Context` and the capability to interrupt the spec after a set period of time - and then clean up.
 
 As your suites grow Ginkgo helps you keep your specs organized with [labels](https://onsi.github.io/ginkgo/#spec-labels) and lets you easily run [subsets of specs](https://onsi.github.io/ginkgo/#filtering-specs), either [programmatically](https://onsi.github.io/ginkgo/#focused-specs) or on the [command line](https://onsi.github.io/ginkgo/#combining-filters).  And Ginkgo's reporting infrastructure generates machine-readable output in a [variety of formats](https://onsi.github.io/ginkgo/#generating-machine-readable-reports) _and_ allows you to build your own [custom reporting infrastructure](https://onsi.github.io/ginkgo/#generating-reports-programmatically).
 

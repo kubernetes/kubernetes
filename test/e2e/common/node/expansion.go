@@ -17,15 +17,19 @@ limitations under the License.
 package node
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
@@ -40,7 +44,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, expansion
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func() {
+	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "FOO",
@@ -57,7 +61,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "env"}, envVars, nil, nil)
 
-		f.TestContainerOutput("env composition", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
@@ -69,7 +73,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command expansion
 		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func() {
+	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -78,7 +82,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""}, envVars, nil, nil)
 
-		f.TestContainerOutput("substitution in container's command", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in container's command", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -88,7 +92,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command argument expansion
 		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func() {
+	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -98,7 +102,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod([]string{"sh", "-c"}, envVars, nil, nil)
 		pod.Spec.Containers[0].Args = []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""}
 
-		f.TestContainerOutput("substitution in container's args", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in container's args", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -108,7 +112,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath expansion
 		Description: Make sure a container's subpath can be set using an expansion of environment variables.
 	*/
-	framework.ConformanceIt("should allow substituting values in a volume subpath", func() {
+	framework.ConformanceIt("should allow substituting values in a volume subpath", func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
@@ -138,7 +142,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		envVars[0].Value = pod.ObjectMeta.Name
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "test -d /testcontainer/" + pod.ObjectMeta.Name + ";echo $?"}
 
-		f.TestContainerOutput("substitution in volume subpath", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in volume subpath", pod, 0, []string{
 			"0",
 		})
 	})
@@ -148,7 +152,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with backticks
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [Slow]", func() {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [Slow]", func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
@@ -174,7 +178,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod(nil, envVars, mounts, volumes)
 
 		// Pod should fail
-		testPodFailSubpath(f, pod)
+		testPodFailSubpath(ctx, f, pod)
 	})
 
 	/*
@@ -182,7 +186,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [Slow]", func() {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [Slow]", func(ctx context.Context) {
 		absolutePath := "/tmp"
 		if framework.NodeOSDistroIs("windows") {
 			// Windows does not typically have a C:\tmp folder.
@@ -213,7 +217,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod(nil, envVars, mounts, volumes)
 
 		// Pod should fail
-		testPodFailSubpath(f, pod)
+		testPodFailSubpath(ctx, f, pod)
 	})
 
 	/*
@@ -221,7 +225,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath ready from failed state
 		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
-	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow]", func() {
+	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow]", func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
@@ -261,14 +265,14 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod.ObjectMeta.Annotations = map[string]string{"notmysubpath": "mypath"}
 
 		ginkgo.By("creating the pod with failed condition")
-		var podClient *framework.PodClient = f.PodClient()
-		pod = podClient.Create(pod)
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
 
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		framework.ExpectError(err, "while waiting for pod to be running")
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(framework.PodStartShortTimeout).Should(e2epod.BeInPhase(v1.PodPending))
 
 		ginkgo.By("updating the pod")
-		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
+		podClient.Update(ctx, pod.ObjectMeta.Name, func(pod *v1.Pod) {
 			if pod.ObjectMeta.Annotations == nil {
 				pod.ObjectMeta.Annotations = make(map[string]string)
 			}
@@ -276,11 +280,11 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		})
 
 		ginkgo.By("waiting for pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -293,7 +297,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	framework.ConformanceIt("should succeed in writing subpaths in container [Slow]", func() {
+	framework.ConformanceIt("should succeed in writing subpaths in container [Slow]", func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
@@ -333,51 +337,49 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "mypath"}
 
 		ginkgo.By("creating the pod")
-		var podClient *framework.PodClient = f.PodClient()
-		pod = podClient.Create(pod)
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
 
 		ginkgo.By("waiting for pod running")
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("creating a file in subpath")
 		cmd := "touch /volume_mount/mypath/foo/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to write to subpath")
 		}
 
 		ginkgo.By("test for file in mounted path")
 		cmd = "test -f /subpath_mount/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to verify file")
 		}
 
 		ginkgo.By("updating the annotation value")
-		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
+		podClient.Update(ctx, pod.ObjectMeta.Name, func(pod *v1.Pod) {
 			pod.ObjectMeta.Annotations["mysubpath"] = "mynewpath"
 		})
 
 		ginkgo.By("waiting for annotated pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 })
 
-func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
-	var podClient *framework.PodClient = f.PodClient()
-	pod = podClient.Create(pod)
+func testPodFailSubpath(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+	podClient := e2epod.NewPodClient(f)
+	pod = podClient.Create(ctx, pod)
 
-	defer func() {
-		e2epod.DeletePodWithWait(f.ClientSet, pod)
-	}()
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 
-	err := e2epod.WaitForPodContainerToFail(f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
+	err := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
 	framework.ExpectNoError(err, "while waiting for the pod container to fail")
 }
 

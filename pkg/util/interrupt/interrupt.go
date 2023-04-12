@@ -36,17 +36,6 @@ type Handler struct {
 	once   sync.Once
 }
 
-// Chain creates a new handler that invokes all notify functions when the critical section exits
-// and then invokes the optional handler's notifications. This allows critical sections to be
-// nested without losing exactly once invocations. Notify functions can invoke any cleanup needed
-// but should not exit (which is the responsibility of the parent handler).
-func Chain(handler *Handler, notify ...func()) *Handler {
-	if handler == nil {
-		return New(nil, notify...)
-	}
-	return New(handler.Signal, append(notify, handler.Close)...)
-}
-
 // New creates a new handler that guarantees all notify functions are run after the critical
 // section exits (or is interrupted by the OS), then invokes the final handler. If no final
 // handler is specified, the default final is `os.Exit(1)`. A handler can only be used for

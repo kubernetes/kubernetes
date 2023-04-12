@@ -79,7 +79,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	removeMetricsForPods(metrics, ignoredPods)
 	removeMetricsForPods(metrics, unreadyPods)
 	if len(metrics) == 0 {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for any ready pods")
+		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
 	}
 
 	requests, err := calculatePodRequests(podList, container, resource)
@@ -191,7 +191,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	removeMetricsForPods(metrics, unreadyPods)
 
 	if len(metrics) == 0 {
-		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
+		return 0, 0, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
 	}
 
 	usageRatio, usage := metricsclient.GetMetricUsageRatio(metrics, targetUsage)
@@ -430,7 +430,7 @@ func calculatePodRequests(pods []*v1.Pod, container string, resource v1.Resource
 				if containerRequest, ok := c.Resources.Requests[resource]; ok {
 					podSum += containerRequest.MilliValue()
 				} else {
-					return nil, fmt.Errorf("missing request for %s", resource)
+					return nil, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.ObjectMeta.Name)
 				}
 			}
 		}

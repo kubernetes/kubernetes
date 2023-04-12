@@ -207,7 +207,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Description: "kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -215,7 +215,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -223,7 +223,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API version of the referent",
+							Description: "apiVersion is the API version of the referent",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -355,14 +355,14 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
+							Description: "spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current information about the autoscaler.",
+							Description: "status is the current information about the autoscaler.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus"),
 						},
@@ -458,7 +458,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "list of horizontal pod autoscaler objects.",
+							Description: "items is the list of horizontal pod autoscaler objects.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -502,7 +502,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 					},
 					"maxReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
+							Description: "maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -510,7 +510,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 					},
 					"targetCPUUtilizationPercentage": {
 						SchemaProps: spec.SchemaProps{
-							Description: "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
+							Description: "targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -533,20 +533,20 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 				Properties: map[string]spec.Schema{
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "most recent generation observed by this autoscaler.",
+							Description: "observedGeneration is the most recent generation observed by this autoscaler.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"lastScaleTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
+							Description: "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
 					"currentReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current number of replicas of pods managed by this autoscaler.",
+							Description: "currentReplicas is the current number of replicas of pods managed by this autoscaler.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -554,7 +554,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 					},
 					"desiredReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desired number of replicas of pods managed by this autoscaler.",
+							Description: "desiredReplicas is the  desired number of replicas of pods managed by this autoscaler.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -562,7 +562,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 					},
 					"currentCPUUtilizationPercentage": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU.",
+							Description: "currentCPUUtilizationPercentage is the current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -589,7 +589,8 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"ContainerResource", "External", "Object", "Pods", "Resource"}},
+							Enum:        []interface{}{"ContainerResource", "External", "Object", "Pods", "Resource"},
+						},
 					},
 					"object": {
 						SchemaProps: spec.SchemaProps{
@@ -611,7 +612,7 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 					},
 					"containerResource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
+							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
 							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricSource"),
 						},
 					},
@@ -643,7 +644,8 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"ContainerResource", "External", "Object", "Pods", "Resource"}},
+							Enum:        []interface{}{"ContainerResource", "External", "Object", "Pods", "Resource"},
+						},
 					},
 					"object": {
 						SchemaProps: spec.SchemaProps{
@@ -665,7 +667,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 					},
 					"containerResource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
 							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus"),
 						},
 					},
@@ -963,14 +965,14 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
+							Description: "spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/autoscaling/v1.ScaleSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
+							Description: "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/autoscaling/v1.ScaleStatus"),
 						},
@@ -992,7 +994,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desired number of instances for the scaled object.",
+							Description: "replicas is the desired number of instances for the scaled object.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1012,7 +1014,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "actual number of observed instances of the scaled object.",
+							Description: "replicas is the actual number of observed instances of the scaled object.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -1020,7 +1022,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Description: "selector is the label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1538,7 +1540,7 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2167,6 +2169,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"sendInitialEvents": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -2256,7 +2265,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2270,7 +2279,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespace defines the space within which each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/namespaces",
+							Description: "Namespace defines the space within which each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2284,7 +2293,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+							Description: "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2325,7 +2334,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"labels": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
+							Description: "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -2341,7 +2350,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"annotations": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
+							Description: "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -2442,7 +2451,7 @@ func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback) common
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -2450,7 +2459,7 @@ func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback) common
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+							Description: "UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -2632,7 +2641,7 @@ func schema_pkg_apis_meta_v1_PatchOptions(ref common.ReferenceCallback) common.O
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2863,7 +2872,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+							Description: "UID of the resource. (when there is a single resource which can be described). More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3259,7 +3268,7 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3355,13 +3364,6 @@ func schema_k8sio_apimachinery_pkg_runtime_Unknown(ref common.ReferenceCallback)
 							Format: "",
 						},
 					},
-					"Raw": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Raw will hold the complete serialized object which couldn't be matched with a registered type. Most likely, nothing should be done with this except for passing it through the system.",
-							Type:        []string{"string"},
-							Format:      "byte",
-						},
-					},
 					"ContentEncoding": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ContentEncoding is encoding used to encode 'Raw' data. Unspecified means no encoding.",
@@ -3379,7 +3381,7 @@ func schema_k8sio_apimachinery_pkg_runtime_Unknown(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"Raw", "ContentEncoding", "ContentType"},
+				Required: []string{"ContentEncoding", "ContentType"},
 			},
 		},
 	}

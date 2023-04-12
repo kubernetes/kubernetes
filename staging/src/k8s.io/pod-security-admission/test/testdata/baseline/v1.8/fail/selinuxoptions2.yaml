@@ -4,12 +4,12 @@ metadata:
   name: selinuxoptions2
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
     securityContext:
       seLinuxOptions: {}
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
     securityContext:
       seLinuxOptions:

@@ -369,7 +369,7 @@ func generateNonce() (nonce []byte) {
 	return
 }
 
-// removeZone removes IPv6 zone identifer from host.
+// removeZone removes IPv6 zone identifier from host.
 // E.g., "[fe80::1%en0]:8080" to "[fe80::1]:8080"
 func removeZone(host string) string {
 	if !strings.HasPrefix(host, "[") {

@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -25,11 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type graphPopulator struct {
@@ -47,95 +44,26 @@ func AddGraphEventHandlers(
 		graph: graph,
 	}
 
-	var hasSynced []cache.InformerSynced
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    g.addNode,
-			UpdateFunc: g.updateNode,
-			DeleteFunc: g.deleteNode,
-		})
-		hasSynced = append(hasSynced, nodes.Informer().HasSynced)
-	}
-
-	pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPod,
 		UpdateFunc: g.updatePod,
 		DeleteFunc: g.deletePod,
 	})
-	hasSynced = append(hasSynced, pods.Informer().HasSynced)
 
-	pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	pvsHandler, _ := pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPV,
 		UpdateFunc: g.updatePV,
 		DeleteFunc: g.deletePV,
 	})
-	hasSynced = append(hasSynced, pvs.Informer().HasSynced)
 
-	attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	attachHandler, _ := attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addVolumeAttachment,
 		UpdateFunc: g.updateVolumeAttachment,
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
-	hasSynced = append(hasSynced, attachments.Informer().HasSynced)
 
-	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, hasSynced...)
-}
-
-func (g *graphPopulator) addNode(obj interface{}) {
-	g.updateNode(nil, obj)
-}
-
-func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
-	node := obj.(*corev1.Node)
-	var oldNode *corev1.Node
-	if oldObj != nil {
-		oldNode = oldObj.(*corev1.Node)
-	}
-
-	// we only set up rules for ConfigMap today, because that is the only reference type
-
-	var name, namespace string
-	if source := node.Spec.ConfigSource; source != nil && source.ConfigMap != nil {
-		name = source.ConfigMap.Name
-		namespace = source.ConfigMap.Namespace
-	}
-
-	var oldName, oldNamespace string
-	if oldNode != nil {
-		if oldSource := oldNode.Spec.ConfigSource; oldSource != nil && oldSource.ConfigMap != nil {
-			oldName = oldSource.ConfigMap.Name
-			oldNamespace = oldSource.ConfigMap.Namespace
-		}
-	}
-
-	// if Node.Spec.ConfigSource wasn't updated, nothing for us to do
-	if name == oldName && namespace == oldNamespace {
-		return
-	}
-
-	path := "nil"
-	if node.Spec.ConfigSource != nil {
-		path = fmt.Sprintf("%s/%s", namespace, name)
-	}
-	klog.V(4).Infof("updateNode configSource reference to %s for node %s", path, node.Name)
-	g.graph.SetNodeConfigMap(node.Name, name, namespace)
-}
-
-func (g *graphPopulator) deleteNode(obj interface{}) {
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	node, ok := obj.(*corev1.Node)
-	if !ok {
-		klog.Infof("unexpected type %T", obj)
-		return
-	}
-
-	// NOTE: We don't remove the node, because if the node is re-created not all pod -> node
-	// links are re-established (we don't get relevant events because the no mutations need
-	// to happen in the API; the state is already there).
-	g.graph.SetNodeConfigMap(node.Name, "", "")
+	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop,
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {

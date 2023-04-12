@@ -53,7 +53,7 @@ Sources:
   FieldRE: "KeyData"
 
 # The following fields are tagged in #95600
-- PackageRE: "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+- PackageRE: "k8s.io/cri-api/pkg/apis/runtime/v1"
   TypeRE: "AuthConfig"
   FieldRE: "Password|IdentityToken|RegistryToken"
 

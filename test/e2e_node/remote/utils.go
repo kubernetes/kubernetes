@@ -26,7 +26,7 @@ import (
 // utils.go contains functions used across test suites.
 
 const (
-	cniVersion       = "v0.9.1"
+	cniVersion       = "v1.2.0"
 	cniArch          = "amd64"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
@@ -49,10 +49,10 @@ const cniConfig = `{
 `
 
 const credentialProviderConfig = `kind: CredentialProviderConfig
-apiVersion: kubelet.config.k8s.io/v1beta1
+apiVersion: kubelet.config.k8s.io/v1
 providers:
   - name: gcp-credential-provider
-    apiVersion: credentialprovider.kubelet.k8s.io/v1beta1
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
     matchImages:
     - "gcr.io"
     - "*.gcr.io"

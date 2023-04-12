@@ -23,6 +23,11 @@ import (
 
 // PluginsV1beta2 default set of v1beta2 plugins.
 var PluginsV1beta2 = &config.Plugins{
+	PreEnqueue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.SchedulingGates},
+		},
+	},
 	QueueSort: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.PrioritySort},
@@ -36,6 +41,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
+			{Name: names.VolumeZone},
 			{Name: names.NodeAffinity},
 		},
 	},
@@ -69,6 +75,8 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
+			{Name: names.NodeResourcesFit},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{
@@ -175,12 +183,18 @@ var PluginsV1beta3 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
+			{Name: names.SchedulingGates},
 		},
 	},
 }
 
 // ExpandedPluginsV1beta3 default set of v1beta3 plugins after MultiPoint expansion
 var ExpandedPluginsV1beta3 = &config.Plugins{
+	PreEnqueue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.SchedulingGates},
+		},
+	},
 	QueueSort: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.PrioritySort},
@@ -193,6 +207,7 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
 			{Name: names.VolumeBinding},
+			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 		},
@@ -225,8 +240,10 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
+			{Name: names.NodeResourcesFit},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{
@@ -345,12 +362,18 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
+			{Name: names.SchedulingGates},
 		},
 	},
 }
 
 // ExpandedPluginsV1 default set of v1 plugins after MultiPoint expansion
 var ExpandedPluginsV1 = &config.Plugins{
+	PreEnqueue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.SchedulingGates},
+		},
+	},
 	QueueSort: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.PrioritySort},
@@ -363,6 +386,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
 			{Name: names.VolumeBinding},
+			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 		},
@@ -395,8 +419,10 @@ var ExpandedPluginsV1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
+			{Name: names.NodeResourcesFit},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.NodeResourcesBalancedAllocation},
 		},
 	},
 	Score: config.PluginSet{

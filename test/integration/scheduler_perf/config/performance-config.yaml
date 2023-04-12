@@ -25,8 +25,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -97,9 +95,6 @@
       measurePods: 1000
 
 - name: SchedulingMigratedInTreePVs
-  featureGates:
-    CSIMigration: true
-    CSIMigrationAWS: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -201,8 +196,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -230,8 +223,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -399,7 +390,7 @@
       measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
-# 
+#
 #  - name: 5000Nodes
 #    params:
 #      initNodes: 5000
@@ -427,7 +418,7 @@
       measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
-# 
+#
 #  - name: 5000Nodes
 #    params:
 #      initNodes: 5000
@@ -491,13 +482,9 @@
 
 - name: SchedulingRequiredPodAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-anti-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -526,13 +513,9 @@
 
 - name: SchedulingPreferredAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -561,8 +544,6 @@
 
 - name: SchedulingRequiredPodAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -597,13 +578,9 @@
 
 - name: SchedulingPreferredAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -630,3 +607,27 @@
       initNamespaces: 100
       measurePods: 1000
 
+- name: SchedulingWithNodeInclusionPolicy
+  featureGates:
+    NodeInclusionPolicyInPodTopologySpread: true
+  defaultPodTemplatePath: config/pod-with-node-inclusion-policy.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $normalNodes
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-taint.yaml
+    countParam: $taintNodes
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    params:
+      taintNodes: 100
+      normalNodes: 400
+      measurePods: 400
+  - name: 5000Nodes
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000

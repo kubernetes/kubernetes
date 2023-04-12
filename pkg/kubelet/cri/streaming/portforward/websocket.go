@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -182,11 +183,12 @@ func (h *websocketStreamHandler) run() {
 }
 
 func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
+	ctx := context.Background()
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
 	klog.V(5).InfoS("Connection invoking forwarder.PortForward for port", "connection", h.conn, "port", p.port)
-	err := h.forwarder.PortForward(h.pod, h.uid, p.port, p.dataStream)
+	err := h.forwarder.PortForward(ctx, h.pod, h.uid, p.port, p.dataStream)
 	klog.V(5).InfoS("Connection done invoking forwarder.PortForward for port", "connection", h.conn, "port", p.port)
 
 	if err != nil {

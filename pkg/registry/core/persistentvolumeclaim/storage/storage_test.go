@@ -216,8 +216,11 @@ func TestDefaultOnReadPvc(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-
 	dataSource := api.TypedLocalObjectReference{
+		Kind: "PersistentVolumeClaim",
+		Name: "my-pvc",
+	}
+	dataSourceRef := api.TypedObjectReference{
 		Kind: "PersistentVolumeClaim",
 		Name: "my-pvc",
 	}
@@ -278,15 +281,15 @@ func TestDefaultOnReadPvc(t *testing.T) {
 				pvc.Spec.DataSource = dataSource.DeepCopy()
 			}
 			if test.dataSourceRef {
-				pvc.Spec.DataSourceRef = dataSource.DeepCopy()
+				pvc.Spec.DataSourceRef = dataSourceRef.DeepCopy()
 			}
 			var expectDataSource *api.TypedLocalObjectReference
 			if test.want {
 				expectDataSource = &dataSource
 			}
-			var expectDataSourceRef *api.TypedLocalObjectReference
+			var expectDataSourceRef *api.TypedObjectReference
 			if test.wantRef {
-				expectDataSourceRef = &dataSource
+				expectDataSourceRef = &dataSourceRef
 			}
 
 			// Method under test

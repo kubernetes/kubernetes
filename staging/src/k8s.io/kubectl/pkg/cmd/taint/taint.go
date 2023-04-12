@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -48,7 +49,6 @@ type TaintOptions struct {
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
 	resources      []string
@@ -62,7 +62,7 @@ type TaintOptions struct {
 
 	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	Mapper meta.RESTMapper
 }
@@ -96,7 +96,7 @@ var (
 		kubectl taint nodes foo bar:NoSchedule`))
 )
 
-func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdTaint(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	options := &TaintOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -144,11 +144,6 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
@@ -332,11 +327,6 @@ func (o TaintOptions) RunTaint() error {
 		}
 
 		mapping := info.ResourceMapping()
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 		client, err := o.ClientForMapping(mapping)
 		if err != nil {
 			return err

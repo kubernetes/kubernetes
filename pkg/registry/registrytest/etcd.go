@@ -17,7 +17,6 @@ limitations under the License.
 package registrytest
 
 import (
-	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,24 +35,18 @@ func NewEtcdStorage(t *testing.T, group string) (*storagebackend.ConfigForResour
 func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*storagebackend.ConfigForResource, *etcd3testing.EtcdTestServer) {
 	t.Helper()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	server, config := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	options := options.NewEtcdOptions(config)
-	completedConfig, err := kubeapiserver.NewStorageFactoryConfig().Complete(options)
-	if err != nil {
-		t.Fatal(err)
-	}
+	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options)
 	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
-	factory, err := completedConfig.New(ctx.Done())
+	factory, err := completedConfig.New()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while making storage factory: %v", err)
 	}
 	resourceConfig, err := factory.NewConfig(resource)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while finding storage destination: %v", err)
 	}
 	return resourceConfig, server
 }

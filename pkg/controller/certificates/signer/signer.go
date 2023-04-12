@@ -248,14 +248,14 @@ func isKubeletServing(req *x509.CertificateRequest, usages []capi.KeyUsage, sign
 	if signerName != capi.KubeletServingSignerName {
 		return false, nil
 	}
-	return true, capihelper.ValidateKubeletServingCSR(req, usagesToSet(usages), true)
+	return true, capihelper.ValidateKubeletServingCSR(req, usagesToSet(usages))
 }
 
 func isKubeletClient(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error) {
 	if signerName != capi.KubeAPIServerClientKubeletSignerName {
 		return false, nil
 	}
-	return true, capihelper.ValidateKubeletClientCSR(req, usagesToSet(usages), true)
+	return true, capihelper.ValidateKubeletClientCSR(req, usagesToSet(usages))
 }
 
 func isKubeAPIServerClient(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error) {

@@ -42,11 +42,15 @@ var (
 
 	// Register registers a collectable metric but uses the global registry
 	Register = defaultRegistry.Register
+
+	// Registerer exposes the global registerer
+	Registerer = defaultRegistry.Registerer
 )
 
 func init() {
 	RawMustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	RawMustRegister(collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll)))
+	defaultRegistry.RegisterMetaMetrics()
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is

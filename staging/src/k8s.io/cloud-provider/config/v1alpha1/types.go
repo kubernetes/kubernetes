@@ -18,12 +18,14 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CloudControllerManagerConfiguration contains elements describing cloud-controller manager.
 type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -32,11 +34,16 @@ type CloudControllerManagerConfiguration struct {
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+	// NodeController holds configuration for node controller
+	// related features.
+	NodeController nodeconfigv1alpha1.NodeControllerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController serviceconfigv1alpha1.ServiceControllerConfiguration
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
+	// Webhook is the configuration for cloud-controller-manager hosted webhooks
+	Webhook WebhookConfiguration
 }
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
@@ -80,4 +87,15 @@ type CloudProviderConfiguration struct {
 	Name string
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string
+}
+
+// WebhookConfiguration contains configuration related to
+// cloud-controller-manager hosted webhooks
+type WebhookConfiguration struct {
+	// Webhooks is the list of webhooks to enable or disable
+	// '*' means "all enabled by default webhooks"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Webhooks []string
 }

@@ -57,10 +57,6 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
-	if config.UDPIdleTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("UDPIdleTimeout"), config.UDPIdleTimeout, "must be greater than 0"))
-	}
-
 	if config.ConfigSyncPeriod.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
@@ -147,7 +143,6 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	}
 
 	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
-	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
 	return allErrs
@@ -185,7 +180,6 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 
 func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	validModes := sets.NewString(
-		string(kubeproxyconfig.ProxyModeUserspace),
 		string(kubeproxyconfig.ProxyModeIPTables),
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
@@ -200,7 +194,6 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 
 func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	validModes := sets.NewString(
-		string(kubeproxyconfig.ProxyModeUserspace),
 		string(kubeproxyconfig.ProxyModeKernelspace),
 	)
 
@@ -208,7 +201,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace(will be 'kernelspace' in a future release)])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently 'kernelspace'])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
@@ -237,36 +230,6 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	}
 
-	return allErrs
-}
-
-func validateIPVSSchedulerMethod(scheduler kubeproxyconfig.IPVSSchedulerMethod, fldPath *field.Path) field.ErrorList {
-	supportedMethod := []kubeproxyconfig.IPVSSchedulerMethod{
-		kubeproxyconfig.RoundRobin,
-		kubeproxyconfig.WeightedRoundRobin,
-		kubeproxyconfig.LeastConnection,
-		kubeproxyconfig.WeightedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnectionWithReplication,
-		kubeproxyconfig.SourceHashing,
-		kubeproxyconfig.DestinationHashing,
-		kubeproxyconfig.ShortestExpectedDelay,
-		kubeproxyconfig.NeverQueue,
-		"",
-	}
-	allErrs := field.ErrorList{}
-	var found bool
-	for i := range supportedMethod {
-		if scheduler == supportedMethod[i] {
-			found = true
-			break
-		}
-	}
-	// Not found
-	if !found {
-		errMsg := fmt.Sprintf("must be in %v, blank means the default algorithm method (currently rr)", supportedMethod)
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Scheduler"), string(scheduler), errMsg))
-	}
 	return allErrs
 }
 

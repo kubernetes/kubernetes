@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -49,7 +47,9 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 	ep := discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status, service, addressType),
 		Conditions: discovery.EndpointConditions{
-			Ready: &ready,
+			Ready:       &ready,
+			Serving:     &serving,
+			Terminating: &terminating,
 		},
 		TargetRef: &v1.ObjectReference{
 			Kind:      "Pod",
@@ -57,11 +57,6 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 			Name:      pod.ObjectMeta.Name,
 			UID:       pod.ObjectMeta.UID,
 		},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
-		ep.Conditions.Serving = &serving
-		ep.Conditions.Terminating = &terminating
 	}
 
 	if pod.Spec.NodeName != "" {
@@ -383,12 +378,17 @@ func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery
 	return unchangedSlices
 }
 
-// hintsEnabled returns true if the provided annotations include a
-// v1.AnnotationTopologyAwareHints key with a value set to "Auto" or "auto".
+// hintsEnabled returns true if the provided annotations include either
+// v1.AnnotationTopologyMode or v1.DeprecatedAnnotationTopologyAwareHints key
+// with a value set to "Auto" or "auto". When both are set,
+// v1.DeprecatedAnnotationTopologyAwareHints has precedence.
 func hintsEnabled(annotations map[string]string) bool {
-	val, ok := annotations[v1.AnnotationTopologyAwareHints]
+	val, ok := annotations[v1.DeprecatedAnnotationTopologyAwareHints]
 	if !ok {
-		return false
+		val, ok = annotations[v1.AnnotationTopologyMode]
+		if !ok {
+			return false
+		}
 	}
 	return val == "Auto" || val == "auto"
 }

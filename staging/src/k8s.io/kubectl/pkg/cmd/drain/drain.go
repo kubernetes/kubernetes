@@ -28,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -48,8 +49,8 @@ type DrainCmdOptions struct {
 	drainer   *drain.Helper
 	nodeInfos []*resource.Info
 
-	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	genericiooptions.IOStreams
+	WarningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -61,7 +62,7 @@ var (
 		kubectl cordon foo`))
 )
 
-func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -90,7 +91,7 @@ var (
 		kubectl uncordon foo`))
 )
 
-func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdUncordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -144,7 +145,7 @@ var (
 		kubectl drain foo --grace-period=900`))
 )
 
-func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
+func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *DrainCmdOptions {
 	o := &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -176,7 +177,7 @@ func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction b
 	}
 }
 
-func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDrain(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -224,11 +225,6 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -259,7 +255,10 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return printer.PrintObj, nil
 	}
 
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -341,7 +340,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		return utilerrors.NewAggregate(errs)
 	}
 	if warnings := list.Warnings(); warnings != "" {
-		o.warningPrinter.Print(warnings)
+		o.WarningPrinter.Print(warnings)
 	}
 	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
 		for _, pod := range list.Pods() {
@@ -400,12 +399,6 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
-					if o.drainer.DryRunStrategy == cmdutil.DryRunServer {
-						if err := o.drainer.DryRunVerifier.HasSupport(gvk); err != nil {
-							printError(err)
-							continue
-						}
-					}
 					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)

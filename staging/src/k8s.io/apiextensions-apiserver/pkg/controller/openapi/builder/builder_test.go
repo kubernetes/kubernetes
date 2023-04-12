@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -540,13 +538,10 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 							actions.Insert(action)
 						}
 						if action == "patch" {
-							expected := []string{"application/json-patch+json", "application/merge-patch+json"}
-							if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-								expected = append(expected, "application/apply-patch+yaml")
-							}
-							assert.Equal(t, operation.Consumes, expected)
+							expected := []string{"application/json-patch+json", "application/merge-patch+json", "application/apply-patch+yaml"}
+							assert.Equal(t, expected, operation.Consumes)
 						} else {
-							assert.Equal(t, operation.Consumes, []string{"application/json", "application/yaml"})
+							assert.Equal(t, []string{"application/json", "application/yaml"}, operation.Consumes)
 						}
 					}
 				}

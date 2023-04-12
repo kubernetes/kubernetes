@@ -20,15 +20,23 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	netutils "k8s.io/utils/net"
 
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientgotesting "k8s.io/client-go/testing"
 
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -620,5 +628,170 @@ func resolveDualStackLocalDetectors(t *testing.T) func(localDetector proxyutilip
 			}
 			return [2]proxyutiliptables.LocalTrafficDetector{localDetector, otherLocalDetector}
 		}
+	}
+}
+
+func TestConfigChange(t *testing.T) {
+	setUp := func() (*os.File, string, error) {
+		tempDir, err := os.MkdirTemp("", "kubeproxy-config-change")
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
+		}
+		fullPath := filepath.Join(tempDir, "kube-proxy-config")
+		file, err := os.Create(fullPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
+		}
+
+		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+bindAddressHardFail: false
+clientConnection:
+  acceptContentTypes: ""
+  burst: 10
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+  qps: 5
+clusterCIDR: 10.244.0.0/16
+configSyncPeriod: 15m0s
+conntrack:
+  maxPerCore: 32768
+  min: 131072
+  tcpCloseWaitTimeout: 1h0m0s
+  tcpEstablishedTimeout: 24h0m0s
+enableProfiling: false
+healthzBindAddress: 0.0.0.0:10256
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 0s
+  syncPeriod: 30s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 30s
+kind: KubeProxyConfiguration
+metricsBindAddress: 127.0.0.1:10249
+mode: ""
+nodePortAddresses: null
+oomScoreAdj: -999
+portRange: ""
+detectLocalMode: "BridgeInterface"`)
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
+		}
+
+		return file, tempDir, nil
+	}
+
+	tearDown := func(file *os.File, tempDir string) {
+		file.Close()
+		os.RemoveAll(tempDir)
+	}
+
+	testCases := []struct {
+		name        string
+		proxyServer proxyRun
+		append      bool
+		expectedErr string
+	}{
+		{
+			name:        "update config file",
+			proxyServer: new(fakeProxyServerLongRun),
+			append:      true,
+			expectedErr: "content of the proxy server's configuration file was updated",
+		},
+		{
+			name:        "fake error",
+			proxyServer: new(fakeProxyServerError),
+			expectedErr: "mocking error from ProxyServer.Run()",
+		},
+	}
+
+	for _, tc := range testCases {
+		file, tempDir, err := setUp()
+		if err != nil {
+			t.Fatalf("unexpected error when setting up environment: %v", err)
+		}
+
+		opt := NewOptions()
+		opt.ConfigFile = file.Name()
+		err = opt.Complete()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opt.proxyServer = tc.proxyServer
+
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- opt.runLoop()
+		}()
+
+		if tc.append {
+			file.WriteString("append fake content")
+		}
+
+		select {
+		case err := <-errCh:
+			if err != nil {
+				if !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("[%s] Expected error containing %v, got %v", tc.name, tc.expectedErr, err)
+				}
+			}
+		case <-time.After(10 * time.Second):
+			t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
+		}
+		tearDown(file, tempDir)
+	}
+}
+
+func Test_waitForPodCIDR(t *testing.T) {
+	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
+	nodeName := "test-node"
+	oldNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            nodeName,
+			ResourceVersion: "1000",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "10.0.0.0/24",
+			PodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
+		},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            nodeName,
+			ResourceVersion: "1",
+		},
+	}
+	updatedNode := node.DeepCopy()
+	updatedNode.Spec.PodCIDRs = expected
+	updatedNode.Spec.PodCIDR = expected[0]
+
+	// start with the new node
+	client := clientsetfake.NewSimpleClientset()
+	client.AddReactor("list", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.NodeList{}
+		return true, obj, nil
+	})
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("nodes", clientgotesting.DefaultWatchReactor(fakeWatch, nil))
+
+	go func() {
+		fakeWatch.Add(node)
+		// receive a delete event for the old node
+		fakeWatch.Delete(oldNode)
+		// set the PodCIDRs on the new node
+		fakeWatch.Modify(updatedNode)
+	}()
+	got, err := waitForPodCIDR(client, node.Name)
+	if err != nil {
+		t.Errorf("waitForPodCIDR() unexpected error %v", err)
+		return
+	}
+	if !reflect.DeepEqual(got.Spec.PodCIDRs, expected) {
+		t.Errorf("waitForPodCIDR() got %v expected to be %v ", got.Spec.PodCIDRs, expected)
 	}
 }

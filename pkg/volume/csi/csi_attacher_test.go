@@ -37,12 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -1092,8 +1089,6 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 }
 
 func TestAttacherMountDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, true)()
-
 	pvName := "test-pv"
 	var testFSGroup int64 = 3000
 	nonFinalError := volumetypes.NewUncertainProgressError("")
@@ -1107,7 +1102,6 @@ func TestAttacherMountDevice(t *testing.T) {
 		stageUnstageSet                bool
 		fsGroup                        *int64
 		expectedVolumeMountGroup       string
-		delegateFSGroupFeatureGate     bool
 		driverSupportsVolumeMountGroup bool
 		shouldFail                     bool
 		skipOnWindows                  bool
@@ -1222,12 +1216,11 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:          volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
 		},
 		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
+			testName:                       "fsgroup provided, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
 			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "3000",
 			stageUnstageSet:                true,
@@ -1235,11 +1228,10 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:                       "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			testName:                       "fsgroup not provided, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "",
 			stageUnstageSet:                true,
@@ -1247,26 +1239,12 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			testName:                       "fsgroup provided, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
 			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: false,
-			expectedVolumeMountGroup:       "",
-			stageUnstageSet:                true,
-			createAttachment:               true,
-			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
-		},
-		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
-			volName:                        "test-vol1",
-			devicePath:                     "path1",
-			deviceMountPath:                "path2",
-			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     false,
-			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "",
 			stageUnstageSet:                true,
 			createAttachment:               true,
@@ -1288,8 +1266,6 @@ func TestAttacherMountDevice(t *testing.T) {
 				t.Skipf("Skipping test case on Windows: %s", tc.testName)
 			}
 			t.Logf("Running test case: %s", tc.testName)
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 			// Setup
 			// Create a new attacher
@@ -1420,7 +1396,6 @@ func TestAttacherMountDevice(t *testing.T) {
 }
 
 func TestAttacherMountDeviceWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, true)()
 	pvName := "test-pv"
 	var testFSGroup int64 = 3000
 	testCases := []struct {
@@ -1621,12 +1596,11 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		},
 		// PV agnostic path negative test cases
 		{
-			testName:        "fail: missing json, fail to retrieve driver and volumeID from globalpath",
-			volID:           "project/zone/test-vol1",
+			testName:        "success: json file doesn't exist, unmount device is skipped",
 			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        "",
 			stageUnstageSet: true,
-			shouldFail:      true,
+			createPV:        true,
 		},
 		{
 			testName:        "fail: invalid json, fail to retrieve driver and volumeID from globalpath",
@@ -1634,45 +1608,6 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        `{"driverName"}}`,
 			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		// Old style PV based path positive test cases
-		{
-			testName:        "success: json file doesn't exist, old style pv based global path -> use PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "success: invalid json file, old style pv based global path -> use PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName"}}`,
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "stage_unstage not set, PV based path, unmount device is skipped",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
-			stageUnstageSet: false,
-		},
-		// Old style PV based path negative test cases
-		{
-			testName:        "fail: json file doesn't exist, old style pv based device path, missing PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		{
-			testName:        "fail: no json, no PV.volID, old style pv based global path",
-			volID:           "",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
 			shouldFail:      true,
 		},
 	}
@@ -1738,7 +1673,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 			// Verify call goes through all the way
 			expectedSet := 0
-			if !tc.stageUnstageSet {
+			if !tc.stageUnstageSet || tc.volID == "" {
 				expectedSet = 1
 			}
 			staged := cdc.nodeClient.GetNodeStagedVolumes()
@@ -1747,7 +1682,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			}
 
 			_, ok := staged[tc.volID]
-			if ok && tc.stageUnstageSet {
+			if ok && tc.stageUnstageSet && tc.volID != "" {
 				t.Errorf("found unexpected staged volume: %s", tc.volID)
 			} else if !ok && !tc.stageUnstageSet {
 				t.Errorf("could not find expected staged volume: %s", tc.volID)

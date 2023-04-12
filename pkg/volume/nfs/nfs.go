@@ -176,7 +176,7 @@ func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder
 	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
-func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	nfsVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -185,7 +185,9 @@ func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(nfsVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(nfsVolume),
+	}, nil
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.

@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/tracing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -169,6 +170,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
+		"/metrics/slis",
 		"/readyz",
 		"/readyz/delegate-health",
 		"/readyz/informer-sync",
@@ -297,16 +299,17 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
-		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
-		RequestInfoResolver:   &request.RequestInfoFactory{},
-		RequestTimeout:        10 * time.Second,
-		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      newLifecycleSignals(),
+		NonLongRunningRequestWaitGroup: &waitgroup.SafeWaitGroup{},
+		RequestInfoResolver:            &request.RequestInfoFactory{},
+		RequestTimeout:                 10 * time.Second,
+		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:               newLifecycleSignals(),
+		TracerProvider:                 tracing.NewNoopTracerProvider(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// confirm this is a no-op
-		if r.Context() != audit.WithAuditAnnotations(r.Context()) {
+		if r.Context() != audit.WithAuditContext(r.Context()) {
 			t.Error("unexpected double wrapping of context")
 		}
 

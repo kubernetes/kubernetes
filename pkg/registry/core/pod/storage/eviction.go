@@ -25,6 +25,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -226,10 +227,24 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
+		// IsPodReady is the current implementation of IsHealthy
+		// If the pod is healthy, it should be guarded by the PDB.
+		if !podutil.IsPodReady(pod) {
+			if feature.DefaultFeatureGate.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
+				if pdb.Spec.UnhealthyPodEvictionPolicy != nil && *pdb.Spec.UnhealthyPodEvictionPolicy == policyv1.AlwaysAllow {
+					// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+					updateDeletionOptions = true
+					return nil
+				}
+			}
+			// default nil and IfHealthyBudget policy
+			if pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+				// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+				// Application guarded by the PDB is not disrupted at the moment and deleting unhealthy (unready) pod will not disrupt it.
+				updateDeletionOptions = true
+				return nil
+			}
+			// confirm no disruptions allowed in checkAndDecrement
 		}
 
 		refresh := false
@@ -264,12 +279,12 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// At this point there was either no PDB or we succeeded in decrementing or
-	// the pod was unready and we have enough healthy replicas
+	// the pod was unhealthy (unready) and we have enough healthy replicas
 
 	deleteOptions := originalDeleteOptions
 
 	// Set deleteOptions.Preconditions.ResourceVersion to ensure
-	// the pod hasn't been considered ready since we calculated
+	// the pod hasn't been considered healthy (ready) since we calculated
 	if updateDeletionOptions {
 		// Take a copy so we can compare to client-provied Options later.
 		deleteOptions = deleteOptions.DeepCopy()
@@ -294,15 +309,34 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 }
 
 func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) error {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		pod, err := getPod(r, ctx, name)
-		if err != nil {
-			return err
+	if !dryrun.IsDryRun(options.DryRun) && feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		getLatestPod := func(_ context.Context, _, oldObj runtime.Object) (runtime.Object, error) {
+			// Throwaway the newObj. We care only about the latest pod obtained from etcd (oldObj).
+			// So we can add DisruptionTarget condition in conditionAppender without conflicts.
+			latestPod := oldObj.(*api.Pod).DeepCopy()
+			if options.Preconditions != nil {
+				if uid := options.Preconditions.UID; uid != nil && len(*uid) > 0 && *uid != latestPod.UID {
+					return nil, errors.NewConflict(
+						schema.GroupResource{Group: "", Resource: "Pod"},
+						latestPod.Name,
+						fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *uid, latestPod.UID),
+					)
+				}
+				if rv := options.Preconditions.ResourceVersion; rv != nil && len(*rv) > 0 && *rv != latestPod.ResourceVersion {
+					return nil, errors.NewConflict(
+						schema.GroupResource{Group: "", Resource: "Pod"},
+						latestPod.Name,
+						fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s). The object might have been modified", *rv, latestPod.ResourceVersion),
+					)
+				}
+			}
+			return latestPod, nil
 		}
+
 		conditionAppender := func(_ context.Context, newObj, _ runtime.Object) (runtime.Object, error) {
 			podObj := newObj.(*api.Pod)
 			podutil.UpdatePodCondition(&podObj.Status, &api.PodCondition{
-				Type:    api.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:    api.DisruptionTarget,
 				Status:  api.ConditionTrue,
 				Reason:  "EvictionByEvictionAPI",
 				Message: "Eviction API: evicting",
@@ -310,10 +344,21 @@ func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string,
 			return podObj, nil
 		}
 
-		podCopyUpdated := rest.DefaultUpdatedObjectInfo(pod, conditionAppender)
+		podUpdatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, getLatestPod, conditionAppender) // order important
 
-		if _, _, err = r.store.Update(ctx, name, podCopyUpdated, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		updatedPodObject, _, err := r.store.Update(ctx, name, podUpdatedObjectInfo, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err != nil {
 			return err
+		}
+
+		if !resourceVersionIsUnset(options) {
+			newResourceVersion, err := meta.NewAccessor().ResourceVersion(updatedPodObject)
+			if err != nil {
+				return err
+			}
+			// bump the resource version, since we are the one who modified it via the update
+			options = options.DeepCopy()
+			options.Preconditions.ResourceVersion = &newResourceVersion
 		}
 	}
 	_, _, err := r.store.Delete(ctx, name, rest.ValidateAllObjectFunc, options)
@@ -351,7 +396,7 @@ func shouldEnforceResourceVersion(pod *api.Pod) bool {
 		return false
 	}
 	// Return true for all other pods to ensure we don't race against a pod becoming
-	// ready and violating PDBs.
+	// healthy (ready) and violating PDBs.
 	return true
 }
 
@@ -393,7 +438,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	// If this is a dry-run, we don't need to go any further than that.
-	if dryRun == true {
+	if dryRun {
 		return nil
 	}
 

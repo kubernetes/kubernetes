@@ -45,9 +45,9 @@ type StableCollector interface {
 	HiddenMetrics() []string
 }
 
-// BaseStableCollector which implements almost all of the methods defined by StableCollector
+// BaseStableCollector which implements almost all methods defined by StableCollector
 // is a convenient assistant for custom collectors.
-// It is recommend that inherit BaseStableCollector when implementing custom collectors.
+// It is recommended to inherit BaseStableCollector when implementing custom collectors.
 type BaseStableCollector struct {
 	descriptors  map[string]*Desc // stores all descriptors by pair<fqName, Desc>, these are collected from DescribeWithStability().
 	registerable map[string]*Desc // stores registerable descriptors by pair<fqName, Desc>, is a subset of descriptors.
@@ -62,7 +62,7 @@ func (bsc *BaseStableCollector) DescribeWithStability(ch chan<- *Desc) {
 }
 
 // Describe sends all descriptors to the provided channel.
-// It intend to be called by prometheus registry.
+// It intended to be called by prometheus registry.
 func (bsc *BaseStableCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range bsc.registerable {
 		ch <- d.toPrometheusDesc()

@@ -28,6 +28,7 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -47,7 +48,7 @@ type Config struct {
 }
 
 // New sets up the plugins and admission start hooks needed for admission
-func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
+func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider, schemaResolver resolver.SchemaResolver) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
 	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
@@ -63,13 +64,13 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	if err != nil {
 		return nil, nil, err
 	}
-
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientset.Discovery())
 	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	kubePluginInitializer := NewPluginInitializer(
 		cloudConfig,
 		discoveryRESTMapper,
 		quotainstall.NewQuotaConfigurationForAdmission(),
+		schemaResolver,
 	)
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {

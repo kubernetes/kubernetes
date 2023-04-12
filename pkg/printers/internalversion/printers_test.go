@@ -612,11 +612,11 @@ func TestPrintNodeRole(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo10",
-					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
+					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/control-plane": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "master,node,proxy", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "control-plane,master,node,proxy", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -979,8 +979,8 @@ func TestPrintIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{
 						IP:       "2.3.4.5",
 						Hostname: "localhost.localdomain",
@@ -1501,6 +1501,24 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			[]metav1.TableRow{{Cells: []interface{}{"test14", "2/2", "Running", "9 (5d ago)", "<unknown>"}}},
+		},
+		{
+			// Test PodScheduled condition with reason WaitingForGates
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test15"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodScheduled,
+							Status: api.ConditionFalse,
+							Reason: api.PodReasonSchedulingGated,
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", api.PodReasonSchedulingGated, "0", "<unknown>"}}},
 		},
 	}
 
@@ -5643,7 +5661,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrol.PriorityLevelEnablementExempt,
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"unlimited", "Exempt", "<none>", "<none>", "<none>", "<none>", "0s"}}},
 		},
 		{
@@ -5655,14 +5673,14 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 47,
+						NominalConcurrencyShares: 47,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						},
 					},
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"unqueued", "Limited", int32(47), "<none>", "<none>", "<none>", "0s"}}},
 		},
 		{
@@ -5674,7 +5692,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 42,
+						NominalConcurrencyShares: 42,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -5686,7 +5704,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 					},
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"queued", "Limited", int32(42), int32(8), int32(3), int32(4), "0s"}}},
 		},
 	}
@@ -5984,6 +6002,18 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
+			name: "ValidatingAdmissionPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicy(&admissionregistration.ValidatingAdmissionPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicyBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicyBinding(&admissionregistration.ValidatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
 			name: "Namespace",
 			printer: func() ([]metav1.TableRow, error) {
 				return printNamespace(&api.Namespace{}, printers.GenerateOptions{})
@@ -6065,12 +6095,6 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "ConfigMap",
 			printer: func() ([]metav1.TableRow, error) {
 				return printConfigMap(&api.ConfigMap{}, printers.GenerateOptions{})
-			},
-		},
-		{
-			name: "PodSecurityPolicy",
-			printer: func() ([]metav1.TableRow, error) {
-				return printPodSecurityPolicy(&policy.PodSecurityPolicy{}, printers.GenerateOptions{})
 			},
 		},
 		{
@@ -6457,4 +6481,84 @@ func TestPrintClusterCIDRList(t *testing.T) {
 			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
+}
+
+func TestPrintIPAddress(t *testing.T) {
+	ip := networking.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "192.168.2.2",
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: networking.IPAddressSpec{
+			ParentRef: &networking.ParentReference{
+				Group:     "mygroup",
+				Resource:  "myresource",
+				Namespace: "mynamespace",
+				Name:      "myname",
+			},
+		},
+	}
+	// Columns: Name, ParentRef, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}}}
+
+	rows, err := printIPAddress(&ip, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	}
+}
+
+func TestPrintIPAddressList(t *testing.T) {
+	ipList := networking.IPAddressList{
+		Items: []networking.IPAddress{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "192.168.2.2",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "mygroup",
+						Resource:  "myresource",
+						Namespace: "mynamespace",
+						Name:      "myname",
+					},
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "2001:db8::2",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-5, 0, 0)},
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "mygroup2",
+						Resource:  "myresource2",
+						Namespace: "mynamespace2",
+						Name:      "myname2",
+					},
+				},
+			},
+		},
+	}
+	// Columns: Name, ParentRef, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}},
+		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "5y1d"}},
+	}
+
+	rows, err := printIPAddressList(&ipList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+
+	}
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	}
+
 }

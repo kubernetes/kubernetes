@@ -3,11 +3,15 @@
 approvers:
   - feiskyer
   - sbangari
+  - daschott
 reviewers:
   - feiskyer
   - sbangari
+  - daschott
 labels:
   - sig/network
+  - sig/windows
+  - area/kube-proxy
 emeritus_approvers:
   - dineshgovindasamy
   - ksubrmnn

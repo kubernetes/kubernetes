@@ -1870,7 +1870,7 @@ The feature gate currently falls back to the default behavior in most cases. Ena
 - CRIContainerLogRotation graduates to GA and unconditionally enabled. ([#99651](https://github.com/kubernetes/kubernetes/pull/99651), [@umohnani8](https://github.com/umohnani8))
 - Component owner can configure the allowlist of metric label with flag '--allow-metric-labels'. ([#99385](https://github.com/kubernetes/kubernetes/pull/99385), [@YoyinZyc](https://github.com/YoyinZyc)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Release]
 - Component owner can configure the allowlist of metric label with flag '--allow-metric-labels'. ([#99738](https://github.com/kubernetes/kubernetes/pull/99738), [@YoyinZyc](https://github.com/YoyinZyc)) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
-- EmptyDir memory backed volumes are sized as the the minimum of pod allocatable memory on a host and an optional explicit user provided value. ([#100319](https://github.com/kubernetes/kubernetes/pull/100319), [@derekwaynecarr](https://github.com/derekwaynecarr)) [SIG Node]
+- EmptyDir memory backed volumes are sized as the minimum of pod allocatable memory on a host and an optional explicit user provided value. ([#100319](https://github.com/kubernetes/kubernetes/pull/100319), [@derekwaynecarr](https://github.com/derekwaynecarr)) [SIG Node]
 - Enables Kubelet to check volume condition and log events to corresponding pods. ([#99284](https://github.com/kubernetes/kubernetes/pull/99284), [@fengzixu](https://github.com/fengzixu)) [SIG Apps, Instrumentation, Node and Storage]
 - EndpointSliceNodeName graduates to GA and thus will be unconditionally enabled -- NodeName will always be available in the v1beta1 API. ([#99746](https://github.com/kubernetes/kubernetes/pull/99746), [@swetharepakula](https://github.com/swetharepakula))
 - Export `NewDebuggingRoundTripper` function and `DebugLevel` options in the k8s.io/client-go/transport package. ([#98324](https://github.com/kubernetes/kubernetes/pull/98324), [@atosatto](https://github.com/atosatto))
@@ -2256,7 +2256,7 @@ filename | sha512 hash
 ### Feature
 
 - Add e2e test to validate performance metrics of volume lifecycle operations ([#94334](https://github.com/kubernetes/kubernetes/pull/94334), [@RaunakShah](https://github.com/RaunakShah)) [SIG Storage and Testing]
-- EmptyDir memory backed volumes are sized as the the minimum of pod allocatable memory on a host and an optional explicit user provided value. ([#100319](https://github.com/kubernetes/kubernetes/pull/100319), [@derekwaynecarr](https://github.com/derekwaynecarr)) [SIG Node]
+- EmptyDir memory backed volumes are sized as the minimum of pod allocatable memory on a host and an optional explicit user provided value. ([#100319](https://github.com/kubernetes/kubernetes/pull/100319), [@derekwaynecarr](https://github.com/derekwaynecarr)) [SIG Node]
 - Enables Kubelet to check volume condition and log events to corresponding pods. ([#99284](https://github.com/kubernetes/kubernetes/pull/99284), [@fengzixu](https://github.com/fengzixu)) [SIG Apps, Instrumentation, Node and Storage]
 - Introduce a churn operator to scheduler perf testing framework. ([#98900](https://github.com/kubernetes/kubernetes/pull/98900), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
 - Kubernetes is now built with Golang 1.16.1 ([#100106](https://github.com/kubernetes/kubernetes/pull/100106), [@justaugustus](https://github.com/justaugustus)) [SIG Cloud Provider, Instrumentation, Release and Testing]

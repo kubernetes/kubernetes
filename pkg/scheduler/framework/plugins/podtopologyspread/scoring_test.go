@@ -18,13 +18,13 @@ package podtopologyspread
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -43,13 +43,13 @@ var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, 
 
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
-		name                       string
-		pod                        *v1.Pod
-		nodes                      []*v1.Node
-		objs                       []runtime.Object
-		config                     config.PodTopologySpreadArgs
-		want                       *preScoreState
-		enableNodeInclustionPolicy bool
+		name                      string
+		pod                       *v1.Pod
+		nodes                     []*v1.Node
+		objs                      []runtime.Object
+		config                    config.PodTopologySpreadArgs
+		want                      *preScoreState
+		enableNodeInclusionPolicy bool
 	}{
 		{
 			name: "normal case",
@@ -84,12 +84,44 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
+			},
+		},
+		{
+			name: "null selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, nil, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label(v1.LabelHostname, "node-x").Obj(),
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
+			},
+			want: &preScoreState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           labels.Nothing(),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				IgnoredNodes: sets.New[string](),
+				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
+				},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 		},
 		{
@@ -125,7 +157,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString("node-x"),
+				IgnoredNodes: sets.New("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 				},
@@ -167,7 +199,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
 					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
@@ -218,7 +250,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "planet", value: "mars"}: pointer.Int64(0),
 				},
@@ -282,7 +314,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{"planet", "mars"}: pointer.Int64(0),
 				},
@@ -314,14 +346,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with labelSelectors",
@@ -348,14 +380,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy honored with nodeAffinity",
@@ -382,14 +414,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
@@ -416,14 +448,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy honored",
@@ -449,14 +481,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyHonor,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy ignored",
@@ -482,14 +514,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 	}
 	for _, tt := range tests {
@@ -503,7 +535,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl, err := New(&tt.config, f, feature.Features{EnableNodeInclusionPolicyInPodTopologySpread: tt.enableNodeInclustionPolicy})
+			pl, err := New(&tt.config, f, feature.Features{EnableNodeInclusionPolicyInPodTopologySpread: tt.enableNodeInclusionPolicy})
 			if err != nil {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
@@ -528,15 +560,15 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 
 func TestPodTopologySpreadScore(t *testing.T) {
 	tests := []struct {
-		name                       string
-		pod                        *v1.Pod
-		existingPods               []*v1.Pod
-		nodes                      []*v1.Node
-		failedNodes                []*v1.Node // nodes + failedNodes = all nodes
-		objs                       []runtime.Object
-		want                       framework.NodeScoreList
-		enableNodeInclustionPolicy bool
-		enableMatchLabelKeys       bool
+		name                      string
+		pod                       *v1.Pod
+		existingPods              []*v1.Pod
+		nodes                     []*v1.Node
+		failedNodes               []*v1.Node // nodes + failedNodes = all nodes
+		objs                      []runtime.Object
+		want                      framework.NodeScoreList
+		enableNodeInclusionPolicy bool
+		enableMatchLabelKeys      bool
 	}{
 		// Explanation on the Legend:
 		// a) X/Y means there are X matching pods on node1 and Y on node2, both nodes are candidates
@@ -623,6 +655,32 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 60},
 				{Name: "node-c", Score: 100},
 				{Name: "node-d", Score: 0},
+			},
+		},
+		{
+			name: "one constraint on node, null selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, nil, nil, nil, nil, nil).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d2").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d3").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 100},
+				{Name: "node-b", Score: 100},
+				{Name: "node-c", Score: 100},
+				{Name: "node-d", Score: 100},
 			},
 		},
 		{
@@ -1029,7 +1087,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with labelSelectors",
@@ -1053,7 +1111,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy honoed with nodeAffinity",
@@ -1077,7 +1135,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
@@ -1101,7 +1159,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy honored",
@@ -1124,7 +1182,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy ignored",
@@ -1147,7 +1205,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
 			},
-			enableNodeInclustionPolicy: true,
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled",
@@ -1238,7 +1296,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			state := framework.NewCycleState()
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
 			p := pl.(*PodTopologySpread)
-			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
@@ -1250,14 +1308,12 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			for _, n := range tt.nodes {
 				nodeName := n.Name
 				score, status := p.Score(ctx, state, tt.pod, nodeName)
-				fmt.Println("get score", score)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			fmt.Println(gotList)
 			status = p.NormalizeScore(ctx, state, tt.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)

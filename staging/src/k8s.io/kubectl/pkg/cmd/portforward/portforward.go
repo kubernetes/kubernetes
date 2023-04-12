@@ -32,7 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -98,7 +98,7 @@ const (
 	defaultPodPortForwardWaitTimeout = 60 * time.Second
 )
 
-func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPortForward(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	opts := &PortForwardOptions{
 		PortForwarder: &defaultPortForwarder{
 			IOStreams: streams,
@@ -128,7 +128,7 @@ type portForwarder interface {
 }
 
 type defaultPortForwarder struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {

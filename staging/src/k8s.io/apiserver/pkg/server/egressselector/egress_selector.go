@@ -29,18 +29,24 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 )
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
+
+func init() {
+	client.Metrics.RegisterMetrics(legacyregistry.Registerer())
+}
 
 // EgressSelector is the map of network context type to context dialer, for network egress.
 type EgressSelector struct {
@@ -216,6 +222,9 @@ func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
 	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
 	tunnelCtx := context.TODO()
 	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+		grpc.WithTimeout(30*time.Second), // matches http.DefaultTransport dial timeout
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -239,9 +248,10 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		return directDialer
 	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		trace := utiltrace.New(fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
-		defer trace.LogIfLong(500 * time.Millisecond)
+		ctx, span := tracing.Start(ctx, fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), attribute.String("address", addr))
+		defer span.End(500 * time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
+		egressmetrics.Metrics.ObserveDialStart(d.options.protocol, d.options.transport)
 		proxier, err := d.connector.connect(ctx)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)

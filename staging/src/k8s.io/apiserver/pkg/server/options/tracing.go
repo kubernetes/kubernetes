@@ -101,11 +101,12 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		if err != nil {
 			return err
 		}
-
-		otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			return egressDialer(ctx, "tcp", addr)
+		if egressDialer != nil {
+			otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
+				return egressDialer(ctx, "tcp", addr)
+			}
+			opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 		}
-		opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 	}
 
 	resourceOpts := []resource.Option{
@@ -153,9 +154,5 @@ func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfigu
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), data, internalConfig); err != nil {
 		return nil, fmt.Errorf("unable to decode tracing configuration data: %v", err)
 	}
-	tc := &tracingapi.TracingConfiguration{
-		Endpoint:               internalConfig.Endpoint,
-		SamplingRatePerMillion: internalConfig.SamplingRatePerMillion,
-	}
-	return tc, nil
+	return &internalConfig.TracingConfiguration, nil
 }

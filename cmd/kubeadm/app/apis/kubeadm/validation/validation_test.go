@@ -533,6 +533,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					BindPort:         6443,
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
@@ -554,6 +555,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					BindPort:         3446,
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
@@ -759,67 +761,67 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
 		ignorePreflightErrorsFromCLI        []string
 		ignorePreflightErrorsFromConfigFile []string
-		expectedSet                         sets.String
+		expectedSet                         sets.Set[string]
 		expectedError                       bool
 	}{
 		{ // empty lists in CLI and config file
 			[]string{},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			false,
 		},
 		{ // empty list in CLI only
 			[]string{},
 			[]string{"a"},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // empty list in config file only
 			[]string{"a"},
 			[]string{},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // no duplicates, no overlap
 			[]string{"a", "b"},
 			[]string{"c", "d"},
-			sets.NewString("a", "b", "c", "d"),
+			sets.New("a", "b", "c", "d"),
 			false,
 		},
 		{ // some duplicates, with some overlapping duplicates
 			[]string{"a", "b", "a"},
 			[]string{"c", "b"},
-			sets.NewString("a", "b", "c"),
+			sets.New("a", "b", "c"),
 			false,
 		},
 		{ // non-duplicate, but 'all' present together with individual checks in CLI
 			[]string{"a", "b", "all"},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // empty list in CLI, but 'all' present in config file, which is forbidden
 			[]string{},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in config file, which is forbidden
 			[]string{"a", "b"},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
 			[]string{"all"},
 			[]string{"a", "b"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // skip all checks
 			[]string{"all"},
 			[]string{},
-			sets.NewString("all"),
+			sets.New("all"),
 			false,
 		},
 	}
@@ -1238,5 +1240,86 @@ func TestGetClusterNodeMask(t *testing.T) {
 				t.Errorf("expected mask: %d, got %d", test.expectedMask, mask)
 			}
 		})
+	}
+}
+
+func TestValidateImageRepository(t *testing.T) {
+	var tests = []struct {
+		imageRepository string
+		expectedErrors  bool
+	}{
+		{
+			imageRepository: "a",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a:5000",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c:5000",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c:5000/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a/b/c",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "127.0.0.1:5000/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: `a.b/c
+			s`,
+			expectedErrors: true,
+		},
+		{
+			imageRepository: " a.b.c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b.c:5000/",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "https://a.b.c:5000",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a//b/c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b.c:5000/test:1.0",
+			expectedErrors:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateImageRepository(tc.imageRepository, nil)
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("case %q error:\n\t expected: %t\n\t actual: %t", tc.imageRepository, tc.expectedErrors, actualErrors)
+		}
 	}
 }

@@ -25,9 +25,13 @@ import (
 )
 
 func TestResourceMapper(t *testing.T) {
-	gvr := func(g, v, r string) schema.GroupVersionResource { return schema.GroupVersionResource{g, v, r} }
+	gvr := func(g, v, r string) schema.GroupVersionResource {
+		return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
+	}
 
-	gvk := func(g, v, k string) schema.GroupVersionKind { return schema.GroupVersionKind{g, v, k} }
+	gvk := func(g, v, k string) schema.GroupVersionKind {
+		return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
+	}
 
 	kindsToRegister := []struct {
 		gvr         schema.GroupVersionResource

@@ -18,9 +18,11 @@ package spec3
 
 import (
 	"encoding/json"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-	"github.com/go-openapi/swag"
 
+	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type Server struct {
@@ -51,12 +53,30 @@ func (s *Server) MarshalJSON() ([]byte, error) {
 }
 
 func (s *Server) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, s)
+	}
+
 	if err := json.Unmarshal(data, &s.ServerProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &s.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Server) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		ServerProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	s.Extensions = internal.SanitizeExtensions(x.Extensions)
+	s.ServerProps = x.ServerProps
+
 	return nil
 }
 
@@ -88,11 +108,28 @@ func (s *ServerVariable) MarshalJSON() ([]byte, error) {
 }
 
 func (s *ServerVariable) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, s)
+	}
 	if err := json.Unmarshal(data, &s.ServerVariableProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &s.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *ServerVariable) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		ServerVariableProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	s.Extensions = internal.SanitizeExtensions(x.Extensions)
+	s.ServerVariableProps = x.ServerVariableProps
+
 	return nil
 }

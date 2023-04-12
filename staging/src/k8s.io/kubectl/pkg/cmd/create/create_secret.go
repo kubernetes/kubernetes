@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -31,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -43,7 +42,7 @@ import (
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets.
 // This is the entry point of create_secret.go which will be called by create.go
-func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: i18n.T("Create a secret using specified subcommand"),
@@ -114,14 +113,13 @@ type CreateSecretOptions struct {
 
 	Client              corev1client.CoreV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSecretOptions creates a new *CreateSecretOptions with default value
-func NewSecretOptions(ioStreams genericclioptions.IOStreams) *CreateSecretOptions {
+func NewSecretOptions(ioStreams genericiooptions.IOStreams) *CreateSecretOptions {
 	return &CreateSecretOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -129,7 +127,7 @@ func NewSecretOptions(ioStreams genericclioptions.IOStreams) *CreateSecretOption
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSecretOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -186,18 +184,6 @@ func (o *CreateSecretOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 		return err
 	}
 
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
-
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -250,10 +236,6 @@ func (o *CreateSecretOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			err := o.DryRunVerifier.HasSupport(secret.GroupVersionKind())
-			if err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		secret, err = o.Client.Secrets(o.Namespace).Create(context.TODO(), secret, createOptions)
@@ -352,13 +334,13 @@ func handleSecretFromFileSources(secret *corev1.Secret, fileSources []string) er
 			if strings.Contains(fileSource, "=") {
 				return fmt.Errorf("cannot give a key name for a directory path")
 			}
-			fileList, err := ioutil.ReadDir(filePath)
+			fileList, err := os.ReadDir(filePath)
 			if err != nil {
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
 			for _, item := range fileList {
 				itemPath := path.Join(filePath, item.Name())
-				if item.Mode().IsRegular() {
+				if item.Type().IsRegular() {
 					keyName = item.Name()
 					if err := addKeyFromFileToSecret(secret, keyName, itemPath); err != nil {
 						return err
@@ -407,7 +389,7 @@ func handleSecretFromEnvFileSources(secret *corev1.Secret, envFileSources []stri
 // addKeyFromFileToSecret adds a key with the given name to a Secret, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToSecret(secret *corev1.Secret, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

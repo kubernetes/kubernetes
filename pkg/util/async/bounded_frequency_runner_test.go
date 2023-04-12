@@ -273,7 +273,7 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 
 	// Let minInterval pass
 	timer.advance(999 * time.Millisecond) // rel=1000ms
-	waitForRun("fourth run", t, timer, obj)
+	waitForRun("fifth run", t, timer, obj)
 
 	// Clean up.
 	stop <- struct{}{}

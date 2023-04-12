@@ -61,7 +61,7 @@ const (
 )
 
 // AllContainers specifies that all containers be visited
-const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+const AllContainers ContainerType = InitContainers | Containers | EphemeralContainers
 
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
@@ -188,6 +188,7 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
+// visitContainerSecretNames returns true unless the visitor returned false when invoked with a secret reference
 func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
@@ -236,6 +237,7 @@ func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
+// visitContainerConfigmapNames returns true unless the visitor returned false when invoked with a configmap reference
 func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.ConfigMapRef != nil {
@@ -255,7 +257,7 @@ func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool
 }
 
 // GetContainerStatus extracts the status of container "name" from "statuses".
-// It also returns if "name" exists.
+// It returns true if "name" exists, else returns false.
 func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {
@@ -270,6 +272,17 @@ func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.Containe
 func GetExistingContainerStatus(statuses []v1.ContainerStatus, name string) v1.ContainerStatus {
 	status, _ := GetContainerStatus(statuses, name)
 	return status
+}
+
+// GetIndexOfContainerStatus gets the index of status of container "name" from "statuses",
+// It returns (index, true) if "name" exists, else returns (0, false).
+func GetIndexOfContainerStatus(statuses []v1.ContainerStatus, name string) (int, bool) {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
@@ -300,7 +313,7 @@ func IsPodTerminal(pod *v1.Pod) bool {
 	return IsPodPhaseTerminal(pod.Status.Phase)
 }
 
-// IsPhaseTerminal returns true if the pod's phase is terminal.
+// IsPodPhaseTerminal returns true if the pod's phase is terminal.
 func IsPodPhaseTerminal(phase v1.PodPhase) bool {
 	return phase == v1.PodFailed || phase == v1.PodSucceeded
 }

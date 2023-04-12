@@ -231,8 +231,12 @@ func (pl *CSILimits) checkAttachableInlineVolume(vol v1.Volume, csiNode *storage
 		return fmt.Errorf("looking up provisioner name for volume %v: %w", vol, err)
 	}
 	if !isCSIMigrationOn(csiNode, inTreeProvisionerName) {
+		csiNodeName := ""
+		if csiNode != nil {
+			csiNodeName = csiNode.Name
+		}
 		klog.V(5).InfoS("CSI Migration is not enabled for provisioner", "provisioner", inTreeProvisionerName,
-			"pod", klog.KObj(pod), "csiNode", csiNode.Name)
+			"pod", klog.KObj(pod), "csiNode", csiNodeName)
 		return nil
 	}
 	// Do translation for the in-tree volume.

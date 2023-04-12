@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -66,17 +67,16 @@ type CreateJobOptions struct {
 	EnforceNamespace    bool
 	Client              batchv1client.BatchV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 	Builder             *resource.Builder
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCreateJobOptions initializes and returns new CreateJobOptions instance
-func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
+func NewCreateJobOptions(ioStreams genericiooptions.IOStreams) *CreateJobOptions {
 	return &CreateJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -84,7 +84,7 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 }
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
-func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateJobOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
@@ -142,11 +142,6 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -215,9 +210,6 @@ func (o *CreateJobOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(job.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

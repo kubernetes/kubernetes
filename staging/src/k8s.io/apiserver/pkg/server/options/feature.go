@@ -25,6 +25,7 @@ import (
 
 type FeatureOptions struct {
 	EnableProfiling           bool
+	DebugSocketPath           string
 	EnableContentionProfiling bool
 }
 
@@ -33,6 +34,7 @@ func NewFeatureOptions() *FeatureOptions {
 
 	return &FeatureOptions{
 		EnableProfiling:           defaults.EnableProfiling,
+		DebugSocketPath:           defaults.DebugSocketPath,
 		EnableContentionProfiling: defaults.EnableContentionProfiling,
 	}
 }
@@ -45,7 +47,9 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
-		"Enable lock contention profiling, if profiling is enabled")
+		"Enable block profiling, if profiling is enabled")
+	fs.StringVar(&o.DebugSocketPath, "debug-socket-path", o.DebugSocketPath,
+		"Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path")
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config) error {
@@ -54,6 +58,7 @@ func (o *FeatureOptions) ApplyTo(c *server.Config) error {
 	}
 
 	c.EnableProfiling = o.EnableProfiling
+	c.DebugSocketPath = o.DebugSocketPath
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 
 	return nil

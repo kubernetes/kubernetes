@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -327,7 +327,7 @@ func (util *rbdUtil) rbdUnlock(b rbdMounter) error {
 	}
 
 	// Construct lock id using host name and a magic prefix.
-	hostName, err := node.GetHostname("")
+	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
 	}

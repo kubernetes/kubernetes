@@ -272,11 +272,22 @@ func tokenize(input string) func() (*treeNode, error) {
 	}
 }
 
+func MustParseLabelFilter(input string) LabelFilter {
+	filter, err := ParseLabelFilter(input)
+	if err != nil {
+		panic(err)
+	}
+	return filter
+}
+
 func ParseLabelFilter(input string) (LabelFilter, error) {
 	if DEBUG_LABEL_FILTER_PARSING {
 		fmt.Println("\n==============")
 		fmt.Println("Input: ", input)
 		fmt.Print("Tokens: ")
+	}
+	if input == "" {
+		return func(_ []string) bool { return true }, nil
 	}
 	nextToken := tokenize(input)
 

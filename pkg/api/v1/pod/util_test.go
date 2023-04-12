@@ -809,6 +809,53 @@ func TestGetContainerStatus(t *testing.T) {
 	}
 }
 
+func TestGetIndexOfContainerStatus(t *testing.T) {
+	testStatus := []v1.ContainerStatus{
+		{
+			Name:  "c1",
+			Ready: false,
+			Image: "image1",
+		},
+		{
+			Name:  "c2",
+			Ready: true,
+			Image: "image1",
+		},
+	}
+
+	tests := []struct {
+		desc           string
+		containerName  string
+		expectedExists bool
+		expectedIndex  int
+	}{
+		{
+			desc:           "first container",
+			containerName:  "c1",
+			expectedExists: true,
+			expectedIndex:  0,
+		},
+		{
+			desc:           "second container",
+			containerName:  "c2",
+			expectedExists: true,
+			expectedIndex:  1,
+		},
+		{
+			desc:           "non-existent container",
+			containerName:  "c3",
+			expectedExists: false,
+			expectedIndex:  0,
+		},
+	}
+
+	for _, test := range tests {
+		idx, exists := GetIndexOfContainerStatus(testStatus, test.containerName)
+		assert.Equal(t, test.expectedExists, exists, "GetIndexOfContainerStatus: "+test.desc)
+		assert.Equal(t, test.expectedIndex, idx, "GetIndexOfContainerStatus: "+test.desc)
+	}
+}
+
 func TestUpdatePodCondition(t *testing.T) {
 	time := metav1.Now()
 

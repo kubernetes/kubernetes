@@ -35,28 +35,27 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
-// InitNodeE2ERemote initializes the node e2e test suite.
-func InitNodeE2ERemote() TestSuite {
-	// TODO: Register flags.
-	return &NodeE2ERemote{}
+// init initializes the node e2e test suite.
+func init() {
+	RegisterTestSuite("default", &NodeE2ERemote{})
 }
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
-		return fmt.Errorf("failed to build the dependencies: %v", err)
+		return fmt.Errorf("failed to build the dependencies: %w", err)
 	}
 
 	// Make sure we can find the newly built binaries
 	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
+		return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
 	}
 
 	rootDir, err := utils.GetK8sRootDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
+		return fmt.Errorf("failed to locate kubernetes root directory: %w", err)
 	}
 
 	// Copy binaries
@@ -64,7 +63,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {
-			return fmt.Errorf("failed to locate test binary %s: %v", bin, err)
+			return fmt.Errorf("failed to locate test binary %s: %w", bin, err)
 		}
 		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
 		if err != nil {
@@ -76,7 +75,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		// Copy system spec file
 		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
 		if _, err := os.Stat(source); err != nil {
-			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
+			return fmt.Errorf("failed to locate system spec %q: %w", source, err)
 		}
 		out, err := exec.Command("cp", source, tardir).CombinedOutput()
 		if err != nil {
@@ -85,15 +84,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	return nil
-}
-
-// prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
-// args and returns the result.
-func prependCOSMounterFlag(args, host, workspace string) (string, error) {
-	klog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
-	mounterPath := filepath.Join(workspace, "mounter")
-	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
-	return args, nil
 }
 
 // prependMemcgNotificationFlag prepends the flag for enabling memcg
@@ -124,8 +114,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		return args, setKubeletSELinuxLabels(host, workspace)
 	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
-		args = prependGCPCredentialProviderFlag(args, workspace)
-		return prependCOSMounterFlag(args, host, workspace)
+		return prependGCPCredentialProviderFlag(args, workspace), nil
 	case strings.Contains(output, "ubuntu"):
 		args = prependGCPCredentialProviderFlag(args, workspace)
 		return prependMemcgNotificationFlag(args), nil
@@ -196,12 +185,15 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 		systemSpecFile = systemSpecName + ".yaml"
 	}
 
+	outputGinkgoFile := filepath.Join(results, fmt.Sprintf("%s-ginkgo.log", host))
+
 	// Run the tests
 	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --runtime-config=%s --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, runtimeConfig, host, results, junitFilePrefix, imageDesc, testArgs),
+		// Note, we need to have set -o pipefail here to ensure we return the appriorate exit code from ginkgo; not tee
+		fmt.Sprintf("set -o pipefail; timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --runtime-config=%s --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s 2>&1 | tee -i %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, runtimeConfig, host, results, junitFilePrefix, imageDesc, testArgs, outputGinkgoFile),
 	)
-	return SSH(host, "sh", "-c", cmd)
+	return SSH(host, "/bin/bash", "-c", cmd)
 }

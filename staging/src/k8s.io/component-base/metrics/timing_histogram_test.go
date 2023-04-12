@@ -440,3 +440,46 @@ func BenchmarkTimingHistogramVecEltFetched(b *testing.B) {
 		x = (x + i) % 60
 	}
 }
+
+func TestUnregisteredVec(t *testing.T) {
+	hv := NewTestableTimingHistogramVec(time.Now, &TimingHistogramOpts{
+		Namespace:    "testns",
+		Subsystem:    "testsubsys",
+		Name:         "testhist",
+		Help:         "Me",
+		Buckets:      []float64{1, 2, 4, 8, 16},
+		InitialValue: 3,
+	},
+		[]string{"label1", "label2"})
+	gauge, err := hv.WithLabelValuesChecked("v1", "v2")
+	if gauge != noop {
+		t.Errorf("Expected noop but got %#+v", gauge)
+	}
+	if !ErrIsNotRegistered(err) {
+		t.Errorf("Expected errNotRegistered but got err=%v", err)
+	}
+}
+
+func TestBadValues(t *testing.T) {
+	hv := NewTestableTimingHistogramVec(time.Now, &TimingHistogramOpts{
+		Namespace:    "testns",
+		Subsystem:    "testsubsys",
+		Name:         "testhist",
+		Help:         "Me",
+		Buckets:      []float64{1, 2, 4, 8, 16},
+		InitialValue: 3,
+	},
+		[]string{"label1", "label2"})
+	registry := NewKubeRegistry()
+	registry.MustRegister(hv)
+	gauge, err := hv.WithLabelValuesChecked("v1")
+	if gauge != noop {
+		t.Errorf("Expected noop but got %#+v", gauge)
+	}
+	if err == nil {
+		t.Error("Expected an error but got nil")
+	}
+	if ErrIsNotRegistered(err) {
+		t.Error("Expected an error other than errNotRegistered but got that one")
+	}
+}

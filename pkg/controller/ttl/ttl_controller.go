@@ -34,7 +34,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,15 +78,19 @@ type Controller struct {
 }
 
 // NewTTLController creates a new TTLController
-func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
 	ttlc := &Controller{
 		kubeClient: kubeClient,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
 	}
-
+	logger := klog.FromContext(ctx)
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    ttlc.addNode,
-		UpdateFunc: ttlc.updateNode,
+		AddFunc: func(obj interface{}) {
+			ttlc.addNode(logger, obj)
+		},
+		UpdateFunc: func(old, newObj interface{}) {
+			ttlc.updateNode(logger, old, newObj)
+		},
 		DeleteFunc: ttlc.deleteNode,
 	})
 
@@ -116,9 +120,9 @@ var (
 func (ttlc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer ttlc.queue.ShutDown()
-
-	klog.Infof("Starting TTL controller")
-	defer klog.Infof("Shutting down TTL controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting TTL controller")
+	defer logger.Info("Shutting down TTL controller")
 
 	if !cache.WaitForNamedCacheSync("TTL", ctx.Done(), ttlc.hasSynced) {
 		return
@@ -131,7 +135,7 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (ttlc *Controller) addNode(obj interface{}) {
+func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
@@ -147,10 +151,10 @@ func (ttlc *Controller) addNode(obj interface{}) {
 			ttlc.desiredTTLSeconds = ttlBoundaries[ttlc.boundaryStep].ttlSeconds
 		}
 	}()
-	ttlc.enqueueNode(node)
+	ttlc.enqueueNode(logger, node)
 }
 
-func (ttlc *Controller) updateNode(_, newObj interface{}) {
+func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
@@ -161,7 +165,7 @@ func (ttlc *Controller) updateNode(_, newObj interface{}) {
 	// We are relying on the fact that Kubelet is updating node status
 	// every 10s (or generally every X seconds), which means that whenever
 	// required, its ttl annotation should be updated within that period.
-	ttlc.enqueueNode(node)
+	ttlc.enqueueNode(logger, node)
 }
 
 func (ttlc *Controller) deleteNode(obj interface{}) {
@@ -191,10 +195,10 @@ func (ttlc *Controller) deleteNode(obj interface{}) {
 	// We are not processing the node, as it no longer exists.
 }
 
-func (ttlc *Controller) enqueueNode(node *v1.Node) {
+func (ttlc *Controller) enqueueNode(logger klog.Logger, node *v1.Node) {
 	key, err := controller.KeyFunc(node)
 	if err != nil {
-		klog.Errorf("Couldn't get key for object %+v", node)
+		logger.Error(nil, "Couldn't get key for object", "object", klog.KObj(node))
 		return
 	}
 	ttlc.queue.Add(key)
@@ -229,7 +233,7 @@ func (ttlc *Controller) getDesiredTTLSeconds() int {
 	return ttlc.desiredTTLSeconds
 }
 
-func getIntFromAnnotation(node *v1.Node, annotationKey string) (int, bool) {
+func getIntFromAnnotation(ctx context.Context, node *v1.Node, annotationKey string) (int, bool) {
 	if node.Annotations == nil {
 		return 0, false
 	}
@@ -239,8 +243,9 @@ func getIntFromAnnotation(node *v1.Node, annotationKey string) (int, bool) {
 	}
 	intValue, err := strconv.Atoi(annotationValue)
 	if err != nil {
-		klog.Warningf("Cannot convert the value %q with annotation key %q for the node %q",
-			annotationValue, annotationKey, node.Name)
+		logger := klog.FromContext(ctx)
+		logger.Info("Could not convert the value with annotation key for the node", "annotationValue",
+			annotationValue, "annotationKey", annotationKey, "node", klog.KObj(node))
 		return 0, false
 	}
 	return intValue, true
@@ -268,11 +273,12 @@ func (ttlc *Controller) patchNodeWithAnnotation(ctx context.Context, node *v1.No
 		return err
 	}
 	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(ctx, node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.V(2).InfoS("Failed to change ttl annotation for node", "node", klog.KObj(node), "err", err)
+		logger.V(2).Info("Failed to change ttl annotation for node", "node", klog.KObj(node), "err", err)
 		return err
 	}
-	klog.V(2).InfoS("Changed ttl annotation", "node", klog.KObj(node), "new_ttl", time.Duration(value)*time.Second)
+	logger.V(2).Info("Changed ttl annotation", "node", klog.KObj(node), "TTL", time.Duration(value)*time.Second)
 	return nil
 }
 
@@ -286,7 +292,7 @@ func (ttlc *Controller) updateNodeIfNeeded(ctx context.Context, key string) erro
 	}
 
 	desiredTTL := ttlc.getDesiredTTLSeconds()
-	currentTTL, ok := getIntFromAnnotation(node, v1.ObjectTTLAnnotationKey)
+	currentTTL, ok := getIntFromAnnotation(ctx, node, v1.ObjectTTLAnnotationKey)
 	if ok && currentTTL == desiredTTL {
 		return nil
 	}

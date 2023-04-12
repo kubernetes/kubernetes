@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -53,23 +54,24 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.Bind,
 		p.PostBind,
 		p.Permit,
+		p.PreEnqueue,
 		p.QueueSort,
 	}
-	n := sets.NewString()
+	n := sets.New[string]()
 	for _, e := range extensions {
 		for _, pg := range e.Enabled {
 			n.Insert(pg.Name)
 		}
 	}
-	return n.List()
+	return sets.List(n)
 }
 
-func setDefaults_KubeSchedulerProfile(prof *configv1.KubeSchedulerProfile) {
+func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSchedulerProfile) {
 	// Set default plugins.
-	prof.Plugins = mergePlugins(getDefaultPlugins(), prof.Plugins)
+	prof.Plugins = mergePlugins(logger, getDefaultPlugins(), prof.Plugins)
 	// Set default plugin configs.
 	scheme := GetPluginArgConversionScheme()
-	existingConfigs := sets.NewString()
+	existingConfigs := sets.New[string]()
 	for j := range prof.PluginConfig {
 		existingConfigs.Insert(prof.PluginConfig[j].Name)
 		args := prof.PluginConfig[j].Args.Object
@@ -101,8 +103,9 @@ func setDefaults_KubeSchedulerProfile(prof *configv1.KubeSchedulerProfile) {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfiguration) {
+	logger := klog.TODO() // called by generated code that doesn't pass a logger. See #115724
 	if obj.Parallelism == nil {
-		obj.Parallelism = pointer.Int32Ptr(16)
+		obj.Parallelism = pointer.Int32(16)
 	}
 
 	if len(obj.Profiles) == 0 {
@@ -111,18 +114,17 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
-		obj.Profiles[0].SchedulerName = pointer.StringPtr(v1.DefaultSchedulerName)
+		obj.Profiles[0].SchedulerName = pointer.String(v1.DefaultSchedulerName)
 	}
 
 	// Add the default set of plugins and apply the configuration.
 	for i := range obj.Profiles {
 		prof := &obj.Profiles[i]
-		setDefaults_KubeSchedulerProfile(prof)
+		setDefaults_KubeSchedulerProfile(logger, prof)
 	}
 
 	if obj.PercentageOfNodesToScore == nil {
-		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
-		obj.PercentageOfNodesToScore = &percentageOfNodesToScore
+		obj.PercentageOfNodesToScore = pointer.Int32(config.DefaultPercentageOfNodesToScore)
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {
@@ -173,22 +175,22 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 
 func SetDefaults_DefaultPreemptionArgs(obj *configv1.DefaultPreemptionArgs) {
 	if obj.MinCandidateNodesPercentage == nil {
-		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+		obj.MinCandidateNodesPercentage = pointer.Int32(10)
 	}
 	if obj.MinCandidateNodesAbsolute == nil {
-		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
+		obj.MinCandidateNodesAbsolute = pointer.Int32(100)
 	}
 }
 
 func SetDefaults_InterPodAffinityArgs(obj *configv1.InterPodAffinityArgs) {
 	if obj.HardPodAffinityWeight == nil {
-		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
+		obj.HardPodAffinityWeight = pointer.Int32(1)
 	}
 }
 
 func SetDefaults_VolumeBindingArgs(obj *configv1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
-		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+		obj.BindTimeoutSeconds = pointer.Int64(600)
 	}
 	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		obj.Shape = []configv1.UtilizationShapePoint{

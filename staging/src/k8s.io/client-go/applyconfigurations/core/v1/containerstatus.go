@@ -18,18 +18,24 @@ limitations under the License.
 
 package v1
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 // ContainerStatusApplyConfiguration represents an declarative configuration of the ContainerStatus type for use
 // with apply.
 type ContainerStatusApplyConfiguration struct {
-	Name                 *string                           `json:"name,omitempty"`
-	State                *ContainerStateApplyConfiguration `json:"state,omitempty"`
-	LastTerminationState *ContainerStateApplyConfiguration `json:"lastState,omitempty"`
-	Ready                *bool                             `json:"ready,omitempty"`
-	RestartCount         *int32                            `json:"restartCount,omitempty"`
-	Image                *string                           `json:"image,omitempty"`
-	ImageID              *string                           `json:"imageID,omitempty"`
-	ContainerID          *string                           `json:"containerID,omitempty"`
-	Started              *bool                             `json:"started,omitempty"`
+	Name                 *string                                 `json:"name,omitempty"`
+	State                *ContainerStateApplyConfiguration       `json:"state,omitempty"`
+	LastTerminationState *ContainerStateApplyConfiguration       `json:"lastState,omitempty"`
+	Ready                *bool                                   `json:"ready,omitempty"`
+	RestartCount         *int32                                  `json:"restartCount,omitempty"`
+	Image                *string                                 `json:"image,omitempty"`
+	ImageID              *string                                 `json:"imageID,omitempty"`
+	ContainerID          *string                                 `json:"containerID,omitempty"`
+	Started              *bool                                   `json:"started,omitempty"`
+	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
+	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -107,5 +113,21 @@ func (b *ContainerStatusApplyConfiguration) WithContainerID(value string) *Conta
 // If called multiple times, the Started field is set to the value of the last call.
 func (b *ContainerStatusApplyConfiguration) WithStarted(value bool) *ContainerStatusApplyConfiguration {
 	b.Started = &value
+	return b
+}
+
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
+	b.AllocatedResources = &value
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.Resources = value
 	return b
 }

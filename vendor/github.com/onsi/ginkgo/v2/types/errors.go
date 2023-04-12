@@ -108,8 +108,8 @@ Please ensure all assertions are inside leaf nodes such as {{bold}}BeforeEach{{/
 
 func (g ginkgoErrors) SuiteNodeInNestedContext(nodeType NodeType, cl CodeLocation) error {
 	docLink := "suite-setup-and-cleanup-beforesuite-and-aftersuite"
-	if nodeType.Is(NodeTypeReportAfterSuite) {
-		docLink = "reporting-nodes---reportaftersuite"
+	if nodeType.Is(NodeTypeReportBeforeSuite | NodeTypeReportAfterSuite) {
+		docLink = "reporting-nodes---reportbeforesuite-and-reportaftersuite"
 	}
 
 	return GinkgoError{
@@ -125,8 +125,8 @@ func (g ginkgoErrors) SuiteNodeInNestedContext(nodeType NodeType, cl CodeLocatio
 
 func (g ginkgoErrors) SuiteNodeDuringRunPhase(nodeType NodeType, cl CodeLocation) error {
 	docLink := "suite-setup-and-cleanup-beforesuite-and-aftersuite"
-	if nodeType.Is(NodeTypeReportAfterSuite) {
-		docLink = "reporting-nodes---reportaftersuite"
+	if nodeType.Is(NodeTypeReportBeforeSuite | NodeTypeReportAfterSuite) {
+		docLink = "reporting-nodes---reportbeforesuite-and-reportaftersuite"
 	}
 
 	return GinkgoError{
@@ -180,6 +180,15 @@ func (g ginkgoErrors) InvalidDeclarationOfFocusedAndPending(cl CodeLocation, nod
 	}
 }
 
+func (g ginkgoErrors) InvalidDeclarationOfFlakeAttemptsAndMustPassRepeatedly(cl CodeLocation, nodeType NodeType) error {
+	return GinkgoError{
+		Heading:      "Invalid Combination of Decorators: FlakeAttempts and MustPassRepeatedly",
+		Message:      formatter.F(`[%s] node was decorated with both FlakeAttempts and MustPassRepeatedly. At most one is allowed.`, nodeType),
+		CodeLocation: cl,
+		DocLink:      "node-decorators-overview",
+	}
+}
+
 func (g ginkgoErrors) UnknownDecorator(cl CodeLocation, nodeType NodeType, decorator interface{}) error {
 	return GinkgoError{
 		Heading:      "Unknown Decorator",
@@ -189,11 +198,46 @@ func (g ginkgoErrors) UnknownDecorator(cl CodeLocation, nodeType NodeType, decor
 	}
 }
 
+func (g ginkgoErrors) InvalidBodyTypeForContainer(t reflect.Type, cl CodeLocation, nodeType NodeType) error {
+	return GinkgoError{
+		Heading:      "Invalid Function",
+		Message:      formatter.F(`[%s] node must be passed {{bold}}func(){{/}} - i.e. functions that take nothing and return nothing.  You passed {{bold}}%s{{/}} instead.`, nodeType, t),
+		CodeLocation: cl,
+		DocLink:      "node-decorators-overview",
+	}
+}
+
 func (g ginkgoErrors) InvalidBodyType(t reflect.Type, cl CodeLocation, nodeType NodeType) error {
+	mustGet := "{{bold}}func(){{/}}, {{bold}}func(ctx SpecContext){{/}}, or {{bold}}func(ctx context.Context){{/}}"
+	if nodeType.Is(NodeTypeContainer) {
+		mustGet = "{{bold}}func(){{/}}"
+	}
 	return GinkgoError{
 		Heading: "Invalid Function",
-		Message: formatter.F(`[%s] node must be passed {{bold}}func(){{/}} - i.e. functions that take nothing and return nothing.
+		Message: formatter.F(`[%s] node must be passed `+mustGet+`.
 You passed {{bold}}%s{{/}} instead.`, nodeType, t),
+		CodeLocation: cl,
+		DocLink:      "node-decorators-overview",
+	}
+}
+
+func (g ginkgoErrors) InvalidBodyTypeForSynchronizedBeforeSuiteProc1(t reflect.Type, cl CodeLocation) error {
+	mustGet := "{{bold}}func() []byte{{/}}, {{bold}}func(ctx SpecContext) []byte{{/}}, or {{bold}}func(ctx context.Context) []byte{{/}}, {{bold}}func(){{/}}, {{bold}}func(ctx SpecContext){{/}}, or {{bold}}func(ctx context.Context){{/}}"
+	return GinkgoError{
+		Heading: "Invalid Function",
+		Message: formatter.F(`[SynchronizedBeforeSuite] node must be passed `+mustGet+` for its first function.
+You passed {{bold}}%s{{/}} instead.`, t),
+		CodeLocation: cl,
+		DocLink:      "node-decorators-overview",
+	}
+}
+
+func (g ginkgoErrors) InvalidBodyTypeForSynchronizedBeforeSuiteAllProcs(t reflect.Type, cl CodeLocation) error {
+	mustGet := "{{bold}}func(){{/}}, {{bold}}func(ctx SpecContext){{/}}, or {{bold}}func(ctx context.Context){{/}}, {{bold}}func([]byte){{/}}, {{bold}}func(ctx SpecContext, []byte){{/}}, or {{bold}}func(ctx context.Context, []byte){{/}}"
+	return GinkgoError{
+		Heading: "Invalid Function",
+		Message: formatter.F(`[SynchronizedBeforeSuite] node must be passed `+mustGet+` for its second function.
+You passed {{bold}}%s{{/}} instead.`, t),
 		CodeLocation: cl,
 		DocLink:      "node-decorators-overview",
 	}
@@ -202,7 +246,7 @@ You passed {{bold}}%s{{/}} instead.`, nodeType, t),
 func (g ginkgoErrors) MultipleBodyFunctions(cl CodeLocation, nodeType NodeType) error {
 	return GinkgoError{
 		Heading:      "Multiple Functions",
-		Message:      formatter.F(`[%s] node must be passed a single {{bold}}func(){{/}} - but more than one was passed in.`, nodeType),
+		Message:      formatter.F(`[%s] node must be passed a single function - but more than one was passed in.`, nodeType),
 		CodeLocation: cl,
 		DocLink:      "node-decorators-overview",
 	}
@@ -211,9 +255,27 @@ func (g ginkgoErrors) MultipleBodyFunctions(cl CodeLocation, nodeType NodeType) 
 func (g ginkgoErrors) MissingBodyFunction(cl CodeLocation, nodeType NodeType) error {
 	return GinkgoError{
 		Heading:      "Missing Functions",
-		Message:      formatter.F(`[%s] node must be passed a single {{bold}}func(){{/}} - but none was passed in.`, nodeType),
+		Message:      formatter.F(`[%s] node must be passed a single function - but none was passed in.`, nodeType),
 		CodeLocation: cl,
 		DocLink:      "node-decorators-overview",
+	}
+}
+
+func (g ginkgoErrors) InvalidTimeoutOrGracePeriodForNonContextNode(cl CodeLocation, nodeType NodeType) error {
+	return GinkgoError{
+		Heading:      "Invalid NodeTimeout SpecTimeout, or GracePeriod",
+		Message:      formatter.F(`[%s] was passed NodeTimeout, SpecTimeout, or GracePeriod but does not have a callback that accepts a {{bold}}SpecContext{{/}} or {{bold}}context.Context{{/}}.  You must accept a context to enable timeouts and grace periods`, nodeType),
+		CodeLocation: cl,
+		DocLink:      "spec-timeouts-and-interruptible-nodes",
+	}
+}
+
+func (g ginkgoErrors) InvalidTimeoutOrGracePeriodForNonContextCleanupNode(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid NodeTimeout SpecTimeout, or GracePeriod",
+		Message:      formatter.F(`[DeferCleanup] was passed NodeTimeout or GracePeriod but does not have a callback that accepts a {{bold}}SpecContext{{/}} or {{bold}}context.Context{{/}}.  You must accept a context to enable timeouts and grace periods`),
+		CodeLocation: cl,
+		DocLink:      "spec-timeouts-and-interruptible-nodes",
 	}
 }
 
@@ -231,6 +293,15 @@ func (g ginkgoErrors) SetupNodeNotInOrderedContainer(cl CodeLocation, nodeType N
 	return GinkgoError{
 		Heading:      "Setup Node not in Ordered Container",
 		Message:      fmt.Sprintf("[%s] setup nodes must appear inside an Ordered container.  They cannot be nested within other containers, even containers in an ordered container.", nodeType),
+		CodeLocation: cl,
+		DocLink:      "ordered-containers",
+	}
+}
+
+func (g ginkgoErrors) InvalidContinueOnFailureDecoration(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "ContinueOnFailure not decorating an outermost Ordered Container",
+		Message:      "ContinueOnFailure can only decorate an Ordered container, and this Ordered container must be the outermost Ordered container.",
 		CodeLocation: cl,
 		DocLink:      "ordered-containers",
 	}
@@ -258,7 +329,7 @@ func (g ginkgoErrors) PushingCleanupNodeDuringTreeConstruction(cl CodeLocation) 
 func (g ginkgoErrors) PushingCleanupInReportingNode(cl CodeLocation, nodeType NodeType) error {
 	return GinkgoError{
 		Heading:      fmt.Sprintf("DeferCleanup cannot be called in %s", nodeType),
-		Message:      "Please inline your cleanup code - Ginkgo won't run cleanup code after a ReportAfterEach or ReportAfterSuite.",
+		Message:      "Please inline your cleanup code - Ginkgo won't run cleanup code after a Reporting node.",
 		CodeLocation: cl,
 		DocLink:      "cleaning-up-our-cleanup-code-defercleanup",
 	}
@@ -380,6 +451,15 @@ func (g ginkgoErrors) InvalidEntryDescription(cl CodeLocation) error {
 	}
 }
 
+func (g ginkgoErrors) MissingParametersForTableFunction(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      fmt.Sprintf("No parameters have been passed to the Table Function"),
+		Message:      fmt.Sprintf("The Table Function expected at least 1 parameter"),
+		CodeLocation: cl,
+		DocLink:      "table-specs",
+	}
+}
+
 func (g ginkgoErrors) IncorrectParameterTypeForTable(i int, name string, cl CodeLocation) error {
 	return GinkgoError{
 		Heading:      "DescribeTable passed incorrect parameter type",
@@ -495,6 +575,13 @@ func (g ginkgoErrors) DryRunInParallelConfiguration() error {
 	return GinkgoError{
 		Heading: "Ginkgo only performs -dryRun in serial mode.",
 		Message: "Please try running ginkgo -dryRun again, but without -p or -procs to ensure the suite is running in series.",
+	}
+}
+
+func (g ginkgoErrors) GracePeriodCannotBeZero() error {
+	return GinkgoError{
+		Heading: "Ginkgo requires a positive --grace-period.",
+		Message: "Please set --grace-period to a positive duration.  The default is 30s.",
 	}
 }
 

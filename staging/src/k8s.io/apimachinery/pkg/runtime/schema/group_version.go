@@ -39,7 +39,7 @@ func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 // ParseKindArg takes the common style of string which may be either `Kind.group.com` or `Kind.version.group.com`
 // and parses it out into both possibilities. This code takes no responsibility for knowing which representation was intended
 // but with a knowledge of all GroupKinds, calling code can take a very good guess. If there are only two segments, then
-// `*GroupVersionResource` is nil.
+// `*GroupVersionKind` is nil.
 // `Kind.group.com` -> `group=com, version=group, kind=Kind` and `group=group.com, kind=Kind`
 func ParseKindArg(arg string) (*GroupVersionKind, GroupKind) {
 	var gvk *GroupVersionKind
@@ -191,8 +191,7 @@ func (gv GroupVersion) Identifier() string {
 // if none of the options match the group. It prefers a match to group and version over just group.
 // TODO: Move GroupVersion to a package under pkg/runtime, since it's used by scheme.
 // TODO: Introduce an adapter type between GroupVersion and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
-//
-//	in fewer places.
+// in fewer places.
 func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
 	for _, gvk := range kinds {
 		if gvk.Group == gv.Group && gvk.Version == gv.Version {
@@ -240,8 +239,7 @@ func (gv GroupVersion) WithResource(resource string) GroupVersionResource {
 // GroupVersions can be used to represent a set of desired group versions.
 // TODO: Move GroupVersions to a package under pkg/runtime, since it's used by scheme.
 // TODO: Introduce an adapter type between GroupVersions and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
-//
-//	in fewer places.
+// in fewer places.
 type GroupVersions []GroupVersion
 
 // Identifier implements runtime.GroupVersioner interface.

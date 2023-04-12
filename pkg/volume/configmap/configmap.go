@@ -122,14 +122,16 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 	}, nil
 }
 
-func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	configMapVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(configMapVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(configMapVolume),
+	}, nil
 }
 
 type configMapVolume struct {
@@ -247,17 +249,17 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = writer.Write(payload)
+	setPerms := func(_ string) error {
+		// This may be the first time writing and new files get created outside the timestamp subdirectory:
+		// change the permissions on the whole volume and not only in the timestamp directory.
+		return volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
+	}
+	err = writer.Write(payload, setPerms)
 	if err != nil {
 		klog.Errorf("Error writing payload to dir: %v", err)
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
-	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
-		return err
-	}
 	setupSuccess = true
 	return nil
 }

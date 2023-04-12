@@ -89,6 +89,9 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
+	if err := etcdOptions.Complete(config.GenericConfig.StorageObjectCountTracker, config.GenericConfig.DrainedNotify(), config.GenericConfig.AddPostStartHook); err != nil {
+		t.Fatal(err)
+	}
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -151,6 +154,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
 		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
+		Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
 	}
 
 	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
@@ -298,7 +302,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		APIPath:       "/api",
 		ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs},
 	}
-	discover := discovery.NewDiscoveryClientForConfigOrDie(c)
+	discover := discovery.NewDiscoveryClientForConfigOrDie(c).WithLegacy()
 	_, all, err := discover.ServerGroupsAndResources()
 	if err != nil {
 		t.Error(err)
@@ -427,7 +431,6 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
 		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):         true,
 	}
 
 	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
@@ -435,7 +438,6 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
 	// are no more beta resources enabled by default.
 	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities").GroupResource():         true,
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
 	}

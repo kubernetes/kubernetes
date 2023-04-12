@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -51,6 +52,10 @@ const (
 	PodConfigNotificationIncremental
 )
 
+type podStartupSLIObserver interface {
+	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+}
+
 // PodConfig is a configuration mux that merges many sources of pod configuration into a single
 // consistent structure, and then delivers incremental change notifications to listeners
 // in order.
@@ -68,9 +73,9 @@ type PodConfig struct {
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder) *PodConfig {
+func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodConfig {
 	updates := make(chan kubetypes.PodUpdate, 50)
-	storage := newPodStorage(updates, mode, recorder)
+	storage := newPodStorage(updates, mode, recorder, startupSLIObserver)
 	podConfig := &PodConfig{
 		pods:    storage,
 		mux:     config.NewMux(storage),
@@ -132,18 +137,21 @@ type podStorage struct {
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
+
+	startupSLIObserver podStartupSLIObserver
 }
 
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *podStorage {
 	return &podStorage{
-		pods:        make(map[string]map[types.UID]*v1.Pod),
-		mode:        mode,
-		updates:     updates,
-		sourcesSeen: sets.String{},
-		recorder:    recorder,
+		pods:               make(map[string]map[types.UID]*v1.Pod),
+		mode:               mode,
+		updates:            updates,
+		sourcesSeen:        sets.String{},
+		recorder:           recorder,
+		startupSLIObserver: startupSLIObserver,
 	}
 }
 
@@ -235,6 +243,10 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				ref.Annotations = make(map[string]string)
 			}
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
+			// ignore static pods
+			if !kubetypes.IsStaticPod(ref) {
+				s.startupSLIObserver.ObservedPodOnWatch(ref, time.Now())
+			}
 			if existing, found := oldPods[ref.UID]; found {
 				pods[ref.UID] = existing
 				needUpdate, needReconcile, needGracefulDelete := checkAndUpdatePod(existing, ref)
@@ -257,16 +269,16 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
-			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else if update.Op == kubetypes.DELETE {
-			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else {
-			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		for _, value := range update.Pods {
 			if existing, found := pods[value.UID]; found {
 				// this is a delete

@@ -18,6 +18,8 @@ package authenticator
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -38,6 +40,7 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
+	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	// Initialize all known client auth plugins.
@@ -80,6 +83,7 @@ type Config struct {
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	SecretsWriter               typedv1core.SecretsGetter
 	BootstrapTokenAuthenticator authenticator.Token
 	// ClientCAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
@@ -125,7 +129,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, tokenAuth))
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
-		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter)
+		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter, config.SecretsWriter)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -138,12 +142,11 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
-	if config.BootstrapToken {
-		if config.BootstrapTokenAuthenticator != nil {
-			// TODO: This can sometimes be nil because of
-			tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, config.BootstrapTokenAuthenticator))
-		}
+
+	if config.BootstrapToken && config.BootstrapTokenAuthenticator != nil {
+		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, config.BootstrapTokenAuthenticator))
 	}
+
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
 	// Because both plugins verify JWTs whichever comes first in the union experiences
@@ -155,7 +158,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		var oidcCAContent oidc.CAContentProvider
 		if len(config.OIDCCAFile) != 0 {
 			var oidcCAErr error
-			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
+			oidcCAContent, oidcCAErr = staticCAContentProviderFromFile("oidc-authenticator", config.OIDCCAFile)
 			if oidcCAErr != nil {
 				return nil, nil, oidcCAErr
 			}
@@ -266,7 +269,7 @@ func newAuthenticatorFromOIDCIssuerURL(opts oidc.Options) (authenticator.Token, 
 }
 
 // newLegacyServiceAccountAuthenticator returns an authenticator.Token or an error
-func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -275,8 +278,12 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAud
 		}
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
+	validator, err := serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter, secretsWriter)
+	if err != nil {
+		return nil, fmt.Errorf("while creating legacy validator, err: %w", err)
+	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter))
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, validator)
 	return tokenAuthenticator, nil
 }
 
@@ -310,4 +317,13 @@ func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
 	}
 
 	return tokencache.New(webhookTokenAuthenticator, false, config.WebhookTokenAuthnCacheTTL, config.WebhookTokenAuthnCacheTTL), nil
+}
+
+func staticCAContentProviderFromFile(purpose, filename string) (dynamiccertificates.CAContentProvider, error) {
+	fileBytes, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamiccertificates.NewStaticCAContent(purpose, fileBytes)
 }

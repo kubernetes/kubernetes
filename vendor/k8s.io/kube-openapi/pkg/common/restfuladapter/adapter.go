@@ -13,4 +13,3 @@ func AdaptWebServices(webServices []*restful.WebService) []common.RouteContainer
 	}
 	return containers
 }
-

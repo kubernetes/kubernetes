@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -125,7 +126,6 @@ type DeleteOptions struct {
 	Timeout     time.Duration
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	Output string
 
@@ -133,11 +133,11 @@ type DeleteOptions struct {
 	Mapper        meta.RESTMapper
 	Result        *resource.Result
 
-	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	genericiooptions.IOStreams
+	WarningPrinter *printers.WarningPrinter
 }
 
-func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
@@ -196,11 +196,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if len(o.Raw) == 0 {
 		r := f.NewBuilder().
@@ -232,7 +227,10 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		}
 	}
 
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 
 	return nil
 }
@@ -248,13 +246,13 @@ func (o *DeleteOptions) Validate() error {
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
-	if o.warningPrinter == nil {
-		return fmt.Errorf("warningPrinter can not be used without initialization")
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
 	}
 
 	switch {
 	case o.GracePeriod == 0 && o.ForceDeletion:
-		o.warningPrinter.Print("Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.")
+		o.WarningPrinter.Print("Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.")
 	case o.GracePeriod > 0 && o.ForceDeletion:
 		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
@@ -318,7 +316,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		options.PropagationPolicy = &o.CascadingStrategy
 
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			o.warningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
+			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
 			warnClusterScope = false
 		}
 
@@ -327,11 +325,6 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 				o.PrintObj(info)
 			}
 			return nil
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
 		}
 		response, err := o.deleteResource(info, options)
 		if err != nil {

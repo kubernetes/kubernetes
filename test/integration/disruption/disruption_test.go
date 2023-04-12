@@ -668,21 +668,45 @@ func TestStalePodDisruption(t *testing.T) {
 
 	cases := map[string]struct {
 		deletePod      bool
+		podPhase       v1.PodPhase
+		reason         string
 		wantConditions []v1.PodCondition
 	}{
 		"stale-condition": {
+			podPhase: v1.PodRunning,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
 		},
 		"deleted-pod": {
+			podPhase:  v1.PodRunning,
 			deletePod: true,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		"disruption-condition-by-kubelet": {
+			podPhase: v1.PodFailed,
+			reason:   v1.PodReasonTerminationByKubelet,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonTerminationByKubelet,
+				},
+			},
+		},
+		"disruption-condition-on-failed-pod": {
+			podPhase: v1.PodFailed,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -702,10 +726,11 @@ func TestStalePodDisruption(t *testing.T) {
 				t.Fatalf("Failed creating pod: %v", err)
 			}
 
-			pod.Status.Phase = v1.PodRunning
+			pod.Status.Phase = tc.podPhase
 			pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
-				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:               v1.DisruptionTarget,
 				Status:             v1.ConditionTrue,
+				Reason:             tc.reason,
 				LastTransitionTime: metav1.Now(),
 			})
 			pod, err = clientSet.CoreV1().Pods(nsName).UpdateStatus(ctx, pod, metav1.UpdateOptions{})

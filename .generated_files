@@ -16,7 +16,6 @@
 
 file-prefix	zz_generated.
 
-file-name	BUILD
 file-name	types.generated.go
 file-name	generated.pb.go
 file-name	generated.proto

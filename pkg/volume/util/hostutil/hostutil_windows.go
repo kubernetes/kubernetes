@@ -123,3 +123,9 @@ func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 	}
 	return info.Mode(), nil
 }
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *HostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return "", nil
+}

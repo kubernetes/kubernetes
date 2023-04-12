@@ -2,8 +2,10 @@
 
 approvers:
   - bowei
+  - sig-network-approvers
 emeritus_approvers:
   - dnardo
 reviewers:
   - bowei
   - freehan
+  - sig-network-reviewers

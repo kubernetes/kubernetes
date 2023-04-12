@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -64,17 +65,16 @@ type CreateCronJobOptions struct {
 	EnforceNamespace    bool
 	Client              batchv1client.BatchV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 	Builder             *resource.Builder
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCreateCronJobOptions returns an initialized CreateCronJobOptions instance
-func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJobOptions {
+func NewCreateCronJobOptions(ioStreams genericiooptions.IOStreams) *CreateCronJobOptions {
 	return &CreateCronJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -82,7 +82,7 @@ func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJ
 }
 
 // NewCmdCreateCronJob is a command to create CronJobs.
-func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateCronJobOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
@@ -147,11 +147,6 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -183,9 +178,6 @@ func (o *CreateCronJobOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(cronJob.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

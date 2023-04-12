@@ -17,12 +17,11 @@ limitations under the License.
 package conversion
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -40,27 +39,27 @@ type converterMetricFactory struct {
 	factoryLock sync.Mutex
 }
 
-func newConverterMertricFactory() *converterMetricFactory {
+func newConverterMetricFactory() *converterMetricFactory {
 	return &converterMetricFactory{durations: map[string]*metrics.HistogramVec{}, factoryLock: sync.Mutex{}}
 }
 
-var _ crConverterInterface = &converterMetric{}
+var _ CRConverter = &converterMetric{}
 
 type converterMetric struct {
-	delegate  crConverterInterface
+	delegate  CRConverter
 	latencies *metrics.HistogramVec
 	crdName   string
 }
 
-func (c *converterMetricFactory) addMetrics(converterName string, crdName string, converter crConverterInterface) (crConverterInterface, error) {
+func (c *converterMetricFactory) addMetrics(crdName string, converter CRConverter) (CRConverter, error) {
 	c.factoryLock.Lock()
 	defer c.factoryLock.Unlock()
-	metric, exists := c.durations[converterName]
+	metric, exists := c.durations["webhook"]
 	if !exists {
 		metric = metrics.NewHistogramVec(
 			&metrics.HistogramOpts{
-				Name:           fmt.Sprintf("apiserver_crd_%s_conversion_duration_seconds", converterName),
-				Help:           fmt.Sprintf("CRD %s conversion duration in seconds", converterName),
+				Name:           "apiserver_crd_webhook_conversion_duration_seconds",
+				Help:           "CRD webhook conversion duration in seconds",
 				Buckets:        latencyBuckets,
 				StabilityLevel: metrics.ALPHA,
 			},
@@ -69,12 +68,12 @@ func (c *converterMetricFactory) addMetrics(converterName string, crdName string
 		if err != nil {
 			return nil, err
 		}
-		c.durations[converterName] = metric
+		c.durations["webhook"] = metric
 	}
 	return &converterMetric{latencies: metric, delegate: converter, crdName: crdName}, nil
 }
 
-func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
+func (m *converterMetric) Convert(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 	start := time.Now()
 	obj, err := m.delegate.Convert(in, targetGV)
 	fromVersion := in.GetObjectKind().GroupVersionKind().Version

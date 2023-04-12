@@ -142,7 +142,7 @@ export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
 export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v0.9.1"
+export WINDOWS_CNI_VERSION="v1.2.0"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
@@ -160,7 +160,7 @@ export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfi
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\node-problem-detector.kubeconfig"
 # Pause container image for Windows container.
-export WINDOWS_INFRA_CONTAINER="registry.k8s.io/pause:3.8"
+export WINDOWS_INFRA_CONTAINER="registry.k8s.io/pause:3.9"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy

@@ -52,7 +52,7 @@ var CharactersAroundMismatchToInclude uint = 5
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var timeType = reflect.TypeOf(time.Time{})
 
-//The default indentation string emitted by the format package
+// The default indentation string emitted by the format package
 var Indent = "    "
 
 var longFormThreshold = 20
@@ -64,6 +64,52 @@ type GomegaStringer interface {
 	// It also ignores the MaxLength value.
 	GomegaString() string
 }
+
+/*
+CustomFormatters can be registered with Gomega via RegisterCustomFormatter()
+Any value to be rendered by Gomega is passed to each registered CustomFormatters.
+The CustomFormatter signals that it will handle formatting the value by returning (formatted-string, true)
+If the CustomFormatter does not want to handle the object it should return ("", false)
+
+Strings returned by CustomFormatters are not truncated
+*/
+type CustomFormatter func(value interface{}) (string, bool)
+type CustomFormatterKey uint
+
+var customFormatterKey CustomFormatterKey = 1
+
+type customFormatterKeyPair struct {
+	CustomFormatter
+	CustomFormatterKey
+}
+
+/*
+RegisterCustomFormatter registers a CustomFormatter and returns a CustomFormatterKey
+
+You can call UnregisterCustomFormatter with the returned key to unregister the associated CustomFormatter
+*/
+func RegisterCustomFormatter(customFormatter CustomFormatter) CustomFormatterKey {
+	key := customFormatterKey
+	customFormatterKey += 1
+	customFormatters = append(customFormatters, customFormatterKeyPair{customFormatter, key})
+	return key
+}
+
+/*
+UnregisterCustomFormatter unregisters a previously registered CustomFormatter.  You should pass in the key returned by RegisterCustomFormatter
+*/
+func UnregisterCustomFormatter(key CustomFormatterKey) {
+	formatters := []customFormatterKeyPair{}
+	for _, f := range customFormatters {
+		if f.CustomFormatterKey == key {
+			continue
+		}
+		formatters = append(formatters, f)
+	}
+	customFormatters = formatters
+}
+
+var customFormatters = []customFormatterKeyPair{}
 
 /*
 Generates a formatted matcher success/failure message of the form:
@@ -212,24 +258,35 @@ Set PrintContextObjects to true to print the content of objects implementing con
 func Object(object interface{}, indentation uint) string {
 	indent := strings.Repeat(Indent, int(indentation))
 	value := reflect.ValueOf(object)
-	return fmt.Sprintf("%s<%s>: %s", indent, formatType(value), formatValue(value, indentation))
+	commonRepresentation := ""
+	if err, ok := object.(error); ok {
+		commonRepresentation += "\n" + IndentString(err.Error(), indentation) + "\n" + indent
+	}
+	return fmt.Sprintf("%s<%s>: %s%s", indent, formatType(value), commonRepresentation, formatValue(value, indentation))
 }
 
 /*
 IndentString takes a string and indents each line by the specified amount.
 */
 func IndentString(s string, indentation uint) string {
+	return indentString(s, indentation, true)
+}
+
+func indentString(s string, indentation uint, indentFirstLine bool) string {
+	result := &strings.Builder{}
 	components := strings.Split(s, "\n")
-	result := ""
 	indent := strings.Repeat(Indent, int(indentation))
 	for i, component := range components {
-		result += indent + component
+		if i > 0 || indentFirstLine {
+			result.WriteString(indent)
+		}
+		result.WriteString(component)
 		if i < len(components)-1 {
-			result += "\n"
+			result.WriteString("\n")
 		}
 	}
 
-	return result
+	return result.String()
 }
 
 func formatType(v reflect.Value) string {
@@ -261,18 +318,27 @@ func formatValue(value reflect.Value, indentation uint) string {
 	if value.CanInterface() {
 		obj := value.Interface()
 
+		// if a CustomFormatter handles this values, we'll go with that
+		for _, customFormatter := range customFormatters {
+			formatted, handled := customFormatter.CustomFormatter(obj)
+			// do not truncate a user-provided CustomFormatter()
+			if handled {
+				return indentString(formatted, indentation+1, false)
+			}
+		}
+
 		// GomegaStringer will take precedence to other representations and disregards UseStringerRepresentation
 		if x, ok := obj.(GomegaStringer); ok {
-			// do not truncate a user-defined GoMegaString() value
-			return x.GomegaString()
+			// do not truncate a user-defined GomegaString() value
+			return indentString(x.GomegaString(), indentation+1, false)
 		}
 
 		if UseStringerRepresentation {
 			switch x := obj.(type) {
 			case fmt.GoStringer:
-				return truncateLongStrings(x.GoString())
+				return indentString(truncateLongStrings(x.GoString()), indentation+1, false)
 			case fmt.Stringer:
-				return truncateLongStrings(x.String())
+				return indentString(truncateLongStrings(x.String()), indentation+1, false)
 			}
 		}
 	}

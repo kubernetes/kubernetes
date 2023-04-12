@@ -36,7 +36,7 @@ func NewMemoryState() State {
 	klog.InfoS("Initialized new in-memory state store")
 	return &stateMemory{
 		assignments:   ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(),
+		defaultCPUSet: cpuset.New(),
 	}
 }
 

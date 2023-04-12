@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -25,9 +26,9 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -42,7 +43,7 @@ import (
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error
+	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
 
 type policyName string
@@ -86,7 +87,7 @@ type Manager interface {
 	// among this and other resource controllers.
 	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
-	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
+	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
 
 	// GetCPUAffinity returns cpuset which includes cpus from shared pools
@@ -401,6 +402,7 @@ func (m *manager) removeStaleState() {
 }
 
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
+	ctx := context.Background()
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
@@ -469,7 +471,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if !cset.Equals(lcset) {
 				klog.V(4).InfoS("ReconcileState: updating container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
-				err = m.updateContainerCPUSet(containerID, cset)
+				err = m.updateContainerCPUSet(ctx, containerID, cset)
 				if err != nil {
 					klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
 					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
@@ -508,12 +510,13 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
 }
 
-func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
+func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
 	// TODO: Consider adding a `ResourceConfigForContainer` helper in
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
+		ctx,
 		containerID,
 		&runtimeapi.ContainerResources{
 			Linux: &runtimeapi.LinuxContainerResources{
@@ -523,7 +526,7 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 }
 
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
-	if result, ok := m.state.GetCPUSet(string(podUID), containerName); ok {
+	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result
 	}
 

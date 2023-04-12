@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta3
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/conversion"
 
-	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
@@ -32,21 +32,5 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 		return err
 	}
 	err = Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
-	// Make roundtrip / fuzzers happy
-	// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
-	out.DNS.Type = ""
 	return err
-}
-
-// Convert_kubeadm_DNS_To_v1beta3_DNS is required since Type does not exist in the DNS struct
-// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
-func Convert_kubeadm_DNS_To_v1beta3_DNS(in *kubeadm.DNS, out *DNS, s conversion.Scope) error {
-	return autoConvert_kubeadm_DNS_To_v1beta3_DNS(in, out, s)
-}
-
-// Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to the missing
-// DNS.Type in v1beta3. TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
-func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
-	out.DNS.Type = kubeadm.CoreDNS
-	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }

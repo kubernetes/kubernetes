@@ -19,7 +19,7 @@ package run
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubectl/pkg/cmd/delete"
@@ -180,14 +181,14 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+						Body:       io.NopCloser(bytes.NewBuffer([]byte("{}"))),
 					}, nil
 				}),
 			}
 
 			tf.ClientConfigVal = &restclient.Config{}
 
-			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
+			cmd := NewCmdRun(tf, genericiooptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
 
 			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
@@ -198,7 +199,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			}
 
 			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
-			deleteOptions, err := deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard())
+			deleteOptions, err := deleteFlags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -207,7 +208,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteOptions,
 
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 
 				Image: "nginx",
 
@@ -338,7 +339,7 @@ func TestGenerateService(t *testing.T) {
 					case test.expectPOST && m == "POST" && p == "/namespaces/test/services":
 						sawPOST = true
 						body := cmdtesting.ObjBody(codec, &test.service)
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}
@@ -368,9 +369,9 @@ func TestGenerateService(t *testing.T) {
 				return
 			}
 
-			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buff, _ := genericiooptions.NewTestIOStreams()
 			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
-			deleteOptions, err := deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard())
+			deleteOptions, err := deleteFlags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -519,7 +520,7 @@ func TestRunValidations(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				bufErr.Write([]byte(str))
 			})
@@ -579,7 +580,7 @@ func TestExpose(t *testing.T) {
 						body := cmdtesting.ObjBody(codec, pod)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case m == "POST" && p == "/namespaces/test/services":
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}
@@ -611,7 +612,7 @@ func TestExpose(t *testing.T) {
 				}),
 			}
 
-			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				bufErr.Write([]byte(str))
 			})
@@ -751,7 +752,7 @@ status: {}
 			tf := cmdtesting.NewTestFactory().WithNamespace("ns")
 			defer tf.Cleanup()
 
-			streams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+			streams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 
 			cmd := NewCmdRun(tf, streams)
 			cmd.Flags().Set("dry-run", "client")

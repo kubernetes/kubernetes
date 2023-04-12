@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	schedulingv1client "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -66,14 +66,13 @@ type PriorityClassOptions struct {
 
 	Client              *schedulingv1client.SchedulingV1Client
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewPriorityClassOptions returns an initialized PriorityClassOptions instance
-func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityClassOptions {
+func NewPriorityClassOptions(ioStreams genericiooptions.IOStreams) *PriorityClassOptions {
 	return &PriorityClassOptions{
 		Value:            0,
 		PreemptionPolicy: "PreemptLowerPriority",
@@ -83,7 +82,7 @@ func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityCla
 }
 
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.
-func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPriorityClassOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -135,11 +134,6 @@ func (o *PriorityClassOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -176,9 +170,6 @@ func (o *PriorityClassOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(priorityClass.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

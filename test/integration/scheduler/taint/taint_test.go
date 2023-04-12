@@ -95,12 +95,10 @@ func TestTaintNodeByCondition(t *testing.T) {
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
-		time.Second, // Pod eviction timeout
 		100,         // Eviction limiter QPS
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
-		true,        // Run taint manager
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)

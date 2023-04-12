@@ -53,7 +53,6 @@ import (
 func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
 	// Start server
 	server := startPodSecurityServer(t)
@@ -76,7 +75,11 @@ func TestPodSecurity(t *testing.T) {
 func TestPodSecurityGAOnly(t *testing.T) {
 	// Disable all alpha and beta features
 	for k, v := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
-		if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
+		if k == "AllAlpha" || k == "AllBeta" {
+			// Skip special features. When processed first, special features may
+			// erroneously disable other features.
+			continue
+		} else if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k, false)()
 		}
 	}
@@ -96,7 +99,6 @@ func TestPodSecurityGAOnly(t *testing.T) {
 func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
 
 	// Start test API server.

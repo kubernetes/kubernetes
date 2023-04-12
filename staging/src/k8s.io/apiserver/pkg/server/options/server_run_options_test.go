@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -164,7 +165,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when ServerRunOptions is valid",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
-				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
+				CorsAllowedOriginList:       []string{"^10.10.10.100$", "^10.10.10.200$"},
 				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -188,4 +189,124 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateCorsAllowedOriginList(t *testing.T) {
+	tests := []struct {
+		regexp           [][]string
+		errShouldContain string
+	}{
+		{
+			regexp: [][]string{
+				{}, // empty list, the cluster operator wants to disable CORS
+				{`^http://foo.com$`},
+				{`^http://foo.com`}, // valid, because we relaxed the validation
+				{`://foo.com$`},
+				{`//foo.com$`},
+				{`^http://foo.com(:|$)`},
+				{`://foo.com(:|$)`},
+				{`//foo.com(:|$)`},
+				{`(^foo.com$)`},
+				{`^http://foo.com$`, `//bar.com(:|$)`},
+			},
+			errShouldContain: "",
+		},
+		{
+			// empty string, indicates that the cluster operator
+			// specified --cors-allowed-origins=""
+			regexp: [][]string{
+				{`^http://foo.com$`, ``},
+			},
+			errShouldContain: "empty value in --cors-allowed-origins",
+		},
+		{
+			regexp: [][]string{
+				{`^foo.com`},
+				{`//foo.com`},
+				{`foo.com$`},
+				{`foo.com(:|$)`},
+			},
+			errShouldContain: "regular expression does not pin to start/end of host in the origin header",
+		},
+		{
+			regexp: [][]string{
+				{`^http://foo.com$`, `^foo.com`}, // one good followed by a bad one
+			},
+			errShouldContain: "regular expression does not pin to start/end of host in the origin header",
+		},
+	}
+
+	for _, test := range tests {
+		for _, regexp := range test.regexp {
+			t.Run(fmt.Sprintf("regexp/%s", regexp), func(t *testing.T) {
+				options := NewServerRunOptions()
+				if errs := options.Validate(); len(errs) != 0 {
+					t.Fatalf("wrong test setup: %#v", errs)
+				}
+
+				options.CorsAllowedOriginList = regexp
+				errsGot := options.Validate()
+				switch {
+				case len(test.errShouldContain) == 0:
+					if len(errsGot) != 0 {
+						t.Errorf("expected no error, but got: %v", errsGot)
+					}
+				default:
+					if len(errsGot) == 0 ||
+						!strings.Contains(utilerrors.NewAggregate(errsGot).Error(), test.errShouldContain) {
+						t.Errorf("expected error to contain: %s, but got: %v", test.errShouldContain, errsGot)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
+	tests := []struct {
+		name             string
+		optionsFn        func() *ServerRunOptions
+		errShouldContain string
+	}{
+		{
+			name: "default should be valid",
+			optionsFn: func() *ServerRunOptions {
+				return NewServerRunOptions()
+			},
+		},
+		{
+			name: "negative not allowed",
+			optionsFn: func() *ServerRunOptions {
+				o := NewServerRunOptions()
+				o.ShutdownWatchTerminationGracePeriod = -time.Second
+				return o
+			},
+			errShouldContain: "shutdown-watch-termination-grace-period, if provided, can not be a negative value",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := test.optionsFn()
+			errsGot := options.Validate()
+			switch {
+			case len(test.errShouldContain) == 0:
+				if len(errsGot) != 0 {
+					t.Errorf("expected no error, but got: %v", errsGot)
+				}
+			default:
+				if len(errsGot) == 0 ||
+					!strings.Contains(utilerrors.NewAggregate(errsGot).Error(), test.errShouldContain) {
+					t.Errorf("expected error to contain: %s, but got: %v", test.errShouldContain, errsGot)
+				}
+			}
+		})
+	}
+
+	t.Run("default should be zero", func(t *testing.T) {
+		options := NewServerRunOptions()
+		if options.ShutdownWatchTerminationGracePeriod != time.Duration(0) {
+			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
+		}
+	})
 }

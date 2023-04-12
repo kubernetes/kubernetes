@@ -63,7 +63,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchema
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,FlowSchema
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
@@ -87,7 +87,7 @@ type FlowSchema struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchemaList
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,FlowSchemaList
 
 // FlowSchemaList is a list of FlowSchema objects.
 type FlowSchemaList struct {
@@ -344,7 +344,7 @@ type FlowSchemaConditionType string
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfiguration
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfiguration struct {
@@ -367,7 +367,7 @@ type PriorityLevelConfiguration struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfigurationList
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,PriorityLevelConfigurationList
 
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 type PriorityLevelConfigurationList struct {
@@ -438,6 +438,35 @@ type LimitedPriorityLevelConfiguration struct {
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
 	LimitResponse LimitResponse `json:"limitResponse,omitempty" protobuf:"bytes,2,opt,name=limitResponse"`
+
+	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// can be borrowed by other priority levels. The value of this
+	// field must be between 0 and 100, inclusive, and it defaults to 0.
+	// The number of seats that other levels can borrow from this level, known
+	// as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+	//
+	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+	//
+	// +optional
+	LendablePercent *int32 `json:"lendablePercent,omitempty" protobuf:"varint,3,opt,name=lendablePercent"`
+
+	// `borrowingLimitPercent`, if present, configures a limit on how many
+	// seats this priority level can borrow from other priority levels.
+	// The limit is known as this level's BorrowingConcurrencyLimit
+	// (BorrowingCL) and is a limit on the total number of seats that this
+	// level may borrow at any one time.
+	// This field holds the ratio of that limit to the level's nominal
+	// concurrency limit. When this field is non-nil, it must hold a
+	// non-negative integer and the limit is calculated as follows.
+	//
+	// BorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )
+	//
+	// The value of this field can be more than 100, implying that this
+	// priority level can borrow a number of seats that is greater than
+	// its own nominal concurrency limit (NominalCL).
+	// When this field is left `nil`, the limit is effectively infinite.
+	// +optional
+	BorrowingLimitPercent *int32 `json:"borrowingLimitPercent,omitempty" protobuf:"varint,4,opt,name=borrowingLimitPercent"`
 }
 
 // LimitResponse defines how to handle requests that can not be executed right now.

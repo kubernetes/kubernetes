@@ -77,6 +77,7 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.Patches,
+			options.DryRun,
 		},
 	}
 }

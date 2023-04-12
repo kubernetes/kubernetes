@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package godirwalk
@@ -17,8 +18,10 @@ type Scanner struct {
 	childMode os.FileMode
 }
 
-// NewScanner returns a new directory Scanner that lazily enumerates the
-// contents of a single directory.
+// NewScanner returns a new directory Scanner that lazily enumerates
+// the contents of a single directory. To prevent resource leaks,
+// caller must invoke either the Scanner's Close or Err method after
+// it has completed scanning a directory.
 //
 //     scanner, err := godirwalk.NewScanner(dirname)
 //     if err != nil {
@@ -55,12 +58,22 @@ func NewScanner(osDirname string) (*Scanner, error) {
 	return scanner, nil
 }
 
-// NewScannerWithScratchBuffer returns a new directory Scanner that lazily
-// enumerates the contents of a single directory. On platforms other than
-// Windows it uses the provided scratch buffer to read from the file system. On
-// Windows the scratch buffer parameter is ignored.
+// NewScannerWithScratchBuffer returns a new directory Scanner that
+// lazily enumerates the contents of a single directory. On platforms
+// other than Windows it uses the provided scratch buffer to read from
+// the file system. On Windows the scratch buffer parameter is
+// ignored. To prevent resource leaks, caller must invoke either the
+// Scanner's Close or Err method after it has completed scanning a
+// directory.
 func NewScannerWithScratchBuffer(osDirname string, scratchBuffer []byte) (*Scanner, error) {
 	return NewScanner(osDirname)
+}
+
+// Close releases resources associated with scanning a directory. Call
+// either this or the Err method when the directory no longer needs to
+// be scanned.
+func (s *Scanner) Close() error {
+	return s.Err()
 }
 
 // Dirent returns the current directory entry while scanning a directory.
@@ -83,17 +96,20 @@ func (s *Scanner) done(err error) {
 		return
 	}
 
-	if cerr := s.dh.Close(); err == nil {
-		s.err = cerr
+	s.err = err
+
+	if err = s.dh.Close(); s.err == nil {
+		s.err = err
 	}
 
 	s.childName, s.osDirname = "", ""
 	s.de, s.dh = nil, nil
 }
 
-// Err returns any error associated with scanning a directory. It is normal to
-// call Err after Scan returns false, even though they both ensure Scanner
-// resources are released. Do not call until done scanning a directory.
+// Err returns any error associated with scanning a directory. It is
+// normal to call Err after Scan returns false, even though they both
+// ensure Scanner resources are released. Call either this or the
+// Close method when the directory no longer needs to be scanned.
 func (s *Scanner) Err() error {
 	s.done(nil)
 	return s.err

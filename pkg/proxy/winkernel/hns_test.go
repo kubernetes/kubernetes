@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 
 	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/stretchr/testify/assert"
 
 	"strings"
 	"testing"
@@ -37,6 +38,8 @@ const (
 	gatewayAddress    = "192.168.1.1"
 	epMacAddress      = "00-11-22-33-44-55"
 	epIpAddress       = "192.168.1.3"
+	epIpv6Address     = "192::3"
+	epIpAddressB      = "192.168.1.4"
 	epIpAddressRemote = "192.168.2.3"
 	epPaAddress       = "10.0.0.3"
 	protocol          = 6
@@ -55,6 +58,51 @@ func TestGetNetworkByName(t *testing.T) {
 
 	if !strings.EqualFold(network.id, Network.Id) {
 		t.Errorf("%v does not match %v", network.id, Network.Id)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetAllEndpointsByNetwork(t *testing.T) {
+	hns := hns{}
+	Network := mustTestNetwork(t)
+
+	ipv4Config := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	ipv6Config := &hcn.IpConfig{
+		IpAddress: epIpv6Address,
+	}
+	Endpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	Endpoint, err := Network.CreateEndpoint(Endpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointIpv4, ipv4EpPresent := mapEndpointsInfo[ipv4Config.IpAddress]
+	assert.True(t, ipv4EpPresent, "IPV4 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.ip, epIpAddress, "IPV4 IP is missing in Dualstack mode")
+
+	endpointIpv6, ipv6EpPresent := mapEndpointsInfo[ipv6Config.IpAddress]
+	assert.True(t, ipv6EpPresent, "IPV6 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.ip, epIpv6Address, "IPV6 IP is missing in Dualstack mode")
+
+	err = Endpoint.Delete()
+	if err != nil {
+		t.Error(err)
 	}
 	err = Network.Delete()
 	if err != nil {
@@ -132,11 +180,11 @@ func TestGetEndpointByIpAddressAndName(t *testing.T) {
 		t.Errorf("%v does not match %v", endpoint.ip, Endpoint.IpConfigurations[0].IpAddress)
 	}
 
-	endpoint, err = hns.getEndpointByName(Endpoint.Name)
+	endpoint2, err := hns.getEndpointByName(Endpoint.Name)
 	if err != nil {
 		t.Error(err)
 	}
-	diff := cmp.Diff(endpoint, Endpoint)
+	diff := cmp.Diff(endpoint, endpoint2)
 	if diff != "" {
 		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
 	}
@@ -302,15 +350,20 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// We populate this to ensure we test for getting existing load balancer
-	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsCount: len(Endpoints)}
-	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
-
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsHash: hash}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
+
 	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 
 	if err != nil {
@@ -450,6 +503,80 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 		t.Fatal("test network was nil without error")
 	}
 	return network
+}
+
+func TestHashEndpoints(t *testing.T) {
+	Network := mustTestNetwork(t)
+	// Create endpoint A
+	ipConfigA := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	endpointASpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigA},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointA, err := Network.CreateEndpoint(endpointASpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoA := &endpointsInfo{
+		ip:    endpointA.IpConfigurations[0].IpAddress,
+		hnsID: endpointA.Id,
+	}
+	// Create Endpoint B
+	ipConfigB := &hcn.IpConfig{
+		IpAddress: epIpAddressB,
+	}
+	endpointBSpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigB},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointB, err := Network.CreateEndpoint(endpointBSpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoB := &endpointsInfo{
+		ip:    endpointB.IpConfigurations[0].IpAddress,
+		hnsID: endpointB.Id,
+	}
+	endpoints := []endpointsInfo{*endpointInfoA, *endpointInfoB}
+	endpointsReverse := []endpointsInfo{*endpointInfoB, *endpointInfoA}
+	h1, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	} else if len(h1) < 1 {
+		t.Error("HashEndpoints failed for endpoints", endpoints)
+	}
+
+	h2, err := hashEndpoints(endpointsReverse)
+	if err != nil {
+		t.Error(err)
+	}
+	if h1 != h2 {
+		t.Errorf("%x does not match %x", h1, h2)
+	}
+
+	// Clean up
+	err = endpointA.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = endpointB.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {

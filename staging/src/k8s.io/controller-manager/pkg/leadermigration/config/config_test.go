@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -114,12 +113,12 @@ controllerLeaders:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			configFile, err := ioutil.TempFile("", tc.name)
+			configFile, err := os.CreateTemp("", tc.name)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer os.Remove(configFile.Name())
-			err = ioutil.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0755))
+			err = os.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0755))
 			if err != nil {
 				t.Fatal(err)
 			}

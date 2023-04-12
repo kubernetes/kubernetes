@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -568,6 +568,7 @@ func TestGetBitforCIDR(t *testing.T) {
 		},
 	}
 
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range cases {
 		_, clusterCIDR, err := utilnet.ParseCIDRSloppy(tc.clusterCIDRStr)
 		if err != nil {
@@ -585,17 +586,17 @@ func TestGetBitforCIDR(t *testing.T) {
 
 		got, err := cs.getIndexForCIDR(subnetCIDR)
 		if err == nil && tc.expectErr {
-			klog.Errorf("expected error but got null for %v", tc.description)
+			logger.Error(nil, "Expected error but got null", "description", tc.description)
 			continue
 		}
 
 		if err != nil && !tc.expectErr {
-			klog.Errorf("unexpected error: %v for %v", err, tc.description)
+			logger.Error(err, "Unexpected error", "description", tc.description)
 			continue
 		}
 
 		if got != tc.expectedBit {
-			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
+			logger.Error(nil, "Unexpected value", "description", tc.description, "expected", tc.expectedBit, "got", got)
 		}
 	}
 }
@@ -673,12 +674,24 @@ func TestCIDRSetv6(t *testing.T) {
 func TestMultiCIDRSetMetrics(t *testing.T) {
 	cidr := "10.0.0.0/16"
 	_, clusterCIDR, _ := utilnet.ParseCIDRSloppy(cidr)
+	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
 	// We have 256 free cidrs
 	a, err := NewMultiCIDRSet(clusterCIDR, 8)
 	if err != nil {
 		t.Fatalf("unexpected error creating MultiCIDRSet: %v", err)
 	}
-	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
+	clusterMaskSize, _ := clusterCIDR.Mask.Size()
+	max := getMaxCIDRs(24, clusterMaskSize)
+	em := testMetrics{
+		usage:      0,
+		allocs:     0,
+		releases:   0,
+		allocTries: 0,
+		max:        float64(max),
+	}
+	expectMetrics(t, cidr, em)
 
 	// Allocate next all.
 	for i := 1; i <= 256; i++ {
@@ -691,16 +704,18 @@ func TestMultiCIDRSetMetrics(t *testing.T) {
 			allocs:     float64(i),
 			releases:   0,
 			allocTries: 0,
+			max:        float64(max),
 		}
 		expectMetrics(t, cidr, em)
 	}
 	// Release all CIDRs.
 	a.Release(clusterCIDR)
-	em := testMetrics{
+	em = testMetrics{
 		usage:      0,
 		allocs:     256,
 		releases:   256,
 		allocTries: 0,
+		max:        float64(max),
 	}
 	expectMetrics(t, cidr, em)
 
@@ -711,6 +726,7 @@ func TestMultiCIDRSetMetrics(t *testing.T) {
 		allocs:     512,
 		releases:   256,
 		allocTries: 0,
+		max:        float64(max),
 	}
 	expectMetrics(t, cidr, em)
 
@@ -719,21 +735,34 @@ func TestMultiCIDRSetMetrics(t *testing.T) {
 func TestMultiCIDRSetMetricsHistogram(t *testing.T) {
 	cidr := "10.0.0.0/16"
 	_, clusterCIDR, _ := utilnet.ParseCIDRSloppy(cidr)
+	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
 	// We have 256 free cidrs.
 	a, err := NewMultiCIDRSet(clusterCIDR, 8)
 	if err != nil {
 		t.Fatalf("unexpected error creating MultiCIDRSet: %v", err)
 	}
-	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
+	clusterMaskSize, _ := clusterCIDR.Mask.Size()
+	max := getMaxCIDRs(24, clusterMaskSize)
+	em := testMetrics{
+		usage:      0,
+		allocs:     0,
+		releases:   0,
+		allocTries: 0,
+		max:        float64(max),
+	}
+	expectMetrics(t, cidr, em)
 
 	// Allocate half of the range.
 	// Occupy does not update the nextCandidate.
 	_, halfClusterCIDR, _ := utilnet.ParseCIDRSloppy("10.0.0.0/17")
 	a.Occupy(halfClusterCIDR)
-	em := testMetrics{
+	em = testMetrics{
 		usage:    0.5,
 		allocs:   128,
 		releases: 0,
+		max:      float64(max),
 	}
 	expectMetrics(t, cidr, em)
 	// Allocate next should iterate until the next free cidr
@@ -746,6 +775,7 @@ func TestMultiCIDRSetMetricsHistogram(t *testing.T) {
 		usage:    float64(129) / float64(256),
 		allocs:   129,
 		releases: 0,
+		max:      float64(max),
 	}
 	expectMetrics(t, cidr, em)
 }
@@ -754,26 +784,53 @@ func TestMultiCIDRSetMetricsDual(t *testing.T) {
 	// create IPv4 cidrSet.
 	cidrIPv4 := "10.0.0.0/16"
 	_, clusterCIDRv4, _ := utilnet.ParseCIDRSloppy(cidrIPv4)
+	clearMetrics(map[string]string{"clusterCIDR": cidrIPv4})
+
 	a, err := NewMultiCIDRSet(clusterCIDRv4, 8)
 	if err != nil {
 		t.Fatalf("unexpected error creating MultiCIDRSet: %v", err)
 	}
-	clearMetrics(map[string]string{"clusterCIDR": cidrIPv4})
+
+	clusterMaskSize, _ := clusterCIDRv4.Mask.Size()
+	maxIPv4 := getMaxCIDRs(24, clusterMaskSize)
+	em := testMetrics{
+		usage:      0,
+		allocs:     0,
+		releases:   0,
+		allocTries: 0,
+		max:        float64(maxIPv4),
+	}
+	expectMetrics(t, cidrIPv4, em)
+
 	// create IPv6 cidrSet.
 	cidrIPv6 := "2001:db8::/48"
 	_, clusterCIDRv6, _ := utilnet.ParseCIDRSloppy(cidrIPv6)
+	clearMetrics(map[string]string{"clusterCIDR": cidrIPv6})
+
 	b, err := NewMultiCIDRSet(clusterCIDRv6, 64)
 	if err != nil {
 		t.Fatalf("unexpected error creating MultiCIDRSet: %v", err)
 	}
-	clearMetrics(map[string]string{"clusterCIDR": cidrIPv6})
+
+	clusterMaskSize, _ = clusterCIDRv6.Mask.Size()
+	maxIPv6 := getMaxCIDRs(64, clusterMaskSize)
+	em = testMetrics{
+		usage:      0,
+		allocs:     0,
+		releases:   0,
+		allocTries: 0,
+		max:        float64(maxIPv6),
+	}
+	expectMetrics(t, cidrIPv6, em)
+
 	// Allocate all.
 	a.Occupy(clusterCIDRv4)
-	em := testMetrics{
+	em = testMetrics{
 		usage:      1,
 		allocs:     256,
 		releases:   0,
 		allocTries: 0,
+		max:        float64(maxIPv4),
 	}
 	expectMetrics(t, cidrIPv4, em)
 
@@ -783,6 +840,7 @@ func TestMultiCIDRSetMetricsDual(t *testing.T) {
 		allocs:     65536,
 		releases:   0,
 		allocTries: 0,
+		max:        float64(maxIPv6),
 	}
 	expectMetrics(t, cidrIPv6, em)
 
@@ -793,6 +851,7 @@ func TestMultiCIDRSetMetricsDual(t *testing.T) {
 		allocs:     256,
 		releases:   256,
 		allocTries: 0,
+		max:        float64(maxIPv4),
 	}
 	expectMetrics(t, cidrIPv4, em)
 	b.Release(clusterCIDRv6)
@@ -801,9 +860,48 @@ func TestMultiCIDRSetMetricsDual(t *testing.T) {
 		allocs:     65536,
 		releases:   65536,
 		allocTries: 0,
+		max:        float64(maxIPv6),
 	}
 	expectMetrics(t, cidrIPv6, em)
 
+}
+
+func Test_getMaxCIDRs(t *testing.T) {
+	cidrIPv4 := "10.0.0.0/16"
+	_, clusterCIDRv4, _ := utilnet.ParseCIDRSloppy(cidrIPv4)
+
+	cidrIPv6 := "2001:db8::/48"
+	_, clusterCIDRv6, _ := utilnet.ParseCIDRSloppy(cidrIPv6)
+
+	tests := []struct {
+		name             string
+		subNetMaskSize   int
+		clusterCIDR      *net.IPNet
+		expectedMaxCIDRs int
+	}{
+		{
+			name:             "IPv4",
+			subNetMaskSize:   24,
+			clusterCIDR:      clusterCIDRv4,
+			expectedMaxCIDRs: 256,
+		},
+		{
+			name:             "IPv6",
+			subNetMaskSize:   64,
+			clusterCIDR:      clusterCIDRv6,
+			expectedMaxCIDRs: 65536,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clusterMaskSize, _ := test.clusterCIDR.Mask.Size()
+			maxCIDRs := getMaxCIDRs(test.subNetMaskSize, clusterMaskSize)
+			if test.expectedMaxCIDRs != maxCIDRs {
+				t.Errorf("incorrect maxCIDRs, expected: %d, got: %d", test.expectedMaxCIDRs, maxCIDRs)
+			}
+		})
+	}
 }
 
 // Metrics helpers.
@@ -812,6 +910,7 @@ func clearMetrics(labels map[string]string) {
 	cidrSetReleases.Delete(labels)
 	cidrSetUsage.Delete(labels)
 	cidrSetAllocationTriesPerRequest.Delete(labels)
+	cidrSetMaxCidrs.Delete(labels)
 }
 
 type testMetrics struct {
@@ -819,6 +918,7 @@ type testMetrics struct {
 	allocs     float64
 	releases   float64
 	allocTries float64
+	max        float64
 }
 
 func expectMetrics(t *testing.T, label string, em testMetrics) {
@@ -839,6 +939,10 @@ func expectMetrics(t *testing.T, label string, em testMetrics) {
 	m.allocTries, err = testutil.GetHistogramMetricValue(cidrSetAllocationTriesPerRequest.WithLabelValues(label))
 	if err != nil {
 		t.Errorf("failed to get %s value, err: %v", cidrSetAllocationTriesPerRequest.Name, err)
+	}
+	m.max, err = testutil.GetGaugeMetricValue(cidrSetMaxCidrs.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", cidrSetMaxCidrs.Name, err)
 	}
 
 	if m != em {

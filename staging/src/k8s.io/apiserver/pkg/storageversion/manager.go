@@ -64,7 +64,7 @@ var _ Manager = &defaultManager{}
 
 // defaultManager indicates if an apiserver has completed reporting its storage versions.
 type defaultManager struct {
-	completed atomic.Value
+	completed atomic.Bool
 
 	mu sync.RWMutex
 	// managedResourceInfos records the ResourceInfos whose StorageVersions will get updated in the next
@@ -268,7 +268,7 @@ func (s *defaultManager) setComplete() {
 
 // Completed returns if updating StorageVersions has completed.
 func (s *defaultManager) Completed() bool {
-	return s.completed.Load().(bool)
+	return s.completed.Load()
 }
 
 func decodableVersions(directlyDecodableVersions []schema.GroupVersion, e runtime.EquivalentResourceRegistry, gr schema.GroupResource) []string {

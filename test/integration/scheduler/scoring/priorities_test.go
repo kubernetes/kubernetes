@@ -76,11 +76,11 @@ const (
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Score: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
-						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
+						{Name: scorePluginName, Weight: pointer.Int32(1)},
 					},
 					Disabled: []configv1.Plugin{
 						{Name: "*"},
@@ -104,10 +104,10 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			},
 			{
-				SchedulerName: pointer.StringPtr("gpu-binpacking-scheduler"),
+				SchedulerName: pointer.String("gpu-binpacking-scheduler"),
 				PluginConfig: []configv1.PluginConfig{
 					{
 						Name: noderesources.Name,
@@ -151,7 +151,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Req(
+	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "2",
 			v1.ResourceMemory: "4G",
@@ -161,7 +161,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Req(
+	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "1",
 			v1.ResourceMemory: "2G",
@@ -185,7 +185,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 
 	// The following pod is using the gpu-binpacking-scheduler profile, which gives a higher weight to
 	// GPU-based binpacking, and so it should land on the node with higher GPU utilization.
-	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Req(
+	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "2",
 			v1.ResourceMemory: "4G",
@@ -442,14 +442,14 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		incomingPod                *v1.Pod
-		existingPods               []*v1.Pod
-		fits                       bool
-		nodes                      []*v1.Node
-		want                       []string // nodes expected to schedule onto
-		enableNodeInclustionPolicy bool
-		enableMatchLabelKeys       bool
+		name                      string
+		incomingPod               *v1.Pod
+		existingPods              []*v1.Pod
+		fits                      bool
+		nodes                     []*v1.Node
+		want                      []string // nodes expected to schedule onto
+		enableNodeInclusionPolicy bool
+		enableMatchLabelKeys      bool
 	}{
 		// note: naming starts at index 0
 		// the symbol ~X~ means that node is infeasible
@@ -512,8 +512,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                       []string{"node-3"},
-			enableNodeInclustionPolicy: true,
+			want:                      []string{"node-3"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as ~3~/~1~
@@ -538,8 +538,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                       []string{"node-3"},
-			enableNodeInclustionPolicy: true,
+			want:                      []string{"node-3"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, node-1 is the preferred fit",
@@ -598,7 +598,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclustionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)

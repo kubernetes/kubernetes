@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
@@ -55,7 +56,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 	})
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
-		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
+		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -68,12 +69,12 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, upgradeTestFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, upgradeTestFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
-		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
+		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -86,7 +87,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, downgradeTests, downgradeTestsFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, downgradeTests, downgradeTestsFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

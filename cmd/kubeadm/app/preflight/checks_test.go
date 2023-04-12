@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
@@ -36,7 +37,9 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
@@ -436,7 +439,7 @@ func TestRunChecks(t *testing.T) {
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
-		actual := RunChecks(rt.p, buf, sets.NewString())
+		actual := RunChecks(rt.p, buf, sets.New[string]())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunChecks:\n\texpected: %t\n\t  actual: %t",
@@ -836,16 +839,16 @@ func TestKubeletVersionCheck(t *testing.T) {
 
 func TestSetHasItemOrAll(t *testing.T) {
 	var tests = []struct {
-		ignoreSet      sets.String
+		ignoreSet      sets.Set[string]
 		testString     string
 		expectedResult bool
 	}{
-		{sets.NewString(), "foo", false},
-		{sets.NewString("all"), "foo", true},
-		{sets.NewString("all", "bar"), "foo", true},
-		{sets.NewString("bar"), "foo", false},
-		{sets.NewString("baz", "foo", "bar"), "foo", true},
-		{sets.NewString("baz", "bar", "foo"), "Foo", true},
+		{sets.New[string](), "foo", false},
+		{sets.New("all"), "foo", true},
+		{sets.New("all", "bar"), "foo", true},
+		{sets.New("bar"), "foo", false},
+		{sets.New("baz", "foo", "bar"), "foo", true},
+		{sets.New("baz", "bar", "foo"), "Foo", true},
 	}
 
 	for _, rt := range tests {
@@ -895,7 +898,7 @@ func TestImagePullCheck(t *testing.T) {
 		},
 	}
 
-	fexec := fakeexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -919,7 +922,7 @@ func TestImagePullCheck(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}
@@ -1001,6 +1004,137 @@ func TestMemCheck(t *testing.T) {
 				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
 			} else if len(errors) != rt.expectedErrors {
 				t.Errorf("expected %d error(s) but got %d: %q", rt.expectedErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestInitIPCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+	// should be a privileged user for the `init` command, otherwise just skip it.
+	isPrivileged := IsPrivilegedUserCheck{}
+	if _, err := isPrivileged.Check(); err != nil {
+		t.Skip("not a privileged user")
+	}
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
+	if err != nil {
+		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
+	}
+	internalcfg.LocalAPIEndpoint.AdvertiseAddress = "" // AdvertiseAddress is optional, it could be auto-detected.
+	ipv4File := "FileContent--proc-sys-net-ipv4-ip_forward"
+	ipv6File := "FileContent--proc-sys-net-ipv6-conf-default-forwarding"
+	var tests = []struct {
+		testName    string
+		PodSubnet   string
+		serviceCidr string
+		expStr      []string
+	}{
+		{
+			testName:    "dual stack",
+			PodSubnet:   "fda9:d324:354d:0::/56",
+			serviceCidr: "10.96.0.0/16,fda9:d324:354d:1::/112",
+			expStr:      []string{"FileContent--proc-sys-net-ipv4-ip_forward", "FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+		{
+			testName:    "single stack ipv4",
+			PodSubnet:   "10.244.0.0/16",
+			serviceCidr: "10.96.0.0/16",
+			expStr:      []string{"FileContent--proc-sys-net-ipv4-ip_forward"},
+		},
+		{
+			testName:    "single stack ipv6",
+			PodSubnet:   "fda9:d324:354d:0::/56",
+			serviceCidr: "fda9:d324:354d:1::/112",
+			expStr:      []string{"FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.testName, func(t *testing.T) {
+			checkList := []string{}
+			internalcfg.Networking.ServiceSubnet = rt.serviceCidr
+			internalcfg.Networking.PodSubnet = rt.PodSubnet
+			checks, err := InitNodeChecks(exec.New(), internalcfg, nil, false, false)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, check := range checks {
+				if check.Name() == ipv4File {
+					checkList = append(checkList, ipv4File)
+				}
+				if check.Name() == ipv6File {
+					checkList = append(checkList, ipv6File)
+				}
+			}
+			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
+				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestJoinIPCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+	// should be a privileged user for the `join` command, otherwise just skip it.
+	isPrivileged := IsPrivilegedUserCheck{}
+	if _, err := isPrivileged.Check(); err != nil {
+		t.Skip("not a privileged user")
+	}
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		Discovery: kubeadmapiv1.Discovery{
+			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
+				Token:                    configutil.PlaceholderToken.Token.String(),
+				APIServerEndpoint:        "kube-apiserver:6443",
+				UnsafeSkipCAVerification: true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected failure when defaulting JoinConfiguration: %v", err)
+	}
+	ipv4File := "FileContent--proc-sys-net-ipv4-ip_forward"
+	ipv6File := "FileContent--proc-sys-net-ipv6-conf-default-forwarding"
+	var tests = []struct {
+		testName string
+		endpoint string
+		expStr   []string
+	}{
+		{
+			testName: "single stack ipv4",
+			endpoint: "10.244.0.0:1234",
+			expStr:   []string{"FileContent--proc-sys-net-ipv4-ip_forward"},
+		},
+		{
+			testName: "single stack ipv6",
+			endpoint: "[fda9:d324:354d:0::]:1234",
+			expStr:   []string{"FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.testName, func(t *testing.T) {
+			checkList := []string{}
+			internalcfg.Discovery.BootstrapToken.APIServerEndpoint = rt.endpoint
+			checks, err := JoinNodeChecks(exec.New(), internalcfg, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, check := range checks {
+				if check.Name() == ipv4File {
+					checkList = append(checkList, ipv4File)
+				}
+				if check.Name() == ipv6File {
+					checkList = append(checkList, ipv6File)
+				}
+			}
+			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
+				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
 			}
 		})
 	}

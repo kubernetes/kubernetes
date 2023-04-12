@@ -212,6 +212,16 @@ func (in *LimitResponse) DeepCopy() *LimitResponse {
 func (in *LimitedPriorityLevelConfiguration) DeepCopyInto(out *LimitedPriorityLevelConfiguration) {
 	*out = *in
 	in.LimitResponse.DeepCopyInto(&out.LimitResponse)
+	if in.LendablePercent != nil {
+		in, out := &in.LendablePercent, &out.LendablePercent
+		*out = new(int32)
+		**out = **in
+	}
+	if in.BorrowingLimitPercent != nil {
+		in, out := &in.BorrowingLimitPercent, &out.BorrowingLimitPercent
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

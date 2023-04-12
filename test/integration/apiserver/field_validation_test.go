@@ -32,12 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
@@ -517,8 +514,6 @@ spec:
 )
 
 func TestFieldValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-
 	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -2934,7 +2929,6 @@ func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless boo
 }
 
 func BenchmarkFieldValidation(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	flag.Lookup("v").Value.Set("0")
 	server, err := kubeapiservertesting.StartTestServer(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {

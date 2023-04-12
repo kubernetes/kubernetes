@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -40,7 +39,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 const (
@@ -141,6 +140,9 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 // NB. this method holds the information about how kubeadm creates kubeconfig files.
 func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if os.IsNotExist(errors.Cause(err)) {
+		return nil, errors.Wrap(err, "the CA files do not exist, please run `kubeadm init phase certs ca` to generate it")
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
@@ -243,7 +245,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 		// fallback to load CA cert data from external CA file
 		clusterCAFilePath := currentConfig.Clusters[currentCluster].CertificateAuthority
 		if len(clusterCAFilePath) > 0 {
-			clusterCABytes, err := ioutil.ReadFile(clusterCAFilePath)
+			clusterCABytes, err := os.ReadFile(clusterCAFilePath)
 			if err != nil {
 				klog.Warningf("failed to load CA cert from %q for kubeconfig %q, %v", clusterCAFilePath, kubeConfigFilePath, err)
 			} else {

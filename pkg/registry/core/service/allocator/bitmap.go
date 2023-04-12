@@ -68,6 +68,7 @@ func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 // allows to pass an offset that divides the allocation bitmap in two blocks.
 // The first block of values will not be used for random value assigned by the AllocateNext()
 // method until the second block of values has been exhausted.
+// The offset value must be always smaller than the bitmap size.
 func NewAllocationMapWithOffset(max int, rangeSpec string, offset int) *AllocationBitmap {
 	a := AllocationBitmap{
 		strategy: randomScanStrategyWithOffset{

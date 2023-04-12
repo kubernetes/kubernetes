@@ -42,14 +42,14 @@ func TestGetContainerDevices(t *testing.T) {
 	contDevices, ok := resContDevices[resourceName1]
 	require.True(t, ok, "resource %q not present", resourceName1)
 
-	for devId, plugInfo := range contDevices {
+	for devID, plugInfo := range contDevices {
 		nodes := plugInfo.GetTopology().GetNodes()
 		require.Equal(t, len(nodes), len(devices), "Incorrect container devices: %v - %v (nodes %v)", devices, contDevices, nodes)
 
 		for _, node := range plugInfo.GetTopology().GetNodes() {
 			dev, ok := devices[node.ID]
 			require.True(t, ok, "NUMA id %v doesn't exist in result", node.ID)
-			require.Equal(t, devId, dev[0], "Can't find device %s in result", dev[0])
+			require.Equal(t, devID, dev[0], "Can't find device %s in result", dev[0])
 		}
 	}
 }

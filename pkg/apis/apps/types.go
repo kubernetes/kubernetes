@@ -143,6 +143,21 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	WhenScaled PersistentVolumeClaimRetentionPolicyType
 }
 
+// StatefulSetOrdinals describes the policy used for replica ordinal assignment
+// in this StatefulSet.
+type StatefulSetOrdinals struct {
+	// start is the number representing the first replica's index. It may be used
+	// to number replicas from an alternate index (eg: 1-indexed) over the default
+	// 0-indexed names, or to orchestrate progressive movement of replicas from
+	// one StatefulSet to another.
+	// If set, replica indices will be in the range:
+	//   [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
+	// If unset, defaults to 0. Replica indices will be in the range:
+	//   [0, .spec.replicas).
+	// +optional
+	Start int32
+}
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// Replicas is the desired number of replicas of the given Template.
@@ -162,7 +177,10 @@ type StatefulSetSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
-	// of the StatefulSet.
+	// of the StatefulSet. Each pod will be named with the format
+	// <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
+	// "web" with index number "3" would be named "web-3".
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -212,9 +230,17 @@ type StatefulSetSpec struct {
 
 	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
 	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
+
+	// ordinals controls the numbering of replica indices in a StatefulSet. The
+	// default ordinals behavior assigns a "0" index to the first replica and
+	// increments the index by one for each additional replica requested. Using
+	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
+	// enabled, which is beta.
+	// +optional
+	Ordinals *StatefulSetOrdinals
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -351,6 +377,7 @@ type DeploymentSpec struct {
 	Selector *metav1.LabelSelector
 
 	// Template describes the pods that will be created.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// The deployment strategy to use to replace existing pods with new ones.
@@ -641,6 +668,7 @@ type DaemonSetSpec struct {
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	Template api.PodTemplateSpec
 
@@ -832,6 +860,7 @@ type ReplicaSetSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// +optional
 	Template api.PodTemplateSpec
 }

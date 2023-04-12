@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
@@ -30,16 +31,12 @@ type WantsCloudConfig interface {
 	SetCloudConfig([]byte)
 }
 
-// WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
-type WantsRESTMapper interface {
-	SetRESTMapper(meta.RESTMapper)
-}
-
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
 	cloudConfig        []byte
 	restMapper         meta.RESTMapper
 	quotaConfiguration quota.Configuration
+	schemaResolver     resolver.SchemaResolver
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -51,11 +48,13 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
+	schemaResolver resolver.SchemaResolver,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		cloudConfig:        cloudConfig,
 		restMapper:         restMapper,
 		quotaConfiguration: quotaConfiguration,
+		schemaResolver:     schemaResolver,
 	}
 }
 
@@ -66,11 +65,15 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetCloudConfig(i.cloudConfig)
 	}
 
-	if wants, ok := plugin.(WantsRESTMapper); ok {
+	if wants, ok := plugin.(initializer.WantsRESTMapper); ok {
 		wants.SetRESTMapper(i.restMapper)
 	}
 
 	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
+	}
+
+	if wants, ok := plugin.(initializer.WantsSchemaResolver); ok {
+		wants.SetSchemaResolver(i.schemaResolver)
 	}
 }

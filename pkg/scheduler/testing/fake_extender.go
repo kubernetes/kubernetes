@@ -52,11 +52,6 @@ func FalsePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.Name))
 }
 
-// FalseAndUnresolvePredicateExtender implements fitPredicate to always return unschedulable and unresolvable status.
-func FalseAndUnresolvePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
-	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("pod is unschedulable and unresolvable on the node %q", node.Name))
-}
-
 // TruePredicateExtender implements FitPredicate function to always return success status.
 func TruePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
 	return framework.NewStatus(framework.Success)

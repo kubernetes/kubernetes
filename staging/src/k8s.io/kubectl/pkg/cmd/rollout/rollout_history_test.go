@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -80,7 +81,7 @@ func TestRolloutHistory(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -124,7 +125,7 @@ Fake ViewHistory Output
 				return "Fake ViewHistory Output\n", nil
 			}
 
-			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)
@@ -176,12 +177,12 @@ func TestMultipleResourceRolloutHistory(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				case p == "/namespaces/test/deployments/bar" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "bar"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -223,7 +224,7 @@ Fake ViewHistory Output
 				return "Fake ViewHistory Output\n", nil
 			}
 
-			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)
@@ -259,7 +260,7 @@ func TestRolloutHistoryWithOutput(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -371,7 +372,7 @@ replicaset.apps/rev2
 				}, nil
 			}
 
-			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)

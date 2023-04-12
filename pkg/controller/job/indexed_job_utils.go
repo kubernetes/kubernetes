@@ -52,17 +52,13 @@ type orderedIntervals []interval
 // empty list if this Job is not tracked with finalizers. The new list includes
 // the indexes that succeeded since the last sync.
 func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
-	var prevIntervals orderedIntervals
-	withFinalizers := trackingUncountedPods(job)
-	if withFinalizers {
-		prevIntervals = succeededIndexesFromJob(job)
-	}
+	prevIntervals := succeededIndexesFromString(job.Status.CompletedIndexes, int(*job.Spec.Completions))
 	newSucceeded := sets.NewInt()
 	for _, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
 		// Succeeded Pod with valid index and, if tracking with finalizers,
 		// has a finalizer (meaning that it is not counted yet).
-		if p.Status.Phase == v1.PodSucceeded && ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && (!withFinalizers || hasJobTrackingFinalizer(p)) {
+		if p.Status.Phase == v1.PodSucceeded && ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && hasJobTrackingFinalizer(p) {
 			newSucceeded.Insert(ix)
 		}
 	}
@@ -152,20 +148,19 @@ func (oi orderedIntervals) has(ix int) bool {
 	return oi[hi].First <= ix
 }
 
-func succeededIndexesFromJob(job *batch.Job) orderedIntervals {
-	if job.Status.CompletedIndexes == "" {
+func succeededIndexesFromString(completedIndexes string, completions int) orderedIntervals {
+	if completedIndexes == "" {
 		return nil
 	}
 	var result orderedIntervals
 	var lastInterval *interval
-	completions := int(*job.Spec.Completions)
-	for _, intervalStr := range strings.Split(job.Status.CompletedIndexes, ",") {
+	for _, intervalStr := range strings.Split(completedIndexes, ",") {
 		limitsStr := strings.Split(intervalStr, "-")
 		var inter interval
 		var err error
 		inter.First, err = strconv.Atoi(limitsStr[0])
 		if err != nil {
-			klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+			klog.InfoS("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
 			continue
 		}
 		if inter.First >= completions {
@@ -174,7 +169,7 @@ func succeededIndexesFromJob(job *batch.Job) orderedIntervals {
 		if len(limitsStr) > 1 {
 			inter.Last, err = strconv.Atoi(limitsStr[1])
 			if err != nil {
-				klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+				klog.InfoS("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
 				continue
 			}
 			if inter.Last >= completions {

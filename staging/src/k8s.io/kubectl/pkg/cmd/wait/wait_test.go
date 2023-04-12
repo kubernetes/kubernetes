@@ -17,7 +17,7 @@ limitations under the License.
 package wait
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
@@ -554,7 +555,7 @@ func TestWaitForDeletion(t *testing.T) {
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: IsDeleted,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -963,8 +964,8 @@ func TestWaitForCondition(t *testing.T) {
 				Timeout:        test.timeout,
 
 				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
+				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -995,7 +996,7 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 		DynamicClient:  fakeClient,
 		Printer:        printers.NewDiscardingPrinter(),
 		ConditionFn:    IsDeleted,
-		IOStreams:      genericclioptions.NewTestIOStreamsDiscard(),
+		IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
 		ForCondition:   "delete",
 	}
 	err := o.RunWait()
@@ -1043,7 +1044,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			jsonPathExp:  "{.foo.bar}",
 			jsonPathCond: "baz",
 
-			expectedErr: "foo is not found",
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
 		{
 			name: "compare boolean JSONPath entry",
@@ -1181,8 +1182,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
 					jsonPathParser:    j,
-					errOut:            ioutil.Discard}.IsJSONPathConditionMet,
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+					errOut:            io.Discard}.IsJSONPathConditionMet,
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()
@@ -1444,8 +1445,8 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j, errOut: ioutil.Discard}.IsJSONPathConditionMet,
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+					jsonPathParser:    j, errOut: io.Discard}.IsJSONPathConditionMet,
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()

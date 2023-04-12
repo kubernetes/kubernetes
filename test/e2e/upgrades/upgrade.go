@@ -19,6 +19,8 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -49,17 +51,17 @@ type Test interface {
 
 	// Setup should create and verify whatever objects need to
 	// exist before the upgrade disruption starts.
-	Setup(f *framework.Framework)
+	Setup(ctx context.Context, f *framework.Framework)
 
 	// Test will run during the upgrade. When the upgrade is
 	// complete, done will be closed and final validation can
 	// begin.
-	Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType)
+	Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade UpgradeType)
 
 	// Teardown should clean up any objects that are created that
 	// aren't already cleaned up by the framework. This will
 	// always be called, even if Setup failed.
-	Teardown(f *framework.Framework)
+	Teardown(ctx context.Context, f *framework.Framework)
 }
 
 // Skippable is an interface that an upgrade test can implement to be

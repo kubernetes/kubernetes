@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -41,7 +42,6 @@ type UndoOptions struct {
 	Builder          func() *resource.Builder
 	ToRevision       int64
 	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.QueryParamVerifier
 	Resources        []string
 	Namespace        string
 	LabelSelector    string
@@ -49,7 +49,7 @@ type UndoOptions struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -68,7 +68,7 @@ var (
 )
 
 // NewRolloutUndoOptions returns an initialized UndoOptions instance
-func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
+func NewRolloutUndoOptions(streams genericiooptions.IOStreams) *UndoOptions {
 	return &UndoOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -77,7 +77,7 @@ func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 }
 
 // NewCmdRolloutUndo returns a Command instance for the 'rollout undo' sub command
-func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutUndo(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutUndoOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -113,11 +113,6 @@ func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
@@ -167,11 +162,6 @@ func (o *UndoOptions) RunUndo() error {
 			return err
 		}
 
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 		result, err := rollbacker.Rollback(info.Object, nil, o.ToRevision, o.DryRunStrategy)
 		if err != nil {
 			return err

@@ -32,7 +32,6 @@ type ExtensionsV1beta1Interface interface {
 	DeploymentsGetter
 	IngressesGetter
 	NetworkPoliciesGetter
-	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
 }
 
@@ -55,10 +54,6 @@ func (c *ExtensionsV1beta1Client) Ingresses(namespace string) IngressInterface {
 
 func (c *ExtensionsV1beta1Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
 	return newNetworkPolicies(c, namespace)
-}
-
-func (c *ExtensionsV1beta1Client) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
 }
 
 func (c *ExtensionsV1beta1Client) ReplicaSets(namespace string) ReplicaSetInterface {

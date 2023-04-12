@@ -26,6 +26,7 @@ import (
 )
 
 var errorStatus = NewStatus(Error, "internal error")
+var statusWithErr = AsStatus(errors.New("internal error"))
 
 func TestStatus(t *testing.T) {
 	tests := []struct {
@@ -138,43 +139,6 @@ func assertStatusCode(t *testing.T, code Code, value int) {
 	}
 }
 
-func TestPluginToStatusMerge(t *testing.T) {
-	tests := []struct {
-		name      string
-		statusMap PluginToStatus
-		wantCode  Code
-	}{
-		{
-			name:      "merge Error and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Error), "p2": NewStatus(Unschedulable)},
-			wantCode:  Error,
-		},
-		{
-			name:      "merge Success and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(Unschedulable)},
-			wantCode:  Unschedulable,
-		},
-		{
-			name:      "merge Success, UnschedulableAndUnresolvable and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(UnschedulableAndUnresolvable), "p3": NewStatus(Unschedulable)},
-			wantCode:  UnschedulableAndUnresolvable,
-		},
-		{
-			name:     "merge nil status",
-			wantCode: Success,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			gotStatus := test.statusMap.Merge()
-			if test.wantCode != gotStatus.Code() {
-				t.Errorf("wantCode %v, gotCode %v", test.wantCode, gotStatus.Code())
-			}
-		})
-	}
-}
-
 func TestPreFilterResultMerge(t *testing.T) {
 	tests := map[string]struct {
 		receiver *PreFilterResult
@@ -183,41 +147,41 @@ func TestPreFilterResultMerge(t *testing.T) {
 	}{
 		"all nil": {},
 		"nil receiver empty input": {
-			in:   &PreFilterResult{NodeNames: sets.NewString()},
-			want: &PreFilterResult{NodeNames: sets.NewString()},
+			in:   &PreFilterResult{NodeNames: sets.New[string]()},
+			want: &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"empty receiver nil input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"empty receiver empty input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			in:       &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			in:       &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"nil receiver populated input": {
-			in:   &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want: &PreFilterResult{NodeNames: sets.NewString("node1")},
+			in:   &PreFilterResult{NodeNames: sets.New("node1")},
+			want: &PreFilterResult{NodeNames: sets.New("node1")},
 		},
 		"empty receiver populated input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			in:       &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			in:       &PreFilterResult{NodeNames: sets.New("node1")},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 
 		"populated receiver nil input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want:     &PreFilterResult{NodeNames: sets.NewString("node1")},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1")},
+			want:     &PreFilterResult{NodeNames: sets.New("node1")},
 		},
 		"populated receiver empty input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
-			in:       &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1")},
+			in:       &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"populated receiver and input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
-			in:       &PreFilterResult{NodeNames: sets.NewString("node2", "node3")},
-			want:     &PreFilterResult{NodeNames: sets.NewString("node2")},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1", "node2")},
+			in:       &PreFilterResult{NodeNames: sets.New("node2", "node3")},
+			want:     &PreFilterResult{NodeNames: sets.New("node2")},
 		},
 	}
 	for name, test := range tests {
@@ -273,10 +237,10 @@ func TestIsStatusEqual(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "error statuses with same message should not be equal",
+			name: "error statuses with same message should be equal",
 			x:    NewStatus(Error, "error"),
 			y:    NewStatus(Error, "error"),
-			want: false,
+			want: true,
 		},
 		{
 			name: "statuses with different reasons should not be equal",
@@ -292,14 +256,20 @@ func TestIsStatusEqual(t *testing.T) {
 		},
 		{
 			name: "wrap error status should be equal with original one",
-			x:    errorStatus,
-			y:    AsStatus(fmt.Errorf("error: %w", errorStatus.AsError())),
+			x:    statusWithErr,
+			y:    AsStatus(fmt.Errorf("error: %w", statusWithErr.AsError())),
 			want: true,
+		},
+		{
+			name: "statues with different errors that have the same message shouldn't be equal",
+			x:    AsStatus(errors.New("error")),
+			y:    AsStatus(errors.New("error")),
+			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cmp.Equal(tt.x, tt.y); got != tt.want {
+			if got := tt.x.Equal(tt.y); got != tt.want {
 				t.Errorf("cmp.Equal() = %v, want %v", got, tt.want)
 			}
 		})

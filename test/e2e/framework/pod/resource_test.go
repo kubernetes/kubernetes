@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -52,7 +53,7 @@ func TestGetPodsInNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := fakeclient.NewSimpleClientset(tt.pods...)
-			got, err := GetPodsInNamespace(cs, "", map[string]string{})
+			got, err := GetPodsInNamespace(context.Background(), cs, "", map[string]string{})
 			if (err != nil) != tt.expectErr {
 				t.Errorf("expectErr = %v, but got err = %v", tt.expectErr, err)
 			}

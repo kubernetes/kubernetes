@@ -89,9 +89,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
-
-	// Pinning values for fields that get defaults if fuzz value is empty string or nil
-	obj.Type = kubeadm.CoreDNS
 }
 
 func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {

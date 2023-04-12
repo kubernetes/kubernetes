@@ -122,11 +122,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.RegistryPullQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: registryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
 	}
+	if kc.MaxParallelImagePulls != nil && *kc.MaxParallelImagePulls < 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: maxParallelImagePulls %v must be a positive number", *kc.MaxParallelImagePulls))
+	}
+	if kc.SerializeImagePulls && kc.MaxParallelImagePulls != nil && *kc.MaxParallelImagePulls > 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: maxParallelImagePulls cannot be larger than 1 unless SerializeImagePulls (--serialize-image-pulls) is set to false"))
+	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
-	}
-	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
 
 	for _, nodeTaint := range kc.RegisterWithTaints {
@@ -146,9 +149,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	default:
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy (--topology-manager-policy) %q must be one of: %q", kc.TopologyManagerPolicy, []string{kubeletconfig.NoneTopologyManagerPolicy, kubeletconfig.BestEffortTopologyManagerPolicy, kubeletconfig.RestrictedTopologyManagerPolicy, kubeletconfig.SingleNumaNodeTopologyManagerPolicy}))
 	}
-	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && !localFeatureGate.Enabled(features.TopologyManager) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope %v requires feature gate TopologyManager", kc.TopologyManagerScope))
-	}
+
 	switch kc.TopologyManagerScope {
 	case kubeletconfig.ContainerTopologyManagerScope:
 	case kubeletconfig.PodTopologyManagerScope:
@@ -255,6 +256,18 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
+	}
+
+	if kc.ContainerRuntimeEndpoint == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: the containerRuntimeEndpoint was not specified or empty"))
+	}
+
+	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+	}
+	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
+		allErrors = append(allErrors,
+			fmt.Errorf("invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery"))
 	}
 
 	return utilerrors.NewAggregate(allErrors)

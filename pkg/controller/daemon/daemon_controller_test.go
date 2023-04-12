@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -43,7 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -255,7 +256,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 	f.Lock()
 	defer f.Unlock()
 	if err := f.FakePodControl.CreatePods(ctx, namespace, template, object, controllerRef); err != nil {
-		return fmt.Errorf("failed to create pod for DaemonSet")
+		return fmt.Errorf("failed to create pod for DaemonSet: %w", err)
 	}
 
 	pod := &v1.Pod{
@@ -309,11 +310,12 @@ type daemonSetsController struct {
 	fakeRecorder *record.FakeRecorder
 }
 
-func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset, error) {
+func newTestController(ctx context.Context, initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset, error) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
 	dsc, err := NewDaemonSetsController(
+		ctx,
 		informerFactory.Apps().V1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		informerFactory.Core().V1().Pods(),
@@ -388,13 +390,22 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 
 func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
 	t.Helper()
+	expectSyncDaemonSetsWithError(t, manager, ds, podControl, expectedCreates, expectedDeletes, expectedEvents, nil)
+}
+
+func expectSyncDaemonSetsWithError(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int, expectedError error) {
+	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Fatal("could not get key for daemon")
 	}
 
 	err = manager.syncHandler(context.TODO(), key)
-	if err != nil {
+	if expectedError != nil && !errors.Is(err, expectedError) {
+		t.Fatalf("Unexpected error returned from syncHandler: %v", err)
+	}
+
+	if expectedError == nil && err != nil {
 		t.Log(err)
 	}
 
@@ -407,7 +418,7 @@ func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.
 // clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
 func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, fakePodControl *fakePodControl) {
 	fakePodControl.Clear()
-
+	logger, _ := ktesting.NewTestContext(t)
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
@@ -445,13 +456,14 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 	}
 	sort.Strings(lines)
 	for _, line := range lines {
-		klog.Info(line)
+		logger.Info(line)
 	}
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -459,7 +471,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		// DeletedFinalStateUnknown should queue the embedded DS if found.
-		manager.deleteDaemonset(cache.DeletedFinalStateUnknown{Key: "foo", Obj: ds})
+		manager.deleteDaemonset(logger, cache.DeletedFinalStateUnknown{Key: "foo", Obj: ds})
 		enqueuedKey, _ := manager.queue.Get()
 		if enqueuedKey.(string) != "default/foo" {
 			t.Errorf("expected delete of DeletedFinalStateUnknown to enqueue the daemonset but found: %#v", enqueuedKey)
@@ -472,8 +484,10 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
+	_, ctx := ktesting.NewTestContext(t)
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
+		ctx,
 		f.Apps().V1().DaemonSets(),
 		f.Apps().V1().ControllerRevisions(),
 		f.Core().V1().Pods(),
@@ -675,7 +689,8 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -695,7 +710,8 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -771,7 +787,8 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, clientset, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -782,6 +799,17 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		var updated *apps.DaemonSet
+		clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			if u, ok := action.(core.UpdateAction); ok {
+				updated = u.GetObject().(*apps.DaemonSet)
+			}
+			return false, nil, nil
+		})
+
 		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
 
 		expectedLimit := 0
@@ -791,6 +819,18 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 		if podControl.FakePodControl.CreateCallCount > expectedLimit {
 			t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
 		}
+		if updated == nil {
+			t.Fatalf("Failed to get updated status")
+		}
+		if got, want := updated.Status.DesiredNumberScheduled, int32(podControl.FakePodControl.CreateLimit)*10; got != want {
+			t.Errorf("Status.DesiredNumberScheduled = %v, want %v", got, want)
+		}
+		if got, want := updated.Status.CurrentNumberScheduled, int32(podControl.FakePodControl.CreateLimit); got != want {
+			t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
+		}
+		if got, want := updated.Status.UpdatedNumberScheduled, int32(podControl.FakePodControl.CreateLimit); got != want {
+			t.Errorf("Status.UpdatedNumberScheduled = %v, want %v", got, want)
+		}
 	}
 }
 
@@ -799,7 +839,8 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 	for _, strategy := range strategies {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -828,7 +869,8 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, clientset, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, clientset, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -856,10 +898,80 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 	}
 }
 
+func TestSimpleDaemonSetUpdatesStatusError(t *testing.T) {
+	var (
+		syncErr   = fmt.Errorf("sync error")
+		statusErr = fmt.Errorf("status error")
+	)
+
+	testCases := []struct {
+		desc string
+
+		hasSyncErr   bool
+		hasStatusErr bool
+
+		expectedErr error
+	}{
+		{
+			desc:         "sync error",
+			hasSyncErr:   true,
+			hasStatusErr: false,
+			expectedErr:  syncErr,
+		},
+		{
+			desc:         "status error",
+			hasSyncErr:   false,
+			hasStatusErr: true,
+			expectedErr:  statusErr,
+		},
+		{
+			desc:         "sync and status error",
+			hasSyncErr:   true,
+			hasStatusErr: true,
+			expectedErr:  syncErr,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			for _, strategy := range updateStrategies() {
+				ds := newDaemonSet("foo")
+				ds.Spec.UpdateStrategy = *strategy
+				_, ctx := ktesting.NewTestContext(t)
+				manager, podControl, clientset, err := newTestController(ctx, ds)
+				if err != nil {
+					t.Fatalf("error creating DaemonSets controller: %v", err)
+				}
+
+				if tc.hasSyncErr {
+					podControl.FakePodControl.Err = syncErr
+				}
+
+				clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+					if action.GetSubresource() != "status" {
+						return false, nil, nil
+					}
+
+					if tc.hasStatusErr {
+						return true, nil, statusErr
+					} else {
+						return false, nil, nil
+					}
+				})
+
+				manager.dsStore.Add(ds)
+				addNodes(manager.nodeStore, 0, 1, nil)
+				expectSyncDaemonSetsWithError(t, manager, ds, podControl, 1, 0, 0, tc.expectedErr)
+			}
+		})
+	}
+}
+
 // DaemonSets should do nothing if there aren't any nodes
 func TestNoNodesDoesNothing(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, podControl, _, err := newTestController()
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -880,7 +992,8 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -902,7 +1015,8 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -967,7 +1081,8 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1000,11 +1115,12 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 
 // DaemonSets should only place onto nodes with sufficient free resource and matched node selector
 func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	podSpec := resourcePodSpecWithoutNodeName("50M", "75m")
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec = podSpec
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -1036,7 +1152,8 @@ func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("simple")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1067,7 +1184,8 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 		ds.Spec.Template.Spec = podSpec
 		now := metav1.Now()
 		ds.DeletionTimestamp = &now
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1098,7 +1216,8 @@ func TestDontDoAnythingIfBeingDeletedRace(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		now := metav1.Now()
 		ds.DeletionTimestamp = &now
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1137,7 +1256,8 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 				}},
 			}},
 		}
-		manager, podControl, _, err := newTestController()
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1184,7 +1304,8 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec2
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1227,7 +1348,8 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 		ds.Spec.Selector = &ls
 		ds.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
 
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1262,7 +1384,8 @@ func TestDealsWithExistingPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1285,7 +1408,8 @@ func TestSelectorDaemonLaunchesPods(t *testing.T) {
 		daemon := newDaemonSet("foo")
 		daemon.Spec.UpdateStrategy = *strategy
 		daemon.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-		manager, podControl, _, err := newTestController(daemon)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, daemon)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1305,7 +1429,8 @@ func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1329,7 +1454,8 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1354,7 +1480,8 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 // DaemonSet with node selector which does not match any node labels should not launch pods.
 func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, podControl, _, err := newTestController()
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1377,7 +1504,8 @@ func TestNameDaemonSetLaunchesPods(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeName = "node-0"
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1396,7 +1524,8 @@ func TestBadNameDaemonSetDoesNothing(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeName = "node-10"
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1416,7 +1545,8 @@ func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 		ds.Spec.Template.Spec.NodeName = "node-6"
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1437,7 +1567,8 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 		ds.Spec.Template.Spec.NodeName = "node-0"
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1453,9 +1584,10 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 
 // DaemonSet with node selector, matching some nodes, should launch pods on all the nodes.
 func TestSelectorDaemonSetLaunchesPods(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -1490,8 +1622,8 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 				},
 			},
 		}
-
-		manager, podControl, _, err := newTestController(daemon)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, daemon)
 		if err != nil {
 			t.Fatalf("error creating DaemonSetsController: %v", err)
 		}
@@ -1509,7 +1641,8 @@ func TestNumberReadyStatus(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, clientset, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, clientset, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1555,7 +1688,8 @@ func TestObservedGeneration(t *testing.T) {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Generation = 1
-		manager, podControl, clientset, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, clientset, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1601,7 +1735,8 @@ func TestDaemonKillFailedPods(t *testing.T) {
 			for _, strategy := range updateStrategies() {
 				ds := newDaemonSet("foo")
 				ds.Spec.UpdateStrategy = *strategy
-				manager, podControl, _, err := newTestController(ds)
+				_, ctx := ktesting.NewTestContext(t)
+				manager, podControl, _, err := newTestController(ctx, ds)
 				if err != nil {
 					t.Fatalf("error creating DaemonSets controller: %v", err)
 				}
@@ -1622,10 +1757,11 @@ func TestDaemonKillFailedPods(t *testing.T) {
 func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		t.Run(string(strategy.Type), func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
 
-			manager, podControl, _, err := newTestController(ds)
+			manager, podControl, _, err := newTestController(ctx, ds)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
 			}
@@ -1693,7 +1829,8 @@ func TestNoScheduleTaintedDoesntEvicitRunningIntolerantPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("intolerant")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1723,7 +1860,8 @@ func TestNoExecuteTaintedDoesEvicitRunningIntolerantPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("intolerant")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1752,7 +1890,8 @@ func TestTaintedNodeDaemonDoesNotLaunchIntolerantPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("intolerant")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1778,7 +1917,8 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 		ds := newDaemonSet("tolerate")
 		ds.Spec.UpdateStrategy = *strategy
 		setDaemonSetToleration(ds, noScheduleTolerations)
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1803,7 +1943,8 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("simple")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1831,7 +1972,8 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("simple")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1860,7 +2002,8 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 		ds := newDaemonSet("tolerate")
 		ds.Spec.UpdateStrategy = *strategy
 		setDaemonSetToleration(ds, noScheduleTolerations)
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1879,7 +2022,8 @@ func TestDaemonSetRespectsTermination(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -1914,7 +2058,8 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
 		setDaemonSetCritical(ds)
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2228,15 +2373,15 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			node.Spec.Unschedulable = c.nodeUnschedulable
-			manager, _, _, err := newTestController()
+			_, ctx := ktesting.NewTestContext(t)
+			manager, _, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
 			}
 			manager.nodeStore.Add(node)
 			for _, p := range c.podsOnNode {
-				manager.podStore.Add(p)
 				p.Spec.NodeName = "test-node"
-				manager.podNodeIndex.Add(p)
+				manager.podStore.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
 			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
@@ -2331,7 +2476,8 @@ func TestUpdateNode(t *testing.T) {
 	}
 	for _, c := range cases {
 		for _, strategy := range updateStrategies() {
-			manager, podControl, _, err := newTestController()
+			logger, ctx := ktesting.NewTestContext(t)
+			manager, podControl, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
 			}
@@ -2362,7 +2508,7 @@ func TestUpdateNode(t *testing.T) {
 			}
 
 			enqueued = false
-			manager.updateNode(c.oldNode, c.newNode)
+			manager.updateNode(logger, c.oldNode, c.newNode)
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 			}
@@ -2512,7 +2658,8 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 
 	for _, c := range cases {
 		for _, strategy := range updateStrategies() {
-			manager, podControl, _, err := newTestController()
+			logger, ctx := ktesting.NewTestContext(t)
+			manager, podControl, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
 			}
@@ -2539,7 +2686,7 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 			}
 
 			enqueued = false
-			manager.deletePod(c.deletedPod)
+			manager.deletePod(logger, c.deletedPod)
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 			}
@@ -2551,7 +2698,8 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _, err := newTestController(ds)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, podControl, _, err := newTestController(ctx, ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2595,7 +2743,8 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		ds2 := newDaemonSet("foo2")
 		ds2.Spec.UpdateStrategy = *strategy
-		manager, _, _, err := newTestController(ds, ds2)
+		_, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx, ds, ds2)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2662,7 +2811,8 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 }
 
 func TestAddNode(t *testing.T) {
-	manager, _, _, err := newTestController()
+	logger, ctx := ktesting.NewTestContext(t)
+	manager, _, _, err := newTestController(ctx)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -2673,14 +2823,13 @@ func TestAddNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	manager.addNode(node1)
+	manager.addNode(logger, node1)
 	if got, want := manager.queue.Len(), 0; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 
 	node2 := newNode("node2", simpleNodeLabel)
-	manager.addNode(node2)
+	manager.addNode(logger, node2)
 	if got, want := manager.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -2692,7 +2841,8 @@ func TestAddNode(t *testing.T) {
 
 func TestAddPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2708,9 +2858,8 @@ func TestAddPod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
-		manager.addPod(pod1)
+		manager.addPod(logger, pod1)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2724,7 +2873,7 @@ func TestAddPod(t *testing.T) {
 		}
 
 		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
-		manager.addPod(pod2)
+		manager.addPod(logger, pod2)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2741,7 +2890,8 @@ func TestAddPod(t *testing.T) {
 
 func TestAddPodOrphan(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2767,7 +2917,7 @@ func TestAddPodOrphan(t *testing.T) {
 
 		// Make pod an orphan. Expect matching sets to be queued.
 		pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
-		manager.addPod(pod)
+		manager.addPod(logger, pod)
 		if got, want := manager.queue.Len(), 2; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2779,7 +2929,8 @@ func TestAddPodOrphan(t *testing.T) {
 
 func TestUpdatePod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2799,7 +2950,7 @@ func TestUpdatePod(t *testing.T) {
 		pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
 		prev := *pod1
 		bumpResourceVersion(pod1)
-		manager.updatePod(&prev, pod1)
+		manager.updatePod(logger, &prev, pod1)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2815,7 +2966,7 @@ func TestUpdatePod(t *testing.T) {
 		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
 		prev = *pod2
 		bumpResourceVersion(pod2)
-		manager.updatePod(&prev, pod2)
+		manager.updatePod(logger, &prev, pod2)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2832,7 +2983,8 @@ func TestUpdatePod(t *testing.T) {
 
 func TestUpdatePodOrphanSameLabels(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2852,7 +3004,7 @@ func TestUpdatePodOrphanSameLabels(t *testing.T) {
 		pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
 		prev := *pod
 		bumpResourceVersion(pod)
-		manager.updatePod(&prev, pod)
+		manager.updatePod(logger, &prev, pod)
 		if got, want := manager.queue.Len(), 0; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2861,7 +3013,8 @@ func TestUpdatePodOrphanSameLabels(t *testing.T) {
 
 func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2882,7 +3035,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 		prev := *pod
 		prev.Labels = map[string]string{"foo2": "bar2"}
 		bumpResourceVersion(pod)
-		manager.updatePod(&prev, pod)
+		manager.updatePod(logger, &prev, pod)
 		if got, want := manager.queue.Len(), 2; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2896,7 +3049,8 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2915,7 +3069,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 		prev := *pod
 		prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds2, controllerKind)}
 		bumpResourceVersion(pod)
-		manager.updatePod(&prev, pod)
+		manager.updatePod(logger, &prev, pod)
 		if got, want := manager.queue.Len(), 2; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2924,7 +3078,8 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 func TestUpdatePodControllerRefRemoved(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2945,7 +3100,7 @@ func TestUpdatePodControllerRefRemoved(t *testing.T) {
 		prev := *pod
 		pod.OwnerReferences = nil
 		bumpResourceVersion(pod)
-		manager.updatePod(&prev, pod)
+		manager.updatePod(logger, &prev, pod)
 		if got, want := manager.queue.Len(), 2; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2954,7 +3109,8 @@ func TestUpdatePodControllerRefRemoved(t *testing.T) {
 
 func TestDeletePod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -2972,7 +3128,7 @@ func TestDeletePod(t *testing.T) {
 		}
 
 		pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
-		manager.deletePod(pod1)
+		manager.deletePod(logger, pod1)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -2986,7 +3142,7 @@ func TestDeletePod(t *testing.T) {
 		}
 
 		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
-		manager.deletePod(pod2)
+		manager.deletePod(logger, pod2)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -3003,7 +3159,8 @@ func TestDeletePod(t *testing.T) {
 
 func TestDeletePodOrphan(t *testing.T) {
 	for _, strategy := range updateStrategies() {
-		manager, _, _, err := newTestController()
+		logger, ctx := ktesting.NewTestContext(t)
+		manager, _, _, err := newTestController(ctx)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -3028,7 +3185,7 @@ func TestDeletePodOrphan(t *testing.T) {
 		}
 
 		pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
-		manager.deletePod(pod)
+		manager.deletePod(logger, pod)
 		if got, want := manager.queue.Len(), 0; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
@@ -3058,9 +3215,10 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
 func TestSurgeDealsWithExistingPods(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -3074,9 +3232,10 @@ func TestSurgeDealsWithExistingPods(t *testing.T) {
 }
 
 func TestSurgePreservesReadyOldPods(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -3113,9 +3272,10 @@ func TestSurgePreservesReadyOldPods(t *testing.T) {
 }
 
 func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -3159,9 +3319,10 @@ func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
 }
 
 func TestSurgeDeletesUnreadyOldPods(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -3198,10 +3359,11 @@ func TestSurgeDeletesUnreadyOldPods(t *testing.T) {
 }
 
 func TestSurgePreservesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
@@ -3242,10 +3404,11 @@ func TestSurgePreservesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
 }
 
 func TestSurgeDeletesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
-	manager, podControl, _, err := newTestController(ds)
+	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}

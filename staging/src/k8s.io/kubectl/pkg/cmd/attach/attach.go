@@ -17,6 +17,7 @@ limitations under the License.
 package attach
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -28,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -87,7 +89,7 @@ type AttachOptions struct {
 }
 
 // NewAttachOptions creates the options for attach
-func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
+func NewAttachOptions(streams genericiooptions.IOStreams) *AttachOptions {
 	return &AttachOptions{
 		StreamOptions: exec.StreamOptions{
 			IOStreams: streams,
@@ -98,7 +100,7 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 }
 
 // NewCmdAttach returns the attach Cobra command
-func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
 		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
@@ -159,7 +161,7 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,
 		Stdout:            stdout,
 		Stderr:            stderr,

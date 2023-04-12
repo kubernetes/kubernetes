@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -35,6 +34,7 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 func TestCreateManagedDisk(t *testing.T) {
@@ -45,7 +45,7 @@ func TestCreateManagedDisk(t *testing.T) {
 	goodDiskEncryptionSetID := fmt.Sprintf("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/diskEncryptionSets/%s", "diskEncryptionSet-name")
 	badDiskEncryptionSetID := fmt.Sprintf("badDiskEncryptionSetID")
 	testTags := make(map[string]*string)
-	testTags[WriteAcceleratorEnabled] = to.StringPtr("true")
+	testTags[WriteAcceleratorEnabled] = pointer.String("true")
 	testCases := []struct {
 		desc                string
 		diskID              string
@@ -68,7 +68,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "100",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "diskid1",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         false,
 		},
 		{
@@ -80,7 +80,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "diskid1",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         false,
 		},
 		{
@@ -92,7 +92,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "100",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         true,
 			expectedErrMsg:      fmt.Errorf("AzureDisk - failed to parse DiskIOPSReadWrite: strconv.Atoi: parsing \"invalid\": invalid syntax"),
 		},
@@ -105,7 +105,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "invalid",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         true,
 			expectedErrMsg:      fmt.Errorf("AzureDisk - failed to parse DiskMBpsReadWrite: strconv.Atoi: parsing \"invalid\": invalid syntax"),
 		},
@@ -118,7 +118,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "100",
 			diskEncryptionSetID: badDiskEncryptionSetID,
 			expectedDiskID:      "",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         true,
 			expectedErrMsg:      fmt.Errorf("AzureDisk - format of DiskEncryptionSetID(%s) is incorrect, correct format: %s", badDiskEncryptionSetID, diskEncryptionSetIDFormat),
 		},
@@ -131,7 +131,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         true,
 			expectedErrMsg:      fmt.Errorf("AzureDisk - DiskIOPSReadWrite parameter is only applicable in UltraSSD_LRS disk type"),
 		},
@@ -144,7 +144,7 @@ func TestCreateManagedDisk(t *testing.T) {
 			diskMBPSReadWrite:   "100",
 			diskEncryptionSetID: goodDiskEncryptionSetID,
 			expectedDiskID:      "",
-			existedDisk:         compute.Disk{ID: to.StringPtr("diskid1"), Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: to.StringPtr("Succeeded")}, Tags: testTags},
+			existedDisk:         compute.Disk{ID: pointer.String("diskid1"), Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &goodDiskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}, ProvisioningState: pointer.String("Succeeded")}, Tags: testTags},
 			expectedErr:         true,
 			expectedErrMsg:      fmt.Errorf("AzureDisk - DiskMBpsReadWrite parameter is only applicable in UltraSSD_LRS disk type"),
 		},
@@ -195,20 +195,20 @@ func TestDeleteManagedDisk(t *testing.T) {
 			desc:           "an error shall be returned if delete an attaching disk",
 			diskName:       "disk1",
 			diskState:      "attaching",
-			existedDisk:    compute.Disk{Name: to.StringPtr("disk1")},
+			existedDisk:    compute.Disk{Name: pointer.String("disk1")},
 			expectedErr:    true,
 			expectedErrMsg: fmt.Errorf("failed to delete disk(/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/disks/disk1) since it's in attaching or detaching state"),
 		},
 		{
 			desc:        "no error shall be returned if everything is good",
 			diskName:    "disk1",
-			existedDisk: compute.Disk{Name: to.StringPtr("disk1")},
+			existedDisk: compute.Disk{Name: pointer.String("disk1")},
 			expectedErr: false,
 		},
 		{
 			desc:           "an error shall be returned if get disk failed",
 			diskName:       fakeGetDiskFailed,
-			existedDisk:    compute.Disk{Name: to.StringPtr(fakeGetDiskFailed)},
+			existedDisk:    compute.Disk{Name: pointer.String(fakeGetDiskFailed)},
 			expectedErr:    true,
 			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 		},
@@ -254,7 +254,7 @@ func TestGetDisk(t *testing.T) {
 		{
 			desc:                      "no error shall be returned if get a normal disk without DiskProperties",
 			diskName:                  "disk1",
-			existedDisk:               compute.Disk{Name: to.StringPtr("disk1")},
+			existedDisk:               compute.Disk{Name: pointer.String("disk1")},
 			expectedErr:               false,
 			expectedProvisioningState: "",
 			expectedDiskID:            "",
@@ -262,7 +262,7 @@ func TestGetDisk(t *testing.T) {
 		{
 			desc:                      "an error shall be returned if get disk failed",
 			diskName:                  fakeGetDiskFailed,
-			existedDisk:               compute.Disk{Name: to.StringPtr(fakeGetDiskFailed)},
+			existedDisk:               compute.Disk{Name: pointer.String(fakeGetDiskFailed)},
 			expectedErr:               true,
 			expectedErrMsg:            fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 			expectedProvisioningState: "",
@@ -312,7 +312,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         diskName,
 			oldSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
+			existedDisk:      compute.Disk{Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      false,
 		},
@@ -321,7 +321,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         diskName,
 			oldSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr("disk1")},
+			existedDisk:      compute.Disk{Name: pointer.String("disk1")},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
 			expectedErrMsg:   fmt.Errorf("DiskProperties of disk(%s) is nil", diskName),
@@ -331,7 +331,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         diskName,
 			oldSize:          *resource.NewQuantity(1*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr("disk1"), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
+			existedDisk:      compute.Disk{Name: pointer.String("disk1"), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      false,
 		},
@@ -340,7 +340,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         fakeGetDiskFailed,
 			oldSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
+			existedDisk:      compute.Disk{Name: pointer.String(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
 			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
@@ -350,7 +350,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         fakeCreateDiskFailed,
 			oldSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr(fakeCreateDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
+			existedDisk:      compute.Disk{Name: pointer.String(fakeCreateDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
 			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Create Disk failed")),
@@ -360,7 +360,7 @@ func TestResizeDisk(t *testing.T) {
 			diskName:         fakeCreateDiskFailed,
 			oldSize:          *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			newSize:          *resource.NewQuantity(3*(1024*1024*1024), resource.BinarySI),
-			existedDisk:      compute.Disk{Name: to.StringPtr(fakeCreateDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Attached}},
+			existedDisk:      compute.Disk{Name: pointer.String(fakeCreateDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Attached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
 			expectedErrMsg:   fmt.Errorf("azureDisk - disk resize is only supported on Unattached disk, current disk state: Attached, already attached to "),
@@ -426,7 +426,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
+			existedDisk: compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expected: map[string]string{
 				v1.LabelTopologyRegion: testCloud0.Location,
 				v1.LabelTopologyZone:   testCloud0.makeZone(testCloud0.Location, 1),
@@ -446,7 +446,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk:    compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"invalid"}},
+			existedDisk:    compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"invalid"}},
 			expectedErr:    true,
 			expectedErrMsg: fmt.Errorf("failed to parse zone [invalid] for AzureDisk %v: %v", diskName, "strconv.Atoi: parsing \"invalid\": invalid syntax"),
 		},
@@ -463,7 +463,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
+			existedDisk: compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected: map[string]string{
 				v1.LabelTopologyRegion: testCloud0.Location,
 			},
@@ -483,7 +483,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk:    compute.Disk{Name: to.StringPtr(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
+			existedDisk:    compute.Disk{Name: pointer.String(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expectedErr:    true,
 			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 		},
@@ -500,7 +500,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk:    compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
+			existedDisk:    compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expectedErr:    true,
 			expectedErrMsg: fmt.Errorf("invalid disk URI: invalidDiskURI"),
 		},
@@ -517,7 +517,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					},
 				},
 			},
-			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
+			existedDisk: compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected:    nil,
 			expectedErr: false,
 		},
@@ -529,7 +529,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 					PersistentVolumeSource: v1.PersistentVolumeSource{},
 				},
 			},
-			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
+			existedDisk: compute.Disk{Name: pointer.String(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected:    nil,
 			expectedErr: false,
 		},

@@ -56,24 +56,29 @@ Go field names must be CamelCase. JSON field names must be camelCase. Other than
 initial letter, the two should almost always match. No underscores nor dashes in either.
 This rule verifies the convention "Other than capitalization of the initial letter, the two should almost always match."
 Examples (also in unit test):
-    Go name      | JSON name    | match
-                   podSpec        false
-    PodSpec        podSpec        true
-    PodSpec        PodSpec        false
-    podSpec        podSpec        false
-    PodSpec        spec           false
-    Spec           podSpec        false
-    JSONSpec       jsonSpec       true
-    JSONSpec       jsonspec       false
-    HTTPJSONSpec   httpJSONSpec   true
+
+	Go name      | JSON name    | match
+	               podSpec        false
+	PodSpec        podSpec        true
+	PodSpec        PodSpec        false
+	podSpec        podSpec        false
+	PodSpec        spec           false
+	Spec           podSpec        false
+	JSONSpec       jsonSpec       true
+	JSONSpec       jsonspec       false
+	HTTPJSONSpec   httpJSONSpec   true
+
 NOTE: this validator cannot tell two sequential all-capital words from one word, therefore the case below
 is also considered matched.
-    HTTPJSONSpec   httpjsonSpec   true
+
+	HTTPJSONSpec   httpjsonSpec   true
+
 NOTE: JSON names in jsonNameBlacklist should skip evaluation
-                                  true
-    podSpec                       true
-    podSpec        -              true
-    podSpec        metadata       true
+
+	                              true
+	podSpec                       true
+	podSpec        -              true
+	podSpec        metadata       true
 */
 type NamesMatch struct{}
 
@@ -114,14 +119,15 @@ func (n *NamesMatch) Validate(t *types.Type) ([]string, error) {
 
 // namesMatch evaluates if goName and jsonName match the API rule
 // TODO: Use an off-the-shelf CamelCase solution instead of implementing this logic. The following existing
-//       packages have been tried out:
-//		github.com/markbates/inflect
-//		github.com/segmentio/go-camelcase
-//		github.com/iancoleman/strcase
-//		github.com/fatih/camelcase
-//	 Please see https://github.com/kubernetes/kube-openapi/pull/83#issuecomment-400842314 for more details
-//	 about why they don't satisfy our need. What we need can be a function that detects an acronym at the
-//	 beginning of a string.
+//
+//	      packages have been tried out:
+//			github.com/markbates/inflect
+//			github.com/segmentio/go-camelcase
+//			github.com/iancoleman/strcase
+//			github.com/fatih/camelcase
+//		 Please see https://github.com/kubernetes/kube-openapi/pull/83#issuecomment-400842314 for more details
+//		 about why they don't satisfy our need. What we need can be a function that detects an acronym at the
+//		 beginning of a string.
 func namesMatch(goName, jsonName string) bool {
 	if jsonNameBlacklist.Has(jsonName) {
 		return true

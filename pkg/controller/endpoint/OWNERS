@@ -4,6 +4,7 @@ approvers:
   - bowei
   - MrHohn
   - thockin
+  - sig-network-approvers
 emeritus_approvers:
   - matchstick
 reviewers:
@@ -11,5 +12,6 @@ reviewers:
   - MrHohn
   - thockin
   - robscott
+  - sig-network-reviewers
 labels:
   - sig/network

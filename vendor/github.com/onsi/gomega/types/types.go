@@ -1,12 +1,13 @@
 package types
 
 import (
+	"context"
 	"time"
 )
 
 type GomegaFailHandler func(message string, callerSkip ...int)
 
-//A simple *testing.T interface wrapper
+// A simple *testing.T interface wrapper
 type GomegaTestingT interface {
 	Helper()
 	Fatalf(format string, args ...interface{})
@@ -18,11 +19,11 @@ type Gomega interface {
 	Expect(actual interface{}, extra ...interface{}) Assertion
 	ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Assertion
 
-	Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion
-	EventuallyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion
+	Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion
+	EventuallyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion
 
-	Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion
-	ConsistentlyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion
+	Consistently(actualOrCtx interface{}, args ...interface{}) AsyncAssertion
+	ConsistentlyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion
 
 	SetDefaultEventuallyTimeout(time.Duration)
 	SetDefaultEventuallyPollingInterval(time.Duration)
@@ -30,9 +31,9 @@ type Gomega interface {
 	SetDefaultConsistentlyPollingInterval(time.Duration)
 }
 
-//All Gomega matchers must implement the GomegaMatcher interface
+// All Gomega matchers must implement the GomegaMatcher interface
 //
-//For details on writing custom matchers, check out: http://onsi.github.io/gomega/#adding-your-own-matchers
+// For details on writing custom matchers, check out: http://onsi.github.io/gomega/#adding-your-own-matchers
 type GomegaMatcher interface {
 	Match(actual interface{}) (success bool, err error)
 	FailureMessage(actual interface{}) (message string)
@@ -70,6 +71,11 @@ type AsyncAssertion interface {
 	WithOffset(offset int) AsyncAssertion
 	WithTimeout(interval time.Duration) AsyncAssertion
 	WithPolling(interval time.Duration) AsyncAssertion
+	Within(timeout time.Duration) AsyncAssertion
+	ProbeEvery(interval time.Duration) AsyncAssertion
+	WithContext(ctx context.Context) AsyncAssertion
+	WithArguments(argsToForward ...interface{}) AsyncAssertion
+	MustPassRepeatedly(count int) AsyncAssertion
 }
 
 // Assertions are returned by Ω and Expect and enable assertions against Gomega matchers

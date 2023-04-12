@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
@@ -243,7 +243,7 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 			// operate on a copy, so we can compare the original and the modified object
 			objCopy := test.object.DeepCopyObject()
 			var infos []*resource.Info
-			o := NewEditOptions(NormalEditMode, genericclioptions.NewTestIOStreamsDiscard())
+			o := NewEditOptions(NormalEditMode, genericiooptions.NewTestIOStreamsDiscard())
 			err := o.extractManagedFields(objCopy)
 			if err != nil {
 				t.Errorf("unexpected extraction error %v", err)

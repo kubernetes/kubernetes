@@ -17,9 +17,17 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,12 +36,6 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
-	"testing"
-	"time"
 )
 
 type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
@@ -48,6 +50,17 @@ type streamContext struct {
 type streamAndReply struct {
 	httpstream.Stream
 	replySent <-chan struct{}
+}
+
+type fakeEmptyDataPty struct {
+}
+
+func (s *fakeEmptyDataPty) Read(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (s *fakeEmptyDataPty) Write(p []byte) (int, error) {
+	return len(p), nil
 }
 
 type fakeMassiveDataPty struct{}
@@ -107,6 +120,7 @@ func writeMassiveData(stdStream io.Writer) struct{} { // write to stdin or stdou
 
 func TestSPDYExecutorStream(t *testing.T) {
 	tests := []struct {
+		timeout     time.Duration
 		name        string
 		options     StreamOptions
 		expectError string
@@ -130,23 +144,40 @@ func TestSPDYExecutorStream(t *testing.T) {
 			expectError: "",
 			attacher:    fakeMassiveDataAttacher,
 		},
+		{
+			timeout: 500 * time.Millisecond,
+			name:    "timeoutTest",
+			options: StreamOptions{
+				Stdin:  &fakeMassiveDataPty{},
+				Stderr: &fakeMassiveDataPty{},
+			},
+			expectError: context.DeadlineExceeded.Error(),
+			attacher:    fakeMassiveDataAttacher,
+		},
 	}
 
 	for _, test := range tests {
-		server := newTestHTTPServer(test.attacher, &test.options)
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestHTTPServer(test.attacher, &test.options)
+			defer server.Close()
 
-		err := attach2Server(server.URL, test.options)
-		gotError := ""
-		if err != nil {
-			gotError = err.Error()
-		}
-		if test.expectError != gotError {
-			t.Errorf("%s: expected [%v], got [%v]", test.name, test.expectError, gotError)
-		}
+			ctx, cancel := context.Background(), func() {}
+			if test.timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, test.timeout)
+			}
+			defer cancel()
 
-		server.Close()
+			err := attach2Server(ctx, server.URL, test.options)
+
+			gotError := ""
+			if err != nil {
+				gotError = err.Error()
+			}
+			if test.expectError != gotError {
+				t.Errorf("%s: expected [%v], got [%v]", test.name, test.expectError, gotError)
+			}
+		})
 	}
-
 }
 
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
@@ -170,16 +201,16 @@ func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
 	return server
 }
 
-func attach2Server(rawURL string, options StreamOptions) error {
+func attach2Server(ctx context.Context, rawURL string, options StreamOptions) error {
 	uri, _ := url.Parse(rawURL)
 	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
 	if err != nil {
 		return err
 	}
 
-	e := make(chan error)
+	e := make(chan error, 1)
 	go func(e chan error) {
-		e <- exec.Stream(options)
+		e <- exec.StreamWithContext(ctx, options)
 	}(e)
 	select {
 	case err := <-e:
@@ -261,5 +292,76 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 		}
 		_, err = stream.Write(bs)
 		return err
+	}
+}
+
+// writeDetector provides a helper method to block until the underlying writer written.
+type writeDetector struct {
+	written chan bool
+	closed  bool
+	io.Writer
+}
+
+func newWriterDetector(w io.Writer) *writeDetector {
+	return &writeDetector{
+		written: make(chan bool),
+		Writer:  w,
+	}
+}
+
+func (w *writeDetector) BlockUntilWritten() {
+	<-w.written
+}
+
+func (w *writeDetector) Write(p []byte) (n int, err error) {
+	if !w.closed {
+		close(w.written)
+		w.closed = true
+	}
+	return w.Writer.Write(p)
+}
+
+// `Executor.StreamWithContext` starts a goroutine in the background to do the streaming
+// and expects the deferred close of the connection leads to the exit of the goroutine on cancellation.
+// This test verifies that works.
+func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
+	writeDetector := newWriterDetector(&fakeEmptyDataPty{})
+	options := StreamOptions{
+		Stdin:  &fakeEmptyDataPty{},
+		Stdout: writeDetector,
+	}
+	server := newTestHTTPServer(fakeMassiveDataAttacher, &options)
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancelFn()
+
+	uri, _ := url.Parse(server.URL)
+	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	streamExec := exec.(*streamExecutor)
+
+	conn, streamer, err := streamExec.newConnectionAndStream(ctx, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errorChan := make(chan error)
+	go func() {
+		errorChan <- streamer.stream(conn)
+	}()
+
+	// Wait until stream goroutine starts.
+	writeDetector.BlockUntilWritten()
+
+	// Close the connection
+	conn.Close()
+
+	select {
+	case <-time.After(1 * time.Second):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case <-errorChan:
+		return
 	}
 }

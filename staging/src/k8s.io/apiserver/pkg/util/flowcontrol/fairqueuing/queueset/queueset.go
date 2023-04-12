@@ -60,12 +60,13 @@ type promiseFactoryFactory func(*queueSet) promiseFactory
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
 // the fields `factory` and `theSet` is non-nil.
 type queueSetCompleter struct {
-	factory        *queueSetFactory
-	reqsGaugePair  metrics.RatioedGaugePair
-	execSeatsGauge metrics.RatioedGauge
-	theSet         *queueSet
-	qCfg           fq.QueuingConfig
-	dealer         *shufflesharding.Dealer
+	factory              *queueSetFactory
+	reqsGaugePair        metrics.RatioedGaugePair
+	execSeatsGauge       metrics.RatioedGauge
+	seatDemandIntegrator metrics.Gauge
+	theSet               *queueSet
+	qCfg                 fq.QueuingConfig
+	dealer               *shufflesharding.Dealer
 }
 
 // queueSet implements the Fair Queuing for Server Requests technique
@@ -92,6 +93,8 @@ type queueSet struct {
 	reqsGaugePair metrics.RatioedGaugePair // .RequestsExecuting covers regular phase only
 
 	execSeatsGauge metrics.RatioedGauge // for all phases of execution
+
+	seatDemandIntegrator metrics.Gauge
 
 	promiseFactory promiseFactory
 
@@ -139,8 +142,28 @@ type queueSet struct {
 	// request(s) that are currently executing in this queueset.
 	totSeatsInUse int
 
+	// totSeatsWaiting is the sum, over all the waiting requests, of their
+	// max width.
+	totSeatsWaiting int
+
 	// enqueues is the number of requests that have ever been enqueued
 	enqueues int
+
+	// totRequestsDispatched is the total number of requests of this
+	// queueSet that have been processed.
+	totRequestsDispatched int
+
+	// totRequestsRejected is the total number of requests of this
+	// queueSet that have been rejected.
+	totRequestsRejected int
+
+	// totRequestsTimedout is the total number of requests of this
+	// queueSet that have been timeouted.
+	totRequestsTimedout int
+
+	// totRequestsCancelled is the total number of requests of this
+	// queueSet that have been cancelled.
+	totRequestsCancelled int
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
@@ -156,17 +179,18 @@ func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory pr
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsGaugePair metrics.RatioedGaugePair, execSeatsGauge metrics.RatioedGauge) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsGaugePair metrics.RatioedGaugePair, execSeatsGauge metrics.RatioedGauge, seatDemandIntegrator metrics.Gauge) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
 	}
 	return &queueSetCompleter{
-		factory:        qsf,
-		reqsGaugePair:  reqsGaugePair,
-		execSeatsGauge: execSeatsGauge,
-		qCfg:           qCfg,
-		dealer:         dealer}, nil
+		factory:              qsf,
+		reqsGaugePair:        reqsGaugePair,
+		execSeatsGauge:       execSeatsGauge,
+		seatDemandIntegrator: seatDemandIntegrator,
+		qCfg:                 qCfg,
+		dealer:               dealer}, nil
 }
 
 // checkConfig returns a non-nil Dealer if the config is valid and
@@ -191,6 +215,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 			estimatedServiceDuration: 3 * time.Millisecond,
 			reqsGaugePair:            qsc.reqsGaugePair,
 			execSeatsGauge:           qsc.execSeatsGauge,
+			seatDemandIntegrator:     qsc.seatDemandIntegrator,
 			qCfg:                     qsc.qCfg,
 			currentR:                 0,
 			lastRealTime:             qsc.factory.clock.Now(),
@@ -295,6 +320,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 		if !qs.canAccommodateSeatsLocked(workEstimate.MaxSeats()) {
 			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d seats are asked for, %d seats are in use (%d are executing) and the limit is %d",
 				qs.qCfg.Name, fsName, descr1, descr2, workEstimate, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
+			qs.totRequestsRejected++
 			metrics.AddReject(ctx, qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
@@ -314,6 +340,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 	// concurrency shares and at max queue length already
 	if req == nil {
 		klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v due to queue full", qs.qCfg.Name, fsName, descr1, descr2)
+		qs.totRequestsRejected++
 		metrics.AddReject(ctx, qs.qCfg.Name, fsName, "queue-full")
 		return nil, qs.isIdleLocked()
 	}
@@ -391,6 +418,8 @@ func (req *request) wait() (bool, bool) {
 	switch decisionAny {
 	case decisionReject:
 		klog.V(5).Infof("QS(%s): request %#+v %#+v timed out after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
+		qs.totRequestsRejected++
+		qs.totRequestsTimedout++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
 		return false, qs.isIdleLocked()
 	case decisionCancel:
@@ -408,10 +437,14 @@ func (req *request) wait() (bool, bool) {
 	if req.removeFromQueueLocked() != nil {
 		defer qs.boundNextDispatchLocked(queue)
 		qs.totRequestsWaiting--
+		qs.totSeatsWaiting -= req.MaxSeats()
+		qs.totRequestsRejected++
+		qs.totRequestsCancelled++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		req.NoteQueued(false)
 		qs.reqsGaugePair.RequestsWaiting.Add(-1)
+		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 	}
 	return false, qs.isIdleLocked()
 }
@@ -597,6 +630,7 @@ func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interfac
 // past the requestWaitLimit
 func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, fsName string) {
 	timeoutCount := 0
+	disqueueSeats := 0
 	now := qs.clock.Now()
 	reqs := queue.requests
 	// reqs are sorted oldest -> newest
@@ -609,6 +643,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, f
 		if arrivalLimit.After(req.arrivalTime) {
 			if req.decision.Set(decisionReject) && req.removeFromQueueLocked() != nil {
 				timeoutCount++
+				disqueueSeats += req.MaxSeats()
 				req.NoteQueued(false)
 				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 			}
@@ -622,7 +657,9 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, f
 	// remove timed out requests from queue
 	if timeoutCount > 0 {
 		qs.totRequestsWaiting -= timeoutCount
+		qs.totSeatsWaiting -= disqueueSeats
 		qs.reqsGaugePair.RequestsWaiting.Add(float64(-timeoutCount))
+		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 	}
 }
 
@@ -657,9 +694,11 @@ func (qs *queueSet) enqueueToBoundLocked(request *request) {
 	}
 	request.removeFromQueueLocked = queue.requests.Enqueue(request)
 	qs.totRequestsWaiting++
+	qs.totSeatsWaiting += request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	request.NoteQueued(true)
 	qs.reqsGaugePair.RequestsWaiting.Add(1)
+	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 }
 
 // dispatchAsMuchAsPossibleLocked does as many dispatches as possible now.
@@ -690,6 +729,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.MaxSeats())
 	qs.reqsGaugePair.RequestsExecuting.Add(1)
 	qs.execSeatsGauge.Add(float64(req.MaxSeats()))
+	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 	klogV := klog.V(5)
 	if klogV.Enabled() {
 		klogV.Infof("QS(%s) at t=%s R=%v: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, fsName, descr1, descr2, qs.totRequestsExecuting)
@@ -711,11 +751,13 @@ func (qs *queueSet) dispatchLocked() bool {
 		return false
 	}
 	qs.totRequestsWaiting--
+	qs.totSeatsWaiting -= request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
 	request.NoteQueued(false)
 	qs.reqsGaugePair.RequestsWaiting.Add(-1)
 	defer qs.boundNextDispatchLocked(queue)
 	if !request.decision.Set(decisionExecute) {
+		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 		return true
 	}
 	request.startTime = qs.clock.Now()
@@ -732,6 +774,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
 	qs.reqsGaugePair.RequestsExecuting.Add(1)
 	qs.execSeatsGauge.Add(float64(request.MaxSeats()))
+	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 	klogV := klog.V(6)
 	if klogV.Enabled() {
 		klogV.Infof("QS(%s) at t=%s R=%v: dispatching request %#+v %#+v work %v from queue %d with start R %v, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
@@ -894,6 +937,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		qs.totSeatsInUse -= r.MaxSeats()
 		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.MaxSeats())
 		qs.execSeatsGauge.Add(-float64(r.MaxSeats()))
+		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 		if r.queue != nil {
 			r.queue.seatsInUse -= r.MaxSeats()
 		}
@@ -1011,13 +1055,32 @@ func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 	qs.lock.Lock()
 	defer qs.lock.Unlock()
 	d := debug.QueueSetDump{
-		Queues:     make([]debug.QueueDump, len(qs.queues)),
-		Waiting:    qs.totRequestsWaiting,
-		Executing:  qs.totRequestsExecuting,
-		SeatsInUse: qs.totSeatsInUse,
+		Queues:       make([]debug.QueueDump, len(qs.queues)),
+		Waiting:      qs.totRequestsWaiting,
+		Executing:    qs.totRequestsExecuting,
+		SeatsInUse:   qs.totSeatsInUse,
+		SeatsWaiting: qs.totSeatsWaiting,
+		Dispatched:   qs.totRequestsDispatched,
+		Rejected:     qs.totRequestsRejected,
+		Timedout:     qs.totRequestsTimedout,
+		Cancelled:    qs.totRequestsCancelled,
 	}
 	for i, q := range qs.queues {
 		d.Queues[i] = q.dumpLocked(includeRequestDetails)
 	}
 	return d
+}
+
+func OnRequestDispatched(r fq.Request) {
+	req, ok := r.(*request)
+	if !ok {
+		return
+	}
+
+	qs := req.qs
+	if qs != nil {
+		qs.lock.Lock()
+		defer qs.lock.Unlock()
+		qs.totRequestsDispatched++
+	}
 }

@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,8 +117,11 @@ type Request struct {
 	subresource  string
 
 	// output
-	err  error
-	body io.Reader
+	err error
+
+	// only one of body / bodyBytes may be set. requests using body are not retriable.
+	body      io.Reader
+	bodyBytes []byte
 
 	retryFn requestRetryFunc
 }
@@ -443,12 +447,15 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 	case []byte:
 		glogBody("Request Body", t)
-		r.body = bytes.NewReader(t)
+		r.body = nil
+		r.bodyBytes = t
 	case io.Reader:
 		r.body = t
+		r.bodyBytes = nil
 	case runtime.Object:
 		// callers may pass typed interface pointers, therefore we must check nil with reflection
 		if reflect.ValueOf(t).IsNil() {
@@ -465,7 +472,8 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 		r.SetHeader("Content-Type", r.c.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -473,7 +481,13 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// URL returns the current working URL.
+// Error returns any error encountered constructing the request, if any.
+func (r *Request) Error() error {
+	return r.err
+}
+
+// URL returns the current working URL. Check the result of Error() to ensure
+// that the returned URL is valid.
 func (r *Request) URL() *url.URL {
 	p := r.pathPrefix
 	if r.namespaceSet && len(r.namespace) > 0 {
@@ -718,7 +732,6 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 
 		resp, err := client.Do(req)
-		updateURLMetrics(ctx, r, resp, err)
 		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return r.newStreamWatcher(resp)
@@ -778,22 +791,36 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error)
 	), nil
 }
 
-// updateURLMetrics is a convenience function for pushing metrics.
-// It also handles corner cases for incomplete/invalid request data.
-func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, err error) {
-	url := "none"
+// updateRequestResultMetric increments the RequestResult metric counter,
+// it should be called with the (response, err) tuple from the final
+// reply from the server.
+func updateRequestResultMetric(ctx context.Context, req *Request, resp *http.Response, err error) {
+	code, host := sanitize(req, resp, err)
+	metrics.RequestResult.Increment(ctx, code, req.verb, host)
+}
+
+// updateRequestRetryMetric increments the RequestRetry metric counter,
+// it should be called with the (response, err) tuple for each retry
+// except for the final attempt.
+func updateRequestRetryMetric(ctx context.Context, req *Request, resp *http.Response, err error) {
+	code, host := sanitize(req, resp, err)
+	metrics.RequestRetry.IncrementRetry(ctx, code, req.verb, host)
+}
+
+func sanitize(req *Request, resp *http.Response, err error) (string, string) {
+	host := "none"
 	if req.c.base != nil {
-		url = req.c.base.Host
+		host = req.c.base.Host
 	}
 
 	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
 	// system so we just report them as `<error>`.
-	if err != nil {
-		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
-	} else {
-		// Metrics for failure codes
-		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
+	code := "<error>"
+	if resp != nil {
+		code = strconv.Itoa(resp.StatusCode)
 	}
+
+	return code, host
 }
 
 // Stream formats and executes the request, and offers streaming of the response.
@@ -825,11 +852,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-		if r.body != nil {
-			req.Body = io.NopCloser(r.body)
-		}
 		resp, err := client.Do(req)
-		updateURLMetrics(ctx, r, resp, err)
 		retry.After(ctx, r, resp, err)
 		if err != nil {
 			// we only retry on an HTTP response with 'Retry-After' header
@@ -889,8 +912,20 @@ func (r *Request) requestPreflightCheck() error {
 }
 
 func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
+	var body io.Reader
+	switch {
+	case r.body != nil && r.bodyBytes != nil:
+		return nil, fmt.Errorf("cannot set both body and bodyBytes")
+	case r.body != nil:
+		body = r.body
+	case r.bodyBytes != nil:
+		// Create a new reader specifically for this request.
+		// Giving each request a dedicated reader allows retries to avoid races resetting the request body.
+		body = bytes.NewReader(r.bodyBytes)
+	}
+
 	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, r.body)
+	req, err := http.NewRequest(r.verb, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -962,7 +997,6 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return err
 		}
 		resp, err := client.Do(req)
-		updateURLMetrics(ctx, r, resp, err)
 		// The value -1 or a value of 0 with a non-nil Body indicates that the length is unknown.
 		// https://pkg.go.dev/net/http#Request
 		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
@@ -1285,6 +1319,14 @@ func (r Result) Get() (runtime.Object, error) {
 // error was returned.)
 func (r Result) StatusCode(statusCode *int) Result {
 	*statusCode = r.statusCode
+	return r
+}
+
+// ContentType returns the "Content-Type" response header into the passed
+// string, returning the Result for possible chaining. (Only valid if no
+// error code was returned.)
+func (r Result) ContentType(contentType *string) Result {
+	*contentType = r.contentType
 	return r
 }
 

@@ -63,7 +63,7 @@ import (
 )
 var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
   /* ... */
-  ginkgo.It("should sign the new added bootstrap tokens", func() {
+  ginkgo.It("should sign the new added bootstrap tokens", func(ctx context.Context) {
     /* ... */
   })
   /* etc */

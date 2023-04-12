@@ -80,7 +80,7 @@ var (
 func newConfig(platform string) *packages.Config {
 	platSplit := strings.Split(platform, "/")
 	goos, goarch := platSplit[0], platSplit[1]
-	mode := packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedSyntax | packages.NeedDeps | packages.NeedImports
+	mode := packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedSyntax | packages.NeedDeps | packages.NeedImports | packages.NeedModule
 	if *defuses {
 		mode = mode | packages.NeedTypesInfo
 	}
@@ -204,7 +204,7 @@ func (c *collector) verify(plat string) ([]string, error) {
 
 	for _, pkg := range allList {
 		if len(pkg.GoFiles) > 0 {
-			if len(pkg.Errors) > 0 {
+			if len(pkg.Errors) > 0 && (pkg.PkgPath == "main" || strings.Contains(pkg.PkgPath, ".")) {
 				errors = append(errors, pkg.Errors...)
 			}
 		}

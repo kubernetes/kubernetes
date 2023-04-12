@@ -35,9 +35,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against endpoint slices.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &discovery.EndpointSlice{} },
-		NewListFunc:              func() runtime.Object { return &discovery.EndpointSliceList{} },
-		DefaultQualifiedResource: discovery.Resource("endpointslices"),
+		NewFunc:                   func() runtime.Object { return &discovery.EndpointSlice{} },
+		NewListFunc:               func() runtime.Object { return &discovery.EndpointSliceList{} },
+		DefaultQualifiedResource:  discovery.Resource("endpointslices"),
+		SingularQualifiedResource: discovery.Resource("endpointslice"),
 
 		CreateStrategy: endpointslice.Strategy,
 		UpdateStrategy: endpointslice.Strategy,

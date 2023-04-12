@@ -18,13 +18,12 @@ package options
 
 import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
 	// When these values are updated, also update test/utils/image/manifest.go
 	defaultPodSandboxImageName    = "registry.k8s.io/pause"
-	defaultPodSandboxImageVersion = "3.8"
+	defaultPodSandboxImageVersion = "3.9"
 )
 
 var (
@@ -36,7 +35,6 @@ var (
 // default values.
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 	return &config.ContainerRuntimeOptions{
-		ContainerRuntime: kubetypes.RemoteContainerRuntime,
-		PodSandboxImage:  defaultPodSandboxImage,
+		PodSandboxImage: defaultPodSandboxImage,
 	}
 }

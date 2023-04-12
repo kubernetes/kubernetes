@@ -24,6 +24,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"go.opentelemetry.io/otel/attribute"
 	kjson "sigs.k8s.io/json"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -50,7 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
 )
 
 const (
@@ -61,9 +63,10 @@ const (
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Patch", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		ctx, span := tracing.Start(ctx, "Patch", traceFields(req)...)
+		defer span.End(500 * time.Millisecond)
 
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
@@ -88,7 +91,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
@@ -100,11 +103,12 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 
 		patchBytes, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Patch)
-		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(patchBytes)}, utiltrace.Field{"err", err})
 		if err != nil {
+			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(patchBytes)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(patchBytes)))
 
 		options := &metav1.PatchOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
@@ -122,7 +126,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		admit = admission.WithAudit(admit)
 
 		audit.LogRequestPatch(req.Context(), patchBytes)
-		trace.Step("Recorded the audit event")
+		span.AddEvent("Recorded the audit event")
 
 		baseContentType := runtime.ContentTypeJSON
 		if patchType == types.ApplyPatchType {
@@ -219,8 +223,6 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			patchType:   patchType,
 			patchBytes:  patchBytes,
 			userAgent:   req.UserAgent(),
-
-			trace: trace,
 		}
 
 		result, wasCreated, err := p.patchResource(ctx, scope)
@@ -228,16 +230,16 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		span.AddEvent("Object stored in database")
 
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
-		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
+		span.AddEvent("About to write a response")
+		defer span.AddEvent("Writing http response done")
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 
@@ -281,8 +283,6 @@ type patcher struct {
 	patchBytes  []byte
 	userAgent   string
 
-	trace *utiltrace.Trace
-
 	// Set at invocation-time (by applyPatch) and immutable thereafter
 	namespace         string
 	updatedObjectInfo rest.UpdatedObjectInfo
@@ -298,7 +298,7 @@ type patchMechanism interface {
 type jsonPatcher struct {
 	*patcher
 
-	fieldManager *fieldmanager.FieldManager
+	fieldManager *managedfields.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object) (runtime.Object, error) {
@@ -418,7 +418,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
-	fieldManager       *fieldmanager.FieldManager
+	fieldManager       *managedfields.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object) (runtime.Object, error) {
@@ -456,7 +456,7 @@ type applyPatcher struct {
 	options             *metav1.PatchOptions
 	creater             runtime.ObjectCreater
 	kind                schema.GroupVersionKind
-	fieldManager        *fieldmanager.FieldManager
+	fieldManager        *managedfields.FieldManager
 	userAgent           string
 	validationDirective string
 }
@@ -544,7 +544,7 @@ func strategicPatchObject(
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
-	p.trace.Step("About to apply patch")
+	tracing.SpanFromContext(ctx).AddEvent("About to apply patch")
 	currentObjectHasUID, err := hasUID(currentObject)
 	if err != nil {
 		return nil, err
@@ -593,7 +593,7 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 // and is given the currently persisted object and the patched object as input.
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-	p.trace.Step("About to check admission control")
+	tracing.SpanFromContext(ctx).AddEvent("About to check admission control")
 	var operation admission.Operation
 	var options runtime.Object
 	if hasUID, err := hasUID(currentObject); err != nil {
@@ -654,9 +654,6 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
-	if scope.FieldManager != nil {
-		transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
-	}
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)

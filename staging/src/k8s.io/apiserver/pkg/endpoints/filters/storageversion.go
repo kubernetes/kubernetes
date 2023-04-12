@@ -100,13 +100,13 @@ func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Man
 		}
 		// If the resource's StorageVersion is not in the to-be-updated list, let it pass.
 		// Non-persisted resources are not in the to-be-updated list, so they will pass.
-		gr := schema.GroupResource{requestInfo.APIGroup, requestInfo.Resource}
+		gr := schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}
 		if !svm.PendingUpdate(gr) {
 			handler.ServeHTTP(w, req)
 			return
 		}
 
-		gv := schema.GroupVersion{requestInfo.APIGroup, requestInfo.APIVersion}
+		gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable(fmt.Sprintf("wait for storage version registration to complete for resource: %v, last seen error: %v", gr, svm.LastUpdateError(gr))), s, gv, w, req)
 	})
 }

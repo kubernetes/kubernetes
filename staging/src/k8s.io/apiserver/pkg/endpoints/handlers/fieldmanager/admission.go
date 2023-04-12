@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/warning"
 )
@@ -70,7 +71,7 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
-	if _, err := DecodeManagedFields(managedFieldsAfterAdmission); err != nil {
+	if err := managedfields.ValidateManagedFields(managedFieldsAfterAdmission); err != nil {
 		objectMeta.SetManagedFields(managedFieldsBeforeAdmission)
 		warning.AddWarning(ctx, "",
 			fmt.Sprintf(InvalidManagedFieldsAfterMutatingAdmissionWarningFormat,

@@ -21,9 +21,11 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"reflect"
 
 	"github.com/spf13/pflag"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -107,32 +109,52 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
+	serviceResolver := &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()}
+	authResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider())
+	conversionFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
+	if err != nil {
+		return nil, err
+	}
+
+	crdRESTOptionsGetter, err := NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd)
+	if err != nil {
+		return nil, err
+	}
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
-			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider()),
+			CRDRESTOptionsGetter: crdRESTOptionsGetter,
+			ConversionFactory:    conversionFactory,
 		},
 	}
 	return config, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
-	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:             etcdOptions.StorageConfig,
-		StoragePrefix:             etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:          etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:     etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection:   etcdOptions.EnableGarbageCollection,
-		DeleteCollectionWorkers:   etcdOptions.DeleteCollectionWorkers,
-		CountMetricPollPeriod:     etcdOptions.StorageConfig.CountMetricPollPeriod,
-		StorageObjectCountTracker: etcdOptions.StorageConfig.StorageObjectCountTracker,
-	}
-	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+// This works on a copy of the etcd options so we don't mutate originals.
+// We assume that the input etcd options have been completed already.
+// Avoid messing with anything outside of changes to StorageConfig as that
+// may lead to unexpected behavior when the options are applied.
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) (genericregistry.RESTOptionsGetter, error) {
+	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	etcdOptions.WatchCacheSizes = nil      // this control is not provided for custom resources
+	etcdOptions.SkipHealthEndpoints = true // avoid double wiring of health checks
 
-	return ret
+	// creates a generic apiserver config for etcdOptions to mutate
+	c := genericapiserver.Config{}
+	if err := etcdOptions.ApplyTo(&c); err != nil {
+		return nil, err
+	}
+	restOptionsGetter := c.RESTOptionsGetter
+	if restOptionsGetter == nil {
+		return nil, fmt.Errorf("server.Config RESTOptionsGetter should not be nil")
+	}
+	// sanity check that no other fields are set
+	c.RESTOptionsGetter = nil
+	if !reflect.DeepEqual(c, genericapiserver.Config{}) {
+		return nil, fmt.Errorf("only RESTOptionsGetter should have been mutated in server.Config")
+	}
+	return restOptionsGetter, nil
 }
 
 type serviceResolver struct {

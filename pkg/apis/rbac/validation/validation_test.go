@@ -330,7 +330,7 @@ type ValidateClusterRoleTest struct {
 }
 
 func (v ValidateClusterRoleTest) test(t *testing.T) {
-	errs := ValidateClusterRole(&v.role)
+	errs := ValidateClusterRole(&v.role, ClusterRoleValidationOptions{false})
 	if len(errs) == 0 {
 		if v.wantErr {
 			t.Fatal("expected validation error")

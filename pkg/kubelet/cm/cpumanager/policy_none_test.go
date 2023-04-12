@@ -37,7 +37,7 @@ func TestNonePolicyAllocate(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -54,7 +54,7 @@ func TestNonePolicyRemove(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -78,7 +78,7 @@ func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(cpuIDs...),
+		defaultCPUSet: cpuset.New(cpuIDs...),
 	}
 
 	cpus := policy.GetAllocatableCPUs(st)

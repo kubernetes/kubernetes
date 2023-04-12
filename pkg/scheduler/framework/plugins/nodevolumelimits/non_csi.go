@@ -56,6 +56,8 @@ const (
 	gcePDVolumeFilterType = "GCE"
 	// azureDiskVolumeFilterType defines the filter name for azureDiskVolumeFilter.
 	azureDiskVolumeFilterType = "AzureDisk"
+	// cinderVolumeFilterType defines the filter name for cinderVolumeFilter.
+	cinderVolumeFilterType = "Cinder"
 
 	// ErrReasonMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
 	ErrReasonMaxVolumeCountExceeded = "node(s) exceed max volume count"
@@ -71,6 +73,15 @@ const AzureDiskName = names.AzureDiskLimits
 func NewAzureDisk(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	return newNonCSILimitsWithInformerFactory(azureDiskVolumeFilterType, informerFactory, fts), nil
+}
+
+// CinderName is the name of the plugin used in the plugin registry and configurations.
+const CinderName = names.CinderLimits
+
+// NewCinder returns function that initializes a new plugin and returns it.
+func NewCinder(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+	informerFactory := handle.SharedInformerFactory()
+	return newNonCSILimitsWithInformerFactory(cinderVolumeFilterType, informerFactory, fts), nil
 }
 
 // EBSName is the name of the plugin used in the plugin registry and configurations.
@@ -160,6 +171,10 @@ func newNonCSILimits(
 		name = AzureDiskName
 		filter = azureDiskVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case cinderVolumeFilterType:
+		name = CinderName
+		filter = cinderVolumeFilter
+		volumeLimitKey = v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		klog.ErrorS(errors.New("wrong filterName"), "Cannot create nonCSILimits plugin")
 		return nil
@@ -201,7 +216,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		return nil
 	}
 
-	newVolumes := make(sets.String)
+	newVolumes := sets.New[string]()
 	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
 		return framework.AsStatus(err)
 	}
@@ -233,7 +248,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	// count unique volumes
-	existingVolumes := make(sets.String)
+	existingVolumes := sets.New[string]()
 	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterVolumes(existingPod.Pod, false /* existing pod */, existingVolumes); err != nil {
 			return framework.AsStatus(err)
@@ -259,7 +274,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	return nil
 }
 
-func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.String) error {
+func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.Set[string]) error {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -460,6 +475,32 @@ var azureDiskVolumeFilter = VolumeFilter{
 	},
 }
 
+// cinderVolumeFilter is a VolumeFilter for filtering cinder Volumes.
+// It will be deprecated once Openstack cloudprovider has been removed from in-tree.
+var cinderVolumeFilter = VolumeFilter{
+	FilterVolume: func(vol *v1.Volume) (string, bool) {
+		if vol.Cinder != nil {
+			return vol.Cinder.VolumeID, true
+		}
+		return "", false
+	},
+
+	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+		if pv.Spec.Cinder != nil {
+			return pv.Spec.Cinder.VolumeID, true
+		}
+		return "", false
+	},
+
+	MatchProvisioner: func(sc *storage.StorageClass) bool {
+		return sc.Provisioner == csilibplugins.CinderInTreePluginName
+	},
+
+	IsMigrated: func(csiNode *storage.CSINode) bool {
+		return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName)
+	},
+}
+
 func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 	return func(node *v1.Node) int {
 		maxVolumesFromEnv := getMaxVolLimitFromEnv()
@@ -481,6 +522,8 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 			return defaultMaxGCEPDVolumes
 		case azureDiskVolumeFilterType:
 			return defaultMaxAzureDiskVolumes
+		case cinderVolumeFilterType:
+			return volumeutil.DefaultMaxCinderVolumes
 		default:
 			return -1
 		}

@@ -123,14 +123,16 @@ func (plugin *gitRepoPlugin) NewUnmounter(volName string, podUID types.UID) (vol
 	}, nil
 }
 
-func (plugin *gitRepoPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *gitRepoPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	gitVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			GitRepo: &v1.GitRepoVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(gitVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(gitVolume),
+	}, nil
 }
 
 // gitRepo volumes are directories which are pre-filled from a git repository.
@@ -233,7 +235,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
+	volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 
 	volumeutil.SetReady(b.getMetaDir())
 	return nil

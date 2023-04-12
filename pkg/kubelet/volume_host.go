@@ -128,16 +128,6 @@ func (kvh *kubeletVolumeHost) GetPodsDir() string {
 	return kvh.kubelet.getPodsDir()
 }
 
-// GetHostIDsForPod if the pod uses user namespaces, takes the uid and gid
-// inside the container and returns the host UID and GID those are mapped to on
-// the host. If containerUID/containerGID is nil, then it returns the host
-// UID/GID for ID 0 inside the container.
-// If the pod is not using user namespaces, as there is no mapping needed, the
-// same containerUID and containerGID params are returned.
-func (kvh *kubeletVolumeHost) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
-	return kvh.kubelet.getHostIDsForPod(pod, containerUID, containerGID)
-}
-
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	dir := kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
 	if runtime.GOOS == "windows" {
@@ -257,11 +247,21 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 }
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return kvh.secretManager.GetSecret
+	if kvh.secretManager != nil {
+		return kvh.secretManager.GetSecret
+	}
+	return func(namespace, name string) (*v1.Secret, error) {
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
+	}
 }
 
 func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return kvh.configMapManager.GetConfigMap
+	if kvh.configMapManager != nil {
+		return kvh.configMapManager.GetConfigMap
+	}
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
+	}
 }
 
 func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {

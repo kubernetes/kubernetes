@@ -23,6 +23,8 @@ package v1beta2
 type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	AssuredConcurrencyShares *int32                           `json:"assuredConcurrencyShares,omitempty"`
 	LimitResponse            *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
+	LendablePercent          *int32                           `json:"lendablePercent,omitempty"`
+	BorrowingLimitPercent    *int32                           `json:"borrowingLimitPercent,omitempty"`
 }
 
 // LimitedPriorityLevelConfigurationApplyConfiguration constructs an declarative configuration of the LimitedPriorityLevelConfiguration type for use with
@@ -44,5 +46,21 @@ func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithAssuredConcurr
 // If called multiple times, the LimitResponse field is set to the value of the last call.
 func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithLimitResponse(value *LimitResponseApplyConfiguration) *LimitedPriorityLevelConfigurationApplyConfiguration {
 	b.LimitResponse = value
+	return b
+}
+
+// WithLendablePercent sets the LendablePercent field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LendablePercent field is set to the value of the last call.
+func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithLendablePercent(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
+	b.LendablePercent = &value
+	return b
+}
+
+// WithBorrowingLimitPercent sets the BorrowingLimitPercent field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BorrowingLimitPercent field is set to the value of the last call.
+func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithBorrowingLimitPercent(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
+	b.BorrowingLimitPercent = &value
 	return b
 }

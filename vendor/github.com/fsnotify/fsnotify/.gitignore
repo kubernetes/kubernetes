@@ -1,6 +1,6 @@
-# Setup a Global .gitignore for OS and editor generated files:
-# https://help.github.com/articles/ignoring-files
-# git config --global core.excludesfile ~/.gitignore_global
+# go test -c output
+*.test
+*.test.exe
 
-.vagrant
-*.sublime-project
+# Output of go build ./cmd/fsnotify
+/fsnotify

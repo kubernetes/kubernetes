@@ -146,7 +146,7 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 // MountDevice implements Attacher.MountDevice. It is called by the kubelet to
 // mount device at the given mount path.
 // This method is idempotent, callers are responsible for retrying on failure.
-func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
+func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
 	klog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -174,7 +174,11 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	if ro {
 		options = append(options, "ro")
 	}
+	if mountArgs.SELinuxLabel != "" {
+		options = volutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+	}
 	mountOptions := volutil.MountOptionFromSpec(spec, options...)
+
 	err = attacher.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
 		os.Remove(deviceMountPath)

@@ -44,6 +44,7 @@ type ContainerRuntime interface {
 	RemoveContainers(containers []string) error
 	PullImage(image string) error
 	ImageExists(image string) (bool, error)
+	SandboxImage() (string, error)
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
@@ -172,4 +173,20 @@ func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
 	return detectCRISocketImpl(isExistingSocket, defaultKnownCRISockets)
+}
+
+// SandboxImage returns the sandbox image used by the container runtime
+func (runtime *CRIRuntime) SandboxImage() (string, error) {
+	args := []string{"-D=false", "info", "-o", "go-template", "--template", "{{.config.sandboxImage}}"}
+	out, err := runtime.crictl(args...).CombinedOutput()
+	if err != nil {
+		return "", errors.Wrapf(err, "output: %s, error", string(out))
+	}
+
+	sandboxImage := strings.TrimSpace(string(out))
+	if len(sandboxImage) > 0 {
+		return sandboxImage, nil
+	}
+
+	return "", errors.Errorf("the detected sandbox image is empty")
 }

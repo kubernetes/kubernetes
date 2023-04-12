@@ -22,12 +22,16 @@ limitations under the License.
 package cleanup
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,11 +47,17 @@ import (
 //
 //
 //
-//
-//
-//
-//
 // This must be line #50.
+
+func init() {
+	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
+		// This callback runs directly after NewDefaultFramework is done.
+		func(f *framework.Framework) {
+			ginkgo.BeforeEach(func() { framework.Logf("extension before") })
+			ginkgo.AfterEach(func() { framework.Logf("extension after") })
+		},
+	)
+}
 
 var _ = ginkgo.Describe("e2e", func() {
 	ginkgo.BeforeEach(func() {
@@ -56,14 +66,28 @@ var _ = ginkgo.Describe("e2e", func() {
 
 	f := framework.NewDefaultFramework("test-namespace")
 
+	// BeforeEach/AfterEach run in first-in-first-out order.
+
+	ginkgo.BeforeEach(func() {
+		framework.Logf("before #1")
+	})
+
+	ginkgo.BeforeEach(func() {
+		framework.Logf("before #2")
+	})
+
 	ginkgo.AfterEach(func() {
-		framework.Logf("after")
+		framework.Logf("after #1")
 		if f.ClientSet == nil {
 			framework.Fail("Wrong order of cleanup operations: framework.AfterEach already ran and cleared f.ClientSet.")
 		}
 	})
 
-	ginkgo.It("works", func() {
+	ginkgo.AfterEach(func() {
+		framework.Logf("after #2")
+	})
+
+	ginkgo.It("works", func(ctx context.Context) {
 		// DeferCleanup invokes in first-in-last-out order
 		ginkgo.DeferCleanup(func() {
 			framework.Logf("cleanup last")
@@ -71,35 +95,65 @@ var _ = ginkgo.Describe("e2e", func() {
 		ginkgo.DeferCleanup(func() {
 			framework.Logf("cleanup first")
 		})
+
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().PersistentVolumes().Delete), "simple", metav1.DeleteOptions{})
+		fail := func(ctx context.Context, name string) error {
+			return fmt.Errorf("fake error for %q", name)
+		}
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(fail), "failure") // Without a failure the output would not be shown in JUnit.
+
+		// More test cases can be added here without affeccting line numbering
+		// of existing tests.
 	})
 })
 
 const (
-	ginkgoOutput = `[BeforeEach] e2e
-  cleanup_test.go:53
+	ginkgoOutput = `> Enter [BeforeEach] e2e - cleanup_test.go:63 <time>
 INFO: before
-[BeforeEach] e2e
-  set up framework | framework.go:xxx
-STEP: Creating a kubernetes client
+< Exit [BeforeEach] e2e - cleanup_test.go:63 <time>
+> Enter [BeforeEach] e2e - set up framework | framework.go:xxx <time>
+STEP: Creating a kubernetes client - framework.go:xxx <time>
 INFO: >>> kubeConfig: yyy/kube.config
-STEP: Building a namespace api object, basename test-namespace
+STEP: Building a namespace api object, basename test-namespace - framework.go:xxx <time>
 INFO: Skipping waiting for service account
-[It] works
-  cleanup_test.go:66
-[AfterEach] e2e
-  cleanup_test.go:59
-INFO: after
-[DeferCleanup] e2e
-  cleanup_test.go:71
+< Exit [BeforeEach] e2e - set up framework | framework.go:xxx <time>
+> Enter [BeforeEach] e2e - cleanup_test.go:56 <time>
+INFO: extension before
+< Exit [BeforeEach] e2e - cleanup_test.go:56 <time>
+> Enter [BeforeEach] e2e - cleanup_test.go:71 <time>
+INFO: before #1
+< Exit [BeforeEach] e2e - cleanup_test.go:71 <time>
+> Enter [BeforeEach] e2e - cleanup_test.go:75 <time>
+INFO: before #2
+< Exit [BeforeEach] e2e - cleanup_test.go:75 <time>
+> Enter [It] works - cleanup_test.go:90 <time>
+< Exit [It] works - cleanup_test.go:90 <time>
+> Enter [AfterEach] e2e - cleanup_test.go:57 <time>
+INFO: extension after
+< Exit [AfterEach] e2e - cleanup_test.go:57 <time>
+> Enter [AfterEach] e2e - cleanup_test.go:79 <time>
+INFO: after #1
+< Exit [AfterEach] e2e - cleanup_test.go:79 <time>
+> Enter [AfterEach] e2e - cleanup_test.go:86 <time>
+INFO: after #2
+< Exit [AfterEach] e2e - cleanup_test.go:86 <time>
+> Enter [DeferCleanup (Each)] e2e - cleanup_test.go:103 <time>
+[FAILED] DeferCleanup callback returned error: fake error for "failure"
+In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
+< Exit [DeferCleanup (Each)] e2e - cleanup_test.go:103 <time>
+> Enter [DeferCleanup (Each)] e2e - cleanup_test.go:99 <time>
+< Exit [DeferCleanup (Each)] e2e - cleanup_test.go:99 <time>
+> Enter [DeferCleanup (Each)] e2e - cleanup_test.go:95 <time>
 INFO: cleanup first
-[DeferCleanup] e2e
-  cleanup_test.go:68
+< Exit [DeferCleanup (Each)] e2e - cleanup_test.go:95 <time>
+> Enter [DeferCleanup (Each)] e2e - cleanup_test.go:92 <time>
 INFO: cleanup last
-[DeferCleanup] e2e
-  dump namespaces | framework.go:xxx
-[DeferCleanup] e2e
-  tear down framework | framework.go:xxx
-STEP: Destroying namespace "test-namespace-zzz" for this suite.
+< Exit [DeferCleanup (Each)] e2e - cleanup_test.go:92 <time>
+> Enter [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
+< Exit [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
+> Enter [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
+STEP: Destroying namespace "test-namespace-zzz" for this suite. - framework.go:xxx <time>
+< Exit [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
 `
 )
 
@@ -143,11 +197,28 @@ func TestCleanup(t *testing.T) {
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
 
-	expected := output.SuiteResults{
-		output.TestResult{
-			Name:            "e2e works",
-			NormalizeOutput: normalizeOutput,
-			Output:          ginkgoOutput,
+	expected := output.TestResult{
+		NormalizeOutput: normalizeOutput,
+		Suite: reporters.JUnitTestSuite{
+			Tests:    1,
+			Failures: 1,
+			Errors:   0,
+			Disabled: 0,
+			Skipped:  0,
+
+			TestCases: []reporters.JUnitTestCase{
+				{
+					Name:   "[It] e2e works",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] DeferCleanup callback returned error: fake error for "failure"
+In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
+`,
+					},
+					SystemErr: ginkgoOutput,
+				},
+			},
 		},
 	}
 

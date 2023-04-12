@@ -31,9 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -57,8 +60,14 @@ var (
 	podSchedulingError              = testutils.PodSchedulingError
 	createAndWaitForNodesInCache    = testutils.CreateAndWaitForNodesInCache
 	waitForPodUnschedulable         = testutils.WaitForPodUnschedulable
+	waitForPodSchedulingGated       = testutils.WaitForPodSchedulingGated
 	waitForPodToScheduleWithTimeout = testutils.WaitForPodToScheduleWithTimeout
 )
+
+type PreEnqueuePlugin struct {
+	called int32
+	admit  bool
+}
 
 type PreFilterPlugin struct {
 	numPreFilterCalled int
@@ -87,10 +96,12 @@ type FilterPlugin struct {
 }
 
 type PostFilterPlugin struct {
+	name                string
 	fh                  framework.Handle
 	numPostFilterCalled int
 	failPostFilter      bool
 	rejectPostFilter    bool
+	breakPostFilter     bool
 }
 
 type ReservePlugin struct {
@@ -146,6 +157,7 @@ type PermitPlugin struct {
 }
 
 const (
+	enqueuePluginName            = "enqueue-plugin"
 	prefilterPluginName          = "prefilter-plugin"
 	postfilterPluginName         = "postfilter-plugin"
 	scorePluginName              = "score-plugin"
@@ -158,6 +170,7 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
+var _ framework.PreEnqueuePlugin = &PreEnqueuePlugin{}
 var _ framework.PreFilterPlugin = &PreFilterPlugin{}
 var _ framework.PostFilterPlugin = &PostFilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
@@ -182,6 +195,18 @@ func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
 		}
 		return plugin, nil
 	}
+}
+
+func (ep *PreEnqueuePlugin) Name() string {
+	return enqueuePluginName
+}
+
+func (ep *PreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	ep.called++
+	if ep.admit {
+		return nil
+	}
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, "not ready for scheduling")
 }
 
 // Name returns name of the score plugin.
@@ -440,7 +465,7 @@ func (pp *PreFilterPlugin) reset() {
 
 // Name returns name of the plugin.
 func (pp *PostFilterPlugin) Name() string {
-	return postfilterPluginName
+	return pp.name
 }
 
 func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
@@ -463,8 +488,12 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if pp.rejectPostFilter {
-		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting unschedulable for pod %v", pod.Name))
 	}
+	if pp.breakPostFilter {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("injecting unresolvable for pod %v", pod.Name))
+	}
+
 	return nil, framework.NewStatus(framework.Success, fmt.Sprintf("make room for pod %v to be schedulable", pod.Name))
 }
 
@@ -605,7 +634,7 @@ func TestPreFilterPlugin(t *testing.T) {
 	}
 }
 
-// TestPostFilterPlugin tests invocation of postfilter plugins.
+// TestPostFilterPlugin tests invocation of postFilter plugins.
 func TestPostFilterPlugin(t *testing.T) {
 	var numNodes int32 = 1
 	tests := []struct {
@@ -614,6 +643,9 @@ func TestPostFilterPlugin(t *testing.T) {
 		rejectFilter              bool
 		failScore                 bool
 		rejectPostFilter          bool
+		rejectPostFilter2         bool
+		breakPostFilter           bool
+		breakPostFilter2          bool
 		expectFilterNumCalled     int32
 		expectScoreNumCalled      int32
 		expectPostFilterNumCalled int
@@ -646,7 +678,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			rejectPostFilter:          true,
 			expectFilterNumCalled:     numNodes * 2,
 			expectScoreNumCalled:      1,
-			expectPostFilterNumCalled: 1,
+			expectPostFilterNumCalled: 2,
 		},
 		{
 			name:                      "Score failed and PostFilter failed",
@@ -656,31 +688,59 @@ func TestPostFilterPlugin(t *testing.T) {
 			rejectPostFilter:          true,
 			expectFilterNumCalled:     numNodes * 2,
 			expectScoreNumCalled:      1,
+			expectPostFilterNumCalled: 2,
+		},
+		{
+			name:                      "Filter failed and first PostFilter broken",
+			numNodes:                  numNodes,
+			rejectFilter:              true,
+			breakPostFilter:           true,
+			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      0,
 			expectPostFilterNumCalled: 1,
 		},
+		{
+			name:                      "Filter failed and second PostFilter broken",
+			numNodes:                  numNodes,
+			rejectFilter:              true,
+			rejectPostFilter:          true,
+			rejectPostFilter2:         true,
+			breakPostFilter2:          true,
+			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      0,
+			expectPostFilterNumCalled: 2,
+		},
 	}
+
+	var postFilterPluginName2 = postfilterPluginName + "2"
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a plugin registry for testing. Register a combination of filter and postFilter plugin.
 			var (
-				filterPlugin     = &FilterPlugin{}
-				scorePlugin      = &ScorePlugin{}
-				postFilterPlugin = &PostFilterPlugin{}
+				filterPlugin      = &FilterPlugin{}
+				scorePlugin       = &ScorePlugin{}
+				postFilterPlugin  = &PostFilterPlugin{name: postfilterPluginName}
+				postFilterPlugin2 = &PostFilterPlugin{name: postFilterPluginName2}
 			)
 			filterPlugin.rejectFilter = tt.rejectFilter
 			scorePlugin.failScore = tt.failScore
 			postFilterPlugin.rejectPostFilter = tt.rejectPostFilter
+			postFilterPlugin2.rejectPostFilter = tt.rejectPostFilter2
+			postFilterPlugin.breakPostFilter = tt.breakPostFilter
+			postFilterPlugin2.breakPostFilter = tt.breakPostFilter2
+
 			registry := frameworkruntime.Registry{
-				filterPluginName:     newPlugin(filterPlugin),
-				scorePluginName:      newPlugin(scorePlugin),
-				postfilterPluginName: newPlugin(postFilterPlugin),
+				filterPluginName:      newPlugin(filterPlugin),
+				scorePluginName:       newPlugin(scorePlugin),
+				postfilterPluginName:  newPlugin(postFilterPlugin),
+				postFilterPluginName2: newPlugin(postFilterPlugin2),
 			}
 
 			// Setup plugins for testing.
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+					SchedulerName: pointer.String(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
 						Filter: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
@@ -700,9 +760,10 @@ func TestPostFilterPlugin(t *testing.T) {
 						PostFilter: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
 								{Name: postfilterPluginName},
+								{Name: postFilterPluginName2},
 							},
 							// Need to disable default in-tree PostFilter plugins, as they will
-							// call RunFilterPlugins and hence impact the "numFilterCalled".
+							// call RunPostFilterPlugins and hence impact the "numPostFilterCalled".
 							Disabled: []configv1.Plugin{
 								{Name: "*"},
 							},
@@ -737,9 +798,6 @@ func TestPostFilterPlugin(t *testing.T) {
 				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled < tt.expectScoreNumCalled {
 					t.Errorf("Expected the score plugin to be called at least %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
-				if postFilterPlugin.numPostFilterCalled < tt.expectPostFilterNumCalled {
-					t.Errorf("Expected the postfilter plugin to be called at least %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
-				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
@@ -750,9 +808,11 @@ func TestPostFilterPlugin(t *testing.T) {
 				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled != tt.expectScoreNumCalled {
 					t.Errorf("Expected the score plugin to be called %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
-				if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
-					t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
-				}
+			}
+
+			numPostFilterCalled := postFilterPlugin.numPostFilterCalled + postFilterPlugin2.numPostFilterCalled
+			if numPostFilterCalled != tt.expectPostFilterNumCalled {
+				t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, numPostFilterCalled)
 			}
 		})
 	}
@@ -926,7 +986,7 @@ func TestPrebindPlugin(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 				Plugins: &configv1.Plugins{
 					PreBind: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -936,7 +996,7 @@ func TestPrebindPlugin(t *testing.T) {
 				},
 			},
 			{
-				SchedulerName: pointer.StringPtr("2nd-scheduler"),
+				SchedulerName: pointer.String("2nd-scheduler"),
 				Plugins: &configv1.Plugins{
 					Filter: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -1468,7 +1528,7 @@ func TestBindPlugin(t *testing.T) {
 	// Setup initial unreserve and bind plugins for testing.
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Disabled: []configv1.Plugin{
@@ -2089,6 +2149,72 @@ func TestPreScorePlugin(t *testing.T) {
 	}
 }
 
+// TestPreEnqueuePlugin tests invocation of enqueue plugins.
+func TestPreEnqueuePlugin(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+
+	// Create a plugin registry for testing. Register only a filter plugin.
+	enqueuePlugin := &PreEnqueuePlugin{}
+	// Plumb a preFilterPlugin to verify if it's called or not.
+	preFilterPlugin := &PreFilterPlugin{}
+	registry, prof := initRegistryAndConfig(t, enqueuePlugin, preFilterPlugin)
+
+	// Create the API server and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "enqueue-plugin", nil), 1,
+		scheduler.WithProfiles(prof),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+	defer testutils.CleanupTest(t, testCtx)
+
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		admitEnqueue bool
+	}{
+		{
+			name:         "pod is admitted to enqueue",
+			pod:          st.MakePod().Name("p").Namespace(testCtx.NS.Name).Container("pause").Obj(),
+			admitEnqueue: true,
+		},
+		{
+			name:         "pod is not admitted to enqueue",
+			pod:          st.MakePod().Name("p").Namespace(testCtx.NS.Name).SchedulingGates([]string{"foo"}).Container("pause").Obj(),
+			admitEnqueue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enqueuePlugin.admit = tt.admitEnqueue
+			// Create a best effort pod.
+			pod, err := createPausePod(testCtx.ClientSet, tt.pod)
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
+
+			if tt.admitEnqueue {
+				if err := waitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
+					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
+				}
+				// Also verify enqueuePlugin is called.
+				if enqueuePlugin.called == 0 {
+					t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
+				}
+			} else {
+				if err := waitForPodSchedulingGated(testCtx.ClientSet, pod, 10*time.Second); err != nil {
+					t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
+				}
+				// Also verify preFilterPlugin is not called.
+				if preFilterPlugin.numPreFilterCalled != 0 {
+					t.Errorf("Expected the preFilter plugin not to be called, but got %v", preFilterPlugin.numPreFilterCalled)
+				}
+			}
+
+			preFilterPlugin.reset()
+			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+		})
+	}
+}
+
 // TestPreemptWithPermitPlugin tests preempt with permit plugins.
 // It verifies how waitingPods behave in different scenarios:
 // - when waitingPods get preempted
@@ -2111,7 +2237,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 				Plugins: &configv1.Plugins{
 					Permit: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -2359,7 +2485,7 @@ func TestActivatePods(t *testing.T) {
 	// Setup initial filter plugin for testing.
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				PreFilter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -2430,6 +2556,8 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 
 	if nodeCount > 0 {
 		if _, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), nodeCount); err != nil {
+			// Make sure to cleanup the resources when initializing error.
+			testutils.CleanupTest(t, testCtx)
 			t.Fatal(err)
 		}
 	}
@@ -2450,6 +2578,8 @@ func initRegistryAndConfig(t *testing.T, plugins ...framework.Plugin) (framework
 		plugin := configv1.Plugin{Name: p.Name()}
 
 		switch p.(type) {
+		case *PreEnqueuePlugin:
+			pls.PreEnqueue.Enabled = append(pls.PreEnqueue.Enabled, plugin)
 		case *PreFilterPlugin:
 			pls.PreFilter.Enabled = append(pls.PreFilter.Enabled, plugin)
 		case *FilterPlugin:
@@ -2476,7 +2606,7 @@ func initRegistryAndConfig(t *testing.T, plugins ...framework.Plugin) (framework
 
 	versionedCfg := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins:       pls,
 		}},
 	}

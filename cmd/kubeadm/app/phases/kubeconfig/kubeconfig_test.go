@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -37,7 +36,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
@@ -492,7 +491,7 @@ func TestValidateKubeConfig(t *testing.T) {
 	if configWithSameClusterCaByExternalFile.Clusters[currentCtx.Cluster] == nil {
 		t.Fatal("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig")
 	}
-	tmpfile, err := ioutil.TempFile("", "external-ca.crt")
+	tmpfile, err := os.CreateTemp("", "external-ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

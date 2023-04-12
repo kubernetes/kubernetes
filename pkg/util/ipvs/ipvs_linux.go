@@ -225,9 +225,9 @@ func toVirtualServer(svc *libipvs.Service) (*VirtualServer, error) {
 		Timeout:   svc.Timeout,
 	}
 
-	// Test Flags >= 0x2, valid Flags ranges [0x2, 0x3]
+	// Test FlagHashed (0x2). A valid flag must include FlagHashed
 	if svc.Flags&FlagHashed == 0 {
-		return nil, fmt.Errorf("Flags of successfully created IPVS service should be >= %d since every service is hashed into the service table", FlagHashed)
+		return nil, fmt.Errorf("Flags of successfully created IPVS service should enable the flag (%x) since every service is hashed into the service table", FlagHashed)
 	}
 	// Sub Flags to 0x2
 	// 011 -> 001, 010 -> 000

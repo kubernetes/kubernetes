@@ -18,12 +18,15 @@ package apiclient
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	pkgversion "k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	core "k8s.io/client-go/testing"
 )
 
@@ -107,5 +110,26 @@ func TestLogDryRunAction(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestDiscoveryServerVersion(t *testing.T) {
+	dryRunGetter := &InitDryRunGetter{
+		controlPlaneName: "controlPlane",
+		serviceSubnet:    "serviceSubnet",
+	}
+	c := NewDryRunClient(dryRunGetter, io.Discard)
+	fakeclientDiscovery, ok := c.Discovery().(*fakediscovery.FakeDiscovery)
+	if !ok {
+		t.Fatal("could not obtain FakeDiscovery from dry run client")
+	}
+	const gitVersion = "foo"
+	fakeclientDiscovery.FakedServerVersion = &pkgversion.Info{GitVersion: gitVersion}
+	ver, err := c.Discovery().ServerVersion()
+	if err != nil {
+		t.Fatalf("Get ServerVersion failed.: %v", err)
+	}
+	if ver.GitVersion != gitVersion {
+		t.Fatalf("GitVersion did not match, expected %s, got %s", gitVersion, ver.GitVersion)
 	}
 }

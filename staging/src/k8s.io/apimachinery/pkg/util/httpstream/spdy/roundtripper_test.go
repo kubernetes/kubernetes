@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"io"
 	"net"
 	"net/http"
@@ -30,11 +29,11 @@ import (
 	"testing"
 
 	"github.com/armon/go-socks5"
-	"github.com/elazarl/goproxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 )
 
 type serverHandlerConfig struct {
@@ -291,6 +290,16 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
+		"proxied valid https, proxy auth with chars that percent escape -> valid https": {
+			serverFunc:             httpsServerValidHostname(t),
+			proxyServerFunc:        httpsServerValidHostname(t),
+			proxyAuth:              url.UserPassword("proxy user", "proxypasswd%"),
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -304,6 +313,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				},
 			))
 			defer server.Close()
+			t.Logf("Server URL: %v", server.URL)
 
 			serverURL, err := url.Parse(server.URL)
 			if err != nil {
@@ -321,18 +331,20 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			var proxyCalledWithAuth bool
 			var proxyCalledWithAuthHeader string
 			if testCase.proxyServerFunc != nil {
-				proxyHandler := goproxy.NewProxyHttpServer()
-
-				proxyHandler.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
-					proxyCalledWithHost = host
+				proxyHandler := utilnettesting.NewHTTPProxyHandler(t, func(req *http.Request) bool {
+					proxyCalledWithHost = req.Host
 
 					proxyAuthHeaderName := "Proxy-Authorization"
-					_, proxyCalledWithAuth = ctx.Req.Header[proxyAuthHeaderName]
-					proxyCalledWithAuthHeader = ctx.Req.Header.Get(proxyAuthHeaderName)
-					return goproxy.OkConnect, host
+					_, proxyCalledWithAuth = req.Header[proxyAuthHeaderName]
+					proxyCalledWithAuthHeader = req.Header.Get(proxyAuthHeaderName)
+					return true
 				})
+				defer proxyHandler.Wait()
 
 				proxy := testCase.proxyServerFunc(proxyHandler)
+				defer proxy.Close()
+
+				t.Logf("Proxy URL: %v", proxy.URL)
 
 				spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
 					proxierCalled = true
@@ -343,7 +355,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					proxyURL.User = testCase.proxyAuth
 					return proxyURL, nil
 				}
-				defer proxy.Close()
 			}
 
 			client := &http.Client{Transport: spdyTransport}
@@ -400,18 +411,19 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 			}
 
-			var expectedProxyAuth string
 			if testCase.proxyAuth != nil {
-				encodedCredentials := base64.StdEncoding.EncodeToString([]byte(testCase.proxyAuth.String()))
-				expectedProxyAuth = "Basic " + encodedCredentials
-			}
-			if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
+				expectedUsername := testCase.proxyAuth.Username()
+				expectedPassword, _ := testCase.proxyAuth.Password()
+				username, password, ok := (&http.Request{Header: http.Header{"Authorization": []string{proxyCalledWithAuthHeader}}}).BasicAuth()
+				if !ok {
+					t.Fatalf("invalid proxy auth header %s", proxyCalledWithAuthHeader)
+				}
+				if username != expectedUsername || password != expectedPassword {
+					t.Fatalf("expected proxy auth \"%s:%s\", got \"%s:%s\"", expectedUsername, expectedPassword, username, password)
+				}
+			} else if proxyCalledWithAuth {
 				t.Fatalf("proxy authorization unexpected, got %q", proxyCalledWithAuthHeader)
 			}
-			if proxyCalledWithAuthHeader != expectedProxyAuth {
-				t.Fatalf("expected to see a call to the proxy with credentials %q, got %q", testCase.proxyAuth, proxyCalledWithAuthHeader)
-			}
-
 		})
 	}
 }

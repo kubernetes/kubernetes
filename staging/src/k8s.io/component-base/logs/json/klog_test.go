@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package json
 
 import (
 	"bytes"
@@ -153,10 +153,10 @@ func TestKlogIntegration(t *testing.T) {
 			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"some","v":0,"pod":{"name":"pod-1","namespace":"kube-system"}}`,
 		},
 		{
-			name: "KObjs",
+			name: "KObjSlice",
 			fun: func() {
 				klog.InfoS("several", "pods",
-					klog.KObjs([]interface{}{
+					klog.KObjSlice([]interface{}{
 						&kmeta{Name: "pod-1", Namespace: "kube-system"},
 						&kmeta{Name: "pod-2", Namespace: "kube-system"},
 					}))

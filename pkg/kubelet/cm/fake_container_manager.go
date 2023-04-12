@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -231,8 +232,24 @@ func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.Contai
 	return nil
 }
 
+func (cm *FakeContainerManager) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	return nil
+}
+
 func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	cm.Lock()
 	defer cm.Unlock()
 	return nil
+}
+
+func (cm *FakeContainerManager) PrepareDynamicResources(pod *v1.Pod) error {
+	return nil
+}
+
+func (cm *FakeContainerManager) UnprepareDynamicResources(*v1.Pod) error {
+	return nil
+}
+
+func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }

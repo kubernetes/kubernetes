@@ -211,6 +211,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
+	if in.TopologyManagerPolicyOptions != nil {
+		in, out := &in.TopologyManagerPolicyOptions, &out.TopologyManagerPolicyOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.QOSReserved != nil {
 		in, out := &in.QOSReserved, &out.QOSReserved
 		*out = make(map[string]string, len(*in))
@@ -220,6 +227,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.CPUCFSQuotaPeriod = in.CPUCFSQuotaPeriod
+	if in.MaxParallelImagePulls != nil {
+		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls
+		*out = new(int32)
+		**out = **in
+	}
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard
 		*out = make(map[string]string, len(*in))

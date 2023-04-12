@@ -8558,6 +8558,180 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				invalid("spec.validation.openAPIV3Schema.properties[f@2].x-kubernetes-validations[0].rule"),
 			},
 		},
+		{
+			name: "x-kubernetes-validations rule with messageExpression",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `self + " should be \"string value\""`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "x-kubernetes-validations rule allows both message and messageExpression",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									Message:           `string should be set to "string value"`,
+									MessageExpression: `self + " should be \"string value\""`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "x-kubernetes-validations rule invalidated by messageExpression syntax error",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `self + " `,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule invalidated by messageExpression not returning a string",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `256`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule invalidated by messageExpression exceeding per-expression estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "true",
+									MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// forbidden due to messageExpression exceeding per-expression cost limit
+				forbidden("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule invalidated by messageExpression exceeding per-CRD estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "true",
+									MessageExpression: `string(self[0]) + string(self[1]) + string(self[2])`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// forbidden due to per-CRD cost limit being exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
+				// forbidden due to messageExpression exceeding per-expression cost limit
+				forbidden("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+				// additional message indicated messageExpression's contribution to exceeding the per-CRD cost limit
+				forbidden("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule invalidated by messageExpression being only empty spaces",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `     `,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -8620,6 +8794,30 @@ func TestSchemaHasDefaults(t *testing.T) {
 		expected := strings.Contains(strings.Replace(string(bs), `"default":null`, `"deleted":null`, -1), `"default":`)
 		if got := schemaHasDefaults(schema); got != expected {
 			t.Errorf("expected %v, got %v for: %s", expected, got, string(bs))
+		}
+	}
+}
+
+func BenchmarkSchemaHas(b *testing.B) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	if err := apiextensions.AddToScheme(scheme); err != nil {
+		b.Fatal(err)
+	}
+	fuzzerFuncs := fuzzer.MergeFuzzerFuncs(apiextensionsfuzzer.Funcs)
+	seed := int64(5577006791947779410)
+	f := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
+	// fuzz internal types
+	schema := &apiextensions.JSONSchemaProps{}
+	f.NilChance(0).NumElements(10, 10).MaxDepth(10).Fuzz(schema)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if SchemaHas(schema, func(_ *apiextensions.JSONSchemaProps) bool {
+			return false
+		}) {
+			b.Errorf("Function returned true")
 		}
 	}
 }

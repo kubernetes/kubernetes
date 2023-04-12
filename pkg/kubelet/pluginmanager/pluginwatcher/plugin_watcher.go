@@ -19,7 +19,6 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -73,12 +72,12 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 			select {
 			case event := <-fsWatcher.Events:
 				//TODO: Handle errors by taking corrective measures
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Has(fsnotify.Create) {
 					err := w.handleCreateEvent(event)
 					if err != nil {
 						klog.ErrorS(err, "Error when handling create event", "event", event)
 					}
-				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				} else if event.Has(fsnotify.Remove) {
 					w.handleDeleteEvent(event)
 				}
 				continue
@@ -159,13 +158,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	klog.V(6).InfoS("Handling create event", "event", event)
 
-	fi, err := os.Stat(event.Name)
-	// TODO: This is a workaround for Windows 20H2 issue for os.Stat(). Please see
-	// microsoft/Windows-Containers#97 for details.
-	// Once the issue is resvolved, the following os.Lstat() is not needed.
-	if err != nil && runtime.GOOS == "windows" {
-		fi, err = os.Lstat(event.Name)
-	}
+	fi, err := getStat(event)
 	if err != nil {
 		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
 	}
@@ -192,9 +185,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 }
 
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
-	if runtime.GOOS == "windows" {
-		socketPath = util.NormalizePath(socketPath)
-	}
+	socketPath = getSocketPath(socketPath)
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still
 	// a possibility that it has been deleted and recreated again before it is

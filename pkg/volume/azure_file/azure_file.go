@@ -202,7 +202,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 	return newSize, nil
 }
 
-func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (volume.ReconstructedVolume, error) {
 	azureVolume := &v1.Volume{
 		Name: volName,
 		VolumeSource: v1.VolumeSource{
@@ -212,7 +212,9 @@ func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(azureVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(azureVolume),
+	}, nil
 }
 
 // azureFile volumes represent mount of an AzureFile share.

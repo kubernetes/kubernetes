@@ -37,7 +37,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -236,6 +235,10 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
 			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 0, but is: %d", retryBackoff.Steps))
 		}
+	}
+
+	if o.RequestHeader != nil {
+		allErrors = append(allErrors, o.RequestHeader.Validate()...)
 	}
 
 	return allErrors
@@ -473,6 +476,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		}
 	}
 
+	authInfo.RequestHeaderConfig = authenticatorConfig.RequestHeaderConfig
 	authInfo.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
 		authInfo.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
@@ -484,10 +488,13 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		versionedInformer.Core().V1().ServiceAccounts().Lister(),
 		versionedInformer.Core().V1().Pods().Lister(),
 	)
+	authenticatorConfig.SecretsWriter = extclient.CoreV1()
 
-	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
-	)
+	if authenticatorConfig.BootstrapToken {
+		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+			versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
+		)
+	}
 
 	if egressSelector != nil {
 		egressDialer, err := egressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())

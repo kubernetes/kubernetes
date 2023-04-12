@@ -17,11 +17,14 @@ limitations under the License.
 package services
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"k8s.io/klog/v2"
@@ -55,6 +58,7 @@ func (es *e2eServices) run(t *testing.T) error {
 
 // start starts the tests embedded services or returns an error.
 func (es *e2eServices) start(t *testing.T) error {
+	_, ctx := ktesting.NewTestContext(t)
 	klog.Info("Starting e2e services...")
 	err := es.startEtcd(t)
 	if err != nil {
@@ -64,7 +68,7 @@ func (es *e2eServices) start(t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	err = es.startNamespaceController()
+	err = es.startNamespaceController(ctx)
 	if err != nil {
 		return nil
 	}
@@ -124,10 +128,10 @@ func (es *e2eServices) startAPIServer(etcdStorage *storagebackend.Config) error 
 }
 
 // startNamespaceController starts the embedded namespace controller or returns an error.
-func (es *e2eServices) startNamespaceController() error {
-	klog.Info("Starting namespace controller")
+func (es *e2eServices) startNamespaceController(ctx context.Context) error {
+	klog.FromContext(ctx).Info("Starting namespace controller")
 	es.nsController = NewNamespaceController(framework.TestContext.Host)
-	return es.nsController.Start()
+	return es.nsController.Start(ctx)
 }
 
 // getServicesHealthCheckURLs returns the health check urls for the internal services.
@@ -135,4 +139,8 @@ func getServicesHealthCheckURLs() []string {
 	return []string{
 		getAPIServerHealthCheckURL(),
 	}
+}
+
+func SetFeatureGatesForInProcessComponents(featureGates map[string]bool) error {
+	return utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
 }

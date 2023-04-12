@@ -32,7 +32,7 @@ Having a defined format allows:
 
 The file format is json, marshalled from a struct authcfg.Info.
 
-Clinet libraries in other languages should use the same format.
+Client libraries in other languages should use the same format.
 
 It is not intended to store general preferences, such as default
 namespace, output options, etc.  CLIs (such as kubectl) and UIs should

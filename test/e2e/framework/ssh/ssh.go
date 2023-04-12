@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -103,12 +103,12 @@ func GetSigner(provider string) (ssh.Signer, error) {
 func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	buffer, err := os.ReadFile(key)
 	if err != nil {
-		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
+		return nil, fmt.Errorf("error reading SSH key %s: %w", key, err)
 	}
 
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing SSH key: '%v'", err)
+		return nil, fmt.Errorf("error parsing SSH key: %w", err)
 	}
 
 	return signer, err
@@ -119,13 +119,13 @@ func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 // looking for internal IPs. If it can't find an internal IP for every node it
 // returns an error, though it still returns all hosts that it found in that
 // case.
-func NodeSSHHosts(c clientset.Interface) ([]string, error) {
-	nodelist := waitListSchedulableNodesOrDie(c)
+func NodeSSHHosts(ctx context.Context, c clientset.Interface) ([]string, error) {
+	nodelist := waitListSchedulableNodesOrDie(ctx, c)
 
 	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
 	// If  ExternalIPs aren't available for all nodes, try falling back to the InternalIPs.
 	if len(hosts) < len(nodelist.Items) {
-		e2elog.Logf("No external IP address on nodes, falling back to internal IPs")
+		framework.Logf("No external IP address on nodes, falling back to internal IPs")
 		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
 	}
 
@@ -146,12 +146,12 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 		go func(host string) {
 			defer wg.Done()
 			if canConnect(host) {
-				e2elog.Logf("Assuming SSH on host %s", host)
+				framework.Logf("Assuming SSH on host %s", host)
 				sshHostsLock.Lock()
 				sshHosts = append(sshHosts, net.JoinHostPort(host, SSHPort))
 				sshHostsLock.Unlock()
 			} else {
-				e2elog.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
+				framework.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
 			}
 		}(host)
 	}
@@ -168,7 +168,7 @@ func canConnect(host string) bool {
 	hostPort := net.JoinHostPort(host, SSHPort)
 	conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
 	if err != nil {
-		e2elog.Logf("cannot dial %s: %v", hostPort, err)
+		framework.Logf("cannot dial %s: %v", hostPort, err)
 		return false
 	}
 	conn.Close()
@@ -188,20 +188,20 @@ type Result struct {
 // NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
 // eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
-func NodeExec(nodeName, cmd, provider string) (Result, error) {
-	return SSH(cmd, net.JoinHostPort(nodeName, SSHPort), provider)
+func NodeExec(ctx context.Context, nodeName, cmd, provider string) (Result, error) {
+	return SSH(ctx, cmd, net.JoinHostPort(nodeName, SSHPort), provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
-func SSH(cmd, host, provider string) (Result, error) {
+func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 	result := Result{Host: host, Cmd: cmd}
 
 	// Get a signer for the provider.
 	signer, err := GetSigner(provider)
 	if err != nil {
-		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		return result, fmt.Errorf("error getting signer for provider %s: %w", provider, err)
 	}
 
 	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
@@ -212,14 +212,14 @@ func SSH(cmd, host, provider string) (Result, error) {
 	}
 
 	if bastion := os.Getenv(sshBastionEnvKey); len(bastion) > 0 {
-		stdout, stderr, code, err := runSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
+		stdout, stderr, code, err := runSSHCommandViaBastion(ctx, cmd, result.User, bastion, host, signer)
 		result.Stdout = stdout
 		result.Stderr = stderr
 		result.Code = code
 		return result, err
 	}
 
-	stdout, stderr, code, err := runSSHCommand(cmd, result.User, host, signer)
+	stdout, stderr, code, err := runSSHCommand(ctx, cmd, result.User, host, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
@@ -229,7 +229,7 @@ func SSH(cmd, host, provider string) (Result, error) {
 
 // runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error.
-func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
@@ -241,7 +241,7 @@ func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 	}
 	client, err := ssh.Dial("tcp", host, config)
 	if err != nil {
-		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
+		err = wait.PollWithContext(ctx, 5*time.Second, 20*time.Second, func(ctx context.Context) (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
 			if client, err = ssh.Dial("tcp", host, config); err != nil {
 				return false, nil // retrying, error will be logged above
@@ -250,12 +250,12 @@ func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 		})
 	}
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, host, err)
 	}
 	defer client.Close()
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s: %w", user, host, err)
 	}
 	defer session.Close()
 
@@ -275,7 +275,7 @@ func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
+			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
 	return bout.String(), berr.String(), code, err
@@ -285,7 +285,7 @@ func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 // host as specific user, along with any SSH-level error. It uses an SSH proxy to connect
 // to bastion, then via that tunnel connects to the remote host. Similar to
 // sshutil.RunSSHCommand but scoped to the needs of the test infrastructure.
-func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
+func runSSHCommandViaBastion(ctx context.Context, cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
 		User:            user,
@@ -295,7 +295,7 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 	}
 	bastionClient, err := ssh.Dial("tcp", bastion, config)
 	if err != nil {
-		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
+		err = wait.PollWithContext(ctx, 5*time.Second, 20*time.Second, func(ctx context.Context) (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, bastion, err)
 			if bastionClient, err = ssh.Dial("tcp", bastion, config); err != nil {
 				return false, err
@@ -304,26 +304,26 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 		})
 	}
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %v", user, bastion, err)
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, bastion, err)
 	}
 	defer bastionClient.Close()
 
 	conn, err := bastionClient.Dial("tcp", host)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error dialing %s from bastion: %v", host, err)
+		return "", "", 0, fmt.Errorf("error dialing %s from bastion: %w", host, err)
 	}
 	defer conn.Close()
 
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, host, config)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating forwarding connection %s from bastion: %v", host, err)
+		return "", "", 0, fmt.Errorf("error creating forwarding connection %s from bastion: %w", host, err)
 	}
 	client := ssh.NewClient(ncc, chans, reqs)
 	defer client.Close()
 
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s from bastion: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s from bastion: %w", user, host, err)
 	}
 	defer session.Close()
 
@@ -343,7 +343,7 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
+			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
 	return bout.String(), berr.String(), code, err
@@ -352,15 +352,15 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 // LogResult records result log
 func LogResult(result Result) {
 	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
-	e2elog.Logf("ssh %s: command:   %s", remote, result.Cmd)
-	e2elog.Logf("ssh %s: stdout:    %q", remote, result.Stdout)
-	e2elog.Logf("ssh %s: stderr:    %q", remote, result.Stderr)
-	e2elog.Logf("ssh %s: exit code: %d", remote, result.Code)
+	framework.Logf("ssh %s: command:   %s", remote, result.Cmd)
+	framework.Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	framework.Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	framework.Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
 // IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
-func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
+func IssueSSHCommandWithResult(ctx context.Context, cmd, provider string, node *v1.Node) (*Result, error) {
+	framework.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
@@ -383,8 +383,8 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
 	}
 
-	e2elog.Logf("SSH %q on %s(%s)", cmd, node.Name, host)
-	result, err := SSH(cmd, host, provider)
+	framework.Logf("SSH %q on %s(%s)", cmd, node.Name, host)
+	result, err := SSH(ctx, cmd, host, provider)
 	LogResult(result)
 
 	if result.Code != 0 || err != nil {
@@ -396,8 +396,8 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 }
 
 // IssueSSHCommand tries to execute a SSH command
-func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
-	_, err := IssueSSHCommandWithResult(cmd, provider, node)
+func IssueSSHCommand(ctx context.Context, cmd, provider string, node *v1.Node) error {
+	_, err := IssueSSHCommandWithResult(ctx, cmd, provider, node)
 	if err != nil {
 		return err
 	}
@@ -419,11 +419,11 @@ func nodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 }
 
 // waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+func waitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediate(pollNodeInterval, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
+	if wait.PollImmediateWithContext(ctx, pollNodeInterval, singleCallTimeout, func(ctx context.Context) (bool, error) {
+		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
@@ -437,8 +437,8 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 }
 
 // waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
-	nodes, err := waitListSchedulableNodes(c)
+func waitListSchedulableNodesOrDie(ctx context.Context, c clientset.Interface) *v1.NodeList {
+	nodes, err := waitListSchedulableNodes(ctx, c)
 	if err != nil {
 		expectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
 	}
@@ -454,7 +454,7 @@ func expectNoError(err error, explain ...interface{}) {
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
 func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
-		e2elog.Logf("Unexpected error occurred: %v", err)
+		framework.Logf("Unexpected error occurred: %v", err)
 	}
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }

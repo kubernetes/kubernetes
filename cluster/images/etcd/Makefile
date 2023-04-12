@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.5] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.7] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,15 +26,15 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.5
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.7
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.5
+LATEST_ETCD_VERSION?=3.5.7
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -43,7 +43,7 @@ ARCH?=amd64
 
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 20H2, ltsc2022
+# OS Version for the Windows images: 1809, ltsc2022
 OSVERSION ?= 1809
 
 # The output type could either be docker (local), or registry.
@@ -54,7 +54,7 @@ ALL_OS = linux windows
 ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
-ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
+ALL_OSVERSIONS.windows := 1809 ltsc2022
 ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-$(arch)-${osversion}))
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
@@ -83,7 +83,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.16.15
+GOLANG_VERSION := 1.17.13
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -125,10 +125,7 @@ build:
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOOS=$(OS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
-	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
-	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOOS=$(OS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
-	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
+	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
 
@@ -182,10 +179,10 @@ else
 	done
 
 	# Add this ENV variable in order to workaround an unsupported arch blocker
-	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
-	# On arm (which is 32-bit), it can't handle >1GB data in-memory, but it is very unlikely someone tinkering with their limited arm devices would reach such a high usage
-	# ppc64le is still quite untested, but compiles and is probably in the process of being validated by IBM.
-	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
+	# On arm (which is 32-bit), it can't handle >1GB data in-memory
+	ifeq ($(ARCH),arm)
+		cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
+	endif
 endif
 
 	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes

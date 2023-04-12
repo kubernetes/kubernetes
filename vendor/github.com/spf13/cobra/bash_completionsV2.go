@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -150,7 +164,7 @@ __%[1]s_process_completion_results() {
     __%[1]s_handle_special_char "$cur" =
 
     # Print the activeHelp statements before we finish
-    if [ ${#activeHelp} -ne 0 ]; then
+    if [ ${#activeHelp[*]} -ne 0 ]; then
         printf "\n";
         printf "%%s\n" "${activeHelp[@]}"
         printf "\n"

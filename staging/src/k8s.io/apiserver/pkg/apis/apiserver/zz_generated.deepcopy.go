@@ -189,16 +189,7 @@ func (in *TLSConfig) DeepCopy() *TLSConfig {
 func (in *TracingConfiguration) DeepCopyInto(out *TracingConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.Endpoint != nil {
-		in, out := &in.Endpoint, &out.Endpoint
-		*out = new(string)
-		**out = **in
-	}
-	if in.SamplingRatePerMillion != nil {
-		in, out := &in.SamplingRatePerMillion, &out.SamplingRatePerMillion
-		*out = new(int32)
-		**out = **in
-	}
+	in.TracingConfiguration.DeepCopyInto(&out.TracingConfiguration)
 	return
 }
 

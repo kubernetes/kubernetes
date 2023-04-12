@@ -32,18 +32,11 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 # Excluded check patterns are always skipped.
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
-  "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
+  "verify-golangci-lint-pr.sh"   # Don't run this as part of the block pull-kubernetes-verify yet. TODO(pohly): try this in a non-blocking job and then reconsider this.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
+  "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )
-
-# Exclude generated-files-remake in certain cases, if they're running in a separate job.
-if [[ ${EXCLUDE_FILES_REMAKE:-} =~ ^[yY]$ ]]; then
-  EXCLUDED_PATTERNS+=(
-    "verify-generated-files-remake.sh" # run in a separate job
-    )
-fi
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
