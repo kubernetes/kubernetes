@@ -293,8 +293,18 @@ func generateDeviceProperties(r *configs.Resources) ([]systemdDbus.Property, err
 			// rules separately to systemd) we can safely skip entries that don't
 			// have a corresponding path.
 			if _, err := os.Stat(entry.Path); err != nil {
-				logrus.Debugf("skipping device %s for systemd: %s", entry.Path, err)
-				continue
+				// Also check /sys/dev so that we don't depend on /dev/{block,char}
+				// being populated. (/dev/{block,char} is populated by udev, which
+				// isn't strictly required for systemd). Ironically, this happens most
+				// easily when starting containerd within a runc created container
+				// itself.
+
+				// We don't bother with securejoin here because we create entry.Path
+				// right above here, so we know it's safe.
+				if _, err := os.Stat("/sys" + entry.Path); err != nil {
+					logrus.Warnf("skipping device %s for systemd: %s", entry.Path, err)
+					continue
+				}
 			}
 		}
 		deviceAllowList = append(deviceAllowList, entry)
@@ -343,30 +353,50 @@ func isUnitExists(err error) bool {
 	return isDbusError(err, "org.freedesktop.systemd1.UnitExists")
 }
 
-func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Property) error {
+func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Property, ignoreExist bool) error {
 	statusChan := make(chan string, 1)
+	retry := true
+
+retry:
 	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
 		_, err := c.StartTransientUnitContext(context.TODO(), unitName, "replace", properties, statusChan)
 		return err
 	})
-	if err == nil {
-		timeout := time.NewTimer(30 * time.Second)
-		defer timeout.Stop()
-
-		select {
-		case s := <-statusChan:
-			close(statusChan)
-			// Please refer to https://pkg.go.dev/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
-			if s != "done" {
-				resetFailedUnit(cm, unitName)
-				return fmt.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
-			}
-		case <-timeout.C:
-			resetFailedUnit(cm, unitName)
-			return errors.New("Timeout waiting for systemd to create " + unitName)
+	if err != nil {
+		if !isUnitExists(err) {
+			return err
 		}
-	} else if !isUnitExists(err) {
+		if ignoreExist {
+			// TODO: remove this hack.
+			// This is kubelet making sure a slice exists (see
+			// https://github.com/opencontainers/runc/pull/1124).
+			return nil
+		}
+		if retry {
+			// In case a unit with the same name exists, this may
+			// be a leftover failed unit. Reset it, so systemd can
+			// remove it, and retry once.
+			resetFailedUnit(cm, unitName)
+			retry = false
+			goto retry
+		}
 		return err
+	}
+
+	timeout := time.NewTimer(30 * time.Second)
+	defer timeout.Stop()
+
+	select {
+	case s := <-statusChan:
+		close(statusChan)
+		// Please refer to https://pkg.go.dev/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
+		if s != "done" {
+			resetFailedUnit(cm, unitName)
+			return fmt.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
+		}
+	case <-timeout.C:
+		resetFailedUnit(cm, unitName)
+		return errors.New("Timeout waiting for systemd to create " + unitName)
 	}
 
 	return nil
