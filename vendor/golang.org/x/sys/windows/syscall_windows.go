@@ -824,6 +824,9 @@ const socket_error = uintptr(^uint32(0))
 //sys	WSAStartup(verreq uint32, data *WSAData) (sockerr error) = ws2_32.WSAStartup
 //sys	WSACleanup() (err error) [failretval==socket_error] = ws2_32.WSACleanup
 //sys	WSAIoctl(s Handle, iocc uint32, inbuf *byte, cbif uint32, outbuf *byte, cbob uint32, cbbr *uint32, overlapped *Overlapped, completionRoutine uintptr) (err error) [failretval==socket_error] = ws2_32.WSAIoctl
+//sys	WSALookupServiceBegin(querySet *WSAQUERYSET, flags uint32, handle *Handle) (err error) [failretval==socket_error] = ws2_32.WSALookupServiceBeginW
+//sys	WSALookupServiceNext(handle Handle, flags uint32, size *int32, querySet *WSAQUERYSET) (err error) [failretval==socket_error] = ws2_32.WSALookupServiceNextW
+//sys	WSALookupServiceEnd(handle Handle) (err error) [failretval==socket_error] = ws2_32.WSALookupServiceEnd
 //sys	socket(af int32, typ int32, protocol int32) (handle Handle, err error) [failretval==InvalidHandle] = ws2_32.socket
 //sys	sendto(s Handle, buf []byte, flags int32, to unsafe.Pointer, tolen int32) (err error) [failretval==socket_error] = ws2_32.sendto
 //sys	recvfrom(s Handle, buf []byte, flags int32, from *RawSockaddrAny, fromlen *int32) (n int32, err error) [failretval==-1] = ws2_32.recvfrom
@@ -1019,8 +1022,7 @@ func (rsa *RawSockaddrAny) Sockaddr() (Sockaddr, error) {
 		for n < len(pp.Path) && pp.Path[n] != 0 {
 			n++
 		}
-		bytes := (*[len(pp.Path)]byte)(unsafe.Pointer(&pp.Path[0]))[0:n]
-		sa.Name = string(bytes)
+		sa.Name = string(unsafe.Slice((*byte)(unsafe.Pointer(&pp.Path[0])), n))
 		return sa, nil
 
 	case AF_INET:
