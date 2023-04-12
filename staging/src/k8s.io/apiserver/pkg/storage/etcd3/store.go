@@ -136,7 +136,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	}
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, preparedKey)
-	metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
+	metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	).Then(
 		clientv3.OpPut(preparedKey, string(newData), opts...),
 	).Commit()
-	metrics.RecordEtcdRequestLatency("create", s.groupResourceString, startTime)
+	metrics.RecordEtcdRequest("create", s.groupResourceString, err, startTime)
 	if err != nil {
 		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 		return err
@@ -255,7 +255,7 @@ func (s *store) conditionalDelete(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
+		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +337,7 @@ func (s *store) conditionalDelete(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("delete", s.groupResourceString, startTime)
+		metrics.RecordEtcdRequest("delete", s.groupResourceString, err, startTime)
 		if err != nil {
 			return err
 		}
@@ -391,7 +391,7 @@ func (s *store) GuaranteedUpdate(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, preparedKey)
-		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
+		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -512,7 +512,7 @@ func (s *store) GuaranteedUpdate(
 		).Else(
 			clientv3.OpGet(preparedKey),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("update", s.groupResourceString, startTime)
+		metrics.RecordEtcdRequest("update", s.groupResourceString, err, startTime)
 		if err != nil {
 			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 			return err
@@ -575,7 +575,7 @@ func (s *store) Count(key string) (int64, error) {
 
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(context.Background(), preparedKey, clientv3.WithRange(clientv3.GetPrefixRangeEnd(preparedKey)), clientv3.WithCountOnly())
-	metrics.RecordEtcdRequestLatency("listWithCount", preparedKey, startTime)
+	metrics.RecordEtcdRequest("listWithCount", preparedKey, err, startTime)
 	if err != nil {
 		return 0, err
 	}
@@ -720,14 +720,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		numReturn := v.Len()
 		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
 	}()
+
+	metricsOp := "get"
+	if recursive {
+		metricsOp = "list"
+	}
+
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
-		if recursive {
-			metrics.RecordEtcdRequestLatency("list", s.groupResourceString, startTime)
-		} else {
-			metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
-		}
+		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
