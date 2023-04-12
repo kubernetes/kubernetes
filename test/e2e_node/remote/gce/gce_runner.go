@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package gce
 
 import (
 	"context"
@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/test/e2e_node/remote"
+
 	"github.com/google/uuid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -39,7 +41,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var _ Runner = (*GCERunner)(nil)
+var _ remote.Runner = (*GCERunner)(nil)
+
+func init() {
+	remote.RegisterRunner("gce", NewGCERunner)
+}
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -80,12 +86,12 @@ const (
 )
 
 type GCERunner struct {
-	cfg               Config
+	cfg               remote.Config
 	gceComputeService *compute.Service
 	gceImages         *internalGCEImageConfig
 }
 
-func NewGCERunner(cfg Config) *GCERunner {
+func NewGCERunner(cfg remote.Config) remote.Runner {
 	if cfg.InstanceNamePrefix == "" {
 		cfg.InstanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
 	}
@@ -108,7 +114,7 @@ func (g *GCERunner) Validate() error {
 	return nil
 }
 
-func (g *GCERunner) StartTests(suite TestSuite, archivePath string, results chan *TestResult) (numTests int) {
+func (g *GCERunner) StartTests(suite remote.TestSuite, archivePath string, results chan *remote.TestResult) (numTests int) {
 	for shortName := range g.gceImages.images {
 		imageConfig := g.gceImages.images[shortName]
 		numTests++
@@ -443,7 +449,7 @@ func ignitionInjectGCEPublicKey(path string, content string) string {
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func (g *GCERunner) testGCEImage(suite TestSuite, archivePath string, imageConfig *internalGCEImage, junitFileName string) *TestResult {
+func (g *GCERunner) testGCEImage(suite remote.TestSuite, archivePath string, imageConfig *internalGCEImage, junitFileName string) *remote.TestResult {
 	ginkgoFlagsStr := g.cfg.GinkgoFlags
 
 	host, err := g.createGCEInstance(imageConfig)
@@ -451,7 +457,7 @@ func (g *GCERunner) testGCEImage(suite TestSuite, archivePath string, imageConfi
 		defer g.deleteGCEInstance(host)
 	}
 	if err != nil {
-		return &TestResult{
+		return &remote.TestResult{
 			Err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", imageConfig.image, err),
 		}
 	}
@@ -461,27 +467,27 @@ func (g *GCERunner) testGCEImage(suite TestSuite, archivePath string, imageConfi
 	deleteFiles := !g.cfg.DeleteInstances && g.cfg.Cleanup
 
 	if err = g.registerGceHostIP(host); err != nil {
-		return &TestResult{
+		return &remote.TestResult{
 			Err:    err,
 			Host:   host,
 			ExitOK: false,
 		}
 	}
 
-	output, exitOk, err := RunRemote(RunRemoteConfig{
-		suite:          suite,
-		archive:        archivePath,
-		host:           host,
-		cleanup:        deleteFiles,
-		imageDesc:      imageConfig.imageDesc,
-		junitFileName:  junitFileName,
-		testArgs:       g.cfg.TestArgs,
-		ginkgoArgs:     ginkgoFlagsStr,
-		systemSpecName: g.cfg.SystemSpecName,
-		extraEnvs:      g.cfg.ExtraEnvs,
-		runtimeConfig:  g.cfg.RuntimeConfig,
+	output, exitOk, err := remote.RunRemote(remote.RunRemoteConfig{
+		Suite:          suite,
+		Archive:        archivePath,
+		Host:           host,
+		Cleanup:        deleteFiles,
+		ImageDesc:      imageConfig.imageDesc,
+		JunitFileName:  junitFileName,
+		TestArgs:       g.cfg.TestArgs,
+		GinkgoArgs:     ginkgoFlagsStr,
+		SystemSpecName: g.cfg.SystemSpecName,
+		ExtraEnvs:      g.cfg.ExtraEnvs,
+		RuntimeConfig:  g.cfg.RuntimeConfig,
 	})
-	result := TestResult{
+	result := remote.TestResult{
 		Output: output,
 		Err:    err,
 		Host:   host,
@@ -495,7 +501,7 @@ func (g *GCERunner) testGCEImage(suite TestSuite, archivePath string, imageConfi
 		klog.Errorf("Failed to collect serial Output from node %q: %v", host, err)
 	} else {
 		logFilename := "serial-1.log"
-		err := WriteLog(host, logFilename, serialPortOutput.Contents)
+		err := remote.WriteLog(host, logFilename, serialPortOutput.Contents)
 		if err != nil {
 			klog.Errorf("Failed to write serial Output from node %q to %q: %v", host, logFilename, err)
 		}
@@ -618,11 +624,11 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		}
 		externalIP := g.getExternalIP(instance)
 		if len(externalIP) > 0 {
-			AddHostnameIP(name, externalIP)
+			remote.AddHostnameIP(name, externalIP)
 		}
 
 		var output string
-		output, err = SSH(name, "sh", "-c",
+		output, err = remote.SSH(name, "sh", "-c",
 			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
@@ -647,7 +653,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 				time.Sleep(time.Second * 20)
 			}
 			var finished string
-			finished, err = SSH(name, "ls", "/var/lib/cloud/instance/boot-finished")
+			finished, err = remote.SSH(name, "ls", "/var/lib/cloud/instance/boot-finished")
 			if err != nil {
 				err = fmt.Errorf("instance %s has not finished cloud-init script: %s", name, finished)
 				continue
@@ -702,7 +708,7 @@ func (g *GCERunner) registerGceHostIP(host string) error {
 	}
 	externalIP := g.getExternalIP(instance)
 	if len(externalIP) > 0 {
-		AddHostnameIP(host, externalIP)
+		remote.AddHostnameIP(host, externalIP)
 	}
 	return nil
 }
@@ -744,7 +750,7 @@ func (g *GCERunner) updateKernelArguments(instance *compute.Instance, image stri
 		return nil
 	}
 
-	out, err := SSH(instance.Name, "sh", "-c", fmt.Sprintf("'%s'", strings.Join(cmd, "&&")))
+	out, err := remote.SSH(instance.Name, "sh", "-c", fmt.Sprintf("'%s'", strings.Join(cmd, "&&")))
 	if err != nil {
 		klog.Errorf("failed to run command %s: out: %s, Err: %v", cmd, out, err)
 		return err
@@ -767,7 +773,7 @@ func (g *GCERunner) rebootInstance(instance *compute.Instance) error {
 	// wait until the instance will not response to SSH
 	klog.Info("Reboot the node and wait for instance not to be available via SSH")
 	if waitErr := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
-		if _, err := SSH(instance.Name, "reboot"); err != nil {
+		if _, err := remote.SSH(instance.Name, "reboot"); err != nil {
 			return true, nil
 		}
 
@@ -779,7 +785,7 @@ func (g *GCERunner) rebootInstance(instance *compute.Instance) error {
 	// wait until the instance will response again to SSH
 	klog.Info("Wait for instance to be available via SSH")
 	if waitErr := wait.PollImmediate(30*time.Second, 5*time.Minute, func() (bool, error) {
-		if _, err := SSH(instance.Name, "sh", "-c", "date"); err != nil {
+		if _, err := remote.SSH(instance.Name, "sh", "-c", "date"); err != nil {
 			return false, nil
 		}
 		return true, nil
