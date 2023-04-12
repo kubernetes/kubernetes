@@ -22,9 +22,9 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/cache"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -33,8 +33,7 @@ import (
 // same RoundTripper will be returned for configs with identical TLS options If
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
-	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports *cache.LRUExpireCache // tlsCacheKey -> *http.Transport
 }
 
 // DialerStopCh is stop channel that is passed down to dynamic cert dialer.
@@ -44,7 +43,7 @@ var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{transports: cache.NewLRUExpireCache(256)}
 
 type tlsCacheKey struct {
 	insecure           bool
@@ -77,13 +76,9 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	}
 
 	if canCache {
-		// Ensure we only create a single transport for the given TLS options
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
 		// See if we already have a custom transport for this config
-		if t, ok := c.transports[key]; ok {
-			return t, nil
+		if t, ok := c.transports.Get(key); ok {
+			return t.(*http.Transport), nil
 		}
 	}
 
@@ -132,7 +127,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 
 	if canCache {
 		// Cache a single transport for these options
-		c.transports[key] = transport
+		c.transports.Add(key, transport, 19*time.Hour)
 	}
 
 	return transport, nil
