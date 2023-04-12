@@ -430,7 +430,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 
 	klog.V(4).Infof("mount of disk %s succeeded", dir)
 	if !b.readOnly {
-		if err := volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil)); err != nil {
+		if err := volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil)); err != nil {
 			klog.Errorf("SetVolumeOwnership returns error %v", err)
 		}
 	}
