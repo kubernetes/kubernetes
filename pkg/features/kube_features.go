@@ -1080,7 +1080,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 
-	NodeLogQuery: {Default: false, PreRelease: featuregate.Alpha},
+	NodeLogQuery: {Default: true, PreRelease: featuregate.Alpha},
 
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
