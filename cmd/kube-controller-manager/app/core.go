@@ -379,7 +379,7 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 		controllerContext.InformerFactory.Resource().V1alpha2().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1alpha2().ResourceClaimTemplates())
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
+		return nil, true, fmt.Errorf("failed to start resource claim controller: %v", err)
 	}
 	go ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
 	return nil, true, nil
