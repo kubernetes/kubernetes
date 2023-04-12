@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1803,6 +1804,80 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateNode(t *testing.T) {
+	nodeReadyStatus := v1.NodeStatus{
+		Allocatable: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU: resource.MustParse("100m"),
+		},
+		Conditions: []v1.NodeCondition{
+			{
+				Type:   v1.NodeReady,
+				Status: v1.ConditionTrue,
+			},
+		},
+	}
+	_, esController := newController(nil, time.Duration(0))
+	sliceInfo := &topologycache.SliceInfo{
+		ServiceKey:  "ns/svc",
+		AddressType: discovery.AddressTypeIPv4,
+		ToCreate: []*discovery.EndpointSlice{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "svc-abc",
+					Namespace: "ns",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc",
+						discovery.LabelManagedBy:   controllerName,
+					},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses:  []string{"172.18.0.2"},
+						Zone:       utilpointer.String("zone-a"),
+						Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
+					},
+					{
+						Addresses:  []string{"172.18.1.2"},
+						Zone:       utilpointer.String("zone-b"),
+						Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
+					},
+				},
+				AddressType: discovery.AddressTypeIPv4,
+			},
+		},
+	}
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+		Status:     nodeReadyStatus,
+	}
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
+		Status:     nodeReadyStatus,
+	}
+	esController.nodeStore.Add(node1)
+	esController.nodeStore.Add(node2)
+	esController.addNode(node1)
+	esController.addNode(node2)
+	// The Nodes don't have the zone label, AddHints should fail.
+	_, _, eventsBuilders := esController.topologyCache.AddHints(sliceInfo)
+	require.Len(t, eventsBuilders, 1)
+	assert.Contains(t, eventsBuilders[0].Message, topologycache.InsufficientNodeInfo)
+
+	updateNode1 := node1.DeepCopy()
+	updateNode1.Labels = map[string]string{v1.LabelTopologyZone: "zone-a"}
+	updateNode2 := node2.DeepCopy()
+	updateNode2.Labels = map[string]string{v1.LabelTopologyZone: "zone-b"}
+
+	// After adding the zone label to the Nodes and calling the event handler updateNode, AddHints should succeed.
+	esController.nodeStore.Update(updateNode1)
+	esController.nodeStore.Update(updateNode2)
+	esController.updateNode(node1, updateNode1)
+	esController.updateNode(node2, updateNode2)
+	_, _, eventsBuilders = esController.topologyCache.AddHints(sliceInfo)
+	require.Len(t, eventsBuilders, 1)
+	assert.Contains(t, eventsBuilders[0].Message, topologycache.TopologyAwareHintsEnabled)
 }
 
 // Test helpers
