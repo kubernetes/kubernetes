@@ -351,6 +351,8 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", updatedPod.Name, p.Pod.Name)
 	}
 
+	// the updated pods remains in the unschedulable queue if the latest update
+	// does not contain expected changes
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(medPriorityPodInfo.Pod), q.SchedulingCycle())
 	if len(q.unschedulablePods.podInfoMap) != 1 {
 		t.Error("Expected unschedulablePods to be 1.")
