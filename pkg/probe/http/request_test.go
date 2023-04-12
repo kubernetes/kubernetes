@@ -65,6 +65,17 @@ func Test_v1HeaderToHTTPHeader(t *testing.T) {
 			},
 		},
 		{
+			name: "case insensitive",
+			headerList: []v1.HTTPHeader{
+				{Name: "HOST", Value: "example.com"},
+				{Name: "FOO-bAR", Value: "value"},
+			},
+			want: http.Header{
+				"Host":    {"example.com"},
+				"Foo-Bar": {"value"},
+			},
+		},
+		{
 			name:       "empty input",
 			headerList: []v1.HTTPHeader{},
 			want:       http.Header{},
