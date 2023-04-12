@@ -511,6 +511,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"NodeLogQuery": false}
 			conf.EnableSystemLogQuery = true
 			return conf
 		},

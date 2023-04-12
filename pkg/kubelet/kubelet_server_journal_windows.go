@@ -36,10 +36,15 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 	}
 
 	psCmd := "Get-WinEvent -FilterHashtable @{LogName='Application'"
-	if n.SinceTime != nil {
+	if len(n.Since) > 0 {
+		psCmd += fmt.Sprintf("; StartTime='%s'", n.Since)
+	} else if n.SinceTime != nil {
 		psCmd += fmt.Sprintf("; StartTime='%s'", n.SinceTime.Format(dateLayout))
 	}
-	if n.UntilTime != nil {
+
+	if len(n.Until) > 0 {
+		psCmd += fmt.Sprintf("; EndTime='%s'", n.Until)
+	} else if n.UntilTime != nil {
 		psCmd += fmt.Sprintf("; EndTime='%s'", n.UntilTime.Format(dateLayout))
 	}
 	var providers []string

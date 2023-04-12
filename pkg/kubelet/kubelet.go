@@ -1584,16 +1584,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 					http.Error(w, errs.ToAggregate().Error(), http.StatusBadRequest)
 					return
 				} else if nlq != nil {
-					if req.URL.Path != "/" && req.URL.Path != "" {
-						http.Error(w, "path not allowed in query mode", http.StatusNotAcceptable)
-						return
-					}
 					if errs := nlq.validate(); len(errs) > 0 {
 						http.Error(w, errs.ToAggregate().Error(), http.StatusNotAcceptable)
 						return
 					}
 					// Validation ensures that the request does not query services and files at the same time
-					if len(nlq.Services) > 0 {
+					// OCP: Presence of journal in the path indicates it is a query for service(s)
+					if len(nlq.Services) > 0 || req.URL.Path == "journal" || req.URL.Path == "journal/" {
 						journal.ServeHTTP(w, req)
 						return
 					}
