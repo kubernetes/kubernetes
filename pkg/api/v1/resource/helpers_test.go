@@ -984,6 +984,67 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:    "no limited containers should result in no limits for the pod",
+			expectedLimits: v1.ResourceList{},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited init container
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		p := &v1.Pod{
