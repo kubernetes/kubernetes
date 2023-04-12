@@ -126,7 +126,7 @@ func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...strin
 		return nil, err
 	}
 
-	s := sets.NewString(namespaces...)
+	s := sets.New(namespaces...)
 	scheduled := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]

@@ -387,7 +387,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
 	diagnosis := framework.Diagnosis{
 		NodeToStatusMap:      make(framework.NodeToStatusMap),
-		UnschedulablePlugins: sets.NewString(),
+		UnschedulablePlugins: sets.New[string](),
 	}
 
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()

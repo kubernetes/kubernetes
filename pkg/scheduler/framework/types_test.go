@@ -1339,26 +1339,26 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 	tests := []struct {
 		name string
 		term *v1.PodAffinityTerm
-		want sets.String
+		want sets.Set[string]
 	}{
 		{
 			name: "podAffinityTerm_namespace_empty",
 			term: &v1.PodAffinityTerm{},
-			want: sets.String{metav1.NamespaceDefault: sets.Empty{}},
+			want: sets.Set[string]{metav1.NamespaceDefault: sets.Empty{}},
 		},
 		{
 			name: "podAffinityTerm_namespace_not_empty",
 			term: &v1.PodAffinityTerm{
 				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
 			},
-			want: sets.NewString(metav1.NamespacePublic, metav1.NamespaceSystem),
+			want: sets.New(metav1.NamespacePublic, metav1.NamespaceSystem),
 		},
 		{
 			name: "podAffinityTerm_namespace_selector_not_nil",
 			term: &v1.PodAffinityTerm{
 				NamespaceSelector: &metav1.LabelSelector{},
 			},
-			want: sets.String{},
+			want: sets.Set[string]{},
 		},
 	}
 

@@ -491,7 +491,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node1",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -519,7 +519,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -595,7 +595,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter:        true,
 		},
@@ -631,7 +631,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node1",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -704,7 +704,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node2",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")},
 			runPreFilter:        true,
 		},
 		{

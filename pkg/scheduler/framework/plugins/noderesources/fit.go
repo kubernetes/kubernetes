@@ -82,8 +82,8 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources                sets.String
-	ignoredResourceGroups           sets.String
+	ignoredResources                sets.Set[string]
+	ignoredResourceGroups           sets.Set[string]
 	enableInPlacePodVerticalScaling bool
 	handle                          framework.Handle
 	resourceAllocationScorer
@@ -165,8 +165,8 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	}
 
 	return &Fit{
-		ignoredResources:                sets.NewString(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.NewString(args.IgnoredResourceGroups...),
+		ignoredResources:                sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 		handle:                          h,
 		resourceAllocationScorer:        *scorePlugin(args),
@@ -286,7 +286,7 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
 	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
