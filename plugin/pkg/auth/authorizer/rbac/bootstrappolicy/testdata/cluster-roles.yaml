@@ -760,21 +760,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - endpoints
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
     - nodes
     verbs:
     - get
