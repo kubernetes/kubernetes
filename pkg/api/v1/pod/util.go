@@ -313,7 +313,9 @@ func IsPodTerminal(pod *v1.Pod) bool {
 	return IsPodPhaseTerminal(pod.Status.Phase)
 }
 
-// IsPodTerminating
+// IsPodTerminating returns true if a pod is terminating.
+// This means that the DeletionTimeStamp is set and
+// the pod is in a nonterminal phase.
 func IsPodTerminating(pod *v1.Pod) bool {
 	if IsPodTerminal(pod) {
 		return false
