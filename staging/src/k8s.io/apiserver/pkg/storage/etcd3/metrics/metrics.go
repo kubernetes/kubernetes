@@ -49,7 +49,7 @@ var (
 	)
 	etcdRequestCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "etcd_request_total",
+			Name:           "etcd_requests_total",
 			Help:           "Etcd request counts for each operation and object type.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},

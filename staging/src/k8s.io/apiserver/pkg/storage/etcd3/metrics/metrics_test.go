@@ -120,9 +120,9 @@ etcd_request_duration_seconds_bucket{operation="foo",type="bar",le="60"} 1
 etcd_request_duration_seconds_bucket{operation="foo",type="bar",le="+Inf"} 1
 etcd_request_duration_seconds_sum{operation="foo",type="bar"} 0.3
 etcd_request_duration_seconds_count{operation="foo",type="bar"} 1
-# HELP etcd_request_total [ALPHA] Etcd request counts for each operation and object type.
-# TYPE etcd_request_total counter
-etcd_request_total{operation="foo",type="bar"} 1
+# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{operation="foo",type="bar"} 1
 `,
 		},
 		{
@@ -159,9 +159,9 @@ etcd_request_duration_seconds_bucket{operation="foo",type="bar",le="60"} 1
 etcd_request_duration_seconds_bucket{operation="foo",type="bar",le="+Inf"} 1
 etcd_request_duration_seconds_sum{operation="foo",type="bar"} 0.3
 etcd_request_duration_seconds_count{operation="foo",type="bar"} 1
-# HELP etcd_request_total [ALPHA] Etcd request counts for each operation and object type.
-# TYPE etcd_request_total counter
-etcd_request_total{operation="foo",type="bar"} 1
+# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{operation="foo",type="bar"} 1
 # HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type.
 # TYPE etcd_request_errors_total counter
 etcd_request_errors_total{operation="foo",type="bar"} 1
