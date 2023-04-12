@@ -207,7 +207,9 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 // Iterate through all pods in desired state of world, and remove if they no
 // longer exist
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
+	podsFromCache := make(map[volumetypes.UniquePodName]struct{})
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
+		podsFromCache[volumetypes.UniquePodName(volumeToMount.Pod.UID)] = struct{}{}
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
 
@@ -254,6 +256,23 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)
+	}
+
+	// Cleanup orphanded entries from processedPods
+	dswp.pods.Lock()
+	orphanedPods := make([]volumetypes.UniquePodName, 0, len(dswp.pods.processedPods))
+	for k := range dswp.pods.processedPods {
+		if _, ok := podsFromCache[k]; !ok {
+			orphanedPods = append(orphanedPods, k)
+		}
+	}
+	dswp.pods.Unlock()
+	for _, orphanedPod := range orphanedPods {
+		uid := types.UID(orphanedPod)
+		_, podExists := dswp.podManager.GetPodByUID(uid)
+		if !podExists && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(uid) {
+			dswp.deleteProcessedPod(orphanedPod)
+		}
 	}
 
 	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()
