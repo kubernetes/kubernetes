@@ -396,6 +396,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			conf.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{
 				MaxContainerRestartPeriod: &metav1.Duration{Duration: 0 * time.Second},
 			}
+
 			return conf
 		},
 		errMsg: "invalid configuration: CrashLoopBackOff.MaxContainerRestartPeriod (got: 0 seconds) must be set between 1s and 300s",
@@ -620,6 +621,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		}, {
 			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": false}
 				conf.EnableSystemLogQuery = true
 				return conf
 			},

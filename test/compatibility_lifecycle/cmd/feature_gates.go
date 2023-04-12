@@ -268,6 +268,9 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 
 func verifyAlphaFeatures(featureList []featureInfo) error {
 	for _, f := range featureList {
+		if f.Name == "NodeLogQuery" {
+			continue
+		}
 		for _, spec := range f.VersionedSpecs {
 			if spec.PreRelease == "Alpha" && spec.Default {
 				return fmt.Errorf("alpha feature %s cannot be enabled by default", f.Name)

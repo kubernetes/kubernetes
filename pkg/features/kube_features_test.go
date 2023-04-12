@@ -77,6 +77,10 @@ func TestEnsureAlphaGatesAreNotSwitchedOnByDefault(t *testing.T) {
 		if feature == "WindowsHostNetwork" {
 			return
 		}
+		// OpenShift-specific
+		if feature == "NodeLogQuery" {
+			return
+		}
 		if spec.PreRelease == featuregate.Alpha && spec.Default {
 			t.Errorf("The alpha feature gate %q is switched on by default", feature)
 		}
