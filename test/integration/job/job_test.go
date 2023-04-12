@@ -1456,7 +1456,7 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobBackOff)
 	}
 
-	// The third pod should be created witin 8 seconds
+	// The third pod should be created within 8 seconds
 	// This check rules out double counting
 	if diff >= 4*jobcontroller.DefaultJobBackOff.Seconds() {
 		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobBackOff)
