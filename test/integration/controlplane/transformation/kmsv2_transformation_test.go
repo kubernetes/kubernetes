@@ -139,16 +139,7 @@ resources:
 `
 
 	providerName := "kms-provider"
-	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMSv2 Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
@@ -242,16 +233,7 @@ resources:
        name: kms-provider
        endpoint: unix:///@kms-provider.sock
 `
-	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMSv2 Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
@@ -433,16 +415,7 @@ resources:
        name: kms-provider
        endpoint: unix:///@kms-provider.sock
 `
-	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMSv2 Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
@@ -557,30 +530,8 @@ resources:
        endpoint: unix:///@kms-provider-2.sock
 `
 
-	pluginMock1, err := kmsv2mock.NewBase64Plugin("@kms-provider-1.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
-	}
-
-	if err := pluginMock1.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock1.CleanUp()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
-		t.Fatalf("Failed to start plugin #1, err: %v", err)
-	}
-
-	pluginMock2, err := kmsv2mock.NewBase64Plugin("@kms-provider-2.sock")
-	if err != nil {
-		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
-	}
-	if err := pluginMock2.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock2.CleanUp()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
-		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
-	}
+	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
@@ -658,16 +609,7 @@ resources:
        endpoint: unix:///@kms-provider.sock
 `
 
-	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMSv2 Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	t.Cleanup(pluginMock.CleanUp)
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
