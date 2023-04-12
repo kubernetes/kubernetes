@@ -100,6 +100,16 @@ func TestConvertObject(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "converting multiple including service to neworking.k8s.io/v1",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/serviceandingress.yaml",
+			outputVersion: "networking.k8s.io/v1",
+			fields: []checkField{
+				{
+					expected: "apiVersion: networking.k8s.io/v1",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

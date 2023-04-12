@@ -180,7 +180,7 @@ func (o *ConvertOptions) RunConvert() error {
 
 	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	internalVersionJSONEncoder := unstructured.NewJSONFallbackEncoder(internalEncoder)
-	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
+	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder, o.IOStreams)
 	if err != nil {
 		return err
 	}
@@ -192,8 +192,8 @@ func (o *ConvertOptions) RunConvert() error {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
-	objects, err := asVersionedObjects(infos, specifiedOutputVersion, encoder)
+func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) (runtime.Object, error) {
+	objects, err := asVersionedObjects(infos, specifiedOutputVersion, encoder, iostream)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 // asVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
+func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
@@ -263,6 +263,14 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 
 		converted, err := tryConvert(scheme.Scheme, info.Object, targetVersions...)
 		if err != nil {
+			// Dont fail on not registered error converting objects.
+			// Simply warn the user with the error returned from api-machinery and continue with the rest of the file
+			// fail on all other errors
+			if runtime.IsNotRegisteredError(err) {
+				fmt.Fprintln(iostream.ErrOut, err.Error())
+				continue
+			}
+
 			return nil, err
 		}
 		objects = append(objects, converted)
