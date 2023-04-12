@@ -30,6 +30,7 @@ _tmp="${KUBE_ROOT}/_tmp_build_tag_files"
 mkdir -p "${_tmp}"
 
 function cleanup {
+    go clean -modcache
     rm -rf "$_tmp"
     rm -f "tempfile"
 }
