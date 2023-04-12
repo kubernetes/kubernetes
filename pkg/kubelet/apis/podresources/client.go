@@ -18,7 +18,9 @@ package podresources
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"google.golang.org/grpc/credentials"
 	"time"
 
 	"google.golang.org/grpc"
@@ -39,16 +41,24 @@ func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSiz
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// 创建TransportCredentials实例
+	creds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
+
+	connOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(creds),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(dialer),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	conn, err := grpc.DialContext(ctx, addr, connOptions...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
+		return nil, nil, fmt.Errorf("error dialing address %s: %v", addr, err)
 	}
+
 	return v1alpha1.NewPodResourcesListerClient(conn), conn, nil
 }
 
