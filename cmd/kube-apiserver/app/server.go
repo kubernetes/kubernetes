@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/dynamic"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
@@ -461,10 +462,17 @@ func buildGenericConfig(
 		return
 	}
 
+	dynamicExternalClient, err := dynamic.NewForConfig(kubeClientConfig)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to create real dynamic external client: %w", err)
+		return
+	}
+
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
-		kubeClientConfig,
+		clientgoExternalClient,
+		dynamicExternalClient,
 		utilfeature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
