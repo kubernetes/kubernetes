@@ -30,15 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/transport"
-	openapicommon "k8s.io/kube-openapi/pkg/common"
-
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/component-base/version"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -52,6 +50,7 @@ import (
 	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 func init() {
