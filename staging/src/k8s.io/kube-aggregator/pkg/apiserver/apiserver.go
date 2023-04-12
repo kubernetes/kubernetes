@@ -38,6 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
@@ -133,7 +134,7 @@ type APIAggregator struct {
 
 	// proxyCurrentCertKeyContent holds he client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
 	proxyCurrentCertKeyContent certKeyFunc
-	proxyTransport             *http.Transport
+	proxyTransportDial         *transport.DialHolder
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
@@ -166,10 +167,6 @@ type APIAggregator struct {
 	// from all aggregated apiservices so they are available from /apis endpoint
 	// when discovery with resources are requested
 	discoveryAggregationController DiscoveryAggregationController
-
-	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
-	// overwrites proxyTransport dialer if not nil
-	egressSelector *egressselector.EgressSelector
 
 	// rejectForwardingRedirects is whether to allow to forward redirect response
 	rejectForwardingRedirects bool
@@ -217,10 +214,23 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
+	var proxyTransportDial *transport.DialHolder
+	if c.GenericConfig.EgressSelector != nil {
+		egressDialer, err := c.GenericConfig.EgressSelector.Lookup(egressselector.Cluster.AsNetworkContext())
+		if err != nil {
+			return nil, err
+		}
+		if egressDialer != nil {
+			proxyTransportDial = &transport.DialHolder{Dial: egressDialer}
+		}
+	} else if c.ExtraConfig.ProxyTransport != nil && c.ExtraConfig.ProxyTransport.DialContext != nil {
+		proxyTransportDial = &transport.DialHolder{Dial: c.ExtraConfig.ProxyTransport.DialContext}
+	}
+
 	s := &APIAggregator{
 		GenericAPIServer:                genericServer,
 		delegateHandler:                 delegationTarget.UnprotectedHandler(),
-		proxyTransport:                  c.ExtraConfig.ProxyTransport,
+		proxyTransportDial:              proxyTransportDial,
 		proxyHandlers:                   map[string]*proxyHandler{},
 		handledGroups:                   sets.String{},
 		handledAlwaysLocalDelegatePaths: sets.String{},
@@ -229,7 +239,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		serviceResolver:                 c.ExtraConfig.ServiceResolver,
 		openAPIConfig:                   c.GenericConfig.OpenAPIConfig,
 		openAPIV3Config:                 c.GenericConfig.OpenAPIV3Config,
-		egressSelector:                  c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
 		rejectForwardingRedirects:       c.ExtraConfig.RejectForwardingRedirects,
 	}
@@ -303,10 +312,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.ApiregistrationV1(),
-		c.ExtraConfig.ProxyTransport,
+		proxyTransportDial,
 		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 		s.serviceResolver,
-		c.GenericConfig.EgressSelector,
 		c.GenericConfig.HasBeenReadySignal(),
 	)
 	if err != nil {
@@ -499,7 +507,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		// Forward calls to discovery manager to update discovery document
 		if s.discoveryAggregationController != nil {
 			handlerCopy := *proxyHandler
-			handlerCopy.setServiceAvailable(true)
+			handlerCopy.setServiceAvailable()
 			s.discoveryAggregationController.AddAPIService(apiService, &handlerCopy)
 		}
 		return nil
@@ -515,9 +523,8 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	proxyHandler := &proxyHandler{
 		localDelegate:              s.delegateHandler,
 		proxyCurrentCertKeyContent: s.proxyCurrentCertKeyContent,
-		proxyTransport:             s.proxyTransport,
+		proxyTransportDial:         s.proxyTransportDial,
 		serviceResolver:            s.serviceResolver,
-		egressSelector:             s.egressSelector,
 		rejectForwardingRedirects:  s.rejectForwardingRedirects,
 	}
 	proxyHandler.updateAPIService(apiService)
