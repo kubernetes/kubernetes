@@ -1823,6 +1823,7 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1830,17 +1831,41 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	forceAllEvents, err := cacher.waitUntilWatchCacheFreshAndForceAllEvents(context.TODO(), 105, storage.ListOptions{SendInitialEvents: pointer.Bool(true)})
-	require.NotNil(t, err, "the target method should return non nil error")
-	require.Equal(t, err.Error(), "Timeout: Too large resource version: 105, current: 100")
-	require.False(t, forceAllEvents, "the target method after returning an error should NOT instruct the caller to ask for all events in the cache (full state)")
+	opts := storage.ListOptions{
+		Predicate:         storage.Everything,
+		SendInitialEvents: pointer.Bool(true),
+		ResourceVersion:   "105",
+	}
+	opts.Predicate.AllowWatchBookmarks = true
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+	verifyEvents(t, w, []watch.Event{
+		{
+			Type: watch.Error,
+			Object: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).Error(),
+				Details: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).(*apierrors.StatusError).Status().Details,
+				Reason:  metav1.StatusReasonTimeout,
+				Code:    504,
+			},
+		},
+	}, true)
 
 	go func() {
 		cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
 	}()
-	forceAllEvents, err = cacher.waitUntilWatchCacheFreshAndForceAllEvents(context.TODO(), 105, storage.ListOptions{SendInitialEvents: pointer.Bool(true)})
-	require.NoError(t, err)
-	require.True(t, forceAllEvents, "the target method should instruct the caller to ask for all events in the cache (full state)")
+	w, err = cacher.Watch(context.Background(), "pods/ns", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+	verifyEvents(t, w, []watch.Event{
+		{
+			Type:   watch.Added,
+			Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+		},
+	}, true)
 }
 
 type fakeStorage struct {
