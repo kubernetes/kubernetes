@@ -73,10 +73,10 @@ func Test_newNodeLogQuery(t *testing.T) {
 		want    *nodeLogQuery
 		wantErr bool
 	}{
-		{name: "empty", query: url.Values{}, want: nil},
-		{query: url.Values{"unknown": []string{"true"}}, want: nil},
+		{name: "empty", query: url.Values{}, want: &nodeLogQuery{}},
+		{query: url.Values{"unknown": []string{"true"}}, want: &nodeLogQuery{}},
 
-		{query: url.Values{"sinceTime": []string{""}}, want: nil},
+		{query: url.Values{"sinceTime": []string{""}}, want: &nodeLogQuery{}},
 		{query: url.Values{"sinceTime": []string{"2019-12-04 02:00:00"}}, wantErr: true},
 		{query: url.Values{"sinceTime": []string{"2019-12-04 02:00:00.000"}}, wantErr: true},
 		{query: url.Values{"sinceTime": []string{"2019-12-04 02"}}, wantErr: true},
@@ -84,7 +84,7 @@ func Test_newNodeLogQuery(t *testing.T) {
 		{query: url.Values{"sinceTime": []string{validTimeValue}},
 			want: &nodeLogQuery{options: options{SinceTime: &validT}}},
 
-		{query: url.Values{"untilTime": []string{""}}, want: nil},
+		{query: url.Values{"untilTime": []string{""}}, want: &nodeLogQuery{}},
 		{query: url.Values{"untilTime": []string{"2019-12-04 02:00:00"}}, wantErr: true},
 		{query: url.Values{"untilTime": []string{"2019-12-04 02:00:00.000"}}, wantErr: true},
 		{query: url.Values{"untilTime": []string{"2019-12-04 02"}}, wantErr: true},
@@ -98,7 +98,7 @@ func Test_newNodeLogQuery(t *testing.T) {
 
 		{query: url.Values{"pattern": []string{"foo"}}, want: &nodeLogQuery{options: options{Pattern: "foo"}}},
 
-		{query: url.Values{"boot": []string{""}}, want: nil},
+		{query: url.Values{"boot": []string{""}}, want: &nodeLogQuery{}},
 		{query: url.Values{"boot": []string{"0"}}, want: &nodeLogQuery{options: options{Boot: intPtr(0)}}},
 		{query: url.Values{"boot": []string{"-23"}}, want: &nodeLogQuery{options: options{Boot: intPtr(-23)}}},
 		{query: url.Values{"boot": []string{"foo"}}, wantErr: true},
@@ -111,6 +111,11 @@ func Test_newNodeLogQuery(t *testing.T) {
 		{query: url.Values{"query": []string{"foo", "/bar"}}, want: &nodeLogQuery{Services: []string{"foo"},
 			Files: []string{"/bar"}}},
 		{query: url.Values{"query": []string{"/foo", `\bar`}}, want: &nodeLogQuery{Files: []string{"/foo", `\bar`}}},
+		{query: url.Values{"unit": []string{""}}, wantErr: true},
+		{query: url.Values{"unit": []string{"   ", "    "}}, wantErr: true},
+		{query: url.Values{"unit": []string{"foo"}}, want: &nodeLogQuery{Services: []string{"foo"}}},
+		{query: url.Values{"unit": []string{"foo", "bar"}}, want: &nodeLogQuery{Services: []string{"foo", "bar"}}},
+		{query: url.Values{"unit": []string{"foo", "/bar"}}, want: &nodeLogQuery{Services: []string{"foo", "/bar"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.query.Encode(), func(t *testing.T) {
@@ -173,10 +178,12 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		pattern  = "foo"
 		invalid  = "foo\\"
 	)
-	since, err := time.Parse(time.RFC3339, "2023-01-04T02:00:00Z")
+	sinceTime, err := time.Parse(time.RFC3339, "2023-01-04T02:00:00Z")
 	assert.NoError(t, err)
-	until, err := time.Parse(time.RFC3339, "2023-02-04T02:00:00Z")
+	untilTime, err := time.Parse(time.RFC3339, "2023-02-04T02:00:00Z")
 	assert.NoError(t, err)
+	since := "2019-12-04 02:00:00"
+	until := "2019-12-04 03:00:00"
 
 	tests := []struct {
 		name     string
@@ -185,23 +192,37 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		options  options
 		wantErr  bool
 	}{
-		{name: "empty", wantErr: true},
-		{name: "empty with options", options: options{SinceTime: &since}, wantErr: true},
+		{name: "empty"},
+		{name: "empty with options", options: options{SinceTime: &sinceTime}},
 		{name: "one service", Services: []string{service1}},
 		{name: "two services", Services: []string{service1, service2}},
 		{name: "one service one file", Services: []string{service1}, Files: []string{file1}, wantErr: true},
 		{name: "two files", Files: []string{file1, file2}, wantErr: true},
 		{name: "one file options", Files: []string{file1}, options: options{Pattern: pattern}, wantErr: true},
 		{name: "invalid pattern", Services: []string{service1}, options: options{Pattern: invalid}, wantErr: true},
-		{name: "since", Services: []string{service1}, options: options{SinceTime: &since}},
-		{name: "until", Services: []string{service1}, options: options{UntilTime: &until}},
-		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},
-			wantErr: true},
-		// boot is not supported on Windows.
-		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}, wantErr: runtime.GOOS == "windows"},
+		{name: "sinceTime", Services: []string{service1}, options: options{SinceTime: &sinceTime}},
+		{name: "untilTime", Services: []string{service1}, options: options{UntilTime: &untilTime}},
+		{name: "sinceTime untilTime", Services: []string{service1}, options: options{SinceTime: &untilTime,
+			UntilTime: &sinceTime}, wantErr: true},
+		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}},
 		{name: "boot out of range", Services: []string{service1}, options: options{Boot: intPtr(1)}, wantErr: true},
 		{name: "tailLines", Services: []string{service1}, options: options{TailLines: intPtr(100)}},
 		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: intPtr(100000)}},
+		{name: "since", Services: []string{service1}, options: options{ocAdm: ocAdm{Since: since}}},
+		{name: "since RFC3339", Services: []string{service1}, options: options{ocAdm: ocAdm{Since: sinceTime.String()}}, wantErr: true},
+		{name: "until", Services: []string{service1}, options: options{ocAdm: ocAdm{Until: until}}},
+		{name: "until RFC3339", Services: []string{service1}, options: options{ocAdm: ocAdm{Until: untilTime.String()}}, wantErr: true},
+		{name: "since sinceTime", Services: []string{service1}, options: options{SinceTime: &sinceTime,
+			ocAdm: ocAdm{Since: since}}, wantErr: true},
+		{name: "until sinceTime", Services: []string{service1}, options: options{SinceTime: &sinceTime,
+			ocAdm: ocAdm{Until: until}}, wantErr: true},
+		{name: "since untilTime", Services: []string{service1}, options: options{UntilTime: &untilTime,
+			ocAdm: ocAdm{Since: since}}, wantErr: true},
+		{name: "until untilTime", Services: []string{service1}, options: options{UntilTime: &untilTime,
+			ocAdm: ocAdm{Until: until}}, wantErr: true},
+		{name: "format", Services: []string{service1}, options: options{ocAdm: ocAdm{Format: "cat"}}},
+		{name: "format invalid", Services: []string{service1}, options: options{ocAdm: ocAdm{Format: "foo"}},
+			wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

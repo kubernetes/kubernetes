@@ -1130,7 +1130,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NFTablesProxyMode: {Default: true, PreRelease: featuregate.Beta},
 
-	NodeLogQuery: {Default: false, PreRelease: featuregate.Beta},
+	NodeLogQuery: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 

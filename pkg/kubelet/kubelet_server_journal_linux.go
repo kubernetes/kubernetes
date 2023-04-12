@@ -31,14 +31,20 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 	args := []string{
 		"--utc",
 		"--no-pager",
-		"--output=short-precise",
 	}
-	if n.SinceTime != nil {
+
+	if len(n.Since) > 0 {
+		args = append(args, fmt.Sprintf("--since=%s", n.Since))
+	} else if n.SinceTime != nil {
 		args = append(args, fmt.Sprintf("--since=%s", n.SinceTime.Format(dateLayout)))
 	}
-	if n.UntilTime != nil {
-		args = append(args, fmt.Sprintf("--until=%s", n.UntilTime.Format(dateLayout)))
+
+	if len(n.Until) > 0 {
+		args = append(args, fmt.Sprintf("--until=%s", n.Until))
+	} else if n.UntilTime != nil {
+		args = append(args, fmt.Sprintf("--until=%s", n.SinceTime.Format(dateLayout)))
 	}
+
 	if n.TailLines != nil {
 		args = append(args, "--pager-end", fmt.Sprintf("--lines=%d", *n.TailLines))
 	}
@@ -49,11 +55,20 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 	}
 	if len(n.Pattern) > 0 {
 		args = append(args, "--grep="+n.Pattern)
+		args = append(args, fmt.Sprintf("--case-sensitive=%t", n.CaseSensitive))
 	}
 
 	if n.Boot != nil {
 		args = append(args, "--boot", fmt.Sprintf("%d", *n.Boot))
 	}
+
+	var output string
+	if len(n.Format) > 0 {
+		output = n.Format
+	} else {
+		output = "short-precise"
+	}
+	args = append(args, fmt.Sprintf("--output=%s", output))
 
 	return "journalctl", args, nil
 }

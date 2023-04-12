@@ -35,7 +35,7 @@ import (
 	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
-
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -54,6 +54,7 @@ var (
 	// character cannot be used to create invalid sequences. This is intended as a broad defense against malformed
 	// input that could cause an escape.
 	reServiceNameUnsafeCharacters = regexp.MustCompile(`[^a-zA-Z\-_.:0-9@]+`)
+	reRelativeDate                = regexp.MustCompile(`^(\+|\-)?[\d]+(s|m|h|d)$`)
 )
 
 // journalServer returns text output from the OS specific service logger to view
@@ -114,6 +115,19 @@ type options struct {
 	// Pattern filters log entries by the provided regex pattern. On Linux nodes, this pattern will be read as a
 	// PCRE2 regex, on Windows nodes it will be read as a PowerShell regex. Support for this is implementation specific.
 	Pattern string
+	ocAdm
+}
+
+// ocAdm encapsulates the oc adm node-logs specific options
+type ocAdm struct {
+	// Since is an ISO timestamp or relative date from which to show logs
+	Since string
+	// Until is an ISO timestamp or relative date until which to show logs
+	Until string
+	// Format is the alternate format (short, cat, json, short-unix) to display journal logs
+	Format string
+	// CaseSensitive controls the case sensitivity of pattern searches
+	CaseSensitive bool
 }
 
 // newNodeLogQuery parses query values and converts all known options into nodeLogQuery
@@ -122,7 +136,7 @@ func newNodeLogQuery(query url.Values) (*nodeLogQuery, field.ErrorList) {
 	var nlq nodeLogQuery
 	var err error
 
-	queries, ok := query["query"]
+	queries, okQuery := query["query"]
 	if len(queries) > 0 {
 		for _, q := range queries {
 			// The presence of / or \ is a hint that the query is for a log file. If the query is for foo.log without a
@@ -134,11 +148,20 @@ func newNodeLogQuery(query url.Values) (*nodeLogQuery, field.ErrorList) {
 			}
 		}
 	}
+	units, okUnit := query["unit"]
+	if len(units) > 0 {
+		for _, u := range units {
+			// We don't check for files as the heuristics do not apply to unit
+			if strings.TrimSpace(u) != "" { // Prevent queries with just spaces
+				nlq.Services = append(nlq.Services, u)
+			}
+		}
+	}
 
 	// Prevent specifying  an empty or blank space query.
 	// Example: kubectl get --raw /api/v1/nodes/$node/proxy/logs?query="   "
-	if ok && (len(nlq.Files) == 0 && len(nlq.Services) == 0) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), queries, "query cannot be empty"))
+	if (okQuery || okUnit) && (len(nlq.Files) == 0 && len(nlq.Services) == 0) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("unit"), queries, "unit cannot be empty"))
 	}
 
 	var sinceTime time.Time
@@ -176,6 +199,9 @@ func newNodeLogQuery(query url.Values) (*nodeLogQuery, field.ErrorList) {
 
 	var tailLines int
 	tailLinesValue := query.Get("tailLines")
+	if len(tailLinesValue) == 0 {
+		tailLinesValue = query.Get("tail")
+	}
 	if len(tailLinesValue) > 0 {
 		tailLines, err = strconv.Atoi(tailLinesValue)
 		if err != nil {
@@ -186,15 +212,28 @@ func newNodeLogQuery(query url.Values) (*nodeLogQuery, field.ErrorList) {
 	}
 
 	pattern := query.Get("pattern")
+	if len(pattern) == 0 {
+		pattern = query.Get("grep")
+	}
 	if len(pattern) > 0 {
 		nlq.Pattern = pattern
+		caseSensitiveValue := query.Get("case-sensitive")
+		if len(caseSensitiveValue) > 0 {
+			caseSensitive, err := strconv.ParseBool(query.Get("case-sensitive"))
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("case-sensitive"), query.Get("case-sensitive"),
+					err.Error()))
+			} else {
+				nlq.CaseSensitive = caseSensitive
+			}
+		}
 	}
+
+	nlq.Since = query.Get("since")
+	nlq.Until = query.Get("until")
+	nlq.Format = query.Get("output")
 
 	if len(allErrs) > 0 {
-		return nil, allErrs
-	}
-
-	if reflect.DeepEqual(nlq, nodeLogQuery{}) {
 		return nil, allErrs
 	}
 
@@ -219,14 +258,13 @@ func validateServices(services []string) field.ErrorList {
 func (n *nodeLogQuery) validate() field.ErrorList {
 	allErrs := validateServices(n.Services)
 	switch {
-	case len(n.Files) == 0 && len(n.Services) == 0:
-		allErrs = append(allErrs, field.Required(field.NewPath("query"), "cannot be empty with options"))
+	// OCP: Allow len(n.Files) == 0 && len(n.Services) == 0 as we want to be able to return all journal / WinEvent logs
 	case len(n.Files) > 0 && len(n.Services) > 0:
 		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), fmt.Sprintf("%v, %v", n.Files, n.Services),
 			"cannot specify a file and service"))
 	case len(n.Files) > 1:
 		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, "cannot specify more than one file"))
-	case len(n.Files) == 1 && n.options != (options{}):
+	case len(n.Files) == 1 && !reflect.DeepEqual(n.options, options{}):
 		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, "cannot specify file with options"))
 	case len(n.Files) == 1:
 		if fullLogFilename, err := securejoin.SecureJoin(nodeLogDir, n.Files[0]); err != nil {
@@ -258,6 +296,35 @@ func (n *nodeLogQuery) validate() field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("pattern"), n.Pattern, err.Error()))
 	}
 
+	// "oc adm node-logs" specific validation
+
+	if n.SinceTime != nil && (len(n.Since) > 0 || len(n.Until) > 0) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("sinceTime"),
+			"`since or until` and `sinceTime` cannot be specified"))
+	}
+
+	if n.UntilTime != nil && (len(n.Since) > 0 || len(n.Until) > 0) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("untilTime"),
+			"`since or until` and `untilTime` cannot be specified"))
+	}
+
+	if err := validateDate(n.Since); err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("since"), n.Since, err.Error()))
+	}
+
+	if err := validateDate(n.Until); err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("until"), n.Until, err.Error()))
+	}
+
+	allowedFormats := sets.New[string]("short-precise", "json", "short", "short-unix", "short-iso",
+		"short-iso-precise", "cat", "")
+	if len(n.Format) > 0 && runtime.GOOS == "windows" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("output"), n.Format,
+			"output is not supported on Windows"))
+	} else if !allowedFormats.Has(n.Format) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("output"), n.Format, allowedFormats.UnsortedList()))
+	}
+
 	return allErrs
 }
 
@@ -280,11 +347,8 @@ func (n *nodeLogQuery) copyForBoot(ctx context.Context, w io.Writer, previousBoo
 		return
 	}
 	nativeLoggers, fileLoggers := n.splitNativeVsFileLoggers(ctx)
-	if len(nativeLoggers) > 0 {
-		n.copyServiceLogs(ctx, w, nativeLoggers, previousBoot)
-	}
 
-	if len(fileLoggers) > 0 && n.options != (options{}) {
+	if len(fileLoggers) > 0 && !reflect.DeepEqual(n.options, options{}) {
 		fmt.Fprintf(w, "\noptions present and query resolved to log files for %v\ntry without specifying options\n",
 			fileLoggers)
 		return
@@ -292,7 +356,11 @@ func (n *nodeLogQuery) copyForBoot(ctx context.Context, w io.Writer, previousBoo
 
 	if len(fileLoggers) > 0 {
 		copyFileLogs(ctx, w, fileLoggers)
+		return
 	}
+	// OCP: Return all logs in the case where nativeLoggers == ""
+	n.copyServiceLogs(ctx, w, nativeLoggers, previousBoot)
+
 }
 
 // splitNativeVsFileLoggers checks if each service logs to native OS logs or to a file and returns a list of services
@@ -441,4 +509,17 @@ func safeServiceName(s string) error {
 		return fmt.Errorf("input contains unsupported characters")
 	}
 	return nil
+}
+
+func validateDate(date string) error {
+	if len(date) == 0 {
+		return nil
+	}
+	if reRelativeDate.MatchString(date) {
+		return nil
+	}
+	if _, err := time.Parse(dateLayout, date); err == nil {
+		return nil
+	}
+	return fmt.Errorf("date must be a relative time of the form '(+|-)[0-9]+(s|m|h|d)' or a date in 'YYYY-MM-DD HH:MM:SS' form")
 }
