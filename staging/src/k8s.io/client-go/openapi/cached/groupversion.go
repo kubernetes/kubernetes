@@ -44,12 +44,12 @@ func (g *groupversion) Schema(contentType string) ([]byte, error) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
+	if g.docs == nil {
+		g.docs = make(map[string]docInfo)
+	}
+
 	cachedInfo, ok := g.docs[contentType]
 	if !ok {
-		if g.docs == nil {
-			g.docs = make(map[string]docInfo)
-		}
-
 		cachedInfo.data, cachedInfo.err = g.delegate.Schema(contentType)
 		g.docs[contentType] = cachedInfo
 	}
