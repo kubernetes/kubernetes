@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"gopkg.in/square/go-jose.v2/jwt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -547,7 +547,7 @@ func TestTokenCreation(t *testing.T) {
 
 				expectedAction := tc.ExpectedActions[i]
 				if !reflect.DeepEqual(expectedAction, action) {
-					t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, spew.Sdump(expectedAction), spew.Sdump(action))
+					t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, dump.Pretty(expectedAction), dump.Pretty(action))
 					continue
 				}
 			}
