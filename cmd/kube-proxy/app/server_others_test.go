@@ -21,6 +21,7 @@ package app
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -677,7 +678,10 @@ func TestProxyServer_createProxier(t *testing.T) {
 				Config:   tt.config,
 				Client:   client,
 				Hostname: "nodename",
-				NodeIP:   netutils.ParseIPSloppy("127.0.0.1"),
+				NodeIPs: map[v1.IPFamily]net.IP{
+					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
+					v1.IPv6Protocol: net.IPv6zero,
+				},
 			}
 			_, err := s.createProxier(tt.config)
 			// TODO: mock the exec.Interface to not fail probing iptables

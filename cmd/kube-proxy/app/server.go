@@ -514,13 +514,14 @@ with the apiserver API to configure the proxy.`,
 type ProxyServer struct {
 	Config *kubeproxyconfig.KubeProxyConfiguration
 
-	Client        clientset.Interface
-	Broadcaster   events.EventBroadcaster
-	Recorder      events.EventRecorder
-	NodeRef       *v1.ObjectReference
-	HealthzServer healthcheck.ProxierHealthUpdater
-	Hostname      string
-	NodeIP        net.IP
+	Client          clientset.Interface
+	Broadcaster     events.EventBroadcaster
+	Recorder        events.EventRecorder
+	NodeRef         *v1.ObjectReference
+	HealthzServer   healthcheck.ProxierHealthUpdater
+	Hostname        string
+	PrimaryIPFamily v1.IPFamily
+	NodeIPs         map[v1.IPFamily]net.IP
 
 	podCIDRs []string // only used for LocalModeNodeCIDR
 
@@ -551,8 +552,7 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		return nil, err
 	}
 
-	s.NodeIP = detectNodeIP(s.Client, s.Hostname, config.BindAddress)
-	klog.InfoS("Detected node IP", "address", s.NodeIP.String())
+	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(s.Client, s.Hostname, config.BindAddress)
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
@@ -778,12 +778,23 @@ func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
 }
 
-// detectNodeIP returns the nodeIP used by the proxier
+// detectNodeIPs returns the proxier's "node IP" or IPs, and the IP family to use if the
+// node turns out to be incapable of dual-stack. (Note that kube-proxy normally runs as
+// dual-stack if the backend is capable of supporting both IP families, regardless of
+// whether the node is *actually* configured as dual-stack or not.)
+
+// (Note that on Linux, the node IPs are used only to determine whether a given
+// LoadBalancerSourceRanges value matches the node or not. In particular, they are *not*
+// used for NodePort handling.)
+//
 // The order of precedence is:
-// 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
-// 2. the primary IP from the Node object, if set
-// 3. if no IP is found it defaults to 127.0.0.1 and IPv4
-func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
+//  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
+//  2. if the Node object can be fetched, then its primary IP is used as the primary IP
+//     (and its secondary IP, if any, is just ignored).
+//  3. otherwise the primary node IP is 127.0.0.1.
+//
+// In all cases, the secondary IP is the zero IP of the other IP family.
+func detectNodeIPs(client clientset.Interface, hostname, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
 	nodeIP := netutils.ParseIPSloppy(bindAddress)
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
@@ -792,21 +803,16 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 		klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
-	return nodeIP
-}
 
-// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
-// will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
-
-	adr := netutils.ParseIPSloppy(bindAddress)
-	if netutils.IsIPv6(adr) {
-		nodes[1] = adr
+	if netutils.IsIPv4(nodeIP) {
+		return v1.IPv4Protocol, map[v1.IPFamily]net.IP{
+			v1.IPv4Protocol: nodeIP,
+			v1.IPv6Protocol: net.IPv6zero,
+		}
 	} else {
-		nodes[0] = adr
+		return v1.IPv6Protocol, map[v1.IPFamily]net.IP{
+			v1.IPv4Protocol: net.IPv4zero,
+			v1.IPv6Protocol: nodeIP,
+		}
 	}
-
-	return nodes
 }

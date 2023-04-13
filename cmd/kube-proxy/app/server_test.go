@@ -19,7 +19,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -32,7 +31,6 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
 
@@ -496,107 +494,141 @@ func makeNodeWithAddresses(name, internal, external string) *v1.Node {
 	return node
 }
 
-func Test_detectNodeIP(t *testing.T) {
+func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
-		name        string
-		nodeInfo    *v1.Node
-		hostname    string
-		bindAddress string
-		expectedIP  net.IP
+		name           string
+		nodeInfo       *v1.Node
+		hostname       string
+		bindAddress    string
+		expectedFamily v1.IPFamily
+		expectedIPv4   string
+		expectedIPv6   string
 	}{
 		{
-			name:        "Bind address IPv4 unicast address and no Node object",
-			nodeInfo:    makeNodeWithAddresses("", "", ""),
-			hostname:    "fakeHost",
-			bindAddress: "10.0.0.1",
-			expectedIP:  netutils.ParseIPSloppy("10.0.0.1"),
+			name:           "Bind address IPv4 unicast address and no Node object",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "10.0.0.1",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "10.0.0.1",
+			expectedIPv6:   "::",
 		},
 		{
-			name:        "Bind address IPv6 unicast address and no Node object",
-			nodeInfo:    makeNodeWithAddresses("", "", ""),
-			hostname:    "fakeHost",
-			bindAddress: "fd00:4321::2",
-			expectedIP:  netutils.ParseIPSloppy("fd00:4321::2"),
+			name:           "Bind address IPv6 unicast address and no Node object",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "fd00:4321::2",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:4321::2",
 		},
 		{
-			name:        "No Valid IP found",
-			nodeInfo:    makeNodeWithAddresses("", "", ""),
-			hostname:    "fakeHost",
-			bindAddress: "",
-			expectedIP:  netutils.ParseIPSloppy("127.0.0.1"),
+			name:           "No Valid IP found",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "127.0.0.1",
+			expectedIPv6:   "::",
 		},
 		// Disabled because the GetNodeIP method has a backoff retry mechanism
 		// and the test takes more than 30 seconds
 		// ok  	k8s.io/kubernetes/cmd/kube-proxy/app	34.136s
 		// {
-		//	name:        "No Valid IP found and unspecified bind address",
-		//	nodeInfo:    makeNodeWithAddresses("", "", ""),
-		//	hostname:    "fakeHost",
-		//	bindAddress: "0.0.0.0",
-		//	expectedIP:  net.IP{127,0,0,1),
+		//	name:           "No Valid IP found and unspecified bind address",
+		//	nodeInfo:       makeNodeWithAddresses("", "", ""),
+		//	hostname:       "fakeHost",
+		//	bindAddress:    "0.0.0.0",
+		//	expectedFamily: v1.IPv4Protocol,
+		//	expectedIPv4:   "127.0.0.1",
+		//	expectedIPv6:   "::",
 		// },
 		{
-			name:        "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
-			hostname:    "fakeHost",
-			bindAddress: "0.0.0.0",
-			expectedIP:  netutils.ParseIPSloppy("192.168.1.1"),
+			name:           "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "192.168.1.1",
+			expectedIPv6:   "::",
 		},
 		{
-			name:        "Bind address :: and node with IPv4 InternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
-			hostname:    "fakeHost",
-			bindAddress: "::",
-			expectedIP:  netutils.ParseIPSloppy("192.168.1.1"),
+			name:           "Bind address :: and node with IPv4 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "192.168.1.1",
+			expectedIPv6:   "::",
 		},
 		{
-			name:        "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
-			hostname:    "fakeHost",
-			bindAddress: "0.0.0.0",
-			expectedIP:  netutils.ParseIPSloppy("fd00:1234::1"),
+			name:           "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:1234::1",
 		},
 		{
-			name:        "Bind address :: and node with IPv6 InternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
-			hostname:    "fakeHost",
-			bindAddress: "::",
-			expectedIP:  netutils.ParseIPSloppy("fd00:1234::1"),
+			name:           "Bind address :: and node with IPv6 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:1234::1",
 		},
 		{
-			name:        "Bind address 0.0.0.0 and node with only IPv4 ExternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
-			hostname:    "fakeHost",
-			bindAddress: "0.0.0.0",
-			expectedIP:  netutils.ParseIPSloppy("90.90.90.90"),
+			name:           "Bind address 0.0.0.0 and node with only IPv4 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::",
 		},
 		{
-			name:        "Bind address :: and node with only IPv4 ExternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
-			hostname:    "fakeHost",
-			bindAddress: "::",
-			expectedIP:  netutils.ParseIPSloppy("90.90.90.90"),
+			name:           "Bind address :: and node with only IPv4 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::",
 		},
 		{
-			name:        "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
-			hostname:    "fakeHost",
-			bindAddress: "0.0.0.0",
-			expectedIP:  netutils.ParseIPSloppy("2001:db8::2"),
+			name:           "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "2001:db8::2",
 		},
 		{
-			name:        "Bind address :: and node with only IPv6 ExternalIP set",
-			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
-			hostname:    "fakeHost",
-			bindAddress: "::",
-			expectedIP:  netutils.ParseIPSloppy("2001:db8::2"),
+			name:           "Bind address :: and node with only IPv6 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "2001:db8::2",
 		},
 	}
 	for _, c := range cases {
-		client := clientsetfake.NewSimpleClientset(c.nodeInfo)
-		ip := detectNodeIP(client, c.hostname, c.bindAddress)
-		if !ip.Equal(c.expectedIP) {
-			t.Errorf("Case[%s] Expected IP %q got %q", c.name, c.expectedIP, ip)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset(c.nodeInfo)
+			primaryFamily, ips := detectNodeIPs(client, c.hostname, c.bindAddress)
+			if primaryFamily != c.expectedFamily {
+				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
+			}
+			if ips[v1.IPv4Protocol].String() != c.expectedIPv4 {
+				t.Errorf("Expected IPv4 %q got %q", c.expectedIPv4, ips[v1.IPv4Protocol].String())
+			}
+			if ips[v1.IPv6Protocol].String() != c.expectedIPv6 {
+				t.Errorf("Expected IPv6 %q got %q", c.expectedIPv6, ips[v1.IPv6Protocol].String())
+			}
+		})
 	}
 }

@@ -92,10 +92,8 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs)
 	}
 
-	primaryFamily := v1.IPv4Protocol
 	primaryProtocol := utiliptables.ProtocolIPv4
-	if netutils.IsIPv6(s.NodeIP) {
-		primaryFamily = v1.IPv6Protocol
+	if s.PrimaryIPFamily == v1.IPv6Protocol {
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
 	execer := exec.New()
@@ -124,11 +122,11 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 		// Validate NodePortAddresses is single-stack
 		npaByFamily := proxyutil.MapCIDRsByIPFamily(config.NodePortAddresses)
-		secondaryFamily := proxyutil.OtherIPFamily(primaryFamily)
+		secondaryFamily := proxyutil.OtherIPFamily(s.PrimaryIPFamily)
 		badAddrs := npaByFamily[secondaryFamily]
 		if len(badAddrs) > 0 {
 			klog.InfoS("Ignoring --nodeport-addresses of the wrong family", "ipFamily", secondaryFamily, "addresses", badAddrs)
-			nodePortAddresses = npaByFamily[primaryFamily]
+			nodePortAddresses = npaByFamily[s.PrimaryIPFamily]
 		}
 	}
 
@@ -157,7 +155,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				s.Hostname,
-				nodeIPTuple(config.BindAddress),
+				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
 				nodePortAddresses,
@@ -172,7 +170,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
-				primaryFamily,
+				s.PrimaryIPFamily,
 				iptInterface,
 				utilsysctl.New(),
 				execer,
@@ -183,7 +181,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				int(*config.IPTables.MasqueradeBit),
 				localDetector,
 				s.Hostname,
-				s.NodeIP,
+				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
 				nodePortAddresses,
@@ -204,8 +202,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
 			klog.InfoS("Creating dualStackProxier for ipvs")
-
-			nodeIPs := nodeIPTuple(config.BindAddress)
 
 			// Always ordered to match []ipt
 			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
@@ -231,7 +227,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				s.Hostname,
-				nodeIPs,
+				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
 				config.IPVS.Scheduler,
@@ -246,7 +242,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			}
 
 			proxier, err = ipvs.NewProxier(
-				primaryFamily,
+				s.PrimaryIPFamily,
 				iptInterface,
 				ipvsInterface,
 				ipsetInterface,
@@ -263,7 +259,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				int(*config.IPTables.MasqueradeBit),
 				localDetector,
 				s.Hostname,
-				s.NodeIP,
+				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
 				config.IPVS.Scheduler,
