@@ -54,7 +54,7 @@ func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibility(ctx co
 
 	result, err = client.CheckPrivateLinkServiceVisibilitySender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CheckPrivateLinkServiceVisibility", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CheckPrivateLinkServiceVisibility", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -87,6 +87,7 @@ func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibilityPrepare
 // http.Response Body if it receives an error.
 func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibilitySender(req *http.Request) (future PrivateLinkServicesCheckPrivateLinkServiceVisibilityFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -134,7 +135,7 @@ func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibilityByResou
 
 	result, err = client.CheckPrivateLinkServiceVisibilityByResourceGroupSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CheckPrivateLinkServiceVisibilityByResourceGroup", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CheckPrivateLinkServiceVisibilityByResourceGroup", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -168,6 +169,7 @@ func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibilityByResou
 // http.Response Body if it receives an error.
 func (client PrivateLinkServicesClient) CheckPrivateLinkServiceVisibilityByResourceGroupSender(req *http.Request) (future PrivateLinkServicesCheckPrivateLinkServiceVisibilityByResourceGroupFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -215,7 +217,7 @@ func (client PrivateLinkServicesClient) CreateOrUpdate(ctx context.Context, reso
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -249,6 +251,7 @@ func (client PrivateLinkServicesClient) CreateOrUpdatePreparer(ctx context.Conte
 // http.Response Body if it receives an error.
 func (client PrivateLinkServicesClient) CreateOrUpdateSender(req *http.Request) (future PrivateLinkServicesCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -295,7 +298,7 @@ func (client PrivateLinkServicesClient) Delete(ctx context.Context, resourceGrou
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -327,6 +330,7 @@ func (client PrivateLinkServicesClient) DeletePreparer(ctx context.Context, reso
 // http.Response Body if it receives an error.
 func (client PrivateLinkServicesClient) DeleteSender(req *http.Request) (future PrivateLinkServicesDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -373,7 +377,7 @@ func (client PrivateLinkServicesClient) DeletePrivateEndpointConnection(ctx cont
 
 	result, err = client.DeletePrivateEndpointConnectionSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "DeletePrivateEndpointConnection", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PrivateLinkServicesClient", "DeletePrivateEndpointConnection", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -406,6 +410,7 @@ func (client PrivateLinkServicesClient) DeletePrivateEndpointConnectionPreparer(
 // http.Response Body if it receives an error.
 func (client PrivateLinkServicesClient) DeletePrivateEndpointConnectionSender(req *http.Request) (future PrivateLinkServicesDeletePrivateEndpointConnectionFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

@@ -132,7 +132,7 @@ func (client VirtualNetworksClient) CreateOrUpdate(ctx context.Context, resource
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -166,6 +166,7 @@ func (client VirtualNetworksClient) CreateOrUpdatePreparer(ctx context.Context, 
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) CreateOrUpdateSender(req *http.Request) (future VirtualNetworksCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -212,7 +213,7 @@ func (client VirtualNetworksClient) Delete(ctx context.Context, resourceGroupNam
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -244,6 +245,7 @@ func (client VirtualNetworksClient) DeletePreparer(ctx context.Context, resource
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) DeleteSender(req *http.Request) (future VirtualNetworksDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -717,7 +719,7 @@ func (client VirtualNetworksClient) UpdateTags(ctx context.Context, resourceGrou
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "UpdateTags", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "UpdateTags", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -751,6 +753,7 @@ func (client VirtualNetworksClient) UpdateTagsPreparer(ctx context.Context, reso
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) UpdateTagsSender(req *http.Request) (future VirtualNetworksUpdateTagsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

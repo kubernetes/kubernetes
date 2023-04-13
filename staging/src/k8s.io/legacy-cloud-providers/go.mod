@@ -6,7 +6,7 @@ go 1.20
 
 require (
 	cloud.google.com/go v0.97.0
-	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.27
 	github.com/Azure/go-autorest/autorest/adal v0.9.20
 	github.com/Azure/go-autorest/autorest/mocks v0.4.2

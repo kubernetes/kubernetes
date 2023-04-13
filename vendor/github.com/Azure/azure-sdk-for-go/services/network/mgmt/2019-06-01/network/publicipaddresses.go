@@ -67,7 +67,7 @@ func (client PublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resour
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -101,6 +101,7 @@ func (client PublicIPAddressesClient) CreateOrUpdatePreparer(ctx context.Context
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) CreateOrUpdateSender(req *http.Request) (future PublicIPAddressesCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -147,7 +148,7 @@ func (client PublicIPAddressesClient) Delete(ctx context.Context, resourceGroupN
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -179,6 +180,7 @@ func (client PublicIPAddressesClient) DeletePreparer(ctx context.Context, resour
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) DeleteSender(req *http.Request) (future PublicIPAddressesDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -866,7 +868,7 @@ func (client PublicIPAddressesClient) UpdateTags(ctx context.Context, resourceGr
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "UpdateTags", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.PublicIPAddressesClient", "UpdateTags", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -900,6 +902,7 @@ func (client PublicIPAddressesClient) UpdateTagsPreparer(ctx context.Context, re
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) UpdateTagsSender(req *http.Request) (future PublicIPAddressesUpdateTagsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

@@ -4,7 +4,7 @@ bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go v0.97.0
 ## explicit; go 1.11
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 ## explicit
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry
