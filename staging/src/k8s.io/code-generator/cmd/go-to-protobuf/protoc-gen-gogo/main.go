@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"log"
 	"strings"
 
 	"github.com/gogo/protobuf/vanity/command"
@@ -37,8 +38,9 @@ func main() {
 	for _, file := range request.FileToGenerate {
 		if strings.Contains(file, "/") {
 			param := "paths=source_relative"
-			request.Parameter = &param
-			break
+			if request.Parameter == nil || !strings.Contains(*request.Parameter, param) {
+				log.Fatalf("please use the option paths=source_relative for relative path %s", file)
+			}
 		}
 	}
 
