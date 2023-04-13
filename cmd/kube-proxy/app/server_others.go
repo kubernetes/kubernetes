@@ -54,7 +54,6 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -441,95 +440,18 @@ func getLocalDetector(ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, confi
 }
 
 func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, ipt [2]utiliptables.Interface, nodePodCIDRs []string) ([2]proxyutiliptables.LocalTrafficDetector, error) {
+	var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 	var err error
-	localDetectors := [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()}
-	switch mode {
-	case proxyconfigapi.LocalModeClusterCIDR:
-		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
-		// but --cluster-cidr is optional.
-		if len(strings.TrimSpace(config.ClusterCIDR)) == 0 {
-			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no cluster CIDR defined")
-			break
-		}
 
-		clusterCIDRs := cidrTuple(config.ClusterCIDR)
-
-		if len(strings.TrimSpace(clusterCIDRs[0])) == 0 {
-			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv4 cluster CIDR defined, defaulting to no-op detect-local for IPv4")
-		} else {
-			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[0], ipt[0])
-			if err != nil { // don't loose the original error
-				return localDetectors, err
-			}
-		}
-
-		if len(strings.TrimSpace(clusterCIDRs[1])) == 0 {
-			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, defaulting to no-op detect-local for IPv6")
-		} else {
-			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[1], ipt[1])
-		}
+	localDetectors[0], err = getLocalDetector(v1.IPv4Protocol, mode, config, ipt[0], nodePodCIDRs)
+	if err != nil {
 		return localDetectors, err
-	case proxyconfigapi.LocalModeNodeCIDR:
-		if len(nodePodCIDRs) == 0 {
-			klog.InfoS("No node info available to configure detect-local-mode NodeCIDR")
-			break
-		}
-		// localDetectors, like ipt, need to be of the order [IPv4, IPv6], but PodCIDRs is setup so that PodCIDRs[0] == PodCIDR.
-		// so have to handle the case where PodCIDR can be IPv6 and set that to localDetectors[1]
-		if netutils.IsIPv6CIDRString(nodePodCIDRs[0]) {
-			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodePodCIDRs[0], ipt[1])
-			if err != nil {
-				return localDetectors, err
-			}
-			if len(nodePodCIDRs) > 1 {
-				localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodePodCIDRs[1], ipt[0])
-			}
-		} else {
-			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodePodCIDRs[0], ipt[0])
-			if err != nil {
-				return localDetectors, err
-			}
-			if len(nodePodCIDRs) > 1 {
-				localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodePodCIDRs[1], ipt[1])
-			}
-		}
-		return localDetectors, err
-	case proxyconfigapi.LocalModeBridgeInterface, proxyconfigapi.LocalModeInterfaceNamePrefix:
-		localDetector, err := getLocalDetector("", mode, config, nil, nodePodCIDRs)
-		if err == nil {
-			localDetectors[0] = localDetector
-			localDetectors[1] = localDetector
-		}
-		return localDetectors, err
-	default:
-		klog.InfoS("Unknown detect-local-mode", "detectLocalMode", mode)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
+	localDetectors[1], err = getLocalDetector(v1.IPv6Protocol, mode, config, ipt[1], nodePodCIDRs)
+	if err != nil {
+		return localDetectors, err
+	}
 	return localDetectors, nil
-}
-
-// cidrTuple takes a comma separated list of CIDRs and return a tuple (ipv4cidr,ipv6cidr)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6) and if no cidr from a family is found an
-// empty string "" is inserted.
-func cidrTuple(cidrList string) [2]string {
-	cidrs := [2]string{"", ""}
-	foundIPv4 := false
-	foundIPv6 := false
-
-	for _, cidr := range strings.Split(cidrList, ",") {
-		if netutils.IsIPv6CIDRString(cidr) && !foundIPv6 {
-			cidrs[1] = cidr
-			foundIPv6 = true
-		} else if !foundIPv4 {
-			cidrs[0] = cidr
-			foundIPv4 = true
-		}
-		if foundIPv6 && foundIPv4 {
-			break
-		}
-	}
-
-	return cidrs
 }
 
 // cleanupAndExit remove iptables rules and ipset/ipvs rules
