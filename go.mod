@@ -20,7 +20,7 @@ require (
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/blang/semver/v4 v4.0.0
-	github.com/container-storage-interface/spec v1.7.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/coredns/corefile-migration v1.0.20
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.4.0
