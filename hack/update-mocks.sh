@@ -36,7 +36,6 @@ function cleanup {
 
 trap cleanup EXIT
 
-kube::golang::verify_go_version
 kube::golang::setup_env
 
 echo 'installing mockgen'
