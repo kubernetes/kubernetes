@@ -79,10 +79,6 @@ func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
 	master string) (*ProxyServer, error) {
 
-	if config == nil {
-		return nil, errors.New("config is required")
-	}
-
 	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
@@ -188,10 +184,6 @@ func newProxyServer(
 
 	if proxyMode == proxyconfigapi.ProxyModeIPTables {
 		klog.InfoS("Using iptables Proxier")
-		if config.IPTables.MasqueradeBit == nil {
-			// MasqueradeBit must be specified or defaulted.
-			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
-		}
 
 		if dualStack {
 			klog.InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
