@@ -983,7 +983,6 @@ type LinuxSandboxSecurityContext struct {
 	//     <full-path-to-profile> is the full path of the profile.
 	//
 	// Default: "", which is identical with unconfined.
-	SeccompProfilePath   string   `protobuf:"bytes,7,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"` // Deprecated: Do not use.
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
@@ -1081,14 +1080,6 @@ func (m *LinuxSandboxSecurityContext) GetApparmor() *SecurityProfile {
 		return m.Apparmor
 	}
 	return nil
-}
-
-// Deprecated: Do not use.
-func (m *LinuxSandboxSecurityContext) GetSeccompProfilePath() string {
-	if m != nil {
-		return m.SeccompProfilePath
-	}
-	return ""
 }
 
 // A security profile which can be used for sandboxes and containers.
@@ -3971,7 +3962,6 @@ type LinuxContainerSecurityContext struct {
 	//     <full-path-to-profile> is the full path of the profile.
 	//
 	// Default: "", which is identical with unconfined.
-	SeccompProfilePath   string   `protobuf:"bytes,10,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"` // Deprecated: Do not use.
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
@@ -4110,14 +4100,6 @@ func (m *LinuxContainerSecurityContext) GetApparmor() *SecurityProfile {
 func (m *LinuxContainerSecurityContext) GetApparmorProfile() string {
 	if m != nil {
 		return m.ApparmorProfile
-	}
-	return ""
-}
-
-// Deprecated: Do not use.
-func (m *LinuxContainerSecurityContext) GetSeccompProfilePath() string {
-	if m != nil {
-		return m.SeccompProfilePath
 	}
 	return ""
 }
@@ -12086,13 +12068,6 @@ func (m *LinuxSandboxSecurityContext) MarshalToSizedBuffer(dAtA []byte) (int, er
 		i--
 		dAtA[i] = 0x42
 	}
-	if len(m.SeccompProfilePath) > 0 {
-		i -= len(m.SeccompProfilePath)
-		copy(dAtA[i:], m.SeccompProfilePath)
-		i = encodeVarintApi(dAtA, i, uint64(len(m.SeccompProfilePath)))
-		i--
-		dAtA[i] = 0x3a
-	}
 	if m.Privileged {
 		i--
 		if m.Privileged {
@@ -14537,13 +14512,6 @@ func (m *LinuxContainerSecurityContext) MarshalToSizedBuffer(dAtA []byte) (int, 
 		}
 		i--
 		dAtA[i] = 0x58
-	}
-	if len(m.SeccompProfilePath) > 0 {
-		i -= len(m.SeccompProfilePath)
-		copy(dAtA[i:], m.SeccompProfilePath)
-		i = encodeVarintApi(dAtA, i, uint64(len(m.SeccompProfilePath)))
-		i--
-		dAtA[i] = 0x52
 	}
 	if len(m.ApparmorProfile) > 0 {
 		i -= len(m.ApparmorProfile)
@@ -19129,10 +19097,6 @@ func (m *LinuxSandboxSecurityContext) Size() (n int) {
 	if m.Privileged {
 		n += 2
 	}
-	l = len(m.SeccompProfilePath)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
-	}
 	if m.RunAsGroup != nil {
 		l = m.RunAsGroup.Size()
 		n += 1 + l + sovApi(uint64(l))
@@ -20133,10 +20097,6 @@ func (m *LinuxContainerSecurityContext) Size() (n int) {
 		n += 1 + sovApi(uint64(l)) + l
 	}
 	l = len(m.ApparmorProfile)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
-	}
-	l = len(m.SeccompProfilePath)
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
 	}
@@ -22058,7 +22018,6 @@ func (this *LinuxSandboxSecurityContext) String() string {
 		`ReadonlyRootfs:` + fmt.Sprintf("%v", this.ReadonlyRootfs) + `,`,
 		`SupplementalGroups:` + fmt.Sprintf("%v", this.SupplementalGroups) + `,`,
 		`Privileged:` + fmt.Sprintf("%v", this.Privileged) + `,`,
-		`SeccompProfilePath:` + fmt.Sprintf("%v", this.SeccompProfilePath) + `,`,
 		`RunAsGroup:` + strings.Replace(this.RunAsGroup.String(), "Int64Value", "Int64Value", 1) + `,`,
 		`Seccomp:` + strings.Replace(this.Seccomp.String(), "SecurityProfile", "SecurityProfile", 1) + `,`,
 		`Apparmor:` + strings.Replace(this.Apparmor.String(), "SecurityProfile", "SecurityProfile", 1) + `,`,
@@ -22781,7 +22740,6 @@ func (this *LinuxContainerSecurityContext) String() string {
 		`ReadonlyRootfs:` + fmt.Sprintf("%v", this.ReadonlyRootfs) + `,`,
 		`SupplementalGroups:` + fmt.Sprintf("%v", this.SupplementalGroups) + `,`,
 		`ApparmorProfile:` + fmt.Sprintf("%v", this.ApparmorProfile) + `,`,
-		`SeccompProfilePath:` + fmt.Sprintf("%v", this.SeccompProfilePath) + `,`,
 		`NoNewPrivs:` + fmt.Sprintf("%v", this.NoNewPrivs) + `,`,
 		`RunAsGroup:` + strings.Replace(this.RunAsGroup.String(), "Int64Value", "Int64Value", 1) + `,`,
 		`MaskedPaths:` + fmt.Sprintf("%v", this.MaskedPaths) + `,`,
@@ -25569,9 +25527,6 @@ func (m *LinuxSandboxSecurityContext) Unmarshal(dAtA []byte) error {
 			}
 			m.Privileged = bool(v != 0)
 		case 7:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SeccompProfilePath", wireType)
-			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
@@ -25598,7 +25553,6 @@ func (m *LinuxSandboxSecurityContext) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SeccompProfilePath = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 8:
 			if wireType != 2 {
@@ -33464,9 +33418,6 @@ func (m *LinuxContainerSecurityContext) Unmarshal(dAtA []byte) error {
 			m.ApparmorProfile = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 10:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SeccompProfilePath", wireType)
-			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
@@ -33493,7 +33444,6 @@ func (m *LinuxContainerSecurityContext) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SeccompProfilePath = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 11:
 			if wireType != 0 {
