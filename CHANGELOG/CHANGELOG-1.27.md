@@ -8,6 +8,8 @@
     - [Node Binaries](#node-binaries)
     - [Container Images](#container-images)
   - [Changelog since v1.26.0](#changelog-since-v1260)
+  - [Known Issues](#known-issues)
+    - [The PreEnqueue extension point doesn't work in backoffQ](#the-preEnqueue-extension-point-doesnt-work-for-pods-going-to-activeq-through-backoffq)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
   - [Changes by Kind](#changes-by-kind)
@@ -197,6 +199,15 @@ name | architectures
 [registry.k8s.io/kube-scheduler:v1.27.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-amd64), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-s390x)
 
 ## Changelog since v1.26.0
+
+## Known Issues
+
+### The PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ
+
+In v1.26.0, we've found the bug that the PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ. 
+It doesn't affect any of the vanilla Kubernetes behavior, but, may break custom PreEnqueue plugins.
+
+The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.26.1.
 
 ## Urgent Upgrade Notes 
 

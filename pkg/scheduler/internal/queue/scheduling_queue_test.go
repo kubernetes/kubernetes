@@ -452,8 +452,6 @@ func TestPriorityQueue_Activate(t *testing.T) {
 }
 
 type preEnqueuePlugin struct {
-	// called counts the number of calling PreEnqueue()
-	called     int
 	allowlists []string
 }
 
@@ -462,7 +460,6 @@ func (pl *preEnqueuePlugin) Name() string {
 }
 
 func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
-	pl.called++
 	for _, allowed := range pl.allowlists {
 		for label := range p.Labels {
 			if label == allowed {
@@ -539,47 +536,6 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 			// Ensure the pod is still located in unschedulablePods.
 			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
 				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
-			}
-		})
-	}
-}
-
-func TestPriorityQueue_flushBackoffQCompleted(t *testing.T) {
-	tests := []struct {
-		name                       string
-		plugin                     framework.PreEnqueuePlugin
-		pod                        *v1.Pod
-		operations                 []operation
-		wantPreEnqueuePluginCalled int
-	}{
-		{
-			name:   "preEnqueue plugin registered, not running preEnqueue plugin when backoff completed",
-			plugin: &preEnqueuePlugin{},
-			pod:    st.MakePod().Name("foo").Label("foo", "").Obj(),
-			operations: []operation{
-				addPodBackoffQ,
-				flushBackoffQ,
-			},
-			wantPreEnqueuePluginCalled: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			m := map[string][]framework.PreEnqueuePlugin{"": {tt.plugin}}
-			c := testingclock.NewFakeClock(time.Now())
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
-				WithPodInitialBackoffDuration(time.Second*1), WithPodMaxBackoffDuration(time.Second*60), WithClock(c))
-			pInfo := newQueuedPodInfoForLookup(tt.pod)
-			pInfo.Gated = true
-			for _, op := range tt.operations {
-				op(q, pInfo)
-			}
-			if tt.wantPreEnqueuePluginCalled != tt.plugin.(*preEnqueuePlugin).called {
-				t.Errorf("Unexpected number of calling preEnqueue: want %v, but got %v", tt.wantPreEnqueuePluginCalled, tt.plugin.(*preEnqueuePlugin).called)
 			}
 		})
 	}
