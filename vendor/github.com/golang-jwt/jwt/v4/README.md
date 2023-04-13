@@ -54,9 +54,9 @@ import "github.com/golang-jwt/jwt/v4"
 
 See [the project documentation](https://pkg.go.dev/github.com/golang-jwt/jwt/v4) for examples of usage:
 
-* [Simple example of parsing and validating a token](https://pkg.go.dev/github.com/golang-jwt/jwt#example-Parse-Hmac)
-* [Simple example of building and signing a token](https://pkg.go.dev/github.com/golang-jwt/jwt#example-New-Hmac)
-* [Directory of Examples](https://pkg.go.dev/github.com/golang-jwt/jwt#pkg-examples)
+* [Simple example of parsing and validating a token](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#example-Parse-Hmac)
+* [Simple example of building and signing a token](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#example-New-Hmac)
+* [Directory of Examples](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#pkg-examples)
 
 ## Extensions
 
@@ -96,7 +96,7 @@ A token is simply a JSON object that is signed by its author. this tells you exa
 * The author of the token was in the possession of the signing secret
 * The data has not been modified since it was signed
 
-It's important to know that JWT does not provide encryption, which means anyone who has access to the token can read its contents. If you need to protect (encrypt) the data, there is a companion spec, `JWE`, that provides this functionality. JWE is currently outside the scope of this library.
+It's important to know that JWT does not provide encryption, which means anyone who has access to the token can read its contents. If you need to protect (encrypt) the data, there is a companion spec, `JWE`, that provides this functionality. The companion project https://github.com/golang-jwt/jwe aims at a (very) experimental implementation of the JWE standard.
 
 ### Choosing a Signing Method
 
@@ -110,10 +110,10 @@ Asymmetric signing methods, such as RSA, use different keys for signing and veri
 
 Each signing method expects a different object type for its signing keys. See the package documentation for details. Here are the most common ones:
 
-* The [HMAC signing method](https://pkg.go.dev/github.com/golang-jwt/jwt#SigningMethodHMAC) (`HS256`,`HS384`,`HS512`) expect `[]byte` values for signing and validation
-* The [RSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt#SigningMethodRSA) (`RS256`,`RS384`,`RS512`) expect `*rsa.PrivateKey` for signing and `*rsa.PublicKey` for validation
-* The [ECDSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt#SigningMethodECDSA) (`ES256`,`ES384`,`ES512`) expect `*ecdsa.PrivateKey` for signing and `*ecdsa.PublicKey` for validation
-* The [EdDSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt#SigningMethodEd25519) (`Ed25519`) expect `ed25519.PrivateKey` for signing and `ed25519.PublicKey` for validation
+* The [HMAC signing method](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#SigningMethodHMAC) (`HS256`,`HS384`,`HS512`) expect `[]byte` values for signing and validation
+* The [RSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#SigningMethodRSA) (`RS256`,`RS384`,`RS512`) expect `*rsa.PrivateKey` for signing and `*rsa.PublicKey` for validation
+* The [ECDSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#SigningMethodECDSA) (`ES256`,`ES384`,`ES512`) expect `*ecdsa.PrivateKey` for signing and `*ecdsa.PublicKey` for validation
+* The [EdDSA signing method](https://pkg.go.dev/github.com/golang-jwt/jwt/v4#SigningMethodEd25519) (`Ed25519`) expect `ed25519.PrivateKey` for signing and `ed25519.PublicKey` for validation
 
 ### JWT and OAuth
 
@@ -131,7 +131,7 @@ This library uses descriptive error messages whenever possible. If you are not g
 
 ## More
 
-Documentation can be found [on pkg.go.dev](https://pkg.go.dev/github.com/golang-jwt/jwt).
+Documentation can be found [on pkg.go.dev](https://pkg.go.dev/github.com/golang-jwt/jwt/v4).
 
 The command line utility included in this project (cmd/jwt) provides a straightforward example of token creation and parsing as well as a useful tool for debugging your own integration. You'll also find several implementation examples in the documentation.
 
