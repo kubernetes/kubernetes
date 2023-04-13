@@ -35,12 +35,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -690,6 +693,7 @@ func GetReadyReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
 // GetAvailableReplicaCountForReplicaSets returns the number of available pods corresponding to the given replica sets.
 func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
 	totalAvailableReplicas := int32(0)
+
 	for _, rs := range replicaSets {
 		if rs != nil {
 			totalAvailableReplicas += rs.Status.AvailableReplicas
@@ -701,14 +705,16 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int3
 // GetTerminatingReplicaCountForReplicaSets returns the number of terminating pods corresponding to the given replica sets.
 func GetTerminatingReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
 	totalTerminatingReplicas := int32(0)
+	if !feature.DefaultFeatureGate.Enabled(features.TerminatingPodsReplicaSetDeployments) {
+		return totalTerminatingReplicas
+	}
 	for _, rs := range replicaSets {
 		if rs != nil {
-			totalTerminatingReplicas += *rs.Status.TerminatingReplicas
+			totalTerminatingReplicas += pointer.Int32Deref(rs.Status.TerminatingReplicas, 0)
 		}
 	}
 	return totalTerminatingReplicas
 }
-
 
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *apps.Deployment) bool {

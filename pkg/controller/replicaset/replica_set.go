@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -717,7 +718,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) &&
-		updatedRS.Status.TerminatingReplicas != (updatedRS.Spec.Replicas) {
+		pointer.Int32Deref(updatedRS.Status.TerminatingReplicas, 0) != pointer.Int32Deref(updatedRS.Spec.Replicas, 0) {
 		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
 	}
 	return manageReplicasErr

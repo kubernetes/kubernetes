@@ -26,6 +26,9 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -44,6 +47,7 @@ func TestCalculateStatus(t *testing.T) {
 		replicaset               *apps.ReplicaSet
 		filteredPods             []*v1.Pod
 		expectedReplicaSetStatus apps.ReplicaSetStatus
+		terminating              bool
 	}{
 		{
 			"1 fully labelled pod",
@@ -57,6 +61,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    1,
 			},
+			false,
 		},
 		{
 			"1 not fully labelled pod",
@@ -70,6 +75,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    1,
 			},
+			false,
 		},
 		{
 			"2 fully labelled pods",
@@ -84,6 +90,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			false,
 		},
 		{
 			"2 not fully labelled pods",
@@ -98,6 +105,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			false,
 		},
 		{
 			"1 fully labelled pod, 1 not fully labelled pod",
@@ -112,6 +120,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			false,
 		},
 		{
 			"1 non-ready pod",
@@ -125,6 +134,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        0,
 				AvailableReplicas:    0,
 			},
+			false,
 		},
 		{
 			"1 ready but non-available pod",
@@ -138,9 +148,10 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    0,
 			},
+			false,
 		},
 		{
-			"1 fully labeld but terminating pod",
+			"1 fully labeled but terminating pod with feature off",
 			fullyLabelledRS,
 			[]*v1.Pod{
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, &now, true),
@@ -150,12 +161,28 @@ func TestCalculateStatus(t *testing.T) {
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        1,
 				AvailableReplicas:    1,
-				TerminatingReplicas:  pointer.Int32Ptr(1),
 			},
+			false,
+		},
+		{
+			"1 fully labeled but terminating pod with feature on",
+			fullyLabelledRS,
+			[]*v1.Pod{
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, &now, true),
+			},
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
+				TerminatingReplicas:  pointer.Int32(1),
+			},
+			true,
 		},
 	}
 
 	for _, test := range rsStatusTests {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.TerminatingPodsReplicaSetDeployments, test.terminating)()
 		replicaSetStatus := calculateStatus(test.replicaset, test.filteredPods, nil)
 		if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
 			t.Errorf("%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetStatus, replicaSetStatus)

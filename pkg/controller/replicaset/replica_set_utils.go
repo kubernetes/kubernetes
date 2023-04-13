@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 
@@ -43,6 +46,7 @@ func updateReplicaSetStatus(logger klog.Logger, c appsclient.ReplicaSetInterface
 		rs.Status.FullyLabeledReplicas == newStatus.FullyLabeledReplicas &&
 		rs.Status.ReadyReplicas == newStatus.ReadyReplicas &&
 		rs.Status.AvailableReplicas == newStatus.AvailableReplicas &&
+		pointer.Int32Deref(rs.Status.TerminatingReplicas, 0) == pointer.Int32Deref(newStatus.TerminatingReplicas, 0) &&
 		rs.Generation == rs.Status.ObservedGeneration &&
 		reflect.DeepEqual(rs.Status.Conditions, newStatus.Conditions) {
 		return rs, nil
@@ -129,7 +133,9 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 	newStatus.FullyLabeledReplicas = int32(fullyLabeledReplicasCount)
 	newStatus.ReadyReplicas = int32(readyReplicasCount)
 	newStatus.AvailableReplicas = int32(availableReplicasCount)
-	newStatus.TerminatingReplicas = pointer.Int32Ptr(int32(terminatingReplicasCount))
+	if feature.DefaultFeatureGate.Enabled(features.TerminatingPodsReplicaSetDeployments) {
+		newStatus.TerminatingReplicas = pointer.Int32(int32(terminatingReplicasCount))
+	}
 	return newStatus
 }
 
