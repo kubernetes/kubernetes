@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -180,7 +180,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
+		t.Logf(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 
@@ -326,7 +326,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
+		t.Logf(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 
@@ -2113,7 +2113,7 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
 			output := roundTrip(t, runtime.Object(&testPod))
 			pod2 := output.(*v1.Pod)
-			if diff.ObjectDiff(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) != "" {
+			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
 				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
 			}
 		})

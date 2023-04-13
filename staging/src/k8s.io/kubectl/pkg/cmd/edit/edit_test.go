@@ -27,12 +27,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -124,7 +124,7 @@ func TestEdit(t *testing.T) {
 					// Convenience to allow recapturing the input and persisting it here
 					os.WriteFile(inputFile, body, os.FileMode(0644))
 				} else {
-					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
+					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, cmp.Diff(string(body), string(expectedInput)))
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 				}
 			}
@@ -147,7 +147,7 @@ func TestEdit(t *testing.T) {
 				// Convenience to allow recapturing the input and persisting it here
 				os.WriteFile(inputFile, body, os.FileMode(0644))
 			} else {
-				t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
+				t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, cmp.Diff(string(body), string(expectedInput)))
 				t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 			}
 		}

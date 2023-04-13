@@ -32,6 +32,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/google/go-cmp/cmp"
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -2602,8 +2602,7 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 			if cs.Resources == nil {
 				continue
 			}
-			if diff.ObjectDiff(c.Resources.Limits, cs.Resources.Limits) != "" ||
-				diff.ObjectDiff(cs.AllocatedResources, cs.Resources.Requests) != "" {
+			if !cmp.Equal(c.Resources.Limits, cs.Resources.Limits) || !cmp.Equal(cs.AllocatedResources, cs.Resources.Requests) {
 				return true
 			}
 		}
@@ -2673,7 +2672,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
 			break
 		}
-		if len(diff.ObjectDiff(container.Resources.Requests, containerStatus.AllocatedResources)) > 0 {
+		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
 			podResized = true
 			break
 		}

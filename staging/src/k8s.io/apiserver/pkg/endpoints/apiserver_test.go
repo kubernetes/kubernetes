@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1832,7 +1832,7 @@ func TestGetTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -2061,13 +2061,7 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				for i := range test.expected {
-					if i >= len(actual) {
-						break
-					}
-					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
-				}
-				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
 			}
 		})
 	}
@@ -2245,7 +2239,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
 			}
 			body = d
 		} else {
@@ -2829,7 +2823,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2869,7 +2863,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2912,7 +2906,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 

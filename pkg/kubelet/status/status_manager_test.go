@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -613,7 +612,7 @@ func TestTerminatePod(t *testing.T) {
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "ContainerStatusUnknown", Message: "The container could not be located when the pod was terminated", ExitCode: 137}}
 	if !reflect.DeepEqual(newStatus.InitContainerStatuses[0].State, expectUnknownState) {
-		t.Errorf("terminated container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.InitContainerStatuses[0].State, expectUnknownState))
+		t.Errorf("terminated container state not defaulted: %s", cmp.Diff(newStatus.InitContainerStatuses[0].State, expectUnknownState))
 	}
 	if !reflect.DeepEqual(newStatus.InitContainerStatuses[1].State, firstStatus.InitContainerStatuses[1].State) {
 		t.Errorf("existing terminated container state not preserved: %#v", newStatus.ContainerStatuses)
@@ -622,7 +621,7 @@ func TestTerminatePod(t *testing.T) {
 		t.Errorf("existing terminated container state not preserved: %#v", newStatus.ContainerStatuses)
 	}
 	if !reflect.DeepEqual(newStatus.ContainerStatuses[0].State, expectUnknownState) {
-		t.Errorf("terminated container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.ContainerStatuses[0].State, expectUnknownState))
+		t.Errorf("terminated container state not defaulted: %s", cmp.Diff(newStatus.ContainerStatuses[0].State, expectUnknownState))
 	}
 	if !reflect.DeepEqual(newStatus.ContainerStatuses[1].State, firstStatus.ContainerStatuses[1].State) {
 		t.Errorf("existing terminated container state not preserved: %#v", newStatus.ContainerStatuses)
@@ -674,22 +673,22 @@ func TestTerminatePodWaiting(t *testing.T) {
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "ContainerStatusUnknown", Message: "The container could not be located when the pod was terminated", ExitCode: 137}}
 	if !reflect.DeepEqual(newStatus.InitContainerStatuses[0].State, expectUnknownState) {
-		t.Errorf("terminated container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.InitContainerStatuses[0].State, expectUnknownState))
+		t.Errorf("terminated container state not defaulted: %s", cmp.Diff(newStatus.InitContainerStatuses[0].State, expectUnknownState))
 	}
 	if !reflect.DeepEqual(newStatus.InitContainerStatuses[1].State, firstStatus.InitContainerStatuses[1].State) {
 		t.Errorf("existing terminated container state not preserved: %#v", newStatus.ContainerStatuses)
 	}
 	if !reflect.DeepEqual(newStatus.InitContainerStatuses[2].State, firstStatus.InitContainerStatuses[2].State) {
-		t.Errorf("waiting container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.InitContainerStatuses[2].State, firstStatus.InitContainerStatuses[2].State))
+		t.Errorf("waiting container state not defaulted: %s", cmp.Diff(newStatus.InitContainerStatuses[2].State, firstStatus.InitContainerStatuses[2].State))
 	}
 	if !reflect.DeepEqual(newStatus.ContainerStatuses[0].State, expectUnknownState) {
-		t.Errorf("terminated container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.ContainerStatuses[0].State, expectUnknownState))
+		t.Errorf("terminated container state not defaulted: %s", cmp.Diff(newStatus.ContainerStatuses[0].State, expectUnknownState))
 	}
 	if !reflect.DeepEqual(newStatus.ContainerStatuses[1].State, firstStatus.ContainerStatuses[1].State) {
 		t.Errorf("existing terminated container state not preserved: %#v", newStatus.ContainerStatuses)
 	}
 	if !reflect.DeepEqual(newStatus.ContainerStatuses[2].State, expectUnknownState) {
-		t.Errorf("waiting container state not defaulted: %s", diff.ObjectReflectDiff(newStatus.ContainerStatuses[2].State, expectUnknownState))
+		t.Errorf("waiting container state not defaulted: %s", cmp.Diff(newStatus.ContainerStatuses[2].State, expectUnknownState))
 	}
 
 	t.Logf("we expect the previous status update to be preserved.")

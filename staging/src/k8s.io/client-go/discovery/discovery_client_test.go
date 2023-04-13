@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/openapi"
@@ -437,7 +436,7 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 		"extensions/v1beta10",
 	}
 	if !reflect.DeepEqual(expectedGroupVersions, serverGroupVersions) {
-		t.Errorf("unexpected group versions: %v", diff.ObjectReflectDiff(expectedGroupVersions, serverGroupVersions))
+		t.Errorf("unexpected group versions: %v", cmp.Diff(expectedGroupVersions, serverGroupVersions))
 	}
 }
 

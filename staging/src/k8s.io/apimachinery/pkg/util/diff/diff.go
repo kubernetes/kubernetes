@@ -27,28 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 )
 
-// StringDiff diffs a and b and returns a human readable diff.
-func StringDiff(a, b string) string {
-	ba := []byte(a)
-	bb := []byte(b)
-	out := []byte{}
-	i := 0
-	for ; i < len(ba) && i < len(bb); i++ {
-		if ba[i] != bb[i] {
-			break
-		}
-		out = append(out, ba[i])
-	}
-	out = append(out, []byte("\n\nA: ")...)
-	out = append(out, ba[i:]...)
-	out = append(out, []byte("\n\nB: ")...)
-	out = append(out, bb[i:]...)
-	out = append(out, []byte("\n\n")...)
-	return string(out)
-}
-
 func legacyDiff(a, b interface{}) string {
 	return cmp.Diff(a, b)
+}
+
+// StringDiff diffs a and b and returns a human readable diff.
+// DEPRECATED: use github.com/google/go-cmp/cmp.Diff
+func StringDiff(a, b string) string {
+	return legacyDiff(a, b)
 }
 
 // ObjectDiff prints the diff of two go objects and fails if the objects

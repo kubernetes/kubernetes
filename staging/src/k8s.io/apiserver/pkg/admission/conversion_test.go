@@ -21,13 +21,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
@@ -341,22 +341,22 @@ func TestConvertVersionedAttributes(t *testing.T) {
 				t.Fatal(err)
 			}
 			if e, a := tc.ExpectedAttrs.Attributes.GetObject(), tc.Attrs.Attributes.GetObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 			if e, a := tc.ExpectedAttrs.Attributes.GetOldObject(), tc.Attrs.Attributes.GetOldObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 			if e, a := tc.ExpectedAttrs.VersionedKind, tc.Attrs.VersionedKind; !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 			if e, a := tc.ExpectedAttrs.VersionedObject, tc.Attrs.VersionedObject; !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 			if e, a := tc.ExpectedAttrs.VersionedOldObject, tc.Attrs.VersionedOldObject; !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 			if e, a := tc.ExpectedAttrs.Dirty, tc.Attrs.Dirty; !reflect.DeepEqual(e, a) {
-				t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 		})
 	}

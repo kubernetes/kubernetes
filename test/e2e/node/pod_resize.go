@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -43,6 +42,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	semver "github.com/blang/semver/v4"
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -281,7 +281,7 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo, flagError boo
 		if flagError {
 			framework.ExpectEqual(tcStatus.AllocatedResources, cStatus.AllocatedResources)
 		}
-		if diff.ObjectDiff(cStatus.AllocatedResources, tcStatus.AllocatedResources) != "" {
+		if !cmp.Equal(cStatus.AllocatedResources, tcStatus.AllocatedResources) {
 			return false
 		}
 	}
@@ -453,7 +453,7 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 			}
 			differs := false
 			for idx, c := range pod.Spec.Containers {
-				if diff.ObjectDiff(c.Resources, *pod.Status.ContainerStatuses[idx].Resources) != "" {
+				if !cmp.Equal(c.Resources, *pod.Status.ContainerStatuses[idx].Resources) {
 					differs = true
 					break
 				}
