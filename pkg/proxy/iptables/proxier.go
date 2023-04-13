@@ -922,7 +922,12 @@ func (proxier *Proxier) syncProxyRules() {
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-	// NB: THIS MUST MATCH the corresponding code in the kubelet
+
+	// NOTE: kubelet creates identical copies of these rules. If you want to change
+	// these rules in the future, you MUST do so in a way that will interoperate
+	// correctly with skewed versions of the rules created by kubelet. (Remove this
+	// comment once IPTablesOwnershipCleanup is GA.)
+
 	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),
 		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
@@ -956,9 +961,13 @@ func (proxier *Proxier) syncProxyRules() {
 		// Kube-proxy's use of `route_localnet` to enable NodePorts on localhost
 		// creates a security hole (https://issue.k8s.io/90259) which this
 		// iptables rule mitigates.
-		// NB: THIS MUST MATCH the corresponding code in the kubelet. (Actually,
-		// kubelet uses "--dst"/"--src" rather than "-d"/"-s" but that's just a
-		// command-line thing and results in the same rule being created.)
+
+		// NOTE: kubelet creates an identical copy of this rule. If you want to
+		// change this rule in the future, you MUST do so in a way that will
+		// interoperate correctly with skewed versions of the rule created by
+		// kubelet. (Actually, kubelet uses "--dst"/"--src" rather than "-d"/"-s"
+		// but that's just a command-line thing and results in the same rule being
+		// created in the kernel.)
 		proxier.filterChains.Write(utiliptables.MakeChainLine(kubeletFirewallChain))
 		proxier.filterRules.Write(
 			"-A", string(kubeletFirewallChain),
