@@ -209,6 +209,17 @@ It doesn't affect any of the vanilla Kubernetes behavior, but, may break custom 
 
 The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.26.1.
 
+### Regression with custom resources and conversion strategy 'None'
+
+There is a regression in 1.27.0 with custom resources whose `CustomResourceDefinition` uses a conversion strategy of
+`None`: server side apply operations may fail with an error such as:
+
+```
+Error from server: failed to prune fields: failed add back owned items: failed to convert pruned object at version ...: conversion for ... returned invalid metadata in object at index 1: missing metadata in converted object
+```
+
+There is no workaround for 1.27.0, and this issue will be fixed in 1.27.1.
+
 ## Urgent Upgrade Notes 
 
 ### (No, really, you MUST read this before you upgrade)
