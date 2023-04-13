@@ -19,6 +19,7 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
@@ -51,9 +52,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
+
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -113,6 +115,11 @@ type DisruptionController struct {
 	// pod keys that need to be synced due to a stale DisruptionTarget condition.
 	stalePodDisruptionQueue   workqueue.RateLimitingInterface
 	stalePodDisruptionTimeout time.Duration
+
+	lock sync.Mutex
+	// FIXME(oleg): key should contain pod labels since those can affect which PDB is updated.
+	podCache          map[string]*v1.Pod
+	pdbUpdatePodQueue workqueue.RateLimitingInterface
 
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
@@ -184,6 +191,8 @@ func NewDisruptionControllerInternal(
 		stalePodDisruptionQueue:   workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "stale_pod_disruption"), workqueue.DefaultControllerRateLimiter()),
 		broadcaster:               record.NewBroadcaster(),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
+		pdbUpdatePodQueue:         workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "update_pod_disruption"), workqueue.DefaultControllerRateLimiter()),
+		podCache:                  make(map[string]*v1.Pod),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
@@ -430,6 +439,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	defer dc.queue.ShutDown()
 	defer dc.recheckQueue.ShutDown()
 	defer dc.stalePodDisruptionQueue.ShutDown()
+	defer dc.pdbUpdatePodQueue.ShutDown()
 
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")
@@ -441,7 +451,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 	go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
-
+	go wait.UntilWithContext(ctx, dc.podConsumerWorker, time.Second)
 	<-ctx.Done()
 }
 
@@ -478,32 +488,21 @@ func (dc *DisruptionController) removeDb(obj interface{}) {
 
 func (dc *DisruptionController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	klog.V(4).Infof("addPod called on pod %q", pod.Name)
-	pdb := dc.getPdbForPod(pod)
-	if pdb == nil {
-		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
-	} else {
-		klog.V(4).Infof("addPod %q -> PDB %q", pod.Name, pdb.Name)
-		dc.enqueuePdb(pdb)
+	klog.V(4).Infof("enqueuePod called on pod %q", pod.Name)
+	key, err := controller.KeyFunc(pod)
+	if err != nil {
+		klog.ErrorS(err, "Couldn't get key for Pod object", "pod", klog.KObj(pod))
+		return
 	}
-	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
-		dc.enqueueStalePodDisruptionCleanup(pod, cleanAfter)
-	}
+	dc.lock.Lock()
+	dc.podCache[key] = pod
+	dc.lock.Unlock()
+
+	dc.pdbUpdatePodQueue.Add(key)
 }
 
-func (dc *DisruptionController) updatePod(_, cur interface{}) {
-	pod := cur.(*v1.Pod)
-	klog.V(4).Infof("updatePod called on pod %q", pod.Name)
-	pdb := dc.getPdbForPod(pod)
-	if pdb == nil {
-		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
-	} else {
-		klog.V(4).Infof("updatePod %q -> PDB %q", pod.Name, pdb.Name)
-		dc.enqueuePdb(pdb)
-	}
-	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
-		dc.enqueueStalePodDisruptionCleanup(pod, cleanAfter)
-	}
+func (dc *DisruptionController) updatePod(_, newObj interface{}) {
+	dc.addPod(newObj)
 }
 
 func (dc *DisruptionController) deletePod(obj interface{}) {
@@ -525,6 +524,16 @@ func (dc *DisruptionController) deletePod(obj interface{}) {
 			return
 		}
 	}
+
+	key, err := controller.KeyFunc(pod)
+	if err != nil {
+		klog.ErrorS(err, "Couldn't get key for Pod object", "pod", klog.KObj(pod))
+	} else {
+		dc.lock.Lock()
+		delete(dc.podCache, key)
+		dc.lock.Unlock()
+	}
+
 	klog.V(4).Infof("deletePod called on pod %q", pod.Name)
 	pdb := dc.getPdbForPod(pod)
 	if pdb == nil {
@@ -533,6 +542,41 @@ func (dc *DisruptionController) deletePod(obj interface{}) {
 	}
 	klog.V(4).Infof("deletePod %q -> PDB %q", pod.Name, pdb.Name)
 	dc.enqueuePdb(pdb)
+}
+
+func (dc *DisruptionController) podConsumerWorker(ctx context.Context) {
+	for dc.processItem() {
+	}
+}
+
+func (dc *DisruptionController) processItem() bool {
+	key, shutdown := dc.pdbUpdatePodQueue.Get()
+	if shutdown {
+		return shutdown
+	}
+	dc.processPod(key.(string))
+	return false
+}
+
+func (dc *DisruptionController) processPod(key string) {
+	dc.lock.Lock()
+	pod, ok := dc.podCache[key]
+	if !ok {
+		panic(fmt.Sprintf("pod %q not found in cache", key))
+	}
+	delete(dc.podCache, key)
+	dc.lock.Unlock()
+
+	pdb := dc.getPdbForPod(pod)
+	if pdb == nil {
+		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
+	} else {
+		klog.V(4).Infof("processPod %q -> PDB %q", pod.Name, pdb.Name)
+		dc.enqueuePdb(pdb)
+	}
+	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
+		dc.enqueueStalePodDisruptionCleanup(pod, cleanAfter)
+	}
 }
 
 func (dc *DisruptionController) enqueuePdb(pdb *policy.PodDisruptionBudget) {
