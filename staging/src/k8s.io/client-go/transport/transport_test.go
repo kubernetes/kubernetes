@@ -24,6 +24,8 @@ import (
 	"net"
 	"net/http"
 	"testing"
+
+	"github.com/golang/groupcache/lru"
 )
 
 const (
@@ -554,5 +556,117 @@ func Test_contextCanceller_RoundTrip(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewCacheBounded(t *testing.T) {
+
+	globalDial := &DialHolder{
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+	}
+
+	config1 := &Config{
+		TLS: TLSConfig{
+			CAData:   []byte(rootCACert),
+			CertData: []byte(certData),
+			KeyData:  []byte(keyData),
+		},
+	}
+
+	config2 := &Config{
+		TLS: TLSConfig{
+			CAData:   []byte(rootCACert),
+			CertData: []byte(certData),
+			KeyData:  []byte(keyData),
+		},
+		DialHolder: globalDial,
+	}
+	tlsCache = &tlsTransportCache{transports: lru.New(1)}
+	rt, err := New(config1)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport1 := rt.(*http.Transport)
+
+	rt, err = New(config2)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport2 := rt.(*http.Transport)
+
+	rt, err = New(config1)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport3 := rt.(*http.Transport)
+
+	if transport1 == nil || transport2 == nil || transport3 == nil {
+		t.Fatal("unexpected nil transport")
+	}
+	if transport1 == transport3 {
+		t.Fatalf("unexpected transports %v %v", transport1, transport3)
+	}
+
+	// check cache works with a large number of entries
+	tlsCache = &tlsTransportCache{transports: lru.New(12)}
+	rt, err = New(config1)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport1 = rt.(*http.Transport)
+
+	rt, err = New(config2)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport2 = rt.(*http.Transport)
+
+	rt, err = New(config1)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	transport3 = rt.(*http.Transport)
+
+	if transport1 == nil || transport2 == nil || transport3 == nil {
+		t.Fatal("unexpected nil transport")
+	}
+	if transport1 != transport3 {
+		t.Fatalf("unexpected transports %v %v", transport1, transport3)
+	}
+
+}
+
+func TestExhaustCache(t *testing.T) {
+	maxCacheEntries := 16
+	config := &Config{
+		TLS: TLSConfig{
+			CAData:   []byte(rootCACert),
+			CertData: []byte(certData),
+			KeyData:  []byte(keyData),
+		},
+	}
+	evicted := false
+	trCache := lru.New(maxCacheEntries)
+	trCache.OnEvicted = func(key lru.Key, _ interface{}) {
+		evicted = true
+	}
+	tlsCache = &tlsTransportCache{transports: trCache}
+	for i := 0; i < maxCacheEntries; i++ {
+		config.TLS.ServerName = fmt.Sprintf("test-server%d", i)
+		_, err := New(config)
+		if err != nil {
+			t.Fatalf("error creating transport: %v", err)
+		}
+	}
+	if evicted {
+		t.Fatalf("unexpected eviction from cache")
+	}
+	config.TLS.ServerName = "test-server-16"
+	_, err := New(config)
+	if err != nil {
+		t.Fatalf("error creating transport: %v", err)
+	}
+	if !evicted {
+		t.Fatalf("expected eviction from cache")
 	}
 }

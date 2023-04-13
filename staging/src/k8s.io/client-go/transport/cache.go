@@ -25,8 +25,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 )
 
 // TlsTransportCache caches TLS http.RoundTrippers different configurations. The
@@ -34,17 +37,29 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports *lru.Cache // key: tlsCacheKey value: *http.Transport
 }
+
+// tlsCache is used to cache all the http Transport configuration
+var tlsCache *tlsTransportCache
 
 // DialerStopCh is stop channel that is passed down to dynamic cert dialer.
 // It's exposed as variable for testing purposes to avoid testing for goroutine
 // leakages.
 var DialerStopCh = wait.NeverStop
 
-const idleConnsPerHost = 25
+const (
+	idleConnsPerHost = 25
+	maxCacheEntries  = 8096
+)
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+func init() {
+	trCache := lru.New(maxCacheEntries)
+	trCache.OnEvicted = func(key lru.Key, _ interface{}) {
+		klog.Warningf("cache exhausted with %d entries, evicting key %s", maxCacheEntries, key.(tlsCacheKey).String())
+	}
+	tlsCache = &tlsTransportCache{transports: trCache}
+}
 
 type tlsCacheKey struct {
 	insecure           bool
@@ -82,8 +97,8 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		defer c.mu.Unlock()
 
 		// See if we already have a custom transport for this config
-		if t, ok := c.transports[key]; ok {
-			return t, nil
+		if t, ok := c.transports.Get(key); ok {
+			return t.(*http.Transport), nil
 		}
 	}
 
@@ -132,7 +147,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 
 	if canCache {
 		// Cache a single transport for these options
-		c.transports[key] = transport
+		c.transports.Add(key, transport)
 	}
 
 	return transport, nil
