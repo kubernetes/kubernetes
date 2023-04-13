@@ -502,6 +502,13 @@ function start_apiserver {
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
+      # Clean previous dynamic certs
+      # This file is owned by root, so we can't always overwrite it (depends if
+      # we run the script as root or not). Let's remove it, that is something we
+      # can always do: either we have write permissions as a user in CERT_DIR or
+      # we run the rm with sudo.
+      ${CONTROLPLANE_SUDO} rm -f "${CERT_DIR}"/kubelet-rotated.kubeconfig
+
       # Create Certs
       generate_certs
     fi
