@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/pflag"
 	oteltrace "go.opentelemetry.io/otel/trace"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -108,14 +107,6 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
 		return nil, err
 	}
-
-	serviceResolver := &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()}
-	authResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider())
-	conversionFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
-	if err != nil {
-		return nil, err
-	}
-
 	crdRESTOptionsGetter, err := NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd)
 	if err != nil {
 		return nil, err
@@ -124,7 +115,8 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: crdRESTOptionsGetter,
-			ConversionFactory:    conversionFactory,
+			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider()),
 		},
 	}
 	return config, nil
