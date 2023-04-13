@@ -51,10 +51,6 @@ func NewProxyServer(o *Options) (*ProxyServer, error) {
 }
 
 func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string) (*ProxyServer, error) {
-	if config == nil {
-		return nil, errors.New("config is required")
-	}
-
 	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
