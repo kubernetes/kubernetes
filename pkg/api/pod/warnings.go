@@ -112,6 +112,11 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 				msg,
 			))
 		}
+
+		// warn if labelSelector is empty which is no-match.
+		if t.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("labelSelector")))
+		}
 	}
 
 	// use of deprecated annotations
@@ -253,6 +258,39 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	// warn if the terminationGracePeriodSeconds is negative.
 	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds < 0 {
 		warnings = append(warnings, fmt.Sprintf("%s: must be >= 0; negative values are invalid and will be treated as 1", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
+	}
+
+	if podSpec.Affinity != nil {
+		if affinity := podSpec.Affinity.PodAffinity; affinity != nil {
+			warnings = append(warnings, warningsForPodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAffinity", "requiredDuringSchedulingIgnoredDuringExecution"))...)
+			warnings = append(warnings, warningsForWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAffinity", "preferredDuringSchedulingIgnoredDuringExecution"))...)
+		}
+		if affinity := podSpec.Affinity.PodAntiAffinity; affinity != nil {
+			warnings = append(warnings, warningsForPodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "requiredDuringSchedulingIgnoredDuringExecution"))...)
+			warnings = append(warnings, warningsForWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "preferredDuringSchedulingIgnoredDuringExecution"))...)
+		}
+	}
+
+	return warnings
+}
+
+func warningsForPodAffinityTerms(terms []api.PodAffinityTerm, fieldPath *field.Path) []string {
+	var warnings []string
+	for i, t := range terms {
+		if t.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("labelSelector")))
+		}
+	}
+	return warnings
+}
+
+func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fieldPath *field.Path) []string {
+	var warnings []string
+	for i, t := range terms {
+		// warn if labelSelector is empty which is no-match.
+		if t.PodAffinityTerm.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
+		}
 	}
 	return warnings
 }
