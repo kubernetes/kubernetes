@@ -5,8 +5,8 @@ module k8s.io/apiserver
 go 1.20
 
 require (
-	github.com/coreos/go-oidc v2.1.0+incompatible
-	github.com/coreos/go-systemd/v22 v22.4.0
+	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
@@ -64,7 +64,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect

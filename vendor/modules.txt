@@ -154,13 +154,13 @@ github.com/coredns/caddy/caddyfile
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
-# github.com/coreos/go-oidc v2.1.0+incompatible
+# github.com/coreos/go-oidc v2.2.1+incompatible
 ## explicit
 github.com/coreos/go-oidc
-# github.com/coreos/go-semver v0.3.0
-## explicit
+# github.com/coreos/go-semver v0.3.1
+## explicit; go 1.8
 github.com/coreos/go-semver/semver
-# github.com/coreos/go-systemd/v22 v22.4.0
+# github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/dbus

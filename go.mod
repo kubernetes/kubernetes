@@ -22,8 +22,8 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/coredns/corefile-migration v1.0.20
-	github.com/coreos/go-oidc v2.1.0+incompatible
-	github.com/coreos/go-systemd/v22 v22.4.0
+	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/cyphar/filepath-securejoin v0.2.3
 	github.com/docker/distribution v2.8.1+incompatible
@@ -152,7 +152,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/coredns/caddy v1.1.0 // indirect
-	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
