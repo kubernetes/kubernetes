@@ -106,7 +106,7 @@ and as such does not resolve issues that may exist in the processed HTML,
 producing a literal interpretation of the input.
 
 If your use case requires semantically well-formed HTML, as defined by the
-WHATWG specifiction, the parser should be used rather than the tokenizer.
+WHATWG specification, the parser should be used rather than the tokenizer.
 */
 package html // import "golang.org/x/net/html"
 

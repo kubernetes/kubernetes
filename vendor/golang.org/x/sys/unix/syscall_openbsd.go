@@ -294,7 +294,6 @@ func Uname(uname *Utsname) error {
 //sysnb	Setreuid(ruid int, euid int) (err error)
 //sysnb	Setresgid(rgid int, egid int, sgid int) (err error)
 //sysnb	Setresuid(ruid int, euid int, suid int) (err error)
-//sysnb	Setrlimit(which int, lim *Rlimit) (err error)
 //sysnb	Setrtable(rtable int) (err error)
 //sysnb	Setsid() (pid int, err error)
 //sysnb	Settimeofday(tp *Timeval) (err error)
