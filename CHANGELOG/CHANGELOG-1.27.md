@@ -198,16 +198,16 @@ name | architectures
 [registry.k8s.io/kube-proxy:v1.27.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-amd64), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-s390x)
 [registry.k8s.io/kube-scheduler:v1.27.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-amd64), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-s390x)
 
-## Changelog since v1.26.0
+## Changelog since v1.27.0
 
 ## Known Issues
 
 ### The PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ
 
-In v1.26.0, we've found the bug that the PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ. 
+In v1.27.0, we've found the bug that the PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ.
 It doesn't affect any of the vanilla Kubernetes behavior, but, may break custom PreEnqueue plugins.
 
-The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.26.1.
+The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.27.1.
 
 ## Urgent Upgrade Notes 
 
