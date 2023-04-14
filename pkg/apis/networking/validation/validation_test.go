@@ -1652,6 +1652,14 @@ func TestValidateIngressClass(t *testing.T) {
 			),
 			expectedErrs: field.ErrorList{},
 		},
+		"valid name, valid controller, invalid scope": {
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", nil, utilpointer.String("foo_ns"))),
+			),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.parameters.scope"), ""),
+			},
+		},
 		"namespace not set when scope is Namespace": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
 				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Namespace"), nil)),
