@@ -204,10 +204,10 @@ name | architectures
 
 ### The PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ
 
-In v1.26.0, we've found the bug that the PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ. 
+In v1.27.0, we've found the bug that the PreEnqueue extension point doesn't work for Pods going to activeQ through backoffQ. 
 It doesn't affect any of the vanilla Kubernetes behavior, but, may break custom PreEnqueue plugins.
 
-The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.26.1.
+The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194) by v1.27.1.
 
 ## Urgent Upgrade Notes 
 
