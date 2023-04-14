@@ -17,7 +17,7 @@ func (ns NsHandle) Equal(_ NsHandle) bool {
 // It is only implemented on Linux, and returns "NS(none)" on other
 // platforms.
 func (ns NsHandle) String() string {
-	return "NS(None)"
+	return "NS(none)"
 }
 
 // UniqueId returns a string which uniquely identifies the namespace
