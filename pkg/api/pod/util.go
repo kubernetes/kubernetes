@@ -540,6 +540,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropResourcesFields(podStatus.EphemeralContainerStatuses)
 		podStatus.Resize = ""
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+		podStatus.ResourceClaimStatuses = nil
+	}
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from

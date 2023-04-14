@@ -19,7 +19,9 @@ package resourceclaim
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,6 +55,7 @@ var (
 	testPodWithResource = makePod(testPodName, testNamespace, testPodUID, *makePodResourceClaim(podResourceClaimName, templateName))
 	otherTestPod        = makePod(testPodName+"-II", testNamespace, testPodUID+"-II")
 	testClaim           = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, makeOwnerReference(testPodWithResource, true))
+	generatedTestClaim  = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName, testNamespace, className, 1, makeOwnerReference(testPodWithResource, true))
 	testClaimReserved   = func() *resourcev1alpha2.ResourceClaim {
 		claim := testClaim.DeepCopy()
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor,
@@ -86,22 +89,67 @@ func init() {
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name            string
-		key             string
-		claims          []*resourcev1alpha2.ResourceClaim
-		pods            []*v1.Pod
-		podsLater       []*v1.Pod
-		templates       []*resourcev1alpha2.ResourceClaimTemplate
-		expectedClaims  []resourcev1alpha2.ResourceClaim
-		expectedError   bool
-		expectedMetrics expectedMetrics
+		name             string
+		key              string
+		claims           []*resourcev1alpha2.ResourceClaim
+		pods             []*v1.Pod
+		podsLater        []*v1.Pod
+		templates        []*resourcev1alpha2.ResourceClaimTemplate
+		expectedClaims   []resourcev1alpha2.ResourceClaim
+		expectedStatuses map[string][]v1.PodResourceClaimStatus
+		expectedError    bool
+		expectedMetrics  expectedMetrics
 	}{
 		{
-			name:            "create",
-			pods:            []*v1.Pod{testPodWithResource},
-			templates:       []*resourcev1alpha2.ResourceClaimTemplate{template},
-			key:             podKey(testPodWithResource),
-			expectedClaims:  []resourcev1alpha2.ResourceClaim{*testClaim},
+			name:           "create",
+			pods:           []*v1.Pod{testPodWithResource},
+			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{1, 0},
+		},
+		{
+			name: "nop",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourcev1alpha2.ResourceClaim{generatedTestClaim},
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "recreate",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				},
+			},
 			expectedMetrics: expectedMetrics{1, 0},
 		},
 		{
@@ -112,11 +160,29 @@ func TestSyncHandler(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name:            "nop",
-			pods:            []*v1.Pod{testPodWithResource},
-			key:             podKey(testPodWithResource),
-			claims:          []*resourcev1alpha2.ResourceClaim{testClaim},
-			expectedClaims:  []resourcev1alpha2.ResourceClaim{*testClaim},
+			name:           "find-existing-claim-by-label",
+			pods:           []*v1.Pod{testPodWithResource},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourcev1alpha2.ResourceClaim{generatedTestClaim},
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name:           "find-existing-claim-by-name",
+			pods:           []*v1.Pod{testPodWithResource},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourcev1alpha2.ResourceClaim{testClaim},
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*testClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &testClaim.Name},
+				},
+			},
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
@@ -139,12 +205,17 @@ func TestSyncHandler(t *testing.T) {
 			key:  podKey(testPod),
 		},
 		{
-			name:            "create-with-other-claim",
-			pods:            []*v1.Pod{testPodWithResource},
-			templates:       []*resourcev1alpha2.ResourceClaimTemplate{template},
-			key:             podKey(testPodWithResource),
-			claims:          []*resourcev1alpha2.ResourceClaim{otherNamespaceClaim},
-			expectedClaims:  []resourcev1alpha2.ResourceClaim{*otherNamespaceClaim, *testClaim},
+			name:           "create-with-other-claim",
+			pods:           []*v1.Pod{testPodWithResource},
+			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourcev1alpha2.ResourceClaim{otherNamespaceClaim},
+			expectedClaims: []resourcev1alpha2.ResourceClaim{*otherNamespaceClaim, *generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
+				},
+			},
 			expectedMetrics: expectedMetrics{1, 0},
 		},
 		{
@@ -296,6 +367,23 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
 			assert.Equal(t, normalizeClaims(tc.expectedClaims), normalizeClaims(claims.Items))
+
+			pods, err := fakeKubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error while listing pods: %v", err)
+			}
+			var actualStatuses map[string][]v1.PodResourceClaimStatus
+			for _, pod := range pods.Items {
+				if len(pod.Status.ResourceClaimStatuses) == 0 {
+					continue
+				}
+				if actualStatuses == nil {
+					actualStatuses = make(map[string][]v1.PodResourceClaimStatus)
+				}
+				actualStatuses[pod.Name] = pod.Status.ResourceClaimStatuses
+			}
+			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
+
 			expectMetrics(t, tc.expectedMetrics)
 		})
 	}
@@ -304,6 +392,25 @@ func TestSyncHandler(t *testing.T) {
 func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) *resourcev1alpha2.ResourceClaim {
 	claim := &resourcev1alpha2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: resourcev1alpha2.ResourceClaimSpec{
+			ResourceClassName: classname,
+		},
+	}
+	if owner != nil {
+		claim.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
+
+	return claim
+}
+
+func makeGeneratedClaim(podClaimName, generateName, namespace, classname string, createCounter int, owner *metav1.OwnerReference) *resourcev1alpha2.ResourceClaim {
+	claim := &resourcev1alpha2.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         fmt.Sprintf("%s-%d", generateName, createCounter),
+			GenerateName: generateName,
+			Namespace:    namespace,
+			Annotations:  map[string]string{"resource.kubernetes.io/pod-claim-name": podClaimName},
+		},
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: classname,
 		},
@@ -369,8 +476,13 @@ func makeOwnerReference(pod *v1.Pod, isController bool) *metav1.OwnerReference {
 
 func normalizeClaims(claims []resourcev1alpha2.ResourceClaim) []resourcev1alpha2.ResourceClaim {
 	sort.Slice(claims, func(i, j int) bool {
-		return claims[i].Namespace < claims[j].Namespace ||
-			claims[i].Name < claims[j].Name
+		if claims[i].Namespace < claims[j].Namespace {
+			return true
+		}
+		if claims[i].Namespace > claims[j].Namespace {
+			return false
+		}
+		return claims[i].Name < claims[j].Name
 	})
 	for i := range claims {
 		if len(claims[i].Status.ReservedFor) == 0 {
@@ -382,7 +494,25 @@ func normalizeClaims(claims []resourcev1alpha2.ResourceClaim) []resourcev1alpha2
 
 func createTestClient(objects ...runtime.Object) *fake.Clientset {
 	fakeClient := fake.NewSimpleClientset(objects...)
+	fakeClient.PrependReactor("create", "resourceclaims", createResourceClaimReactor())
 	return fakeClient
+}
+
+// createResourceClaimReactor implements the logic required for the GenerateName field to work when using
+// the fake client. Add it with client.PrependReactor to your fake client.
+func createResourceClaimReactor() func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	nameCounter := 1
+	var mutex sync.Mutex
+	return func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		claim := action.(k8stesting.CreateAction).GetObject().(*resourcev1alpha2.ResourceClaim)
+		if claim.Name == "" && claim.GenerateName != "" {
+			claim.Name = fmt.Sprintf("%s-%d", claim.GenerateName, nameCounter)
+		}
+		nameCounter++
+		return false, nil, nil
+	}
 }
 
 // Metrics helpers

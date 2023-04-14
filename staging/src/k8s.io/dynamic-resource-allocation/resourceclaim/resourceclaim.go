@@ -24,6 +24,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"errors"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,25 +32,53 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var (
+	// ErrAPIUnsupported is wrapped by the actual errors returned by Name and
+	// indicates that none of the required fields are set.
+	ErrAPIUnsupported = errors.New("none of the supported fields are set")
+
+	// ErrClaimNotFound is wrapped by the actual errors returned by Name and
+	// indicates that the claim has not been created yet.
+	ErrClaimNotFound = errors.New("ResourceClaim not created yet")
+)
+
 // Name returns the name of the ResourceClaim object that gets referenced by or
-// created for the PodResourceClaim. The name is deterministic and therefore
-// this function does not need any additional information and it will never
-// fail.
+// created for the PodResourceClaim. Three different results are possible:
 //
-// Either podClaim.ResourceClaimName or podClaim.Template must be non-nil, but not
-// both. This is enforced by API validation.
+//   - An error is returned when some field is not set as expected (either the
+//     input is invalid or the API got extended and the library and the client
+//     using it need to be updated) or the claim hasn't been created yet.
+//
+//     The error includes pod and pod claim name and the unexpected field and
+//     is derived from one of the pre-defined errors in this package.
+//
+//   - A nil string pointer and no error when the ResourceClaim intentionally
+//     didn't get created and the PodResourceClaim can be ignored.
+//
+//   - A pointer to the name and no error when the ResourceClaim got created.
+//     In this case the boolean determines whether IsForPod must be called
+//     after retrieving the ResourceClaim and before using it.
 //
 // If podClaim.Template is not nil, the caller must check that the
 // ResourceClaim is indeed the one that was created for the Pod by calling
 // IsUsable.
-func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) string {
-	if podClaim.Source.ResourceClaimName != nil {
-		return *podClaim.Source.ResourceClaimName
+func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
+	switch {
+	case podClaim.Source.ResourceClaimName != nil:
+		return podClaim.Source.ResourceClaimName, false, nil
+	case podClaim.Source.ResourceClaimTemplateName != nil:
+		for _, status := range pod.Status.ResourceClaimStatuses {
+			if status.Name == podClaim.Name {
+				return status.ResourceClaimName, true, nil
+			}
+		}
+		return nil, false, fmt.Errorf(`pod "%s/%s": %w`, pod.Namespace, pod.Name, ErrClaimNotFound)
+	default:
+		return nil, false, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
 	}
-	return pod.Name + "-" + podClaim.Name
 }
 
-// IsForPod checks that the ResourceClaim is the ephemeral volume that
+// IsForPod checks that the ResourceClaim is the one that
 // was created for the Pod. It returns an error that is informative
 // enough to be returned by the caller without adding further details
 // about the Pod or ResourceClaim.

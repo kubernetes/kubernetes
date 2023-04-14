@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -179,6 +181,17 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		nodes := NewNodes(f, 1, 4)
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
+
+		ginkgo.It("truncates the name of a generated resource claim", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			pod.Name = strings.Repeat("p", 63)
+			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
+			pod.Spec.Containers[0].Resources.Claims[0].Name = pod.Spec.ResourceClaims[0].Name
+			b.create(ctx, parameters, template, pod)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
 
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
@@ -759,7 +772,7 @@ func (b *builder) podInline(allocationMode resourcev1alpha2.AllocationMode) (*v1
 		{
 			Name: podClaimName,
 			Source: v1.ClaimSource{
-				ResourceClaimTemplateName: &pod.Name,
+				ResourceClaimTemplateName: utilpointer.String(pod.Name),
 			},
 		},
 	}
