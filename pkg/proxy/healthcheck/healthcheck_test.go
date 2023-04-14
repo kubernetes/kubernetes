@@ -25,11 +25,10 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type fakeListener struct {
@@ -176,10 +175,10 @@ func TestServer(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn].endpoints)
 	}
 	if len(listener.openPorts) != 1 {
-		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
 	if !listener.hasPort(":9376") {
-		t.Errorf("expected port :9376 to be open\n%s", spew.Sdump(listener.openPorts))
+		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
@@ -262,7 +261,7 @@ func TestServer(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn3].endpoints)
 	}
 	if len(listener.openPorts) != 3 {
-		t.Errorf("expected 3 open ports, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 3 open ports, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
 	// test the handlers
 	testHandler(hcs, nsn1, http.StatusServiceUnavailable, 0, t)
@@ -505,10 +504,10 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn].endpoints)
 	}
 	if len(listener.openPorts) != 1 {
-		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
 	if !listener.hasPort("127.0.0.1:9376") {
-		t.Errorf("expected port :9376 to be open\n%s", spew.Sdump(listener.openPorts))
+		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)

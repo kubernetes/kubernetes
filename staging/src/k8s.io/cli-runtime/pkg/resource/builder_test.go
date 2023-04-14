@@ -30,7 +30,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/yaml"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -542,11 +542,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 				switch tt.object.(type) {
 				case *v1.Pod:
 					if _, ok := v.Object.(*v1.Pod); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+						t.Errorf("unexpected info: %v", dump.Pretty(v.Object))
 					}
 				case *v1.ReplicationController:
 					if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+						t.Errorf("unexpected info: %v", dump.Pretty(v.Object))
 					}
 				}
 			}
