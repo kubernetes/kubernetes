@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
+
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -227,9 +228,6 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
 			return true
-		},
-		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
