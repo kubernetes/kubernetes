@@ -2,6 +2,31 @@ libseccomp-golang: Releases
 ===============================================================================
 https://github.com/seccomp/libseccomp-golang
 
+* Version 0.10.0 - June 9, 2022
+- Minimum supported version of libseccomp bumped to v2.3.1
+- Add seccomp userspace notification API (ActNotify, filter.*Notif*)
+- Add filter.{Get,Set}SSB (to support SCMP_FLTATR_CTL_SSB)
+- Add filter.{Get,Set}Optimize (to support SCMP_FLTATR_CTL_OPTIMIZE)
+- Add filter.{Get,Set}RawRC (to support SCMP_FLTATR_API_SYSRAWRC)
+- Add ArchPARISC, ArchPARISC64, ArchRISCV64
+- Add ActKillProcess and ActKillThread; deprecate ActKill
+- Add go module support
+- Return ErrSyscallDoesNotExist when unable to resolve a syscall
+- Fix some functions to check for both kernel level API and libseccomp version
+- Fix MakeCondition to use sanitizeCompareOp
+- Fix AddRule to handle EACCES (from libseccomp >= 2.5.0)
+- Updated the main docs and converted to README.md
+- Added CONTRIBUTING.md, SECURITY.md, and administrative docs under doc/admin
+- Add GitHub action CI, enable more linters
+- test: test against various libseccomp versions
+- test: fix and simplify execInSubprocess
+- test: fix APILevelIsSupported
+- Refactor the Errno(-1 * retCode) pattern
+- Refactor/unify libseccomp version / API level checks
+- Code cleanups (linter, formatting, spelling fixes)
+- Cleanup: use errors.New instead of fmt.Errorf where appropriate
+- Cleanup: remove duplicated cgo stuff, redundant linux build tag
+
 * Version 0.9.1 - May 21, 2019
 - Minimum supported version of libseccomp bumped to v2.2.0
 - Use Libseccomp's `seccomp_version` API to retrieve library version
