@@ -96,7 +96,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {
 		ginkgo.Context("On running pod with PodOverhead defined", func() {
 			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 
