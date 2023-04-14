@@ -21,11 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
@@ -470,7 +469,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			newServices := svcTracker.serviceToServiceMap(tc.service)
 
 			if len(newServices) != len(tc.expected) {
-				t.Fatalf("expected %d new, got %d: %v", len(tc.expected), len(newServices), spew.Sdump(newServices))
+				t.Fatalf("expected %d new, got %d: %v", len(tc.expected), len(newServices), dump.Pretty(newServices))
 			}
 			for svcKey, expectedInfo := range tc.expected {
 				svcInfo, exists := newServices[svcKey].(*BaseServicePortInfo)

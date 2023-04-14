@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 func TestVisitorHttpGet(t *testing.T) {
@@ -182,7 +182,7 @@ func TestFlattenListVisitor(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(test.Infos) != 6 {
-		t.Fatal(spew.Sdump(test.Infos))
+		t.Fatal(dump.Pretty(test.Infos))
 	}
 }
 
@@ -197,7 +197,7 @@ func TestFlattenListVisitorWithVisitorError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(test.Infos) != 6 {
-		t.Fatal(spew.Sdump(test.Infos))
+		t.Fatal(dump.Pretty(test.Infos))
 	}
 }
 

@@ -27,10 +27,9 @@ import (
 
 	"k8s.io/utils/pointer"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -452,13 +451,13 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 
 	c.updateAPIServiceStatus(foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
-		t.Error(spew.Sdump(fakeClient.Actions()))
+		t.Error(dump.Pretty(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
 	c.updateAPIServiceStatus(foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
-		t.Error(spew.Sdump(fakeClient.Actions()))
+		t.Error(dump.Pretty(fakeClient.Actions()))
 	}
 }
 
