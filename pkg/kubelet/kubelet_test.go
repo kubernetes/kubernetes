@@ -2530,9 +2530,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		testPod2.UID: true,
 		testPod3.UID: true,
 	}
-	defer kubelet.podManager.DeletePod(testPod3)
-	defer kubelet.podManager.DeletePod(testPod2)
-	defer kubelet.podManager.DeletePod(testPod1)
+	defer kubelet.podManager.RemovePod(testPod3)
+	defer kubelet.podManager.RemovePod(testPod2)
+	defer kubelet.podManager.RemovePod(testPod1)
 
 	tests := []struct {
 		name                string

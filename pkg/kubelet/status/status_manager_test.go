@@ -53,7 +53,7 @@ import (
 type mutablePodManager interface {
 	AddPod(*v1.Pod)
 	UpdatePod(*v1.Pod)
-	DeletePod(*v1.Pod)
+	RemovePod(*v1.Pod)
 }
 
 // Generate new instance of test pod with the same initial value.
@@ -572,7 +572,7 @@ func TestStaticPod(t *testing.T) {
 	verifyActions(t, m, []core.Action{})
 
 	t.Logf("Change mirror pod identity.")
-	m.podManager.(mutablePodManager).DeletePod(mirrorPod)
+	m.podManager.(mutablePodManager).RemovePod(mirrorPod)
 	mirrorPod.UID = "new-mirror-pod"
 	mirrorPod.Status = v1.PodStatus{}
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)

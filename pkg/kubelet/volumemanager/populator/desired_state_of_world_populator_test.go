@@ -17,9 +17,10 @@ limitations under the License.
 package populator
 
 import (
-	"k8s.io/klog/v2/ktesting"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2/ktesting"
 
 	"fmt"
 
@@ -287,7 +288,7 @@ func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T)
 	if !dswp.podPreviouslyProcessed(podName) {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
 	}
-	fakePodManager.DeletePod(pod)
+	fakePodManager.RemovePod(pod)
 }
 
 func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
@@ -325,7 +326,7 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 
 type mutablePodManager interface {
 	GetPodByName(string, string) (*v1.Pod, bool)
-	DeletePod(*v1.Pod)
+	RemovePod(*v1.Pod)
 }
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
@@ -338,7 +339,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.(mutablePodManager).DeletePod(pod)
+	dswp.podManager.(mutablePodManager).RemovePod(pod)
 
 	dswp.findAndRemoveDeletedPods()
 
@@ -461,7 +462,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.(mutablePodManager).DeletePod(pod)
+	dswp.podManager.(mutablePodManager).RemovePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	// Add the volume to ASW by reconciling.
@@ -758,7 +759,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	fakePodManager.DeletePod(pod)
+	fakePodManager.RemovePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	//pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted

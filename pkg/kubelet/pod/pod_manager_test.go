@@ -111,7 +111,7 @@ func TestGetSetPods(t *testing.T) {
 
 }
 
-func TestDeletePods(t *testing.T) {
+func TestRemovePods(t *testing.T) {
 	mirrorPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID("mirror-pod-uid"),
@@ -147,11 +147,11 @@ func TestDeletePods(t *testing.T) {
 	podManager, _ := newTestManager()
 	podManager.SetPods(updates)
 
-	podManager.DeletePod(staticPod)
+	podManager.RemovePod(staticPod)
 
 	actualPods := podManager.GetPods()
 	if len(actualPods) == len(expectedPods) {
-		t.Fatalf("Run DeletePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
+		t.Fatalf("Run RemovePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
 	}
 
 	_, _, orphanedMirrorPodNames := podManager.GetPodsAndMirrorPods()

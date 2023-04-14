@@ -77,10 +77,10 @@ type Manager interface {
 	AddPod(pod *v1.Pod)
 	// UpdatePod updates the given pod in the manager.
 	UpdatePod(pod *v1.Pod)
-	// DeletePod deletes the given pod from the manager.  For mirror pods,
+	// RemovePod deletes the given pod from the manager.  For mirror pods,
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
-	DeletePod(pod *v1.Pod)
+	RemovePod(pod *v1.Pod)
 
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
@@ -98,7 +98,7 @@ type Manager interface {
 // basicManager is a functional Manager.
 //
 // All fields in basicManager are read-only and are updated calling SetPods,
-// AddPod, UpdatePod, or DeletePod.
+// AddPod, UpdatePod, or RemovePod.
 type basicManager struct {
 	// Protects all internal maps.
 	lock sync.RWMutex
@@ -189,7 +189,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	}
 }
 
-func (pm *basicManager) DeletePod(pod *v1.Pod) {
+func (pm *basicManager) RemovePod(pod *v1.Pod) {
 	updateMetrics(pod, nil)
 	pm.lock.Lock()
 	defer pm.lock.Unlock()

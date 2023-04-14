@@ -64,18 +64,6 @@ func (mr *MockManagerMockRecorder) AddPod(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPod", reflect.TypeOf((*MockManager)(nil).AddPod), arg0)
 }
 
-// DeletePod mocks base method.
-func (m *MockManager) DeletePod(arg0 *v1.Pod) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeletePod", arg0)
-}
-
-// DeletePod indicates an expected call of DeletePod.
-func (mr *MockManagerMockRecorder) DeletePod(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePod", reflect.TypeOf((*MockManager)(nil).DeletePod), arg0)
-}
-
 // GetMirrorPodByPod mocks base method.
 func (m *MockManager) GetMirrorPodByPod(arg0 *v1.Pod) (*v1.Pod, bool) {
 	m.ctrl.T.Helper()
@@ -210,6 +198,18 @@ func (m *MockManager) GetUIDTranslations() (map[types0.ResolvedPodUID]types0.Mir
 func (mr *MockManagerMockRecorder) GetUIDTranslations() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUIDTranslations", reflect.TypeOf((*MockManager)(nil).GetUIDTranslations))
+}
+
+// RemovePod mocks base method.
+func (m *MockManager) RemovePod(arg0 *v1.Pod) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemovePod", arg0)
+}
+
+// RemovePod indicates an expected call of RemovePod.
+func (mr *MockManagerMockRecorder) RemovePod(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePod", reflect.TypeOf((*MockManager)(nil).RemovePod), arg0)
 }
 
 // SetPods mocks base method.
