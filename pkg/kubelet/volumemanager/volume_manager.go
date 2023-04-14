@@ -60,7 +60,7 @@ const (
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
+	desiredStateOfWorldPopulatorLoopSleepPeriod = 1 * time.Second
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -400,11 +400,6 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	klog.V(3).InfoS("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
-	// Some pods expect to have Setup called over and over again to update.
-	// Remount plugins for which this is true. (Atomically updating volumes,
-	// like Downward API, depend on this to update the contents of the volume).
-	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
-
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		podAttachAndMountRetryInterval,
@@ -444,8 +439,6 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 
 	klog.V(3).InfoS("Waiting for volumes to unmount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
-
-	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
 	err := wait.PollUntilContextTimeout(
 		ctx,

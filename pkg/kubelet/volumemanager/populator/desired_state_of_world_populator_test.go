@@ -189,7 +189,7 @@ func TestFindAndAddNewPods_WithDifferentConditions(t *testing.T) {
 			desc:          "HasAddedPods is true, ShouldPodRuntimeBeRemoved is false, ShouldPodContainerBeTerminating is true",
 			hasAddedPods:  true,
 			podState:      Terminating,
-			expectedFound: false, // Pod should not be added to DSW
+			expectedFound: true, // Pod should be added to DSW
 		},
 		{
 			desc:          "HasAddedPods is true, ShouldPodRuntimeBeRemoved and ShouldPodContainerBeTerminating are both true",
@@ -282,7 +282,6 @@ func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T)
 	}
 	pluginPVOmittingClient(dswp)
 
-	dswp.ReprocessPod(podName)
 	dswp.findAndAddNewPods()
 
 	if !dswp.podPreviouslyProcessed(podName) {
@@ -351,7 +350,6 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	// podWorker may call volume_manager WaitForUnmount() after we processed the pod in findAndRemoveDeletedPods()
-	dswp.ReprocessPod(podName)
 	dswp.findAndRemoveDeletedPods()
 
 	// findAndRemoveDeletedPods() above must detect orphaned pod and delete it from the map
@@ -1440,7 +1438,6 @@ func clearASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *te
 
 func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePodName,
 	dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld, newSize resource.Quantity) []v1.UniqueVolumeName {
-	dswp.ReprocessPod(uniquePodName)
 	dswp.findAndAddNewPods()
 	return getResizeRequiredVolumes(dsw, asw, newSize)
 }

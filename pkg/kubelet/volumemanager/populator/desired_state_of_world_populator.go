@@ -55,12 +55,6 @@ import (
 type DesiredStateOfWorldPopulator interface {
 	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
-	// ReprocessPod sets value for the specified pod in processedPods
-	// to false, forcing it to be reprocessed. This is required to enable
-	// remounting volumes on pod updates (volumes like Downward API volumes
-	// depend on this behavior to ensure volume content is updated).
-	ReprocessPod(podName volumetypes.UniquePodName)
-
 	// HasAddedPods returns whether the populator has looped through the list
 	// of active pods and added them to the desired state of the world cache,
 	// at a time after sources are all ready, at least once. It does not
@@ -157,11 +151,6 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 	wait.Until(dswp.populatorLoop, dswp.loopSleepDuration, stopCh)
 }
 
-func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
-	podName volumetypes.UniquePodName) {
-	dswp.markPodProcessingFailed(podName)
-}
-
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	dswp.hasAddedPodsLock.RLock()
 	defer dswp.hasAddedPodsLock.RUnlock()
@@ -188,15 +177,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	}
 
 	for _, pod := range dswp.podManager.GetPods() {
-		// Keep consistency of adding pod during reconstruction
-		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
-			// Do not (re)add volumes for pods that can't also be starting containers
-			continue
-		}
-
-		if !dswp.hasAddedPods && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
-			// When kubelet restarts, we need to add pods to dsw if there is a possibility
-			// that the container may still be running
+		if dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
 			continue
 		}
 
@@ -293,9 +274,6 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	uniquePodName := util.GetUniquePodName(pod)
-	if dswp.podPreviouslyProcessed(uniquePodName) {
-		return
-	}
 
 	allVolumesAdded := true
 	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod)
@@ -420,14 +398,6 @@ func (dswp *desiredStateOfWorldPopulator) podPreviouslyProcessed(
 	defer dswp.pods.RUnlock()
 
 	return dswp.pods.processedPods[podName]
-}
-
-// markPodProcessingFailed marks the specified pod from processedPods as false to indicate that it failed processing
-func (dswp *desiredStateOfWorldPopulator) markPodProcessingFailed(
-	podName volumetypes.UniquePodName) {
-	dswp.pods.Lock()
-	dswp.pods.processedPods[podName] = false
-	dswp.pods.Unlock()
 }
 
 // podHasBeenSeenOnce returns true if the pod has been seen by the popoulator
