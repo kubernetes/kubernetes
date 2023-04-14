@@ -1270,8 +1270,8 @@ func printServiceList(list *api.ServiceList, options printers.GenerateOptions) (
 }
 
 func formatHosts(rules []networking.IngressRule) string {
-	list := []string{}
 	max := 3
+	list := make([]string, 0, max)
 	more := false
 	for _, rule := range rules {
 		if len(list) == max {

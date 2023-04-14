@@ -6560,5 +6560,29 @@ func TestPrintIPAddressList(t *testing.T) {
 	if !reflect.DeepEqual(expected, rows) {
 		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
+}
 
+func BenchmarkFormatHosts(b *testing.B) {
+	var s string
+	rules := []networking.IngressRule{
+		{
+			Host: "foo.com",
+		},
+		{
+			Host: "foo.bar.com",
+		},
+		{
+			Host: "foo.bar.baz.com",
+		},
+		{
+			Host: "foo.bar.baz.qux.com",
+		},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s = formatHosts(rules)
+	}
+	// Avoid compiler optimizations
+	_ = s
 }
