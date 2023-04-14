@@ -139,20 +139,18 @@ var _ storageframework.EphemeralTestDriver = &hostpathCSIDriver{}
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() storageframework.TestDriver {
 	capabilities := map[storageframework.Capability]bool{
-		storageframework.CapPersistence:                    	 true,
-		storageframework.CapSnapshotDataSource:             	 true,
-		storageframework.CapMultiPODs:                      	 true,
-		storageframework.CapBlock:                          	 true,
-		storageframework.CapPVCDataSource:                  	 true,
-		storageframework.CapControllerExpansion:            	 true,
-		storageframework.CapOfflineExpansion:               	 true,
-		storageframework.CapOnlineExpansion:                	 true,
-		storageframework.CapSingleNodeVolume:               	 true,
-		storageframework.CapReadWriteOncePod:               	 true,
-		storageframework.CapMultiplePVsSameID:              	 true,
-		storageframework.CapFSResizeFromSourceNotSupported: 	 true,
-		storageframework.CapReadOnlyMany:                   	 true,
-
+		storageframework.CapPersistence:                    true,
+		storageframework.CapSnapshotDataSource:             true,
+		storageframework.CapMultiPODs:                      true,
+		storageframework.CapBlock:                          true,
+		storageframework.CapPVCDataSource:                  true,
+		storageframework.CapControllerExpansion:            true,
+		storageframework.CapOfflineExpansion:               true,
+		storageframework.CapOnlineExpansion:                true,
+		storageframework.CapSingleNodeVolume:               true,
+		storageframework.CapReadWriteOncePod:               true,
+		storageframework.CapMultiplePVsSameID:              true,
+		storageframework.CapFSResizeFromSourceNotSupported: true,
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
 		// test. --maxvolumespernode=10 gets
@@ -818,17 +816,16 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:   true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits:                      false,
-				storageframework.CapTopology:                          true,
-				storageframework.CapControllerExpansion:               true,
-				storageframework.CapOfflineExpansion:                  true,
-				storageframework.CapOnlineExpansion:                   true,
-				storageframework.CapNodeExpansion:                     true,
-				storageframework.CapSnapshotDataSource:                true,
-				storageframework.CapReadWriteOncePod:                  true,
-				storageframework.CapMultiplePVsSameID:                 true,
-				storageframework.CapFSResizeFromSourceNotSupported:    true, //TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
-				storageframework.CapReadOnlyMany:                      true,
+				storageframework.CapVolumeLimits:                   false,
+				storageframework.CapTopology:                       true,
+				storageframework.CapControllerExpansion:            true,
+				storageframework.CapOfflineExpansion:               true,
+				storageframework.CapOnlineExpansion:                true,
+				storageframework.CapNodeExpansion:                  true,
+				storageframework.CapSnapshotDataSource:             true,
+				storageframework.CapReadWriteOncePod:               true,
+				storageframework.CapMultiplePVsSameID:              true,
+				storageframework.CapFSResizeFromSourceNotSupported: true, //TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
