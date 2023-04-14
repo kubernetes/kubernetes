@@ -164,6 +164,7 @@ func init() {
 	legacyregistry.MustRegister(requestRetry)
 	legacyregistry.RawMustRegister(execPluginCertTTL)
 	legacyregistry.MustRegister(execPluginCertRotation)
+	legacyregistry.MustRegister(execPluginCalls)
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
