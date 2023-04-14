@@ -185,4 +185,7 @@ status:
   qosClass: qosClassValue
   reason: reasonValue
   resize: resizeValue
+  resourceClaimStatuses:
+  - name: nameValue
+    resourceClaimName: resourceClaimNameValue
   startTime: "2007-01-01T01:01:01Z"
