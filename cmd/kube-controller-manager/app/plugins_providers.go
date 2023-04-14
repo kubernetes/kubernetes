@@ -23,6 +23,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
@@ -91,7 +92,6 @@ func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumeP
 	// Then append non-attachable volumes
 	pluginName := plugins.AzureFileInTreePluginName
 	pluginInfo := pluginInfo{
-		pluginMigrationFeature:  features.CSIMigrationAzureFile,
 		pluginUnregisterFeature: features.InTreePluginAzureFileUnregister,
 		pluginProbeFunction:     azure_file.ProbeVolumePlugins,
 	}
