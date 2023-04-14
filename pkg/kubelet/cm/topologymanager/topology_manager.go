@@ -135,6 +135,11 @@ var _ Manager = &manager{}
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName)
 
+	// When policy is none, the scope is not relevant, so we can short circuit here.
+	if topologyPolicyName == PolicyNone {
+		return &manager{scope: NewNoneScope()}, nil
+	}
+
 	opts, err := NewPolicyOptions(topologyPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -151,9 +156,6 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 
 	var policy Policy
 	switch topologyPolicyName {
-
-	case PolicyNone:
-		policy = NewNonePolicy()
 
 	case PolicyBestEffort:
 		policy = NewBestEffortPolicy(numaInfo, opts)
