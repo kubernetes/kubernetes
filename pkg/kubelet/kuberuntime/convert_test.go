@@ -94,10 +94,7 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 	for _, test := range testCases {
 		actual := toKubeContainerImageSpec(test.input)
 		sort.Slice(actual.Annotations, func(i, j int) bool {
-			if actual.Annotations[i].Name < actual.Annotations[j].Name {
-				return true
-			}
-			return false
+			return actual.Annotations[i].Name < actual.Annotations[j].Name
 		})
 		assert.Equal(t, test.expected, actual)
 	}
