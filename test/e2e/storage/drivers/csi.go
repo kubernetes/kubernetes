@@ -151,6 +151,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
+
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
 		// test. --maxvolumespernode=10 gets
