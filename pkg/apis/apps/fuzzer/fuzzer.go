@@ -41,15 +41,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 			}
 			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-				policies := []apps.PersistentVolumeClaimRetentionPolicyType{
-					apps.RetainPersistentVolumeClaimRetentionPolicyType,
-					apps.DeletePersistentVolumeClaimRetentionPolicyType,
-				}
-				choice := int32(c.Rand.Int31())
-				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-					WhenDeleted: policies[choice&1],
-					WhenScaled:  policies[(choice>>1)&1],
-				}
+				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
 			}
 			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
 				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
