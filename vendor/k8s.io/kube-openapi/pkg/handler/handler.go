@@ -85,6 +85,13 @@ func NewOpenAPIServiceLazy(swagger cached.Data[*spec.Swagger]) *OpenAPIService {
 		return cached.NewResultOK(timedSpec{spec: json, lastModified: time.Now()}, computeETag(json))
 	}, &o.specCache)
 	o.protoCache = cached.NewTransformer(func(result cached.Result[timedSpec]) cached.Result[timedSpec] {
+		defer func() {
+			err := recover()
+			if err != nil {
+				klog.Errorf("###>>> panic in OpenAPI handler: %s", err)
+				klog.Errorf("result.Data.spec is %q", result.Data.spec)
+			}
+		}()
 		if result.Err != nil {
 			return cached.NewResultErr[timedSpec](result.Err)
 		}
