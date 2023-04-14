@@ -5,7 +5,7 @@ module k8s.io/apiserver
 go 1.20
 
 require (
-	github.com/coreos/go-oidc v2.1.0+incompatible
+	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
