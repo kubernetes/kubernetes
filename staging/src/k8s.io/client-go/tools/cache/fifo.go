@@ -162,19 +162,7 @@ func (f *FIFO) hasSynced_locked() bool {
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *FIFO) Add(obj interface{}) error {
-	id, err := f.keyFunc(obj)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.populated = true
-	if _, exists := f.items[id]; !exists {
-		f.queue = append(f.queue, id)
-	}
-	f.items[id] = obj
-	f.cond.Broadcast()
-	return nil
+	return f.addItem(obj, false)
 }
 
 // AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
@@ -184,14 +172,7 @@ func (f *FIFO) Add(obj interface{}) error {
 // safely retry items without contending with the producer and potentially enqueueing
 // stale items.
 func (f *FIFO) AddIfNotPresent(obj interface{}) error {
-	id, err := f.keyFunc(obj)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.addIfNotPresent(id, obj)
-	return nil
+	return f.addItem(obj, true)
 }
 
 // addIfNotPresent assumes the fifo lock is already held and adds the provided
@@ -205,6 +186,32 @@ func (f *FIFO) addIfNotPresent(id string, obj interface{}) {
 	f.queue = append(f.queue, id)
 	f.items[id] = obj
 	f.cond.Broadcast()
+}
+
+// addItem is a helper function that adds an item to the FIFO queue
+// under the given key 'id'. If 'ifNotPresent' is true, the item will
+// only be added if it is not already present in the queue. The function
+// acquires the FIFO lock, updates the queue and item map, and then
+// releases the lock. If the item is successfully added, a broadcast
+// signal is sent to any waiting consumers.
+func (f *FIFO) addItem(obj interface{}, ifNotPresent bool) error {
+	id, err := f.keyFunc(obj)
+	if err != nil {
+		return KeyError{obj, err}
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.populated = true
+	_, exists := f.items[id]
+	if ifNotPresent && exists {
+		return nil
+	} else if !exists {
+		f.queue = append(f.queue, id)
+	}
+
+	f.items[id] = obj
+	f.cond.Broadcast()
+	return nil
 }
 
 // Update is the same as Add in this implementation.
