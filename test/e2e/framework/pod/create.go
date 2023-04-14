@@ -231,7 +231,7 @@ func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVol
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: volumeMountPath})
 		} else {
-			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath, ReadOnly: pvcsReadOnly})
+			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath})
 		}
 		volumes[volumeIndex] = v1.Volume{
 			Name: volumename,
@@ -248,7 +248,7 @@ func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVol
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		volumeMountPath := fmt.Sprintf(VolumeMountPathTemplate, volumeIndex+1)
 		// In-line volumes can be only filesystem, not block.
-		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath, ReadOnly: pvcsReadOnly})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath})
 		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: *src}
 		volumeIndex++
 	}

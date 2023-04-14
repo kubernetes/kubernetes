@@ -189,11 +189,6 @@ const (
 	// that are cloned or restored from a snapshot.
 	CapFSResizeFromSourceNotSupported Capability = "FSResizeFromSourceNotSupported"
 
-	// Anti-capability for drivers that do not support filesystem resizing of PVCs
-	// that are cloned or restored from a snapshot specifically in ReadOnlyMany
-	// mode.
-	CapFSROXResizeFromSourceNotSupported Capability = "FSROXResizeFromSourceNotSupported"
-
 	// To support ReadWriteOncePod, the following CSI sidecars must be
 	// updated to these versions or greater:
 	// - csi-provisioner:v3.0.0+

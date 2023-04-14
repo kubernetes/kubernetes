@@ -151,7 +151,6 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               	 true,
 		storageframework.CapMultiplePVsSameID:              	 true,
 		storageframework.CapFSResizeFromSourceNotSupported: 	 true,
-		storageframework.CapFSROXResizeFromSourceNotSupported: true,
 		storageframework.CapReadOnlyMany:                   	 true,
 
 		// This is needed for the
@@ -829,7 +828,6 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapReadWriteOncePod:                  true,
 				storageframework.CapMultiplePVsSameID:                 true,
 				storageframework.CapFSResizeFromSourceNotSupported:    true, //TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
-				storageframework.CapFSROXResizeFromSourceNotSupported: true,
 				storageframework.CapReadOnlyMany:                      true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
