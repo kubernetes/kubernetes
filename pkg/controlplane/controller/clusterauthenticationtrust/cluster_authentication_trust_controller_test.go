@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -312,7 +312,7 @@ func getFinalConfigMaps(t *testing.T, client *fake.Clientset) (map[string]*corev
 	created := false
 
 	for _, action := range client.Actions() {
-		t.Log(spew.Sdump(action))
+		t.Log(dump.Pretty(action))
 		if action.Matches("create", "configmaps") {
 			created = true
 			obj := action.(clienttesting.CreateAction).GetObject().(*corev1.ConfigMap)

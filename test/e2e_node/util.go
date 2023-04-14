@@ -87,9 +87,12 @@ const (
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
-var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
-
-var containerRuntimeUnitName = ""
+var (
+	kubeletHealthCheckURL    = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
+	containerRuntimeUnitName = ""
+	// KubeletConfig is the kubelet configuration the test is running against.
+	kubeletCfg *kubeletconfig.KubeletConfiguration
+)
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig(ctx)
@@ -482,7 +485,7 @@ func kubeletHealthCheck(url string) bool {
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if kubeletCfg.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}
 	return cgroupName.ToCgroupfs()

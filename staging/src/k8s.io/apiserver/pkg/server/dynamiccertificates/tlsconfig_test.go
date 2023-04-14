@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 var serverKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
@@ -114,7 +114,7 @@ func TestNewStaticCertKeyContent(t *testing.T) {
 			}
 			actual, err := c.newTLSContent()
 			if !reflect.DeepEqual(actual, test.expected) {
-				t.Error(spew.Sdump(actual))
+				t.Error(dump.Pretty(actual))
 			}
 			switch {
 			case err == nil && len(test.expectedErr) == 0:

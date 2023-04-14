@@ -41,7 +41,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
@@ -244,8 +243,6 @@ type NodeTestContextType struct {
 	NodeConformance bool
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
-	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig kubeletconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
 	// RuntimeConfig is a map of API server runtime configuration values.
