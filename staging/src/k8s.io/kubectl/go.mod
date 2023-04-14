@@ -12,7 +12,7 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
-	github.com/fvbommel/sortorder v1.0.1
+	github.com/fvbommel/sortorder v1.1.0
 	github.com/go-openapi/jsonreference v0.20.1
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
