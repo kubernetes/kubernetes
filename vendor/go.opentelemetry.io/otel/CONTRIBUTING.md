@@ -508,7 +508,7 @@ Approvers:
 - [David Ashpole](https://github.com/dashpole), Google
 - [Robert Pająk](https://github.com/pellared), Splunk
 - [Chester Cheung](https://github.com/hanyuancheung), Tencent
-- [Damien Mathieu](https://github.com/dmathieu), Auth0/Okta
+- [Damien Mathieu](https://github.com/dmathieu), Elastic
 
 Maintainers:
 
