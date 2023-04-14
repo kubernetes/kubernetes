@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,8 +70,8 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 				Id: "test",
 				Spec: &runtimeapi.ImageSpec{
 					Annotations: map[string]string{
-						"kubernetes.io/os":             "linux",
 						"kubernetes.io/runtimehandler": "handler",
+						"kubernetes.io/os":             "linux",
 					},
 				},
 			},
@@ -92,6 +93,12 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 
 	for _, test := range testCases {
 		actual := toKubeContainerImageSpec(test.input)
+		sort.Slice(actual.Annotations, func(i, j int) bool {
+			if actual.Annotations[i].Name < actual.Annotations[j].Name {
+				return true
+			}
+			return false
+		})
 		assert.Equal(t, test.expected, actual)
 	}
 }
