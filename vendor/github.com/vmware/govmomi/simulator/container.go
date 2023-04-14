@@ -114,6 +114,20 @@ func (c *container) inspect(vm *VirtualMachine) error {
 			net := &vm.Guest.Net[0]
 			net.IpAddress = []string{s.IPAddress}
 			net.MacAddress = s.MacAddress
+			net.IpConfig = &types.NetIpConfigInfo{
+				IpAddress: []types.NetIpConfigInfoIpAddress{{
+					IpAddress:    s.IPAddress,
+					PrefixLength: int32(s.IPPrefixLen),
+					State:        string(types.NetIpConfigInfoIpAddressStatusPreferred),
+				}},
+			}
+		}
+
+		for _, d := range vm.Config.Hardware.Device {
+			if eth, ok := d.(types.BaseVirtualEthernetCard); ok {
+				eth.GetVirtualEthernetCard().MacAddress = s.MacAddress
+				break
+			}
 		}
 	}
 

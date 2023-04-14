@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2020 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2023 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -784,6 +784,11 @@ func (f *Finder) NetworkList(ctx context.Context, path string) ([]object.Network
 	}
 
 	if len(ns) == 0 {
+		net, nerr := f.networkByID(ctx, path)
+		if nerr == nil {
+			return []object.NetworkReference{net}, nil
+		}
+
 		return nil, &NotFoundError{"network", path}
 	}
 
@@ -798,18 +803,13 @@ func (f *Finder) NetworkList(ctx context.Context, path string) ([]object.Network
 // Examples:
 // - Name:                "dvpg-1"
 // - Inventory Path:      "vds-1/dvpg-1"
+// - Cluster Path:        "/dc-1/host/cluster-1/dvpg-1"
 // - ManagedObject ID:    "DistributedVirtualPortgroup:dvportgroup-53"
 // - Logical Switch UUID: "da2a59b8-2450-4cb2-b5cc-79c4c1d2144c"
 // - Segment ID:          "/infra/segments/vnet_ce50e69b-1784-4a14-9206-ffd7f1f146f7"
 func (f *Finder) Network(ctx context.Context, path string) (object.NetworkReference, error) {
 	networks, err := f.NetworkList(ctx, path)
 	if err != nil {
-		if _, ok := err.(*NotFoundError); ok {
-			net, nerr := f.networkByID(ctx, path)
-			if nerr == nil {
-				return net, nil
-			}
-		}
 		return nil, err
 	}
 
