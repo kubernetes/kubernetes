@@ -243,7 +243,7 @@ github.com/go-task/slim-sprig
 # github.com/godbus/dbus/v5 v5.0.6
 ## explicit; go 1.12
 github.com/godbus/dbus/v5
-# github.com/gofrs/uuid v4.0.0+incompatible
+# github.com/gofrs/uuid v4.4.0+incompatible
 ## explicit
 github.com/gofrs/uuid
 # github.com/gogo/protobuf v1.3.2
