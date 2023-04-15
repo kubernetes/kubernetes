@@ -312,8 +312,8 @@ func (info *endpointsInfo) IsTerminating() bool {
 }
 
 // GetZoneHint returns the zone hint for the endpoint.
-func (info *endpointsInfo) GetZoneHints() sets.String {
-	return sets.String{}
+func (info *endpointsInfo) GetZoneHints() sets.Set[string] {
+	return sets.Set[string]{}
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.

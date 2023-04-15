@@ -32,12 +32,12 @@ import (
 )
 
 type fakeListener struct {
-	openPorts sets.String
+	openPorts sets.Set[string]
 }
 
 func newFakeListener() *fakeListener {
 	return &fakeListener{
-		openPorts: sets.String{},
+		openPorts: sets.Set[string]{},
 	}
 }
 

@@ -481,8 +481,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					svcInfo.port != expectedInfo.port ||
 					svcInfo.protocol != expectedInfo.protocol ||
 					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
-					!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
-					!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
+					!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
+					!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
 					!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
@@ -492,8 +492,8 @@ func TestServiceToServiceMap(t *testing.T) {
 						svcInfo.port != expectedInfo.port ||
 						svcInfo.protocol != expectedInfo.protocol ||
 						svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
-						!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
-						!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
+						!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
+						!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
 						!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
 						t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)
 					}

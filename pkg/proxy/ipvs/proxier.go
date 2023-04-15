@@ -1018,7 +1018,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if err != nil {
 			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {
-			nodeAddresses = nodeAddrSet.List()
+			nodeAddresses = nodeAddrSet.UnsortedList()
 			for _, address := range nodeAddresses {
 				a := netutils.ParseIPSloppy(address)
 				if a.IsLoopback() {
@@ -1839,7 +1839,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// curEndpoints represents IPVS destinations listed from current system.
-	curEndpoints := sets.NewString()
+	curEndpoints := sets.New[string]()
 	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list IPVS destinations")
@@ -1883,13 +1883,13 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 	}
 
-	newEndpoints := sets.NewString()
+	newEndpoints := sets.New[string]()
 	for _, epInfo := range endpoints {
 		newEndpoints.Insert(epInfo.String())
 	}
 
 	// Create new endpoints
-	for _, ep := range newEndpoints.List() {
+	for _, ep := range sets.List(newEndpoints) {
 		ip, port, err := net.SplitHostPort(ep)
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse endpoint", "endpoint", ep)

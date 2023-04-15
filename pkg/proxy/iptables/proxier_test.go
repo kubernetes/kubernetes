@@ -608,14 +608,14 @@ func countRules(tableName utiliptables.Table, ruleData string) int {
 // returns a sorted array of all of the unique matches of the parenthesized group.
 func findAllMatches(lines []string, pattern string) []string {
 	regex := regexp.MustCompile(pattern)
-	allMatches := sets.NewString()
+	allMatches := sets.New[string]()
 	for _, line := range lines {
 		match := regex.FindStringSubmatch(line)
 		if len(match) == 2 {
 			allMatches.Insert(match[1])
 		}
 	}
-	return allMatches.List()
+	return sets.List(allMatches)
 }
 
 // checkIPTablesRuleJumps checks that every `-j` in the given rules jumps to a chain
@@ -629,7 +629,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 	for tableName, lines := range tables {
 		// Find all of the lines like ":KUBE-SERVICES", indicating chains that
 		// iptables-restore would create when loading the data.
-		createdChains := sets.NewString(findAllMatches(lines, `^:([^ ]*)`)...)
+		createdChains := sets.New[string](findAllMatches(lines, `^:([^ ]*)`)...)
 		// Find all of the lines like "-X KUBE-SERVICES ..." indicating chains
 		// that we are deleting because they are no longer used, and remove
 		// those chains from createdChains.
@@ -637,11 +637,11 @@ func checkIPTablesRuleJumps(ruleData string) error {
 
 		// Find all of the lines like "-A KUBE-SERVICES ..." indicating chains
 		// that we are adding at least one rule to.
-		filledChains := sets.NewString(findAllMatches(lines, `-A ([^ ]*)`)...)
+		filledChains := sets.New[string](findAllMatches(lines, `-A ([^ ]*)`)...)
 
 		// Find all of the chains that are jumped to by some rule so we can make
 		// sure we only jump to valid chains.
-		jumpedChains := sets.NewString(findAllMatches(lines, `-j ([^ ]*)`)...)
+		jumpedChains := sets.New[string](findAllMatches(lines, `-j ([^ ]*)`)...)
 		// Ignore jumps to chains that we expect to exist even if kube-proxy
 		// didn't create them itself.
 		jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
@@ -651,7 +651,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		missingChains := jumpedChains.Difference(createdChains)
 		missingChains = missingChains.Union(filledChains.Difference(createdChains))
 		if len(missingChains) > 0 {
-			return fmt.Errorf("some chains in %s are used but were not created: %v", tableName, missingChains.List())
+			return fmt.Errorf("some chains in %s are used but were not created: %v", tableName, missingChains.UnsortedList())
 		}
 
 		// Find cases where we have "-A FOO ... -j BAR", but no "-A BAR ...",
@@ -661,7 +661,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		emptyChains := jumpedChains.Difference(filledChains)
 		emptyChains.Delete(string(kubeNodePortsChain))
 		if len(emptyChains) > 0 {
-			return fmt.Errorf("some chains in %s are jumped to but have no rules: %v", tableName, emptyChains.List())
+			return fmt.Errorf("some chains in %s are jumped to but have no rules: %v", tableName, emptyChains.UnsortedList())
 		}
 
 		// Find cases where we have ":BAR" but no "-A FOO ... -j BAR", meaning
@@ -669,7 +669,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		extraChains := createdChains.Difference(jumpedChains)
 		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(kubeMarkMasqChain), string(kubeProxyFirewallChain), string(kubeletFirewallChain))
 		if len(extraChains) > 0 {
-			return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
+			return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.UnsortedList())
 		}
 	}
 
