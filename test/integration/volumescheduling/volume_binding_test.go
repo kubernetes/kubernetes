@@ -21,7 +21,6 @@ package volumescheduling
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -427,10 +426,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 
 	// Set max volume limit to the number of PVCs the test will create
 	// TODO: remove when max volume limit allows setting through storageclass
-	if err := os.Setenv(nodevolumelimits.KubeMaxPDVols, fmt.Sprintf("%v", podLimit*volsPerPod)); err != nil {
-		t.Fatalf("failed to set max pd limit: %v", err)
-	}
-	defer os.Unsetenv(nodevolumelimits.KubeMaxPDVols)
+	t.Setenv(nodevolumelimits.KubeMaxPDVols, fmt.Sprintf("%v", podLimit*volsPerPod))
 
 	scName := &classWait
 	if dynamic {
