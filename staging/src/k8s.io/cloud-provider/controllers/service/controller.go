@@ -674,6 +674,10 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
+	// For the same reason as above, also check for changes to the providerID
+	if respectsPredicates(oldNode, nodeHasProviderIDPredicate) != respectsPredicates(newNode, nodeHasProviderIDPredicate) {
+		return true
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
 		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 	}
@@ -935,14 +939,17 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
+		nodeHasProviderIDPredicate,
 	}
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
+		nodeHasProviderIDPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
 		nodeIncludedPredicate,
+		nodeHasProviderIDPredicate,
 		// This is not perfect, but probably good enough. We won't update the
 		// LBs just because the taint was added (see shouldSyncUpdatedNode) but
 		// if any other situation causes an LB sync, tainted nodes will be
@@ -966,6 +973,10 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 func nodeIncludedPredicate(node *v1.Node) bool {
 	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
 	return !hasExcludeBalancerLabel
+}
+
+func nodeHasProviderIDPredicate(node *v1.Node) bool {
+	return node.Spec.ProviderID != ""
 }
 
 // We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.
