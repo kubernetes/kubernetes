@@ -467,9 +467,9 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
 	}
 	table := []struct {
 		desc                string
@@ -573,13 +573,14 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 }
 
 func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
-	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node2NotReady := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
-	node2Tainted := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint}}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
-	node2SpuriousChange := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Phase: v1.NodeTerminated, Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node2Exclude := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2NotReady := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2Tainted := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID, Taints: []v1.Taint{{Key: ToBeDeletedTaint}}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2SpuriousChange := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Phase: v1.NodeTerminated, Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2Exclude := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2ProviderIDUnset := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
 
 	type stateChanges struct {
 		nodes       []*v1.Node
@@ -667,6 +668,20 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 			},
 		},
 		{
+			desc:         "1 node gets providerID set",
+			initialState: []*v1.Node{node1, node2ProviderIDUnset, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
 			desc:         "1 node goes Ready",
 			initialState: []*v1.Node{node1, node2NotReady, node3},
 			stateChanges: []stateChanges{
@@ -745,10 +760,10 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 }
 
 func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
-	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node4 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node4 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
 
 	services := []*v1.Service{
 		newService("s0", "777", v1.ServiceTypeLoadBalancer),
@@ -1804,9 +1819,10 @@ func Test_respectsPredicates(t *testing.T) {
 		want  bool
 	}{
 		{want: false, input: &v1.Node{}},
-		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
+		{want: true, input: &v1.Node{Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}},
-		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
+		{want: true, input: &v1.Node{Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
 
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
@@ -1885,6 +1901,8 @@ func TestListWithPredicate(t *testing.T) {
 	}
 }
 
+var providerID = "providerID"
+
 func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 	testcases := []struct {
 		name       string
@@ -1899,7 +1917,8 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 					Name: "node",
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
+					Taints:     []v1.Taint{},
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -1920,6 +1939,7 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 							Key: ToBeDeletedTaint,
 						},
 					},
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -1944,6 +1964,7 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 							Key: ToBeDeletedTaint,
 						},
 					},
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -1959,7 +1980,8 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 					Name: "node",
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
+					Taints:     []v1.Taint{},
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -2342,6 +2364,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -2354,6 +2379,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 			newNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -2372,6 +2400,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -2384,6 +2415,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 			newNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -2487,6 +2521,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -2499,6 +2536,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 			newNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{},
@@ -2537,6 +2577,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{},
 				},
@@ -2544,6 +2587,9 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 			newNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -2727,6 +2773,72 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 				},
 			},
 			shouldSync: false,
+		},
+		{
+			name: "providerID set F->T",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync: true,
+		},
+		{
+			name: "providerID set T->F",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: providerID,
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			shouldSync: true,
 		},
 	}
 	for _, testcase := range testcases {
