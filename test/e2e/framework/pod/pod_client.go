@@ -38,7 +38,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -154,15 +153,15 @@ func (c *PodClient) AddEphemeralContainerSync(ctx context.Context, pod *v1.Pod, 
 	namespace := c.f.Namespace.Name
 
 	podJS, err := json.Marshal(pod)
-	framework.ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod %q", FormatPod(pod))
 
 	ecPod := pod.DeepCopy()
 	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
 	ecJS, err := json.Marshal(ecPod)
-	framework.ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", FormatPod(pod))
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
-	framework.ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating patch to add ephemeral container %q", FormatPod(pod))
 
 	// Clients may optimistically attempt to add an ephemeral container to determine whether the EphemeralContainers feature is enabled.
 	if _, err := c.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers"); err != nil {
@@ -171,6 +170,17 @@ func (c *PodClient) AddEphemeralContainerSync(ctx context.Context, pod *v1.Pod, 
 
 	framework.ExpectNoError(WaitForContainerRunning(ctx, c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
 	return nil
+}
+
+// FormatPod returns a string representing a pod in a consistent human readable format,
+// with pod name, namespace and pod UID as part of the string.
+// This code is taken from k/k/pkg/kubelet/util/format/pod.go to remove
+// e2e framework -> k/k/pkg/kubelet dependency.
+func FormatPod(pod *v1.Pod) string {
+	if pod == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID)
 }
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
