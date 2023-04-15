@@ -660,15 +660,10 @@ func nodeNames(nodes []*v1.Node) sets.String {
 }
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		// Only Nodes with changes to the label
-		// "node.kubernetes.io/exclude-from-external-load-balancers" will
-		// trigger a load balancer re-sync.
-		return respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate)
-	}
 	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync ETP=local services
-	// for changes on the readiness condition, hence if a node remains NotReady
+	// compounded result of all predicates. We don't sync changes on the
+	// readiness condition for eTP:Local services or when
+	// StableLoadBalancerNodeSet is enabled, hence if a node remains NotReady
 	// and a user adds the exclusion label we will need to sync as to make sure
 	// this change is reflected correctly on ETP=local services. The sync
 	// function compares lastSyncedNodes with the new (existing) set of nodes
@@ -679,7 +674,10 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
-	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
+		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
+	}
+	return false
 }
 
 // syncNodes handles updating the hosts pointed to by all load
