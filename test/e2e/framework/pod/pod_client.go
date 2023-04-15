@@ -38,7 +38,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -313,10 +312,29 @@ func (c *PodClient) PodIsReady(ctx context.Context, name string) bool {
 	return podutils.IsPodReady(pod)
 }
 
+// RemoveString returns a newly created []string that contains all items from slice
+// that are not equal to s.
+// This code is taken from k/k/pkg/util/slice/slice.go to remove
+// e2e/framework/pod -> k/k/pkg/util/slice dependency.
+func removeString(slice []string, s string) []string {
+	newSlice := make([]string, 0)
+	for _, item := range slice {
+		if item != s {
+			newSlice = append(newSlice, item)
+		}
+	}
+	if len(newSlice) == 0 {
+		// Sanitize for unit tests so we don't need to distinguish empty array
+		// and nil.
+		return nil
+	}
+	return newSlice
+}
+
 // RemovePodFinalizer removes the pod's finalizer
 func (c *PodClient) RemoveFinalizer(ctx context.Context, podName string, finalizerName string) {
 	framework.Logf("Removing pod's %q finalizer: %q", podName, finalizerName)
 	c.Update(ctx, podName, func(pod *v1.Pod) {
-		pod.ObjectMeta.Finalizers = slice.RemoveString(pod.ObjectMeta.Finalizers, finalizerName, nil)
+		pod.ObjectMeta.Finalizers = removeString(pod.ObjectMeta.Finalizers, finalizerName)
 	})
 }
