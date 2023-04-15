@@ -643,9 +643,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -725,9 +723,7 @@ func TestHTTPProxyCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -744,23 +740,19 @@ func TestHTTPProxyCheck(t *testing.T) {
 	}
 }
 
-// resetProxyEnv is helper function that unsets all *_proxy variables
-// and return previously set values as map. This can be used to restore
-// original state of the environment.
-func resetProxyEnv(t *testing.T) map[string]string {
-	savedEnv := make(map[string]string)
+// resetProxyEnv is helper function that unsets all *_proxy variables.
+func resetProxyEnv(t *testing.T) {
 	for _, e := range os.Environ() {
-		pair := strings.Split(e, "=")
-		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
-			savedEnv[pair[0]] = pair[1]
-			os.Unsetenv(pair[0])
+		key, value, _ := strings.Cut(e, "=")
+		if strings.HasSuffix(strings.ToLower(key), "_proxy") {
+			t.Cleanup(func() { os.Setenv(key, value) })
+			os.Unsetenv(key)
 		}
 	}
-	t.Log("Saved environment: ", savedEnv)
 
-	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
-	os.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
-	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+	t.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	t.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
+	t.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
 	// Check if we can reliably execute tests:
 	// ProxyFromEnvironment caches the *_proxy environment variables and
 	// if ProxyFromEnvironment already executed before our test with empty
@@ -777,15 +769,6 @@ func resetProxyEnv(t *testing.T) map[string]string {
 		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
 	}
 	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
-	return savedEnv
-}
-
-// restoreEnv is helper function to restores values
-// of environment variables from saved state in the map
-func restoreEnv(e map[string]string) {
-	for k, v := range e {
-		os.Setenv(k, v)
-	}
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
