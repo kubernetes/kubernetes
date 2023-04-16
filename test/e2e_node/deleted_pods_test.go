@@ -155,12 +155,17 @@ var _ = SIGDescribe("Deleted pods handling [NodeConformance]", func() {
 							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sh", "-c"},
 							Args: []string{`
+							sleep 9999999 &
+							PID=$!
 							_term() {
+								kill $PID
 								echo "Caught SIGTERM signal!"
-								exit 0
 							}
+
 							trap _term SIGTERM
-							while true; do sleep 5; done
+							wait $PID
+
+							exit 0
 							`,
 							},
 						},
