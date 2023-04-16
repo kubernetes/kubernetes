@@ -121,7 +121,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	var tmpContainerCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
 	for pod := range checkpointV2.Entries {
-		tmpAssignments[pod] = make(map[string]cpuset.CPUSet)
+		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(checkpointV2.Entries[pod]))
 		for container, cpuString := range checkpointV2.Entries[pod] {
 			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
 				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %v", cpuString, container, pod, err)
