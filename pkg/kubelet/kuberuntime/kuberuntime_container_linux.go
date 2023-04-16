@@ -343,6 +343,7 @@ func (m swapConfigurationHelper) configureLimitedSwap(lcr *runtimeapi.LinuxConta
 }
 
 func (m swapConfigurationHelper) configureUnlimitedSwap(lcr *runtimeapi.LinuxContainerResources) {
+	klog.Infof("configuring unlimited swap")
 	if m.isCgroup2UnifiedMode {
 		lcr.Unified[cm.Cgroup2MaxSwapFilename] = "max"
 	} else {
@@ -351,6 +352,7 @@ func (m swapConfigurationHelper) configureUnlimitedSwap(lcr *runtimeapi.LinuxCon
 }
 
 func (m swapConfigurationHelper) configureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
+	klog.Infof("configuring no swap")
 	if m.isCgroup2UnifiedMode {
 		lcr.Unified[cm.Cgroup2MaxSwapFilename] = "0"
 	} else {
