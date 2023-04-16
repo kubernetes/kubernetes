@@ -41,8 +41,8 @@ func TestNewEndpointSlice(t *testing.T) {
 	portName := "foo"
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		Ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
-		AddressType: ipAddressType,
+		ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
+		addressType: ipAddressType,
 	}
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
@@ -76,8 +76,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -99,8 +99,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -124,8 +124,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -148,8 +148,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -175,8 +175,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -197,8 +197,8 @@ func TestNewEndpointSlice(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Namespace:       service.Namespace,
 				},
-				Ports:       endpointMeta.Ports,
-				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.ports,
+				AddressType: endpointMeta.addressType,
 				Endpoints:   []discovery.Endpoint{},
 			},
 		},
@@ -981,8 +981,8 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 	addressType := discovery.AddressTypeIPv4
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		AddressType: addressType,
-		Ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
+		addressType: addressType,
+		ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
 	}
 
 	return svc, endpointMeta
@@ -998,8 +998,8 @@ func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, s
 			Namespace:       namespace,
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
+		Ports:       endpointMeta.ports,
+		AddressType: endpointMeta.addressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
 }

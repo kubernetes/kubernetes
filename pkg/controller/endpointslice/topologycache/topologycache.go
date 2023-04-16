@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	// OverloadThreshold represents the maximum overload any individual endpoint
+	// overloadThreshold represents the maximum overload any individual endpoint
 	// should be exposed to.
-	OverloadThreshold float64 = 0.2
+	overloadThreshold float64 = 0.2
 )
 
 // TopologyCache tracks the distribution of Nodes and endpoints across zones.
@@ -49,12 +49,12 @@ type TopologyCache struct {
 // Service.
 type EndpointZoneInfo map[string]int
 
-// Allocation describes the number of endpoints that should be allocated for a
+// allocation describes the number of endpoints that should be allocated for a
 // zone.
-type Allocation struct {
-	Minimum int
-	Maximum int
-	Desired float64
+type allocation struct {
+	minimum int
+	maximum int
+	desired float64
 }
 
 // NewTopologyCache initializes a new TopologyCache.
@@ -212,7 +212,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 			klog.V(2).Infof("Ignoring node %s because it has an excluded label", node.Name)
 			continue
 		}
-		if !NodeReady(node.Status) {
+		if !isNodeReady(node) {
 			klog.V(2).Infof("Ignoring node %s because it is not ready: %v", node.Name, node.Status.Conditions)
 			continue
 		}
@@ -269,7 +269,7 @@ func (t *TopologyCache) HasPopulatedHints(serviceKey string) bool {
 // getAllocations returns a set of minimum and maximum allocations per zone. If
 // it is not possible to provide allocations that are below the overload
 // threshold, a nil value will be returned.
-func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]Allocation, *EventBuilder) {
+func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]allocation, *EventBuilder) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -298,14 +298,14 @@ func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]Allocation,
 
 	remainingMinEndpoints := numEndpoints
 	minTotal := 0
-	allocations := map[string]Allocation{}
+	allocations := map[string]allocation{}
 
 	for zone, ratio := range t.cpuRatiosByZone {
 		desired := ratio * float64(numEndpoints)
-		minimum := int(math.Ceil(desired * (1 / (1 + OverloadThreshold))))
-		allocations[zone] = Allocation{
-			Minimum: minimum,
-			Desired: math.Max(desired, float64(minimum)),
+		minimum := int(math.Ceil(desired * (1 / (1 + overloadThreshold))))
+		allocations[zone] = allocation{
+			minimum: minimum,
+			desired: math.Max(desired, float64(minimum)),
 		}
 		minTotal += minimum
 		remainingMinEndpoints -= minimum
@@ -319,7 +319,7 @@ func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]Allocation,
 	}
 
 	for zone, allocation := range allocations {
-		allocation.Maximum = allocation.Minimum + numEndpoints - minTotal
+		allocation.maximum = allocation.minimum + numEndpoints - minTotal
 		allocations[zone] = allocation
 	}
 

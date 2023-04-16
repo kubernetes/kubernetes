@@ -495,7 +495,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 		},
 		{
 			desc:        "Existing placeholder that's the same",
-			existing:    newEndpointSlice(&svc, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: discovery.AddressTypeIPv4}),
+			existing:    newEndpointSlice(&svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}),
 			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
 		},
 		{
@@ -1022,7 +1022,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	// "IP" is a deprecated address type, ensuring that it is handled properly.
-	endpointMeta.AddressType = discovery.AddressType("IP")
+	endpointMeta.addressType = discovery.AddressType("IP")
 
 	existingSlices := []*discovery.EndpointSlice{}
 	pods := []*corev1.Pod{}
@@ -1367,8 +1367,8 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 					Name:            "to-create",
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 				},
-				AddressType: endpointMeta.AddressType,
-				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.addressType,
+				Ports:       endpointMeta.ports,
 			}
 
 			// Add EndpointSlice that can be updated.
@@ -1377,8 +1377,8 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 					Name:            "to-update",
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 				},
-				AddressType: endpointMeta.AddressType,
-				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.addressType,
+				Ports:       endpointMeta.ports,
 			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Expected no error creating EndpointSlice during test setup, got %v", err)
@@ -1393,8 +1393,8 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 					Name:            "to-delete",
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 				},
-				AddressType: endpointMeta.AddressType,
-				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.addressType,
+				Ports:       endpointMeta.ports,
 			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Expected no error creating EndpointSlice during test setup, got %v", err)
@@ -1687,7 +1687,7 @@ func TestReconcileTopology(t *testing.T) {
 	for name, pods := range slicePods {
 		endpoints := []discovery.Endpoint{}
 		for _, pod := range pods {
-			endpoints = append(endpoints, podToEndpoint(pod, nodesByName[pod.Spec.NodeName], &svc, endpointMeta.AddressType))
+			endpoints = append(endpoints, podToEndpoint(pod, nodesByName[pod.Spec.NodeName], &svc, endpointMeta.addressType))
 		}
 
 		slicesByName[name] = &discovery.EndpointSlice{
@@ -1699,8 +1699,8 @@ func TestReconcileTopology(t *testing.T) {
 					discovery.LabelServiceName: svc.Name,
 				},
 			},
-			AddressType: endpointMeta.AddressType,
-			Ports:       endpointMeta.Ports,
+			AddressType: endpointMeta.addressType,
+			Ports:       endpointMeta.ports,
 			Endpoints:   endpoints,
 		}
 	}
