@@ -505,9 +505,9 @@ The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194)
 - Graduated `matchLabelKeys` in `podTopologySpread` to Beta ([#116291](https://github.com/kubernetes/kubernetes/pull/116291), [@denkensk](https://github.com/denkensk))
 - Graduated the `CSINodeExpandSecret` feature to Beta. This feature facilitates passing secrets to CSI driver as part of Node Expansion CSI operation. ([#115621](https://github.com/kubernetes/kubernetes/pull/115621), [@humblec](https://github.com/humblec))
 - Graduated the `LegacyServiceAccountTokenTracking` feature gate to Beta. The usage of auto-generated secret-based service account token now produces warnings by default, and relevant Secrets are labeled with a last-used timestamp (label key `kubernetes.io/legacy-token-last-used`). ([#114523](https://github.com/kubernetes/kubernetes/pull/114523), [@zshihang](https://github.com/zshihang)) [SIG API Machinery and Auth]
-- HPA controller exposes the following metrics from the kube-controller-manager.
-  - `metric_computation_duration_seconds`: Number of metric computations. 
-  - `metric_computation_total`: The time(seconds) that the HPA controller takes to calculate one metric. ([#116326](https://github.com/kubernetes/kubernetes/pull/116326), [@sanposhiho](https://github.com/sanposhiho)) [SIG Apps, Autoscaling and Instrumentation]
+- HPA controller exposes the following metrics from the kube-controller-manager. 
+  - `metric_computation_duration_seconds`: The time(seconds) that the HPA controller takes to calculate one metric.
+  - `metric_computation_total`: Number of metric computations. ([#116326](https://github.com/kubernetes/kubernetes/pull/116326), [@sanposhiho](https://github.com/sanposhiho)) [SIG Apps, Autoscaling and Instrumentation]
 - HPA controller starts to expose metrics from the kube-controller-manager.\n- `reconciliations_total`: Number of reconciliation of HPA controller. \n- `reconciliation_duration_seconds`: The time(seconds) that the HPA controller takes to reconcile once. ([#116010](https://github.com/kubernetes/kubernetes/pull/116010), [@sanposhiho](https://github.com/sanposhiho))
 - Kube-up now includes `CoreDNS` version `v1.9.3` ([#114279](https://github.com/kubernetes/kubernetes/pull/114279), [@pacoxu](https://github.com/pacoxu))
 - Kubeadm: added the experimental (alpha) feature gate `EtcdLearnerMode` that allows etcd members to be joined as learner and only then promoted as voting members ([#113318](https://github.com/kubernetes/kubernetes/pull/113318), [@pacoxu](https://github.com/pacoxu))
