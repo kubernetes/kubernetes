@@ -20,6 +20,9 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
+	cadvisorv1 "github.com/google/cadvisor/info/v1"
+	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"math"
 	"os"
 	"strconv"
@@ -103,35 +106,19 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		lcr.Unified = map[string]string{}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+	if swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo); utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
 		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 		switch m.memorySwapBehavior {
 		case kubelettypes.UnlimitedSwap:
-			// -1 = unlimited swap
-			lcr.MemorySwapLimitInBytes = -1
+			swapConfigurationHelper.configureUnlimitedSwap(lcr)
 		case kubelettypes.LimitedSwap:
-			// TODO: implement
-			fallthrough
+			swapConfigurationHelper.configureLimitedSwap(lcr, pod, container)
 		default:
-			if libcontainercgroups.IsCgroup2UnifiedMode() {
-				lcr.Unified[cm.Cgroup2MaxSwapFilename] = "0"
-			} else {
-				// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
-				// Some swapping is still possible.
-				// Note that if memory limit is 0, memory swap limit is ignored.
-				lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
-			}
+			swapConfigurationHelper.configureNoSwap(lcr)
 		}
 	} else {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			lcr.Unified[cm.Cgroup2MaxSwapFilename] = "0"
-		} else {
-			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
-			// Some swapping is still possible.
-			// Note that if memory limit is 0, memory swap limit is ignored.
-			lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
-		}
+		swapConfigurationHelper.configureNoSwap(lcr)
 	}
 
 	// Set memory.min and memory.high to enforce MemoryQoS
@@ -306,4 +293,69 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 		}
 	}
 	return cStatusResources
+}
+
+type swapConfigurationHelper struct {
+	isCgroup2UnifiedMode bool
+	machineInfo          cadvisorv1.MachineInfo
+}
+
+func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo) *swapConfigurationHelper {
+	return &swapConfigurationHelper{isCgroup2UnifiedMode: libcontainercgroups.IsCgroup2UnifiedMode(), machineInfo: machineInfo}
+}
+
+func (m swapConfigurationHelper) configureLimitedSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+	podQos := kubeapiqos.GetPodQOS(pod)
+	if podQos != v1.PodQOSBurstable {
+		m.configureNoSwap(lcr)
+		return
+	}
+
+	containerMemoryRequest := container.Resources.Requests.Memory()
+	if containerMemoryRequest == nil {
+		m.configureNoSwap(lcr)
+		return
+	}
+
+	totalPodMemory := resource.Quantity{}
+
+	for _, container := range pod.Spec.Containers {
+		memoryRequest := container.Resources.Requests.Memory()
+		if memoryRequest != nil {
+			totalPodMemory.Add(*container.Resources.Requests.Memory())
+		}
+	}
+
+	requestedMemoryProportion := float64(containerMemoryRequest.Value()) / float64(totalPodMemory.Value())
+	swapMemoryProportion := float64(m.machineInfo.SwapCapacity) / float64(m.machineInfo.MemoryCapacity)
+
+	swapLimit := int64(requestedMemoryProportion * swapMemoryProportion * float64(containerMemoryRequest.Value()))
+	m.configureSwap(lcr, swapLimit)
+}
+
+func (m swapConfigurationHelper) configureUnlimitedSwap(lcr *runtimeapi.LinuxContainerResources) {
+	if m.isCgroup2UnifiedMode {
+		lcr.Unified[cm.Cgroup2MaxSwapFilename] = "max"
+	} else {
+		lcr.MemorySwapLimitInBytes = -1
+	}
+}
+
+func (m swapConfigurationHelper) configureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
+	if m.isCgroup2UnifiedMode {
+		lcr.Unified[cm.Cgroup2MaxSwapFilename] = "0"
+	} else {
+		// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
+		// Some swapping is still possible.
+		// Note that if memory limit is 0, memory swap limit is ignored.
+		lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
+	}
+}
+
+func (m swapConfigurationHelper) configureSwap(lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {
+	if m.isCgroup2UnifiedMode {
+		lcr.Unified[cm.Cgroup2MaxSwapFilename] = fmt.Sprintf("%d", swapMemory)
+	} else {
+		lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes + swapMemory
+	}
 }
