@@ -106,7 +106,7 @@ var (
 		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
 
-var supportedSubresources = []string{"status", "scale"}
+var supportedSubresources = []string{"status", "scale", "ephemeralcontainers"}
 
 func NewPatchOptions(ioStreams genericiooptions.IOStreams) *PatchOptions {
 	return &PatchOptions{

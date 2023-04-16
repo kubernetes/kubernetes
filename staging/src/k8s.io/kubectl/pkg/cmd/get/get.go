@@ -139,7 +139,7 @@ const (
 	useServerPrintColumns = "server-print"
 )
 
-var supportedSubresources = []string{"status", "scale"}
+var supportedSubresources = []string{"status", "scale", "ephemeralcontainers"}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOptions {
