@@ -106,18 +106,22 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		lcr.Unified = map[string]string{}
 	}
 
+	klog.Infof("[generateLinuxContainerResources()]: configuring container: %s", container.Name)
 	if swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo); utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
 		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 		switch m.memorySwapBehavior {
 		case kubelettypes.UnlimitedSwap:
+			klog.Info("configuring unlimited swap")
 			swapConfigurationHelper.configureUnlimitedSwap(lcr)
 		case kubelettypes.LimitedSwap:
+			klog.Info("configuring limited swap")
 			swapConfigurationHelper.configureLimitedSwap(lcr, pod, container)
 		default:
 			swapConfigurationHelper.configureNoSwap(lcr)
 		}
 	} else {
+		klog.Info("swap is disabled")
 		swapConfigurationHelper.configureNoSwap(lcr)
 	}
 
@@ -330,6 +334,11 @@ func (m swapConfigurationHelper) configureLimitedSwap(lcr *runtimeapi.LinuxConta
 	swapMemoryProportion := float64(m.machineInfo.SwapCapacity) / float64(m.machineInfo.MemoryCapacity)
 
 	swapLimit := int64(requestedMemoryProportion * swapMemoryProportion * float64(containerMemoryRequest.Value()))
+
+	klog.Infof("[limited swap]: totalPodMemory=%d, containerMemoryRequest=%d, requestedMemoryProportion=%.2f", totalPodMemory.Value(), containerMemoryRequest.Value(), requestedMemoryProportion)
+	klog.Infof("[limited swap]: node memory capacity=%d, swap capacity=%d, swap proportion=%.2f", m.machineInfo.MemoryCapacity, m.machineInfo.SwapCapacity, swapMemoryProportion)
+	klog.Infof("[limited swap]: swap limitation: %d", swapLimit)
+
 	m.configureSwap(lcr, swapLimit)
 }
 
