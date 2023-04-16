@@ -92,7 +92,7 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
-// CreateJob is a check that verifies that a Job can be created in the cluster
+// createJob is a check that verifies that a Job can be created in the cluster
 func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) (lastError error) {
 	const (
 		jobName = "upgrade-health-check"
