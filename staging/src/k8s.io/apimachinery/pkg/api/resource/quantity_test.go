@@ -1137,6 +1137,28 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestMul(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{decQuantity(10, 0, DecimalSI), decQuantity(1, 1, DecimalSI), decQuantity(100, 0, DecimalSI)},
+		{decQuantity(10, 0, DecimalSI), decQuantity(1, 0, BinarySI), decQuantity(10, 0, DecimalSI)},
+		{decQuantity(10, 0, BinarySI), decQuantity(1, 0, DecimalSI), decQuantity(10, 0, BinarySI)},
+		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(0, 0, DecimalSI)},
+		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+	}
+
+	for i, test := range tests {
+		test.a.Mul(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
 func TestAddSubRoundTrip(t *testing.T) {
 	for k := -10; k <= 10; k++ {
 		q := Quantity{Format: DecimalSI}

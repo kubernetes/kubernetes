@@ -88,6 +88,54 @@ func TestInt64AmountAdd(t *testing.T) {
 		}
 	}
 }
+
+func TestInt64AmountMul(t *testing.T) {
+	for _, test := range []struct {
+		a, b, c int64Amount
+		ok      bool
+	}{
+		{int64Amount{value: 100, scale: 1}, int64Amount{value: 10, scale: 2}, int64Amount{value: 10000, scale: 1}, true},
+		{int64Amount{value: 100, scale: 1}, int64Amount{value: 1, scale: 2}, int64Amount{value: 1000, scale: 1}, true},
+		{int64Amount{value: 100, scale: 1}, int64Amount{value: 1, scale: 100}, int64Amount{value: 1, scale: 100}, false},
+		{int64Amount{value: -5, scale: 2}, int64Amount{value: 50, scale: 1}, int64Amount{value: -2500, scale: 1}, true},
+		{int64Amount{value: -5, scale: 2}, int64Amount{value: 5, scale: 2}, int64Amount{value: -25, scale: 2}, true},
+
+		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 1, scale: -1}, int64Amount{value: 9223372036854775807, scale: -1}, true},
+		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 0, scale: -1}, int64Amount{value: 0, scale: -1}, true},
+		{int64Amount{value: mostPositive / 10, scale: 1}, int64Amount{value: 10, scale: 0}, int64Amount{value: mostPositive, scale: -1}, false},
+	} {
+		c := test.a
+		ok := c.Mul(test.b)
+		if ok != test.ok {
+			t.Errorf("%v: unexpected ok: %t", test, ok)
+		}
+		if ok {
+			if c != test.c {
+				t.Errorf("%v: unexpected result: %d", test, c)
+			}
+		} else {
+			if c != test.a {
+				t.Errorf("%v: overflow multiplication mutated source: %d", test, c)
+			}
+		}
+
+		// multiplication is commutative
+		c = test.b
+		if ok = c.Mul(test.a); ok != test.ok {
+			t.Errorf("%v: unexpected ok: %t", test, ok)
+		}
+		if ok {
+			if c != test.c {
+				t.Errorf("%v: unexpected result: %d", test, c)
+			}
+		} else {
+			if c != test.b {
+				t.Errorf("%v: overflow multiplication mutated source: %d", test, c)
+			}
+		}
+	}
+}
+
 func TestInt64AsCanonicalString(t *testing.T) {
 	for _, test := range []struct {
 		value    int64

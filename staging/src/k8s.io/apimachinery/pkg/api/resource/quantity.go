@@ -592,6 +592,19 @@ func (q *Quantity) Sub(y Quantity) {
 	q.ToDec().d.Dec.Sub(q.d.Dec, y.AsDec())
 }
 
+// Mul multiplies the provided y quantity to the current value. If the current value is zero,
+// the format of the quantity will be updated to the format of y.
+func (q *Quantity) Mul(y Quantity) {
+	q.s = ""
+	if q.IsZero() {
+		q.Format = y.Format
+	}
+	if q.d.Dec == nil && y.d.Dec == nil && q.i.Mul(y.i) {
+		return
+	}
+	q.ToDec().d.Dec.Mul(q.d.Dec, y.AsDec())
+}
+
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) Cmp(y Quantity) int {
