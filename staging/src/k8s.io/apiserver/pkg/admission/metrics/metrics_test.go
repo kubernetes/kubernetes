@@ -36,6 +36,7 @@ var (
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
+	t.Parallel()
 	defer Metrics.reset()
 	defer legacyregistry.Reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
@@ -59,6 +60,7 @@ func TestObserveAdmissionStep(t *testing.T) {
 }
 
 func TestObserveAdmissionController(t *testing.T) {
+	t.Parallel()
 	defer Metrics.reset()
 	defer legacyregistry.Reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
