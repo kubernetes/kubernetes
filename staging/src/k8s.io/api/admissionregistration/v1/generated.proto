@@ -226,7 +226,7 @@ message MutatingWebhook {
   repeated MatchCondition matchConditions = 12;
 }
 
-// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+// MutatingWebhookConfiguration describes the configuration of an admission webhook that accept or reject and may change the object.
 message MutatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
@@ -484,7 +484,7 @@ message ValidatingWebhook {
   repeated MatchCondition matchConditions = 11;
 }
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accept or reject and object without changing it.
 message ValidatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
