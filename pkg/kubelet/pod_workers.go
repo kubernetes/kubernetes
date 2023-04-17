@@ -775,16 +775,23 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		}
 		// if this pod is being synced for the first time, we need to make sure it is an active pod
 		if options.Pod != nil && (options.Pod.Status.Phase == v1.PodFailed || options.Pod.Status.Phase == v1.PodSucceeded) {
-			// check to see if the pod is not running and the pod is terminal.
-			// If this succeeds then record in the podWorker that it is terminated.
+			// Check to see if the pod is not running and the pod is terminal; if this succeeds then record in the podWorker that it is terminated.
+			// This is needed because after a kubelet restart, we need to ensure terminal pods will NOT be considered active in Pod Admission. See http://issues.k8s.io/105523
+			// However, `filterOutInactivePods`, considers pods that are actively terminating as active. As a result, `IsPodKnownTerminated()` needs to return true and thus `terminatedAt` needs to be set.
 			if statusCache, err := p.podCache.Get(uid); err == nil {
 				if isPodStatusCacheTerminal(statusCache) {
+					// At this point we know:
+					// (1) The pod is terminal based on the config source.
+					// (2) The pod is terminal based on the runtime cache.
+					// This implies that this pod had already completed `SyncTerminatingPod` sometime in the past. The pod is likely being synced for the first time due to a kubelet restart.
+					// These pods need to complete SyncTerminatedPod to ensure that all resources are cleaned and that the status manager makes the final status updates for the pod.
+					// As a result, set finished: false, to ensure a Terminated event will be sent and `SyncTerminatedPod` will run.
 					status = &podSyncStatus{
 						terminatedAt:       now,
 						terminatingAt:      now,
 						syncedAt:           now,
 						startedTerminating: true,
-						finished:           true,
+						finished:           false,
 						fullname:           kubecontainer.BuildPodFullName(name, ns),
 					}
 				}
