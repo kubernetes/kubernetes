@@ -57,12 +57,9 @@ type annotation struct {
 }
 
 // AddAuditAnnotation sets the audit annotation for the given key, value pair.
-// It is safe to call at most parts of request flow that come after WithAuditAnnotations.
-// The notable exception being that this function must not be called via a
-// defer statement (i.e. after ServeHTTP) in a handler that runs before WithAudit
-// as at that point the audit event has already been sent to the audit sink.
-// Handlers that are unaware of their position in the overall request flow should
-// prefer AddAuditAnnotation over LogAnnotation to avoid dropping annotations.
+// This function must not be called via a defer statement (i.e. after ServeHTTP)
+// in a handler that runs before WithAudit as at that point the audit event has
+// already been sent to the audit sink.
 func AddAuditAnnotation(ctx context.Context, key, value string) {
 	ac := AuditContextFrom(ctx)
 	if ac == nil {
@@ -141,7 +138,7 @@ func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
 	}
 }
 
-// LogAnnotation fills in the Annotations according to the key value pair.
+// logAnnotation fills in the Annotations according to the key value pair.
 func logAnnotation(ae *auditinternal.Event, key, value string) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
