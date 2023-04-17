@@ -19,6 +19,7 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -51,9 +53,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
+
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -113,6 +116,10 @@ type DisruptionController struct {
 	// pod keys that need to be synced due to a stale DisruptionTarget condition.
 	stalePodDisruptionQueue   workqueue.RateLimitingInterface
 	stalePodDisruptionTimeout time.Duration
+
+	labelCacheLock   sync.Mutex
+	labelUpdateQueue workqueue.RateLimitingInterface
+	labelCache       map[string]labels.Set
 
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
@@ -441,6 +448,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 	go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
+	go wait.UntilWithContext(ctx, dc.podProcessorWorker, time.Second)
 
 	<-ctx.Done()
 }
@@ -476,33 +484,72 @@ func (dc *DisruptionController) removeDb(obj interface{}) {
 	dc.enqueuePdb(pdb)
 }
 
-func (dc *DisruptionController) addPod(obj interface{}) {
-	pod := obj.(*v1.Pod)
-	klog.V(4).Infof("addPod called on pod %q", pod.Name)
-	pdb := dc.getPdbForPod(pod)
-	if pdb == nil {
-		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
-	} else {
-		klog.V(4).Infof("addPod %q -> PDB %q", pod.Name, pdb.Name)
-		dc.enqueuePdb(pdb)
-	}
+type podLabelItem struct {
+	encodedLabels string
+	namespace     string
+}
+
+func (dc *DisruptionController) enqueuePod(pod *v1.Pod) {
+	labelString := labels.Set(pod.Labels).String()
+
+	dc.labelCacheLock.Lock()
+	dc.labelCache[labelString] = pod.Labels
+	dc.labelUpdateQueue.Add(podLabelItem{encodedLabels: labelString, namespace: pod.Namespace})
+	dc.labelCacheLock.Unlock()
+
 	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
 		dc.enqueueStalePodDisruptionCleanup(pod, cleanAfter)
 	}
 }
 
-func (dc *DisruptionController) updatePod(_, cur interface{}) {
-	pod := cur.(*v1.Pod)
-	klog.V(4).Infof("updatePod called on pod %q", pod.Name)
-	pdb := dc.getPdbForPod(pod)
+func (dc *DisruptionController) podProcessorWorker(ctx context.Context) {
+	for dc.processQueue() {
+	}
+}
+
+func (dc *DisruptionController) processQueue() bool {
+	obj, shutdown := dc.labelUpdateQueue.Get()
+	if shutdown {
+		return false
+	}
+	defer dc.labelUpdateQueue.Done(obj)
+
+	podItem := obj.(podLabelItem)
+	dc.labelCacheLock.Lock()
+	podLabels, ok := dc.labelCache[podItem.encodedLabels]
+	delete(dc.labelCache, podItem.encodedLabels)
+	dc.labelCacheLock.Unlock()
+	if !ok {
+		klog.Errorf("Pod with labels %q not found in cache", podItem.encodedLabels)
+	}
+	dc.processPodEvent(podItem.namespace, podLabels)
+	return true
+}
+
+func (dc *DisruptionController) processPodEvent(namespace string, labels labels.Set) {
+	pdb := dc.getPdbForPodLabels(namespace, labels)
 	if pdb == nil {
-		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
+		klog.V(4).Infof("No matching pdb for pod labels %q", labels.String())
 	} else {
-		klog.V(4).Infof("updatePod %q -> PDB %q", pod.Name, pdb.Name)
+		klog.V(4).Infof("addPod %q -> PDB %q", labels.String(), pdb.Name)
 		dc.enqueuePdb(pdb)
 	}
-	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
-		dc.enqueueStalePodDisruptionCleanup(pod, cleanAfter)
+}
+
+func (dc *DisruptionController) addPod(obj interface{}) {
+	pod := obj.(*v1.Pod)
+	klog.V(4).Infof("addPod called on pod %q", pod.Name)
+	dc.enqueuePod(pod)
+}
+
+func (dc *DisruptionController) updatePod(oldObj, newObj interface{}) {
+	newPod := newObj.(*v1.Pod)
+	klog.V(4).Infof("updatePod called on pod %q", newPod.Name)
+	dc.enqueuePod(newPod)
+
+	oldPod := oldObj.(*v1.Pod)
+	if labels.Equals(oldPod.Labels, newPod.Labels) {
+		dc.enqueuePod(oldPod)
 	}
 }
 
@@ -526,13 +573,7 @@ func (dc *DisruptionController) deletePod(obj interface{}) {
 		}
 	}
 	klog.V(4).Infof("deletePod called on pod %q", pod.Name)
-	pdb := dc.getPdbForPod(pod)
-	if pdb == nil {
-		klog.V(4).Infof("No matching pdb for pod %q", pod.Name)
-		return
-	}
-	klog.V(4).Infof("deletePod %q -> PDB %q", pod.Name, pdb.Name)
-	dc.enqueuePdb(pdb)
+	dc.enqueuePod(pod)
 }
 
 func (dc *DisruptionController) enqueuePdb(pdb *policy.PodDisruptionBudget) {
@@ -563,20 +604,21 @@ func (dc *DisruptionController) enqueueStalePodDisruptionCleanup(pod *v1.Pod, d 
 	klog.V(4).InfoS("Enqueued pod to cleanup stale DisruptionTarget condition", "pod", klog.KObj(pod))
 }
 
-func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionBudget {
+func (dc *DisruptionController) getPdbForPodLabels(podNamespace string, podLabels labels.Set) *policy.PodDisruptionBudget {
 	// GetPodPodDisruptionBudgets returns an error only if no
 	// PodDisruptionBudgets are found.  We don't return that as an error to the
 	// caller.
-	pdbs, err := dc.pdbLister.GetPodPodDisruptionBudgets(pod)
+	pdbs, err := dc.pdbLister.GetPodLabelsDisruptionBudgets(podNamespace, podLabels)
 	if err != nil {
-		klog.V(4).Infof("No PodDisruptionBudgets found for pod %v, PodDisruptionBudget controller will avoid syncing.", pod.Name)
+		klog.V(4).Infof("No PodDisruptionBudgets found for pod labels %s, PodDisruptionBudget controller will avoid syncing.", podLabels.String())
 		return nil
 	}
 
 	if len(pdbs) > 1 {
-		msg := fmt.Sprintf("Pod %q/%q matches multiple PodDisruptionBudgets.  Chose %q arbitrarily.", pod.Namespace, pod.Name, pdbs[0].Name)
+		msg := fmt.Sprintf("Pod labels %q/%q matche multiple PodDisruptionBudgets. Chose %q arbitrarily.", podNamespace, podLabels.String(), pdbs[0].Name)
 		klog.Warning(msg)
-		dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
+		// FIXME(oleg): how to emit events?
+		//dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
 	}
 	return pdbs[0]
 }

@@ -29,6 +29,7 @@ import (
 // PodDisruptionBudgetLister.
 type PodDisruptionBudgetListerExpansion interface {
 	GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error)
+	GetPodLabelsDisruptionBudgets(namespace string, podLabels labels.Set) ([]*policy.PodDisruptionBudget, error)
 }
 
 // PodDisruptionBudgetNamespaceListerExpansion allows custom methods to be added to
@@ -37,9 +38,14 @@ type PodDisruptionBudgetNamespaceListerExpansion interface{}
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.
 func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
+	return s.GetPodLabelsDisruptionBudgets(pod.Namespace, pod.Labels)
+}
+
+// GetPodLabelsDisruptionBudgets returns a list of PodDisruptionBudgets matching pod labels.
+func (s *podDisruptionBudgetLister) GetPodLabelsDisruptionBudgets(namespace string, podLabels labels.Set) ([]*policy.PodDisruptionBudget, error) {
 	var selector labels.Selector
 
-	list, err := s.PodDisruptionBudgets(pod.Namespace).List(labels.Everything())
+	list, err := s.PodDisruptionBudgets(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -54,14 +60,14 @@ func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*
 		}
 
 		// Unlike the v1beta version, here we let an empty selector match everything.
-		if !selector.Matches(labels.Set(pod.Labels)) {
+		if !selector.Matches(podLabels) {
 			continue
 		}
 		pdbList = append(pdbList, pdb)
 	}
 
 	if len(pdbList) == 0 {
-		return nil, fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		return nil, fmt.Errorf("could not find PodDisruptionBudget for pod with labels: %v in namespace %s ", podLabels, namespace)
 	}
 
 	return pdbList, nil
