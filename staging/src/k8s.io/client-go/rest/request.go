@@ -1067,7 +1067,9 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 	return result.body, result.err
 }
 
-// transformResponse converts an API response into a structured API object
+// transformResponse check response status, and read response body
+// if request succeeded, set result.body
+// if request failed, we try to decode response body as a typed error.
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
 	var body []byte
 	if resp.Body != nil {
@@ -1118,6 +1120,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			case resp.StatusCode == http.StatusSwitchingProtocols:
 				// no-op, we've been upgraded
 			case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
+				// we can't get the corresponding decoder,
+				// calculate an unstructured error from the response
 				return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 			}
 			return Result{
@@ -1133,18 +1137,24 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	case resp.StatusCode == http.StatusSwitchingProtocols:
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
-		// calculate an unstructured error from the response which the Result object may use if the caller
-		// did not return a structured error.
-		retryAfter, _ := retryAfterSeconds(resp)
-		err := r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
-		return Result{
+		ret := Result{
 			body:        body,
 			contentType: contentType,
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
-			err:         err,
 			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
+		if decoder != nil {
+			// try to decode the response body to typed error
+			if structuredErrObj := transformStructuredResponseError(body, decoder); structuredErrObj != nil {
+				ret.err = errors.FromObject(structuredErrObj)
+				return ret
+			}
+		}
+		// calculate an unstructured error from the response
+		retryAfter, _ := retryAfterSeconds(resp)
+		ret.err = r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
+		return ret
 	}
 
 	return Result{
@@ -1221,6 +1231,28 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 	return r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
 }
 
+// try to decode the got response into a typed error
+//   - if an error occurs during decode, we return nil
+//   - if decode succeed, we return typed error
+func transformStructuredResponseError(body []byte, decoder runtime.Decoder) runtime.Object {
+	// attempt to convert the body into a Status object
+	// to be backwards compatible with old servers that do not return a version, default to "v1"
+	out, _, err := decoder.Decode(body, &schema.GroupVersionKind{Version: "v1"}, nil)
+	if err != nil {
+		klog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
+		return nil
+	}
+	switch t := out.(type) {
+	case *metav1.Status:
+		// because we default the kind, we *must* check for StatusFailure
+		if t.Status == metav1.StatusFailure {
+			return t
+		}
+	}
+	klog.V(5).Infof("expect *metav1.Status but got: %T", out)
+	return nil
+}
+
 // newUnstructuredResponseError instantiates the appropriate generic error for the provided input. It also logs the body.
 func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool, statusCode int, method string, retryAfter int) error {
 	// cap the amount of output we create
@@ -1291,6 +1323,7 @@ func (r Result) Raw() ([]byte, error) {
 // Get returns the result as an object, which means it passes through the decoder.
 // If the returned object is of type Status and has .Status != StatusSuccess, the
 // additional information in Status will be used to enrich the error.
+// See the Request.Do() comment for what errors you might get.
 func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		// Check whether the result has a Status object in the body and prefer that.
@@ -1300,17 +1333,10 @@ func (r Result) Get() (runtime.Object, error) {
 		return nil, fmt.Errorf("serializer for %s doesn't exist", r.contentType)
 	}
 
-	// decode, but if the result is Status return that as an error instead.
+	// decode, body as API Object
 	out, _, err := r.decoder.Decode(r.body, nil, nil)
 	if err != nil {
 		return nil, err
-	}
-	switch t := out.(type) {
-	case *metav1.Status:
-		// any status besides StatusSuccess is considered an error.
-		if t.Status != metav1.StatusSuccess {
-			return nil, errors.FromObject(t)
-		}
 	}
 	return out, nil
 }
@@ -1350,15 +1376,6 @@ func (r Result) Into(obj runtime.Object) error {
 	if err != nil || out == obj {
 		return err
 	}
-	// if a different object is returned, see if it is Status and avoid double decoding
-	// the object.
-	switch t := out.(type) {
-	case *metav1.Status:
-		// any status besides StatusSuccess is considered an error.
-		if t.Status != metav1.StatusSuccess {
-			return errors.FromObject(t)
-		}
-	}
 	return nil
 }
 
@@ -1374,26 +1391,6 @@ func (r Result) WasCreated(wasCreated *bool) Result {
 // additional information in Status will be used to enrich the error.
 // See the Request.Do() comment for what errors you might get.
 func (r Result) Error() error {
-	// if we have received an unexpected server error, and we have a body and decoder, we can try to extract
-	// a Status object.
-	if r.err == nil || !errors.IsUnexpectedServerError(r.err) || len(r.body) == 0 || r.decoder == nil {
-		return r.err
-	}
-
-	// attempt to convert the body into a Status object
-	// to be backwards compatible with old servers that do not return a version, default to "v1"
-	out, _, err := r.decoder.Decode(r.body, &schema.GroupVersionKind{Version: "v1"}, nil)
-	if err != nil {
-		klog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
-		return r.err
-	}
-	switch t := out.(type) {
-	case *metav1.Status:
-		// because we default the kind, we *must* check for StatusFailure
-		if t.Status == metav1.StatusFailure {
-			return errors.FromObject(t)
-		}
-	}
 	return r.err
 }
 

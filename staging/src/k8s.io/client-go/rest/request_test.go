@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -857,10 +858,14 @@ func TestTransformUnstructuredError(t *testing.T) {
 		{
 			// status in response overrides transformed result
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"BadRequest","code":400}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
-				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
+				ErrStatus: metav1.Status{
+					Status: metav1.StatusFailure,
+					Code:   http.StatusBadRequest,
+					Reason: metav1.StatusReasonBadRequest,
+				},
 			},
 		},
 		{
@@ -879,10 +884,14 @@ func TestTransformUnstructuredError(t *testing.T) {
 			// we default apiVersion for backwards compatibility with old clients
 			// TODO: potentially remove in 1.7
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","reason":"BadRequest","code":400}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
-				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
+				ErrStatus: metav1.Status{
+					Status: metav1.StatusFailure,
+					Code:   http.StatusBadRequest,
+					Reason: metav1.StatusReasonBadRequest,
+				},
 			},
 		},
 		{
@@ -906,9 +915,6 @@ func TestTransformUnstructuredError(t *testing.T) {
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if !apierrors.IsUnexpectedServerError(err) {
-				t.Errorf("unexpected error type: %v", err)
 			}
 			if len(testCase.Name) != 0 && !strings.Contains(err.Error(), testCase.Name) {
 				t.Errorf("unexpected error string: %s", err)
@@ -4068,5 +4074,112 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	expected := concurrency * (req.maxRetries + 1)
 	if atomic.LoadInt32(&attempts) != int32(expected) {
 		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
+	}
+}
+
+func TestErrorTypedNotCorrectly(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+
+	testCases := []struct {
+		name        string
+		do          func(responseBody io.Reader) error
+		responseErr metav1.Status
+	}{
+		{
+			name: "create resource forbidden",
+			responseErr: metav1.Status{
+				TypeMeta: metav1.TypeMeta{},
+				ListMeta: metav1.ListMeta{},
+				Status:   "Failure",
+				Message:  `foos is forbidden: User "system:serviceaccount:issue:default" cannot create resource "foos" in API group "example.io" in the namespace "default"`,
+				Reason:   "Forbidden",
+				Details: &metav1.StatusDetails{
+					Group: "example.io",
+					Kind:  "foos",
+				},
+				Code: 403,
+			},
+			do: func(responseBody io.Reader) error {
+				req := &Request{
+					verb: http.MethodPost,
+					c: &RESTClient{
+						content: defaultContentConfig(),
+						Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+							// always send a retry-after response
+							return &http.Response{
+								StatusCode: http.StatusForbidden,
+								Header:     http.Header{"Content-Type": []string{"application/json"}},
+								Body:       io.NopCloser(responseBody)}, nil
+						}),
+					},
+					backoff:    &noSleepBackOff{},
+					maxRetries: 9, // 10 attempts in total, including the first
+					retryFn:    defaultRequestRetryFn,
+				}
+				result := req.Do(ctx)
+				return result.Error()
+			},
+		},
+		{
+			name: "watch resource forbidden",
+			responseErr: metav1.Status{
+				TypeMeta: metav1.TypeMeta{},
+				ListMeta: metav1.ListMeta{},
+				Status:   "Failure",
+				Message:  `foos is forbidden: User "system:serviceaccount:issue:default" cannot watch resource "foos" in API group "example.io" in the namespace "default"`,
+				Reason:   "Forbidden",
+				Details: &metav1.StatusDetails{
+					Group: "example.io",
+					Kind:  "foos",
+				},
+				Code: 403,
+			},
+			do: func(responseBody io.Reader) error {
+				req := &Request{
+					verb: http.MethodGet,
+					c: &RESTClient{
+						content: defaultContentConfig(),
+						Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+							// always send a retry-after response
+							return &http.Response{
+								StatusCode: http.StatusForbidden,
+								Header:     http.Header{"Content-Type": []string{"application/json"}},
+								Body:       io.NopCloser(responseBody)}, nil
+						}),
+					},
+					backoff:    &noSleepBackOff{},
+					maxRetries: 9, // 10 attempts in total, including the first
+					retryFn:    defaultRequestRetryFn,
+				}
+				_, err := req.Watch(ctx)
+				return err
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buff := &bytes.Buffer{}
+			encoder, err := defaultContentConfig().Negotiator.Encoder("application/json", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := encoder.Encode(&tc.responseErr, buff); err != nil {
+				t.Fatal(err)
+			}
+			err = tc.do(buff)
+			if err == nil {
+				t.Fatal("expect err but got nil")
+			}
+			statusErr, ok := err.(*apierrors.StatusError)
+			if !ok {
+				t.Fatalf("expect apierrors.StatusErr but got %T", err)
+			}
+			if !apiequality.Semantic.DeepEqual(statusErr.ErrStatus, tc.responseErr) {
+				t.Log(cmp.Diff(statusErr.ErrStatus, tc.responseErr))
+				t.Fatalf("got unexpect err")
+			}
+		})
 	}
 }
