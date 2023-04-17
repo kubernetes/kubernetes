@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -461,4 +463,119 @@ func newExternalNameService(namespace, name string) *v1.Service {
 	svc.Spec.Type = v1.ServiceTypeExternalName
 	svc.Spec.ExternalName = "google.com"
 	return svc
+}
+
+func TestFlakeEndpointCreate(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	informers := informers.NewSharedInformerFactory(client, 0)
+
+	epController := endpoint.NewEndpointController(
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Endpoints(),
+		client,
+		0)
+
+	// Start informer and controllers
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epController.Run(ctx, 1)
+
+	// Create namespace
+	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-flake", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	// Create a pod with labels
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: ns.Name,
+			Labels:    labelMap(),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "fakenode",
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				},
+			},
+		},
+	}
+
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
+	}
+
+	// Set pod IPs
+	createdPod.Status = v1.PodStatus{
+		Phase:  v1.PodRunning,
+		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+	}
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+	}
+
+	// Create a service associated to the pod
+	svc := newService(ns.Name, "foo1")
+	svc1, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
+	}
+
+	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("endpoints not found: %v", err)
+	}
+
+	// Force recomputation on the endpoint controller
+	svc1.SetLabels(map[string]string{"foo": "bar", "foo2": "bar"})
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc1, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update service %s: %v", svc1.Name, err)
+	}
+
+	expectedLabelsKeys := []string{"foo", "foo2"}
+	labels := map[string]string{}
+	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		endpoint, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc1.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		t.Logf("obtained endpoint with labels %v", endpoint.Labels)
+		if endpoint.Labels != nil && endpoint.Labels["foo"] == "bar" && endpoint.Labels["foo2"] == "bar" {
+			labels = endpoint.Labels
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("endpoints not found: %v", err)
+	}
+	labelsKeys := []string{}
+	for k := range labels {
+		if strings.Contains(k, "foo") {
+			labelsKeys = append(labelsKeys, k)
+		}
+	}
+	if !reflect.DeepEqual(labelsKeys, expectedLabelsKeys) {
+		t.Fatalf("got %v expected %v ", labelsKeys, expectedLabelsKeys)
+	}
 }
