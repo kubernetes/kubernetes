@@ -78,6 +78,7 @@ func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumecon
 		return allPlugins, err
 	}
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	return allPlugins, nil
 }
 
