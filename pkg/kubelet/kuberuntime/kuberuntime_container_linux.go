@@ -45,15 +45,23 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 		libcontainercgroups.IsCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
-	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget, enforceMemoryQoS)
+	cl, err := m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget, enforceMemoryQoS)
+	if err != nil {
+		return err
+	}
+	config.Linux = cl
 	return nil
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) *runtimeapi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
+	sc, err := m.determineEffectiveSecurityContext(pod, container, uid, username)
+	if err != nil {
+		return nil, err
+	}
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
-		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
+		SecurityContext: sc,
 	}
 
 	if nsTarget != nil && lc.SecurityContext.NamespaceOptions.Pid == runtimeapi.NamespaceMode_CONTAINER {
@@ -124,7 +132,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		}
 	}
 
-	return lc
+	return lc, nil
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits

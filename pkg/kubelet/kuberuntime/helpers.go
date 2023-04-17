@@ -210,28 +210,32 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) string {
+func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (string, error) {
 	if scmp == nil {
 		if fallbackToRuntimeDefault {
-			return v1.SeccompProfileRuntimeDefault
+			return v1.SeccompProfileRuntimeDefault, nil
 		}
-		return ""
+		return "", nil
 	}
 	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
+		return v1.SeccompProfileRuntimeDefault, nil
 	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
-		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-		return v1.SeccompLocalhostProfileNamePrefix + fname
+	if scmp.Type == v1.SeccompProfileTypeLocalhost {
+		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+			return v1.SeccompLocalhostProfileNamePrefix + fname, nil
+		} else {
+			return "", fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
+		}
 	}
 	if scmp.Type == v1.SeccompProfileTypeUnconfined {
-		return v1.SeccompProfileNameUnconfined
+		return v1.SeccompProfileNameUnconfined, nil
 	}
 
 	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
+		return v1.SeccompProfileRuntimeDefault, nil
 	}
-	return ""
+	return "", nil
 }
 
 func annotationProfile(profile, profileRootPath string) string {
@@ -244,7 +248,7 @@ func annotationProfile(profile, profileRootPath string) string {
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) string {
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) (string, error) {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
 		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
@@ -253,7 +257,7 @@ func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string
 	// if container field does not exist, try container annotation (deprecated)
 	if containerName != "" {
 		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
-			return annotationProfile(profile, m.seccompProfileRoot)
+			return annotationProfile(profile, m.seccompProfileRoot), nil
 		}
 	}
 
@@ -264,46 +268,50 @@ func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string
 
 	// as last resort, try to apply pod annotation (deprecated)
 	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
-		return annotationProfile(profile, m.seccompProfileRoot)
+		return annotationProfile(profile, m.seccompProfileRoot), nil
 	}
 
 	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
+		return v1.SeccompProfileRuntimeDefault, nil
 	}
 
-	return ""
+	return "", nil
 }
 
-func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
 	if scmp == nil {
 		if fallbackToRuntimeDefault {
 			return &runtimeapi.SecurityProfile{
 				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-			}
+			}, nil
 		}
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_Unconfined,
-		}
+		}, nil
 	}
 	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-		}
+		}, nil
 	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
-		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-		return &runtimeapi.SecurityProfile{
-			ProfileType:  runtimeapi.SecurityProfile_Localhost,
-			LocalhostRef: fname,
+	if scmp.Type == v1.SeccompProfileTypeLocalhost {
+		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+			return &runtimeapi.SecurityProfile{
+				ProfileType:  runtimeapi.SecurityProfile_Localhost,
+				LocalhostRef: fname,
+			}, nil
+		} else {
+			return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
 		}
 	}
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}
+	}, nil
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
 		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
@@ -317,12 +325,12 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	if fallbackToRuntimeDefault {
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-		}
+		}, nil
 	}
 
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}
+	}, nil
 }
 
 func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
