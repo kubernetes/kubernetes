@@ -242,8 +242,19 @@ func assignedPod(pod *v1.Pod) bool {
 }
 
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
-func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
-	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
+func responsibleForPod(pod *v1.Pod, profiles profile.Map, recorderFactory profile.RecorderFactory) bool {
+	isResponsible := profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
+	if !isResponsible && pod.DeletionTimestamp == nil {
+		// Prepare event clients.
+		var profileNames []string
+		for name := range profiles {
+			profileNames = append(profileNames, name)
+		}
+		recorder := recorderFactory("kube-scheduler")
+		recorder.Eventf(pod, nil, v1.EventTypeWarning, "FindScheduler", "Scheduling",
+			"%v scheduler not in %v", pod.Spec.SchedulerName, profileNames)
+	}
+	return isResponsible
 }
 
 // addAllEventHandlers is a helper function used in tests and in Scheduler
@@ -253,6 +264,7 @@ func addAllEventHandlers(
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	gvkMap map[framework.GVK]framework.ActionType,
+	recorderFactory profile.RecorderFactory,
 ) {
 	// scheduled pod cache
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
@@ -287,12 +299,12 @@ func addAllEventHandlers(
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
+					return !assignedPod(t) && responsibleForPod(t, sched.Profiles, recorderFactory)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
 						// The carried object may be stale, so we don't use it to check if
 						// it's assigned or not.
-						return responsibleForPod(pod, sched.Profiles)
+						return responsibleForPod(pod, sched.Profiles, recorderFactory)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false

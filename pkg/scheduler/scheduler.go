@@ -346,7 +346,7 @@ func New(client clientset.Interface,
 	}
 	sched.applyDefaultHandlers()
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap), recorderFactory)
 
 	return sched, nil
 }
