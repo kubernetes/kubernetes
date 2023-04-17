@@ -686,7 +686,9 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 			case <-stopCh:
 				return
 			default:
+				cacher.Lock()
 				cacher.bookmarkWatchers.popExpiredWatchers()
+				cacher.Unlock()
 			}
 		}
 	}()
@@ -700,9 +702,9 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 
 	// wait out the expiration period and pop expired watchers
 	time.Sleep(2 * time.Second)
+	cacher.Lock()
 	cacher.bookmarkWatchers.popExpiredWatchers()
-	cacher.bookmarkWatchers.lock.Lock()
-	defer cacher.bookmarkWatchers.lock.Unlock()
+	cacher.Unlock()
 	if len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
 		numWatchers := 0
 		for bucketID, v := range cacher.bookmarkWatchers.watchersBuckets {
