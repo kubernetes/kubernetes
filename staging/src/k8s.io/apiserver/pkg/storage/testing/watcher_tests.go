@@ -54,6 +54,12 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		Spec:       example.PodSpec{NodeName: "bar"},
 	}
 
+	selectedPod := func(pod *example.Pod) *example.Pod {
+		result := pod.DeepCopy()
+		result.Labels = map[string]string{"select": "true"}
+		return result
+	}
+
 	tests := []struct {
 		name       string
 		namespace  string
@@ -94,6 +100,24 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 			},
 		},
+	}, {
+		name:      "filtering",
+		namespace: fmt.Sprintf("test-ns-5-%t", recursive),
+		watchTests: []*testWatchStruct{
+			{selectedPod(basePod), true, watch.Added},
+			{basePod, true, watch.Deleted},
+			{selectedPod(basePod), true, watch.Added},
+			{selectedPod(basePodAssigned), true, watch.Modified},
+			{nil, true, watch.Deleted},
+		},
+		pred: storage.SelectionPredicate{
+			Label: labels.SelectorFromSet(labels.Set{"select": "true"}),
+			Field: fields.Everything(),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*example.Pod)
+				return labels.Set(pod.Labels), nil, nil
+			},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,17 +137,39 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 			if err != nil {
 				t.Fatalf("Watch failed: %v", err)
 			}
+
+			// Create a pod in a different namespace first to ensure
+			// that its corresponding event will not be propagated.
+			badKey := fmt.Sprintf("/pods/%s-bad/foo", tt.namespace)
+			badOut := &example.Pod{}
+			err = store.GuaranteedUpdate(ctx, badKey, badOut, true, nil, storage.SimpleUpdate(
+				func(runtime.Object) (runtime.Object, error) {
+					obj := basePod.DeepCopy()
+					obj.Namespace = fmt.Sprintf("%s-bad", tt.namespace)
+					return obj, nil
+				}), nil)
+			if err != nil {
+				t.Fatalf("GuaranteedUpdate of bad pod failed: %v", err)
+			}
+
 			var prevObj *example.Pod
 			for _, watchTest := range tt.watchTests {
 				out := &example.Pod{}
-				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-					func(runtime.Object) (runtime.Object, error) {
-						obj := watchTest.obj.DeepCopy()
-						obj.Namespace = tt.namespace
-						return obj, nil
-					}), nil)
-				if err != nil {
-					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				if watchTest.obj != nil {
+					err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+						func(runtime.Object) (runtime.Object, error) {
+							obj := watchTest.obj.DeepCopy()
+							obj.Namespace = tt.namespace
+							return obj, nil
+						}), nil)
+					if err != nil {
+						t.Fatalf("GuaranteedUpdate failed: %v", err)
+					}
+				} else {
+					err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil)
+					if err != nil {
+						t.Fatalf("Delete failed: %v", err)
+					}
 				}
 				if watchTest.expectEvent {
 					expectObj := out
@@ -226,6 +272,60 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 	testCheckResult(t, watch.Modified, w, out)
 }
 
+func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storage.Interface) {
+	_, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	startRV := storedObj.ResourceVersion
+
+	watcher, err := store.Watch(ctx, "/pods/test-ns", storage.ListOptions{ResourceVersion: startRV, Predicate: storage.Everything, Recursive: true})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Depending on the implementation, different number of events that
+	// should be delivered to the watcher can be created before it will
+	// block the implementation and as a result force the watcher to be
+	// closed (as otherwise events would have to be dropped).
+	// For now, this number is smallest for Cacher and it equals 21 for it.
+	totalPods := 21
+	for i := 0; i < totalPods; i++ {
+		out := &example.Pod{}
+		pod := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"},
+		}
+		err := store.GuaranteedUpdate(ctx, computePodKey(pod), out, true, nil, storage.SimpleUpdate(
+			func(runtime.Object) (runtime.Object, error) {
+				return pod, nil
+			}), nil)
+		if err != nil {
+			t.Errorf("GuaranteedUpdate failed: %v", err)
+		}
+	}
+
+	// Now stop the watcher and check if the consecutive events are being delivered.
+	watcher.Stop()
+
+	watched := 0
+	for {
+		event, ok := <-watcher.ResultChan()
+		if !ok {
+			break
+		}
+		object := event.Object
+		if co, ok := object.(runtime.CacheableObject); ok {
+			object = co.GetObject()
+		}
+		if a, e := object.(*example.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
+			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
+		}
+		watched++
+	}
+	// We expect at least N events to be delivered, depending on the implementation.
+	// For now, this number is smallest for Cacher and it equals 10 (size of the out buffer).
+	if watched < 10 {
+		t.Errorf("Unexpected number of events: %v, expected: %v", watched, totalPods)
+	}
+}
+
 func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	key := computePodKey(obj)
@@ -282,6 +382,63 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
+	}
+}
+
+func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Interface) {
+	// initialRV is used to initate the watcher at the beginning of the world.
+	podList := example.PodList{}
+	options := storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}
+	if err := store.GetList(ctx, "/pods", options, &podList); err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
+	}
+	initialRV := podList.ResourceVersion
+
+	options = storage.ListOptions{
+		ResourceVersion: initialRV,
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+
+	// Create a number of watchers that will not be reading any result.
+	nonReadingWatchers := 50
+	for i := 0; i < nonReadingWatchers; i++ {
+		watcher, err := store.Watch(ctx, "/pods/test-ns", options)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
+	}
+
+	// Create a second watcher that will be reading result.
+	readingWatcher, err := store.Watch(ctx, "/pods/test-ns", options)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer readingWatcher.Stop()
+
+	// Depending on the implementation, different number of events that
+	// should be delivered to the watcher can be created before it will
+	// block the implementation and as a result force the watcher to be
+	// closed (as otherwise events would have to be dropped).
+	// For now, this number is smallest for Cacher and it equals 21 for it.
+	//
+	// Create more events to ensure that we're not blocking other watchers
+	// forever.
+	startTime := time.Now()
+	for i := 0; i < 22; i++ {
+		out := &example.Pod{}
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"}}
+		if err := store.Create(ctx, computePodKey(pod), pod, out, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+		testCheckResult(t, watch.Added, readingWatcher, out)
+	}
+	if time.Since(startTime) > time.Duration(250*nonReadingWatchers)*time.Millisecond {
+		t.Errorf("waiting for events took too long: %v", time.Since(startTime))
 	}
 }
 
