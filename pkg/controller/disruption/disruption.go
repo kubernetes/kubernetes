@@ -191,6 +191,8 @@ func NewDisruptionControllerInternal(
 		stalePodDisruptionQueue:   workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "stale_pod_disruption"), workqueue.DefaultControllerRateLimiter()),
 		broadcaster:               record.NewBroadcaster(),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
+		labelUpdateQueue:          workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "pod_labels_disruption"), workqueue.DefaultControllerRateLimiter()),
+		labelCache:                make(map[string]labels.Set),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
