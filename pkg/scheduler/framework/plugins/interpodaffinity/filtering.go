@@ -101,14 +101,14 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 	return copy
 }
 
+// update updates the count of pods that meet the matching criteria in a particular topology.
+// This function assumes the node has the label keyed with `tk`.
 func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64) {
-	if tv, ok := node.Labels[tk]; ok {
-		pair := topologyPair{key: tk, value: tv}
-		m[pair] += value
-		// value could be negative, hence we delete the entry if it is down to zero.
-		if m[pair] == 0 {
-			delete(m, pair)
-		}
+	pair := topologyPair{key: tk, value: node.Labels[tk]}
+	m[pair] += value
+	// value could be negative, hence we delete the entry if it is down to zero.
+	if m[pair] == 0 {
+		delete(m, pair)
 	}
 }
 
@@ -116,7 +116,7 @@ func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64
 // for each affinity term if "targetPod" matches ALL terms.
 func (m topologyToMatchedTermCount) updateWithAffinityTerms(
 	terms []framework.AffinityTerm, pod *v1.Pod, node *v1.Node, value int64) {
-	if podMatchesAllAffinityTerms(terms, pod) {
+	if podMatchesAllAffinityTerms(node, terms, pod) {
 		for _, t := range terms {
 			m.update(node, t.TopologyKey, value)
 		}
@@ -128,6 +128,9 @@ func (m topologyToMatchedTermCount) updateWithAffinityTerms(
 func (m topologyToMatchedTermCount) updateWithAntiAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, value int64) {
 	// Check anti-affinity terms.
 	for _, t := range terms {
+		if !nodeHasTopologyKeyLabel(node, t.TopologyKey) {
+			continue
+		}
 		if t.Matches(pod, nsLabels) {
 			m.update(node, t.TopologyKey, value)
 		}
@@ -135,11 +138,14 @@ func (m topologyToMatchedTermCount) updateWithAntiAffinityTerms(terms []framewor
 }
 
 // returns true IFF the given pod matches all the given terms.
-func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) bool {
+func podMatchesAllAffinityTerms(node *v1.Node, terms []framework.AffinityTerm, pod *v1.Pod) bool {
 	if len(terms) == 0 {
 		return false
 	}
 	for _, t := range terms {
+		if !nodeHasTopologyKeyLabel(node, t.TopologyKey) {
+			continue
+		}
 		// The incoming pod NamespaceSelector was merged into the Namespaces set, and so
 		// we are not explicitly passing in namespace labels.
 		if !t.Matches(pod, nil) {
@@ -147,6 +153,11 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 		}
 	}
 	return true
+}
+
+func nodeHasTopologyKeyLabel(node *v1.Node, topologyKey string) bool {
+	_, ok := node.Labels[topologyKey]
+	return ok
 }
 
 // calculates the following for each existing pod on each node:
@@ -358,7 +369,7 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 		// in the cluster matches the namespace and selector of this pod, the pod matches
 		// its own terms, and the node has all the requested topologies, then we allow the pod
 		// to pass the affinity check.
-		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod) {
+		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(nodeInfo.Node(), state.podInfo.RequiredAffinityTerms, state.podInfo.Pod) {
 			return true
 		}
 		return false
