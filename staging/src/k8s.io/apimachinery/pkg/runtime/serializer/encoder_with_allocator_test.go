@@ -18,7 +18,7 @@ package serializer
 
 import (
 	"crypto/rand"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +49,7 @@ func benchmarkEncodeFor(b *testing.B, target runtime.Encoder) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for n := 0; n < b.N; n++ {
-				err := target.Encode(tc.obj, ioutil.Discard)
+				err := target.Encode(tc.obj, io.Discard)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -64,7 +64,7 @@ func benchmarkEncodeWithAllocatorFor(b *testing.B, target runtime.EncoderWithAll
 			b.ReportAllocs()
 			allocator := &runtime.Allocator{}
 			for n := 0; n < b.N; n++ {
-				err := target.EncodeWithAllocator(tc.obj, ioutil.Discard, allocator)
+				err := target.EncodeWithAllocator(tc.obj, io.Discard, allocator)
 				if err != nil {
 					b.Fatal(err)
 				}
