@@ -38,6 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util"
@@ -364,9 +365,15 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
+	o.resetChannels()
+	return nil
+}
+
+// resetChannels creates the channels needed to coordinate the port forward session. If port forwarding needs to be restarted,
+// this function must be called to reset the channels.
+func (o *PortForwardOptions) resetChannels() {
 	o.StopChannel = make(chan struct{}, 1)
 	o.ReadyChannel = make(chan struct{})
-	return nil
 }
 
 // Validate validates all the required options for port-forward cmd.
@@ -387,15 +394,6 @@ func (o PortForwardOptions) Validate() error {
 
 // RunPortForward implements all the necessary functionality for port-forward cmd.
 func (o PortForwardOptions) RunPortForward() error {
-	pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("unable to forward port because pod is not running. Current status=%v", pod.Status.Phase)
-	}
-
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
@@ -407,11 +405,31 @@ func (o PortForwardOptions) RunPortForward() error {
 		}
 	}()
 
-	req := o.RESTClient.Post().
-		Resource("pods").
-		Namespace(o.Namespace).
-		Name(pod.Name).
-		SubResource("portforward")
+	for {
+		pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+		if pod.Status.Phase != corev1.PodRunning {
+			return fmt.Errorf("unable to forward port because pod is not running. Current status=%v", pod.Status.Phase)
+		}
+
+		req := o.RESTClient.Post().
+			Resource("pods").
+			Namespace(o.Namespace).
+			Name(pod.Name).
+			SubResource("portforward")
+
+		err = o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+
+		// If the connection was lost, reset the channels and attempt to restart port forwarding.
+		if err == portforward.ErrLostConnectionToPod {
+			klog.Warning("Lost connection to pod. Attempting to restart port forwarding.")
+			o.resetChannels()
+			continue
+		}
+
+		return err
+	}
 }

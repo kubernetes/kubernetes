@@ -31,19 +31,24 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/portforward"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 type fakePortForwarder struct {
-	method string
-	url    *url.URL
-	pfErr  error
+	method    string
+	url       *url.URL
+	pfErr     error
+	pfErrFunc func() error
 }
 
 func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
 	f.method = method
 	f.url = url
+	if f.pfErrFunc != nil {
+		return f.pfErrFunc()
+	}
 	return f.pfErr
 }
 
@@ -140,6 +145,78 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 
 func TestPortForward(t *testing.T) {
 	testPortForward(t, nil, []string{"foo", ":5000", ":1000"})
+}
+
+func TestPortForwardReconnectOnLostConnection(t *testing.T) {
+	var flags map[string]string
+	args := []string{"foo", ":5000", ":1000"}
+
+	testError := portforward.ErrLostConnectionToPod
+
+	var err error
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	ns := scheme.Codecs.WithoutConversion()
+
+	tf.Client = &fake.RESTClient{
+		VersionedAPIPath:     "/api/v1",
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test/pods/foo" && m == "GET":
+				body := cmdtesting.ObjBody(codec, execPod())
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+			default:
+				t.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	ff := &fakePortForwarder{}
+
+	callCount := 0
+	ff.pfErrFunc = func() error {
+		callCount++
+		if callCount == 5 {
+			return nil
+		}
+		return portforward.ErrLostConnectionToPod
+	}
+
+	if testError != nil {
+		ff.pfErr = testError
+	}
+
+	opts := &PortForwardOptions{}
+	cmd := NewCmdPortForward(tf, genericiooptions.NewTestIOStreamsDiscard())
+	cmd.Run = func(cmd *cobra.Command, args []string) {
+		if err = opts.Complete(tf, cmd, args); err != nil {
+			return
+		}
+		opts.PortForwarder = ff
+		if err = opts.Validate(); err != nil {
+			return
+		}
+		err = opts.RunPortForward()
+	}
+
+	for name, value := range flags {
+		cmd.Flags().Set(name, value)
+	}
+	cmd.Run(cmd, args)
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	expectedCallCount := 5
+	if callCount != expectedCallCount {
+		t.Errorf("Expected ForwardPorts to be called %d times, but was called %d times", expectedCallCount, callCount)
+	}
 }
 
 func TestTranslateServicePortToTargetPort(t *testing.T) {
