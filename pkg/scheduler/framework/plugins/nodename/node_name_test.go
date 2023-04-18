@@ -39,6 +39,17 @@ func TestNodeName(t *testing.T) {
 			name: "no host specified",
 		},
 		{
+			pod:  &v1.Pod{},
+			node: st.MakeNode().Name("foo").Obj(),
+			name: "pod without name can fit to all node",
+		},
+		{
+			pod:  st.MakePod().Node("foo").Obj(),
+			node: &v1.Node{},
+			name: "node without name doesn't allow any pod to fit",
+                        wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+		},
+		{
 			pod:  st.MakePod().Node("foo").Obj(),
 			node: st.MakeNode().Name("foo").Obj(),
 			name: "host matches",
