@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"io/fs"
 	"os"
 	"reflect"
 	"testing"
@@ -25,67 +26,90 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
+type fakeDirEntry struct {
+	name string
+}
+
 type fakeFileInfo struct {
 	name string
 }
 
-func (fi *fakeFileInfo) Name() string {
-	return fi.name
+func (f fakeFileInfo) Name() string {
+	return f.name
 }
 
-func (fi *fakeFileInfo) Size() int64 {
+func (f fakeFileInfo) Size() int64 {
 	return 0
 }
 
-func (fi *fakeFileInfo) Mode() os.FileMode {
+func (f fakeFileInfo) Mode() fs.FileMode {
 	return 777
 }
 
-func (fi *fakeFileInfo) ModTime() time.Time {
+func (f fakeFileInfo) ModTime() time.Time {
 	return time.Now()
 }
-func (fi *fakeFileInfo) IsDir() bool {
+
+func (f fakeFileInfo) IsDir() bool {
 	return false
 }
 
-func (fi *fakeFileInfo) Sys() interface{} {
+func (f fakeFileInfo) Sys() any {
 	return nil
+}
+
+func (fd *fakeDirEntry) Type() fs.FileMode {
+	return 777
+}
+
+func (fd *fakeDirEntry) Info() (fs.FileInfo, error) {
+	return fakeFileInfo{
+		name: fd.name,
+	}, nil
+}
+
+func (fd *fakeDirEntry) Name() string {
+	return fd.name
+}
+
+func (fd *fakeDirEntry) IsDir() bool {
+	return false
 }
 
 type fakeIOHandler struct{}
 
-func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.DirEntry, error) {
 	switch dirname {
 	case "/dev/disk/by-path/":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-0",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "fc-0x5005076810213b32-lun-2",
 		}
-		f3 := &fakeFileInfo{
+		f3 := &fakeDirEntry{
 			name: "abc-0000:41:00.0-fc-0x5005076810213404-lun-0",
 		}
-		f4 := &fakeFileInfo{
+		f4 := &fakeDirEntry{
 			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-12",
 		}
-		f5 := &fakeFileInfo{
+		f5 := &fakeDirEntry{
 			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-1",
 		}
-		f6 := &fakeFileInfo{
+		f6 := &fakeDirEntry{
 			name: "fc-0x5005076810213b32-lun-25",
 		}
-		return []os.FileInfo{f4, f5, f6, f1, f2, f3}, nil
+		return []os.DirEntry{f4, f5, f6, f1, f2, f3}, nil
 	case "/sys/block/":
-		f := &fakeFileInfo{
+		f := &fakeDirEntry{
 			name: "dm-1",
 		}
-		return []os.FileInfo{f}, nil
+		return []os.DirEntry{f}, nil
 	case "/dev/disk/by-id/":
-		f := &fakeFileInfo{
+		f := &fakeDirEntry{
 			name: "scsi-3600508b400105e210000900000490000",
 		}
-		return []os.FileInfo{f}, nil
+		return []os.DirEntry{f}, nil
 	}
 	return nil, nil
 }
