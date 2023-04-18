@@ -147,7 +147,7 @@ github.com/containerd/console
 # github.com/containerd/ttrpc v1.1.0
 ## explicit; go 1.13
 github.com/containerd/ttrpc
-# github.com/coredns/caddy v1.1.0
+# github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
 # github.com/coredns/corefile-migration v1.0.20
