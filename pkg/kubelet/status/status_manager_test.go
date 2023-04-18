@@ -18,7 +18,6 @@ package status
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -29,6 +28,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -89,7 +90,7 @@ func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager.AddPod(getTestPod())
 	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
 	testRootDir := ""
-	if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 		return nil
 	} else {
 		testRootDir = tempDir

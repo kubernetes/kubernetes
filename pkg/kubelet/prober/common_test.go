@@ -17,9 +17,10 @@ limitations under the License.
 package prober
 
 import (
-	"io/ioutil"
 	"reflect"
 	"sync"
+
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +112,7 @@ func newTestManager() *manager {
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
 	testRootDir := ""
-	if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 		return nil
 	} else {
 		testRootDir = tempDir
