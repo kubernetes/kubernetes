@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -375,9 +376,14 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	localError := make(chan struct{})
 	remoteDone := make(chan struct{})
 
+	var bytesReceived atomic.Int64
+	var bytesSent atomic.Int64
+
 	go func() {
 		// Copy from the remote side to the local port.
-		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		bytes, err := io.Copy(conn, dataStream)
+		bytesReceived.Store(bytes)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			runtime.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
 		}
 
@@ -390,7 +396,9 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		defer dataStream.Close()
 
 		// Copy from the local port to the remote side.
-		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		bytes, err := io.Copy(dataStream, conn)
+		bytesSent.Store(bytes)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			runtime.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
 			// break out of the select below without waiting for the other copy to finish
 			close(localError)
@@ -407,7 +415,11 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
-		pf.streamConn.Close()
+
+		// If no bytes were sent or received, the connection was never established and streamConn should be closed so that port forwarding can exit.
+		if bytesReceived.Load() == 0 && bytesSent.Load() == 0 {
+			pf.streamConn.Close()
+		}
 	}
 }
 

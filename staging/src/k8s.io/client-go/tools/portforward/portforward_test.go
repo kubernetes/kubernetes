@@ -628,3 +628,73 @@ func TestForwardPortsReturnsNilWhenStopChanIsClosed(t *testing.T) {
 		t.Fatalf("unexpected error from pf.ForwardPorts(): %s", err)
 	}
 }
+
+func TestConnectionStateOnError(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		dataFromLocal          *bytes.Buffer
+		dataFromRemote         *bytes.Buffer
+		errorData              *bytes.Buffer
+		expectConnectionClosed bool
+	}{
+		{
+			name:                   "Connection should remain open if there is no error",
+			dataFromLocal:          bytes.NewBufferString(""),
+			dataFromRemote:         bytes.NewBufferString(""),
+			errorData:              bytes.NewBufferString(""),
+			expectConnectionClosed: false,
+		},
+		{
+			name:                   "Connection should remain open if an error occurs but some data was sent successfully",
+			dataFromLocal:          bytes.NewBufferString("test"),
+			dataFromRemote:         bytes.NewBufferString(""),
+			errorData:              bytes.NewBufferString("something bad happened"),
+			expectConnectionClosed: false,
+		},
+		{
+			name:                   "Connection should remain open if an error occurs but some data was received successfully",
+			dataFromLocal:          bytes.NewBufferString(""),
+			dataFromRemote:         bytes.NewBufferString("test"),
+			errorData:              bytes.NewBufferString("something bad happened"),
+			expectConnectionClosed: false,
+		},
+		{
+			name:                   "Connection should be closed if an error occurs and no data was sent or received",
+			dataFromLocal:          bytes.NewBufferString(""),
+			dataFromRemote:         bytes.NewBufferString(""),
+			errorData:              bytes.NewBufferString("something bad happened"),
+			expectConnectionClosed: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := bytes.NewBufferString("")
+			errOut := bytes.NewBufferString("")
+
+			pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, errOut)
+			if err != nil {
+				t.Fatalf("error while calling New: %s", err)
+			}
+
+			// Setup fake local connection
+			localConnection := &fakeConn{
+				sendBuffer:    tc.dataFromLocal,
+				receiveBuffer: bytes.NewBufferString(""),
+			}
+
+			// Setup fake remote connection to return an error message on the error stream
+			remoteConnection := newFakeConnection()
+			remoteConnection.dataStream.readFunc = tc.dataFromRemote.Read
+			remoteConnection.dataStream.writeFunc = bytes.NewBufferString("").Write
+			remoteConnection.errorStream.readFunc = tc.errorData.Read
+			pf.streamConn = remoteConnection
+
+			pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
+
+			var actualConnectionClosed = pf.streamConn.(*fakeConnection).closed
+			if actualConnectionClosed != tc.expectConnectionClosed {
+				t.Errorf("expected connection closed to be %v, but was %v", tc.expectConnectionClosed, actualConnectionClosed)
+			}
+		})
+	}
+}
