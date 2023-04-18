@@ -18,13 +18,13 @@ package genericclioptions
 
 import (
 	"fmt"
-	"io/ioutil"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/printers"
+	"os"
 )
 
 // templates are logically optional for specifying a format.
@@ -89,7 +89,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.Resour
 	}
 
 	if templateFormat == "templatefile" || templateFormat == "go-template-file" {
-		data, err := ioutil.ReadFile(templateValue)
+		data, err := os.ReadFile(templateValue)
 		if err != nil {
 			return nil, fmt.Errorf("error reading --template %s, %v", templateValue, err)
 		}
