@@ -471,9 +471,9 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		makeNode(tweakName("node1")),
+		makeNode(tweakName("node2")),
+		makeNode(tweakName("node3")),
 	}
 	table := []struct {
 		desc                string
@@ -933,10 +933,10 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 }
 
 func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
-	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
-	node4 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node1 := makeNode(tweakName("node1"))
+	node2 := makeNode(tweakName("node2"))
+	node3 := makeNode(tweakName("node3"))
+	node4 := makeNode(tweakName("node4"))
 
 	services := []*v1.Service{
 		newService("s0", "777", v1.ServiceTypeLoadBalancer),
@@ -1992,9 +1992,10 @@ func Test_respectsPredicates(t *testing.T) {
 		want  bool
 	}{
 		{want: false, input: &v1.Node{}},
-		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
+		{want: true, input: &v1.Node{Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}},
-		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
+		{want: true, input: &v1.Node{Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
 
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
@@ -2073,6 +2074,8 @@ func TestListWithPredicate(t *testing.T) {
 	}
 }
 
+var providerID = "providerID"
+
 type nodeTweak func(n *v1.Node)
 
 // TODO: use this pattern in all the tests above.
@@ -2083,7 +2086,8 @@ func makeNode(tweaks ...nodeTweak) *v1.Node {
 			Labels: map[string]string{},
 		},
 		Spec: v1.NodeSpec{
-			Taints: []v1.Taint{},
+			Taints:     []v1.Taint{},
+			ProviderID: providerID,
 		},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{{
@@ -2168,6 +2172,12 @@ func tweakDeleted() nodeTweak {
 		n.DeletionTimestamp = &metav1.Time{
 			Time: time.Now(),
 		}
+	}
+}
+
+func tweakUnsetProviderID() nodeTweak {
+	return func(n *v1.Node) {
+		n.Spec.ProviderID = ""
 	}
 }
 
@@ -2328,6 +2338,17 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:              makeNode(tweakDeleted()),
 		shouldSync:           false,
 		stableNodeSetEnabled: true,
+	}, {
+		name:       "providerID set F -> T",
+		oldNode:    makeNode(tweakUnsetProviderID()),
+		newNode:    makeNode(),
+		shouldSync: true,
+	}, {
+		name:                 "providerID set F -> T",
+		oldNode:              makeNode(tweakUnsetProviderID()),
+		newNode:              makeNode(),
+		shouldSync:           true,
+		stableNodeSetEnabled: true,
 	}}
 	for _, testcase := range testcases {
 		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.stableNodeSetEnabled), func(t *testing.T) {
@@ -2357,6 +2378,16 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 			name:       "tainted T, excluded T->F",
 			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, providerID set F->T",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakUnsetProviderID()),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, providerID set T->F",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakUnsetProviderID()),
 			shouldSync: true,
 		}, {
 			name:       "tainted T, ready F->T",
@@ -2389,6 +2420,16 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetReady(false)),
 			shouldSync: false,
 		}, {
+			name:       "excluded T, providerID set F->T",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakUnsetProviderID()),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "excluded T, providerID set T->F",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakUnsetProviderID()),
+			shouldSync: true,
+		}, {
 			name:       "ready F, tainted F->T",
 			oldNode:    makeNode(tweakSetReady(false)),
 			newNode:    makeNode(tweakSetReady(false), tweakAddTaint(ToBeDeletedTaint)),
@@ -2408,6 +2449,46 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 			oldNode:    makeNode(tweakSetReady(false), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 			newNode:    makeNode(tweakSetReady(false)),
 			shouldSync: true,
+		}, {
+			name:       "ready F, providerID set F->T",
+			oldNode:    makeNode(tweakSetReady(false), tweakUnsetProviderID()),
+			newNode:    makeNode(tweakSetReady(false)),
+			shouldSync: true,
+		}, {
+			name:       "ready F, providerID set T->F",
+			oldNode:    makeNode(tweakSetReady(false)),
+			newNode:    makeNode(tweakSetReady(false), tweakUnsetProviderID()),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, tainted F->T",
+			oldNode:    makeNode(tweakUnsetProviderID()),
+			newNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: false,
+		}, {
+			name:       "providerID unset, tainted T->F",
+			oldNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakUnsetProviderID()),
+			shouldSync: false,
+		}, {
+			name:       "providerID unset, excluded F->T",
+			oldNode:    makeNode(tweakUnsetProviderID()),
+			newNode:    makeNode(tweakUnsetProviderID(), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, excluded T->F",
+			oldNode:    makeNode(tweakUnsetProviderID(), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakUnsetProviderID()),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, ready F->T",
+			oldNode:    makeNode(tweakUnsetProviderID()),
+			newNode:    makeNode(tweakUnsetProviderID(), tweakSetReady(false)),
+			shouldSync: false,
+		}, {
+			name:       "providerID unset, ready T->F",
+			oldNode:    makeNode(tweakUnsetProviderID()),
+			newNode:    makeNode(tweakUnsetProviderID(), tweakSetReady(true)),
+			shouldSync: false,
 		}}
 		for _, testcase := range testcases {
 			t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, fgEnabled), func(t *testing.T) {
