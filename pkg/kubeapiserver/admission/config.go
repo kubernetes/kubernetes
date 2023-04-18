@@ -17,11 +17,12 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
 	"net/http"
 	"time"
 
 	"k8s.io/klog/v2"
+
+	"os"
 
 	"go.opentelemetry.io/otel/trace"
 
@@ -55,7 +56,7 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	var cloudConfig []byte
 	if c.CloudConfigFile != "" {
 		var err error
-		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
+		cloudConfig, err = os.ReadFile(c.CloudConfigFile)
 		if err != nil {
 			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
