@@ -5,7 +5,7 @@ source $(dirname $0)/version
 
 cd $(dirname $0)/..
 
-OS_ARCH_LINUX="amd64 arm64"
+OS_ARCH_LINUX="arm64 amd64"
 K8S_BASE="k8s.io/component-base"
 
 mkdir -p output/bin
