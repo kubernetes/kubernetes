@@ -37,7 +37,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -67,7 +66,7 @@ imagePolicy:
 `
 
 func TestNewFromConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestNewFromConfig(t *testing.T) {
 		{data.Key, clientKey},
 	}
 	for _, file := range files {
-		if err := ioutil.WriteFile(file.name, file.data, 0400); err != nil {
+		if err := os.WriteFile(file.name, file.data, 0400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -196,7 +195,7 @@ current-context: default
 		// Use a closure so defer statements trigger between loop iterations.
 		t.Run(tt.msg, func(t *testing.T) {
 			err := func() error {
-				tempfile, err := ioutil.TempFile("", "")
+				tempfile, err := os.CreateTemp("", "")
 				if err != nil {
 					return err
 				}
@@ -211,7 +210,7 @@ current-context: default
 					return fmt.Errorf("failed to execute test template: %v", err)
 				}
 
-				tempconfigfile, err := ioutil.TempFile("", "")
+				tempconfigfile, err := os.CreateTemp("", "")
 				if err != nil {
 					return err
 				}
@@ -359,7 +358,7 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 // newImagePolicyWebhook creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new newImagePolicyWebhook from it.
 func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
-	tempfile, err := ioutil.TempFile("", "")
+	tempfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +380,7 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 		return nil, err
 	}
 
-	tempconfigfile, err := ioutil.TempFile("", "")
+	tempconfigfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
