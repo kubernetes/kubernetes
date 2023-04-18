@@ -81,7 +81,7 @@ var _ types.GomegaMatcher = &matcher[string]{}
 // assertions. The difference is that failed assertions are returned as an
 // error:
 //
-//	if err := Gomega().Expect(pod.Status.Phase).To(gomega.BeEqual(v1.Running)); err != nil {
+//	if err := Gomega().Expect(pod.Status.Phase).To(gomega.Equal(v1.Running)); err != nil {
 //	    return fmt.Errorf("test pod not running: %w", err)
 //	}
 //
@@ -294,14 +294,14 @@ var ErrFailure error = FailureError{}
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 //
-// Deprecated: use gomega.Expect().To(gomega.BeEqual())
+// Deprecated: use gomega.Expect().To(gomega.Equal())
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
 }
 
 // ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
 //
-// Deprecated: use gomega.Expect().ToNot(gomega.BeEqual())
+// Deprecated: use gomega.Expect().ToNot(gomega.Equal())
 func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).NotTo(gomega.Equal(extra), explain...)
 }
