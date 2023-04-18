@@ -119,7 +119,7 @@ type DisruptionController struct {
 
 	labelCacheLock   sync.Mutex
 	labelUpdateQueue workqueue.RateLimitingInterface
-	labelCache       map[string]labels.Set
+	labelCache       map[podLabelItem]labels.Set
 
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
@@ -192,7 +192,7 @@ func NewDisruptionControllerInternal(
 		broadcaster:               record.NewBroadcaster(),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
 		labelUpdateQueue:          workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "pod_labels_disruption"), workqueue.DefaultControllerRateLimiter()),
-		labelCache:                make(map[string]labels.Set),
+		labelCache:                make(map[podLabelItem]labels.Set),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
@@ -493,10 +493,10 @@ type podLabelItem struct {
 
 func (dc *DisruptionController) enqueuePod(pod *v1.Pod) {
 	labelString := labels.Set(pod.Labels).String()
-
+	item := podLabelItem{encodedLabels: labelString, namespace: pod.Namespace}
 	dc.labelCacheLock.Lock()
-	dc.labelCache[labelString] = pod.Labels
-	dc.labelUpdateQueue.Add(podLabelItem{encodedLabels: labelString, namespace: pod.Namespace})
+	dc.labelCache[item] = pod.Labels
+	dc.labelUpdateQueue.Add(item)
 	dc.labelCacheLock.Unlock()
 
 	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
@@ -518,8 +518,8 @@ func (dc *DisruptionController) processQueue() bool {
 
 	podItem := obj.(podLabelItem)
 	dc.labelCacheLock.Lock()
-	podLabels, ok := dc.labelCache[podItem.encodedLabels]
-	delete(dc.labelCache, podItem.encodedLabels)
+	podLabels, ok := dc.labelCache[podItem]
+	delete(dc.labelCache, podItem)
 	dc.labelCacheLock.Unlock()
 	if !ok {
 		klog.Errorf("Pod with labels %q not found in cache", podItem.encodedLabels)
