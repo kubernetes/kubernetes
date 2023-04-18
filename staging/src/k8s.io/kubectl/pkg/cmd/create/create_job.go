@@ -33,6 +33,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -107,6 +108,19 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+
+	// Completion for relevant flags
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"from",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var completions []string
+			crons := completion.CompGetResource(f, "cronjob", "")
+			for _, name := range crons {
+				completions = append(completions, fmt.Sprintf("cronjob/%s", name))
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}))
+
 	return cmd
 }
 
