@@ -770,7 +770,20 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	klog.V(2).InfoS("Killing container with a grace period", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
-	err := m.runtimeService.StopContainer(ctx, containerID.ID, gracePeriod)
+	var err error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		err = m.runtimeService.StopContainer(ctx, containerID.ID, gracePeriod)
+
+	}()
+	select {
+	case <-ctx.Done():
+		err = errors.New("Container receives the ctx.Done signal and cancels the deletion")
+		return err
+	case <-done:
+	}
+
 	if err != nil && !crierror.IsNotFound(err) {
 		klog.ErrorS(err, "Container termination failed with gracePeriod", "pod", klog.KObj(pod), "podUID", pod.UID,
 			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
