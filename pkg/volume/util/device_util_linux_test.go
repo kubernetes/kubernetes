@@ -21,6 +21,7 @@ package util
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"reflect"
 	"regexp"
@@ -58,87 +59,87 @@ func (handler *mockOsIOHandler) ReadFile(filename string) ([]byte, error) {
 	return nil, errors.New("not Implemented for Mock")
 }
 
-func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.DirEntry, error) {
 	switch dirname {
 	case "/sys/block/dm-1/slaves":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sda",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "sdb",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/block/":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sda",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "dm-1",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/class/iscsi_host":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "host2",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "host3",
 		}
-		f3 := &fakeFileInfo{
+		f3 := &fakeDirEntry{
 			name: "ignore",
 		}
-		return []os.FileInfo{f1, f2, f3}, nil
+		return []os.DirEntry{f1, f2, f3}, nil
 	case "/sys/class/iscsi_host/host2/device":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "session1",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "ignore",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/class/iscsi_host/host3/device":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "session2",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "ignore",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/class/iscsi_host/host2/device/session1":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "connection1:0",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "ignore",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/class/iscsi_host/host3/device/session2":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "connection2:0",
 		}
-		f2 := &fakeFileInfo{
+		f2 := &fakeDirEntry{
 			name: "ignore",
 		}
-		return []os.FileInfo{f1, f2}, nil
+		return []os.DirEntry{f1, f2}, nil
 	case "/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:1/block":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sda",
 		}
-		return []os.FileInfo{f1}, nil
+		return []os.DirEntry{f1}, nil
 	case "/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:2/block":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sdc",
 		}
-		return []os.FileInfo{f1}, nil
+		return []os.DirEntry{f1}, nil
 	case "/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:1/block":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sdb",
 		}
-		return []os.FileInfo{f1}, nil
+		return []os.DirEntry{f1}, nil
 	case "/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:2/block":
-		f1 := &fakeFileInfo{
+		f1 := &fakeDirEntry{
 			name: "sdd",
 		}
-		return []os.FileInfo{f1}, nil
+		return []os.DirEntry{f1}, nil
 	}
 	return nil, errors.New("not Implemented for Mock")
 }
@@ -176,31 +177,54 @@ func (handler *mockOsIOHandler) WriteFile(filename string, data []byte, perm os.
 	return errors.New("not Implemented for Mock")
 }
 
+type fakeDirEntry struct {
+	name string
+}
+
 type fakeFileInfo struct {
 	name string
 }
 
-func (fi *fakeFileInfo) Name() string {
-	return fi.name
+func (f fakeFileInfo) Name() string {
+	return f.name
 }
 
-func (fi *fakeFileInfo) Size() int64 {
+func (f fakeFileInfo) Size() int64 {
 	return 0
 }
 
-func (fi *fakeFileInfo) Mode() os.FileMode {
+func (f fakeFileInfo) Mode() fs.FileMode {
 	return 777
 }
 
-func (fi *fakeFileInfo) ModTime() time.Time {
+func (f fakeFileInfo) ModTime() time.Time {
 	return time.Now()
 }
-func (fi *fakeFileInfo) IsDir() bool {
+
+func (f fakeFileInfo) IsDir() bool {
 	return false
 }
 
-func (fi *fakeFileInfo) Sys() interface{} {
+func (f fakeFileInfo) Sys() any {
 	return nil
+}
+
+func (fd *fakeDirEntry) Type() fs.FileMode {
+	return 777
+}
+
+func (fd *fakeDirEntry) Info() (fs.FileInfo, error) {
+	return fakeFileInfo{
+		name: fd.name,
+	}, nil
+}
+
+func (fd *fakeDirEntry) Name() string {
+	return fd.name
+}
+
+func (fd *fakeDirEntry) IsDir() bool {
+	return false
 }
 
 func TestFindMultipathDeviceForDevice(t *testing.T) {

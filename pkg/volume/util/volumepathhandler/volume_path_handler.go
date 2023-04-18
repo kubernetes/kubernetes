@@ -18,7 +18,6 @@ package volumepathhandler
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -279,12 +278,17 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 // GetDeviceBindMountRefs searches bind mounts under global map path
 func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	var refs []string
-	files, err := ioutil.ReadDir(mapPath)
+	files, err := os.ReadDir(mapPath)
 	if err != nil {
 		return nil, err
 	}
 	for _, file := range files {
-		if file.Mode()&os.ModeDevice != os.ModeDevice {
+		fileInfo, err := file.Info()
+		if err != nil {
+			return nil, err
+		}
+		if fileInfo.Mode()&os.ModeDevice != os.ModeDevice {
+			//if file.Mode()&os.ModeDevice != os.ModeDevice {
 			continue
 		}
 		filename := file.Name()
