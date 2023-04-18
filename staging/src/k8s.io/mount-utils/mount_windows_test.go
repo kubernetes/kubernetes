@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/utils/exec/testing"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 func makeLink(link, target string) error {
@@ -146,7 +147,7 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 			"Dir",
 			"",
 			func(base, fileName, targetLinkName string) error {
-				return os.Mkdir(filepath.Join(base, fileName), 0o750)
+				return os.Mkdir(filepath.Join(base, fileName), 0750)
 			},
 			true,
 			false,
