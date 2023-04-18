@@ -19,7 +19,6 @@ package headerrequest
 import (
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +27,7 @@ import (
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilcert "k8s.io/client-go/util/cert"
+	"os"
 )
 
 // StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.
@@ -112,7 +112,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	}
 
 	// Wrap with an x509 verifier
-	caData, err := ioutil.ReadFile(clientCA)
+	caData, err := os.ReadFile(clientCA)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %v", clientCA, err)
 	}

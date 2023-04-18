@@ -18,7 +18,6 @@ package egressselector
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1beta1"
 	"k8s.io/utils/path"
+	"os"
 	"sigs.k8s.io/yaml"
 )
 
@@ -51,7 +51,7 @@ func ReadEgressSelectorConfiguration(configFilePath string) (*apiserver.EgressSe
 		return nil, nil
 	}
 	// a file was provided, so we just read it.
-	data, err := ioutil.ReadFile(configFilePath)
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read egress selector configuration from %q [%v]", configFilePath, err)
 	}

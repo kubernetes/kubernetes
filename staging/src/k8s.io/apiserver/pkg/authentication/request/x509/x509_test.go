@@ -21,12 +21,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"os"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -723,7 +724,7 @@ func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
 	certs := []*x509.Certificate{}
 	for _, name := range names {
 		filename := "testdata/" + name + ".pem"
-		data, err := ioutil.ReadFile(filename)
+		data, err := os.ReadFile(filename)
 		if err != nil {
 			t.Fatalf("error reading %s: %v", filename, err)
 		}

@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -702,7 +701,7 @@ func (storage *SimpleTypedStorage) GetSingularName() string {
 
 func bodyOrDie(response *http.Response) string {
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		panic(err)
 	}
@@ -715,7 +714,7 @@ func extractBody(response *http.Response, object runtime.Object) (string, error)
 
 func extractBodyDecoder(response *http.Response, object runtime.Object, decoder runtime.Decoder) (string, error) {
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return string(body), err
 	}
@@ -724,7 +723,7 @@ func extractBodyDecoder(response *http.Response, object runtime.Object, decoder 
 
 func extractBodyObject(response *http.Response, decoder runtime.Decoder) (runtime.Object, string, error) {
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, string(body), err
 	}
@@ -887,7 +886,7 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		defer response.Body.Close()
-		data, err := ioutil.ReadAll(response.Body)
+		data, err := io.ReadAll(response.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -956,7 +955,7 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		defer response.Body.Close()
-		data, err := ioutil.ReadAll(response.Body)
+		data, err := io.ReadAll(response.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1121,7 +1120,7 @@ func TestList(t *testing.T) {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -1179,7 +1178,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, url, http.StatusBadRequest, resp)
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -1244,7 +1243,7 @@ func TestListCompression(t *testing.T) {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -1298,7 +1297,7 @@ func TestLogs(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1347,7 +1346,7 @@ func TestNonEmptyList(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1460,7 +1459,7 @@ func BenchmarkGet(b *testing.B) {
 		if resp.StatusCode != http.StatusOK {
 			b.Fatalf("unexpected response: %#v", resp)
 		}
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 			b.Fatalf("unable to read body")
 		}
 	}
@@ -1496,7 +1495,7 @@ func BenchmarkGetNoCompression(b *testing.B) {
 		if resp.StatusCode != http.StatusOK {
 			b.Fatalf("unexpected response: %#v", resp)
 		}
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 			b.Fatalf("unable to read body")
 		}
 	}
@@ -1555,7 +1554,7 @@ func TestGetCompression(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("unexpected error reading body: %v", err)
 		}
@@ -2042,12 +2041,12 @@ func TestWatchTable(t *testing.T) {
 				test.send(simpleStorage.fakeWatch)
 			}()
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Logf("Body:\n%s", string(body))
-			d := watcher(resp.Header.Get("Content-Type"), ioutil.NopCloser(bytes.NewReader(body)))
+			d := watcher(resp.Header.Get("Content-Type"), io.NopCloser(bytes.NewReader(body)))
 			var actual []*metav1.WatchEvent
 			for {
 				var event metav1.WatchEvent
@@ -2243,7 +2242,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			}
 			body = d
 		} else {
-			d, err := ioutil.ReadAll(resp.Body)
+			d, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2282,7 +2281,7 @@ func TestGetBinary(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2537,7 +2536,7 @@ func TestConnect(t *testing.T) {
 		t.Errorf("unexpected response: %#v", resp)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2575,7 +2574,7 @@ func TestConnectResponderObject(t *testing.T) {
 		t.Errorf("unexpected response: %#v", resp)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2616,7 +2615,7 @@ func TestConnectResponderError(t *testing.T) {
 		t.Errorf("unexpected response: %#v", resp)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2685,7 +2684,7 @@ func TestConnectWithOptions(t *testing.T) {
 		t.Errorf("unexpected response: %#v", resp)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2735,7 +2734,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 		t.Errorf("unexpected response: %#v", resp)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2812,7 +2811,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
+		s, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -2852,7 +2851,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
+		s, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -2895,7 +2894,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
+		s, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -3285,7 +3284,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	b, err := ioutil.ReadAll(response.Body)
+	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
@@ -3562,7 +3561,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v\n%s", response, readBodyOrDie(response.Body))
 	}
-	b, err := ioutil.ReadAll(response.Body)
+	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
@@ -3923,7 +3922,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	b, err := ioutil.ReadAll(response.Body)
+	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if !strings.Contains(string(b), "does not match the expected API version") {
@@ -3988,7 +3987,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	b, err := ioutil.ReadAll(response.Body)
+	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if !strings.Contains(string(b), "does not match the expected API version") {
@@ -4385,7 +4384,7 @@ func TestXGSubresource(t *testing.T) {
 }
 
 func readBodyOrDie(r io.Reader) []byte {
-	body, err := ioutil.ReadAll(r)
+	body, err := io.ReadAll(r)
 	if err != nil {
 		panic(err)
 	}
@@ -4426,10 +4425,10 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		if response.StatusCode != http.StatusBadRequest {
-			body, _ := ioutil.ReadAll(response.Body)
+			body, _ := io.ReadAll(response.Body)
 			b.Fatalf("Unexpected response %#v\n%s", response, body)
 		}
-		_, _ = ioutil.ReadAll(response.Body)
+		_, _ = io.ReadAll(response.Body)
 		response.Body.Close()
 	}
 	b.StopTimer()
