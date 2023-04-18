@@ -6,7 +6,7 @@ go 1.20
 
 require (
 	github.com/stretchr/testify v1.8.2
-	gopkg.in/square/go-jose.v2 v2.6.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.90.1

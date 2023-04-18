@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/json"
+	jose "gopkg.in/go-jose/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2/json"
 )
 
 // JSONWebToken represents a JSON Web Token (as specified in RFC7519).
@@ -60,7 +60,7 @@ func (t *JSONWebToken) Claims(key interface{}, dest ...interface{}) error {
 // verified. This function won't work for encrypted JWTs.
 func (t *JSONWebToken) UnsafeClaimsWithoutVerification(dest ...interface{}) error {
 	if t.unverifiedPayload == nil {
-		return fmt.Errorf("square/go-jose: Cannot get unverified claims")
+		return fmt.Errorf("go-jose/go-jose: Cannot get unverified claims")
 	}
 	claims := t.unverifiedPayload()
 	for _, d := range dest {

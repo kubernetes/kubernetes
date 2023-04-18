@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/klog/v2"
 
