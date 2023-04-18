@@ -22,7 +22,7 @@ package retry
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -182,8 +182,8 @@ func getRawError(resp *http.Response, err error) error {
 
 	// return the http status if it is unable to get response body.
 	defer resp.Body.Close()
-	respBody, _ := ioutil.ReadAll(resp.Body)
-	resp.Body = ioutil.NopCloser(bytes.NewReader(respBody))
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body = io.NopCloser(bytes.NewReader(respBody))
 	if len(respBody) == 0 {
 		return fmt.Errorf("HTTP status code (%d)", resp.StatusCode)
 	}
