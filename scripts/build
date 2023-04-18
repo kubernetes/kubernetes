@@ -6,6 +6,7 @@ source $(dirname $0)/version
 cd $(dirname $0)/..
 
 OS_ARCH_LINUX="arm64 amd64"
+KUBE_BUILD_PLATFORMS="linux/arm64 linux/amd64"
 K8S_BASE="k8s.io/component-base"
 
 mkdir -p output/bin
@@ -21,9 +22,9 @@ GOLDFLAGS="
     -X ${K8S_BASE}/version.buildDate=${buildDate}
 "
 
+build/run.sh make kubelet KUBE_BUILD_PLATFORMS="${KUBE_BUILD_PLATFORMS}"
+
 for ARCH in ${OS_ARCH_LINUX}; do
-        echo Building kubelet-$ARCH
-        build/run.sh make kubelet KUBE_BUILD_PLATFORMS=linux/$ARCH
         mv _output/dockerized/bin/linux/$ARCH/kubelet .
         if [ $ARCH = "amd64" ]; then
             ./kubelet --version
