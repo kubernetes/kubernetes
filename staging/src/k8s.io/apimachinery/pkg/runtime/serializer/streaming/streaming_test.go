@@ -19,7 +19,6 @@ package streaming
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +40,7 @@ func (d *fakeDecoder) Decode(data []byte, gvk *schema.GroupVersionKind, into run
 func TestEmptyDecoder(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	d := &fakeDecoder{}
-	_, _, err := NewDecoder(ioutil.NopCloser(buf), d).Decode(nil, nil)
+	_, _, err := NewDecoder(io.NopCloser(buf), d).Decode(nil, nil)
 	if err != io.EOF {
 		t.Fatal(err)
 	}
