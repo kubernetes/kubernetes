@@ -22,7 +22,7 @@ package retry
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -129,7 +129,7 @@ func TestGetError(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: test.code,
 			Header:     http.Header{},
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte("some error"))),
+			Body:       io.NopCloser(bytes.NewReader([]byte("some error"))),
 		}
 		if test.retryAfter != 0 {
 			resp.Header.Add("Retry-After", fmt.Sprintf("%d", test.retryAfter))
@@ -225,7 +225,7 @@ func TestGetStatusNotFoundAndForbiddenIgnoredError(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: test.code,
 			Header:     http.Header{},
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte("some error"))),
+			Body:       io.NopCloser(bytes.NewReader([]byte("some error"))),
 		}
 		if test.retryAfter != 0 {
 			resp.Header.Add("Retry-After", fmt.Sprintf("%d", test.retryAfter))
