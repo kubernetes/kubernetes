@@ -486,14 +486,10 @@ func TestFilenameOptionsValidate(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/pod/pod_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/rc/rc_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "inode/hardlink"))
-	defer os.RemoveAll(tmpDir)
 
 	// create test files
 	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
@@ -554,12 +550,8 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 
 func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple_invalid")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "inode/symlink/pod"))
-	defer os.RemoveAll(tmpDir)
 
 	// create test files
 	writeTestFile(t, fmt.Sprintf("%s/inode/symlink/pod/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
@@ -1890,11 +1882,7 @@ func TestHasNames(t *testing.T) {
 
 func TestUnstructured(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp("", "unstructured_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// create test files
 	writeTestFile(t, fmt.Sprintf("%s/pod.json", tmpDir), aPod)

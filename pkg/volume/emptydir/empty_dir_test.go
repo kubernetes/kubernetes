@@ -52,11 +52,7 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "emptydirTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
@@ -142,11 +138,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
-	basePath, err := os.MkdirTemp("", "emptydir_volume_test")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 
 	var (
 		volumePath  = filepath.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
@@ -299,11 +291,7 @@ func testTearDown(unmounter volume.Unmounter, metadataDir, volPath string) error
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath, err := os.MkdirTemp("", "emptydirTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir： %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
@@ -328,11 +316,7 @@ func TestPluginBackCompat(t *testing.T) {
 // TestMetrics tests that MetricProvider methods return sane values.
 func TestMetrics(t *testing.T) {
 	// Create an empty temp directory for the volume
-	tmpDir, err := os.MkdirTemp("", "empty_dir_test")
-	if err != nil {
-		t.Fatalf("Can't make a tmp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
@@ -351,7 +335,7 @@ func TestMetrics(t *testing.T) {
 	// Need to create the subdirectory
 	os.MkdirAll(mounter.GetPath(), 0755)
 
-	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs()
+	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs(t)
 	if err != nil {
 		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
 	}

@@ -29,14 +29,10 @@ import (
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "metrics_du_test")
-	if err != nil {
-		t.Fatalf("Can't make a tmp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	metrics := NewMetricsDu(tmpDir)
 
-	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs()
+	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs(t)
 	if err != nil {
 		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
 	}

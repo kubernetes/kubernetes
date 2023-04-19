@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -282,12 +281,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 }
 
 func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration.PluginManager, csitrans.CSITranslator, fakeframework.PersistentVolumeLister, fakeframework.PersistentVolumeClaimLister) {
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	*fsVolumeMode = v1.PersistentVolumeFilesystem
 
 	csiTranslator := csitrans.New()

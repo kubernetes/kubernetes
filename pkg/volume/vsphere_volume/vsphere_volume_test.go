@@ -37,11 +37,7 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "vsphereVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
@@ -85,11 +81,7 @@ func (fake *fakePDManager) DeleteVolume(vd *vsphereVolumeDeleter) error {
 
 func TestPlugin(t *testing.T) {
 	// Initial setup to test volume plugin
-	tmpDir, err := os.MkdirTemp("", "vsphereVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
@@ -193,11 +185,7 @@ func TestPlugin(t *testing.T) {
 
 func TestUnsupportedCloudProvider(t *testing.T) {
 	// Initial setup to test volume plugin
-	tmpDir, err := os.MkdirTemp("", "vsphereVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	testcases := []struct {
 		name          string
@@ -238,11 +226,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 }
 
 func TestUnsupportedVolumeHost(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "vsphereVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 

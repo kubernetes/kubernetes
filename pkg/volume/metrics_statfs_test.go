@@ -17,7 +17,6 @@ limitations under the License.
 package volume_test
 
 import (
-	"os"
 	"testing"
 
 	. "k8s.io/kubernetes/pkg/volume"
@@ -44,11 +43,7 @@ func TestGetMetricsStatFS(t *testing.T) {
 		t.Errorf("Expected error when calling GetMetrics on incorrectly initialized MetricsStatFS, actual nil")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "metric_statfs_test")
-	if err != nil {
-		t.Fatalf("Can't make a tmp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	metrics = NewMetricsStatFS(tmpDir)
 	actual, err = metrics.GetMetrics()

@@ -157,11 +157,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "flexvolume_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()
@@ -192,11 +188,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "flexvolume_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()

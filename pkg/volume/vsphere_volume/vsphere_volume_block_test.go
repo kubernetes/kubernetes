@@ -41,12 +41,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// make our test path for fake GlobalMapPath
 	// /tmp symbolized our pluginDir
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/vsphere-volume/volumeDevices/
-	tmpVDir, err := os.MkdirTemp("", "vsphereBlockVolume")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %s", err)
-	}
-	// deferred clean up
-	defer os.RemoveAll(tmpVDir)
+	tmpVDir := t.TempDir()
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
@@ -78,12 +73,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 }
 
 func TestGetPodAndPluginMapPaths(t *testing.T) {
-	tmpVDir, err := os.MkdirTemp("", "vsphereBlockVolume")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %s", err)
-	}
-	// deferred clean up
-	defer os.RemoveAll(tmpVDir)
+	tmpVDir := t.TempDir()
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 	expectedPodPath := filepath.Join(tmpVDir, testPodPath)

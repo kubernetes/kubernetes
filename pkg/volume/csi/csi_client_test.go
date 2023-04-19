@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -468,11 +467,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 func TestClientNodePublishVolume(t *testing.T) {
 	var testFSGroup int64 = 3000
 
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	testPath := filepath.Join(tmpDir, "path")
 
 	testCases := []struct {
@@ -534,11 +529,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 }
 
 func TestClientNodeUnpublishVolume(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	testPath := filepath.Join(tmpDir, "path")
 
 	testCases := []struct {
@@ -578,11 +569,7 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 func TestClientNodeStageVolume(t *testing.T) {
 	var testFSGroup int64 = 3000
 
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	testPath := filepath.Join(tmpDir, "/test/path")
 
 	testCases := []struct {
@@ -644,11 +631,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 }
 
 func TestClientNodeUnstageVolume(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	testPath := filepath.Join(tmpDir, "/test/path")
 
 	testCases := []struct {

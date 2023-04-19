@@ -42,13 +42,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// make our test path for fake GlobalMapPath
 	// /tmp symbolized our pluginDir
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/gce-pd/volumeDevices/pdVol1
-	tmpVDir, err := os.MkdirTemp("", "gceBlockTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	//deferred clean up
-	defer os.RemoveAll(tmpVDir)
-
+	tmpVDir := t.TempDir()
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	//Bad Path
@@ -100,12 +94,7 @@ func getTestVolume(readOnly bool, path string, isBlock bool) *volume.Spec {
 }
 
 func TestGetPodAndPluginMapPaths(t *testing.T) {
-	tmpVDir, err := os.MkdirTemp("", "gceBlockTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	//deferred clean up
-	defer os.RemoveAll(tmpVDir)
+	tmpVDir := t.TempDir()
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 	expectedPodPath := filepath.Join(tmpVDir, testPodPath)

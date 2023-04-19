@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 
@@ -954,11 +953,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nodeName := tc.existingNode.Name
 		client := fake.NewSimpleClientset(tc.existingNode)
 
-		tmpDir, err := os.MkdirTemp("", "nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
@@ -971,7 +966,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err := nim.CreateCSINode()
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
@@ -1015,11 +1010,7 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		nodeName := tc.existingNode.Name
 		client := getClientSet(tc.existingNode, tc.existingCSINode)
 
-		tmpDir, err := os.MkdirTemp("", "nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
@@ -1032,6 +1023,8 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 
 		//// Act
 		nim.CreateCSINode()
+
+		var err error
 		if addNodeInfo {
 			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {

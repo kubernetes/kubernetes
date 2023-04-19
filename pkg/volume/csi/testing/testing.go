@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"os"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,10 +31,7 @@ import (
 
 // NewTestPlugin creates a plugin mgr to load plugins and setup a fake client
 func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePluginMgr, *volume.VolumePlugin, string) {
-	tmpDir, err := os.MkdirTemp("", "csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	if client == nil {
 		client = fakeclient.NewSimpleClientset()

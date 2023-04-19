@@ -31,7 +31,6 @@ import (
 
 func TestFSGroupMount(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
-	defer os.RemoveAll(tmpDir)
 	info, err := os.Stat(tmpDir)
 	if err != nil {
 		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)

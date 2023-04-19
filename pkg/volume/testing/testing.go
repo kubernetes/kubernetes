@@ -1274,17 +1274,13 @@ func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
 
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
 // a tmpfs filesystem on this system.
-func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
+func FindEmptyDirectoryUsageOnTmpfs(t *testing.T) (*resource.Quantity, error) {
 	// The command below does not exist on Windows. Additionally, empty folders have size 0 on Windows.
 	if goruntime.GOOS == "windows" {
 		used, err := resource.ParseQuantity("0")
 		return &used, err
 	}
-	tmpDir, err := os.MkdirTemp("", "metrics_du_test")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	out, err := exec.New().Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", tmpDir).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)

@@ -118,12 +118,7 @@ func TestSkipPermissionChange(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "volume_linux_test")
-			if err != nil {
-				t.Fatalf("error creating temp dir: %v", err)
-			}
-
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			info, err := os.Lstat(tmpDir)
 			if err != nil {
@@ -279,12 +274,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "volume_linux_ownership")
-			if err != nil {
-				t.Fatalf("error creating temp dir: %v", err)
-			}
-
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 			info, err := os.Lstat(tmpDir)
 			if err != nil {
 				t.Fatalf("error reading permission of tmpdir: %v", err)
@@ -424,14 +414,9 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "volume_linux_ownership")
-			if err != nil {
-				t.Fatalf("error creating temp dir: %v", err)
-			}
+			tmpDir := t.TempDir()
 
-			defer os.RemoveAll(tmpDir)
-
-			err = test.setupFunc(tmpDir)
+			err := test.setupFunc(tmpDir)
 			if err != nil {
 				t.Errorf("for %s error running setup with: %v", test.description, err)
 			}

@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -75,11 +74,7 @@ func TestRunOnce(t *testing.T) {
 		podtest.NewFakeMirrorClient())
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	basePath, err := os.MkdirTemp("", "kubelet")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 	kb := &Kubelet{
 		rootDirectory:    filepath.Clean(basePath),
 		recorder:         &record.FakeRecorder{},
@@ -101,6 +96,7 @@ func TestRunOnce(t *testing.T) {
 	kb.containerManager = cm.NewStubContainerManager()
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	var err error
 	kb.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, []volume.VolumePlugin{plug}, nil /* prober */)
 	if err != nil {

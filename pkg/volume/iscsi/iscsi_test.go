@@ -35,11 +35,7 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -72,11 +68,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -94,19 +86,10 @@ type fakeDiskManager struct {
 	tmpDir string
 }
 
-func NewFakeDiskManager() *fakeDiskManager {
-	dir, err := os.MkdirTemp("", "iscsi_test")
-	if err != nil {
-		panic(err)
-	}
-
+func NewFakeDiskManager(t *testing.T) *fakeDiskManager {
 	return &fakeDiskManager{
-		tmpDir: dir,
+		tmpDir: t.TempDir(),
 	}
-}
-
-func (fake *fakeDiskManager) Cleanup() {
-	os.RemoveAll(fake.tmpDir)
 }
 
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
@@ -149,11 +132,7 @@ func (fake *fakeDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath s
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
-	tmpDir, err := os.MkdirTemp("", "iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -162,8 +141,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeManager := NewFakeDiskManager()
-	defer fakeManager.Cleanup()
+	fakeManager := NewFakeDiskManager(t)
 	fakeMounter := mount.NewFakeMounter(nil)
 	fakeExec := &testingexec.FakeExec{}
 	mounter, err := plug.(*iscsiPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec, nil)
@@ -191,8 +169,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	fakeManager2 := NewFakeDiskManager()
-	defer fakeManager2.Cleanup()
+	fakeManager2 := NewFakeDiskManager(t)
 	unmounter, err := plug.(*iscsiPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
@@ -246,11 +223,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

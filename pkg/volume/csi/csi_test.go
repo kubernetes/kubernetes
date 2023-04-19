@@ -220,11 +220,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "csi-test")
-			if err != nil {
-				t.Fatalf("can't create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			var driverInfo *storage.CSIDriver
 			objs := []runtime.Object{}

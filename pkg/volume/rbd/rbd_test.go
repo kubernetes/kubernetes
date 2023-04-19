@@ -50,12 +50,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// make our test path for fake GlobalMapPath
 	// /tmp symbolized our pluginDir
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/rbd/volumeDevices/pdVol1
-	tmpVDir, err := os.MkdirTemp("", "rbdBlockTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	//deferred clean up
-	defer os.RemoveAll(tmpVDir)
+	tmpVDir := t.TempDir()
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
@@ -94,11 +89,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
@@ -363,12 +354,8 @@ func TestPlugin(t *testing.T) {
 		t.Skip("Skipping test that fails on Windows")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	tmpDir := t.TempDir()
+	tmpDir, err := filepath.EvalSymlinks(tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,11 +428,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -531,11 +514,7 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 
 // https://github.com/kubernetes/kubernetes/issues/57744
 func TestGetDeviceMountPath(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
@@ -598,11 +577,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skipf("TestConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
 	}
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
@@ -657,11 +632,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
@@ -679,8 +650,7 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRequiresRemount(t *testing.T) {
-	tmpDir, _ := os.MkdirTemp("", "rbd_test")
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/rbd")
@@ -716,11 +686,7 @@ func TestGetRbdImageSize(t *testing.T) {
 }
 
 func TestGetRbdImageInfo(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for i, c := range []struct {
 		DeviceMountPath    string
@@ -747,11 +713,7 @@ func TestGetRbdImageInfo(t *testing.T) {
 }
 
 func TestUnsupportedVolumeHost(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))

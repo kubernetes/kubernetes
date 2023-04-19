@@ -43,17 +43,13 @@ const (
 )
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := os.MkdirTemp("", "downwardApi_volume_test.")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	}
+	tempDir := t.TempDir()
 	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, nil)
-	defer os.RemoveAll(tmpDir)
+	_, host := newTestHost(t, nil)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -203,7 +199,6 @@ type downwardAPITest struct {
 	pod        *v1.Pod
 	mounter    volume.Mounter
 	volumePath string
-	rootDir    string
 }
 
 func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAnnotations map[string]string, modes map[string]int32) *downwardAPITest {
@@ -280,7 +275,6 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		pod:        pod,
 		mounter:    mounter,
 		volumePath: volumePath,
-		rootDir:    rootDir,
 	}
 }
 
@@ -301,7 +295,6 @@ func (test *downwardAPITest) tearDown() {
 	} else if !os.IsNotExist(err) {
 		test.t.Errorf("TearDown() failed: %v", err)
 	}
-	os.RemoveAll(test.rootDir)
 }
 
 // testStep represents a named step of downwardAPITest.

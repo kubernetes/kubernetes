@@ -33,21 +33,13 @@ import (
 )
 
 func TestNewAtomicWriter(t *testing.T) {
-	targetDir, err := os.MkdirTemp("", "atomic-write")
-	if err != nil {
-		t.Fatalf("unexpected error creating tmp dir: %v", err)
-	}
-	defer os.RemoveAll(targetDir)
-
-	_, err = NewAtomicWriter(targetDir, "-test-")
+	targetDir := t.TempDir()
+	_, err := NewAtomicWriter(targetDir, "-test-")
 	if err != nil {
 		t.Fatalf("unexpected error creating writer for existing target dir: %v", err)
 	}
 
-	nonExistentDir, err := os.MkdirTemp("", "atomic-write")
-	if err != nil {
-		t.Fatalf("unexpected error creating tmp dir: %v", err)
-	}
+	nonExistentDir := t.TempDir()
 	err = os.Remove(nonExistentDir)
 	if err != nil {
 		t.Fatalf("unexpected error ensuring dir %v does not exist: %v", nonExistentDir, err)
@@ -221,15 +213,10 @@ func TestPathsToRemove(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := os.MkdirTemp("", "atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-		defer os.RemoveAll(targetDir)
+		targetDir := t.TempDir()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
-		err = writer.Write(tc.payload1, nil)
+		err := writer.Write(tc.payload1, nil)
 		if err != nil {
 			t.Errorf("%v: unexpected error writing: %v", tc.name, err)
 			continue
@@ -389,12 +376,7 @@ IAAAAAAAsDyZDwU=`
 	}
 
 	for _, tc := range cases {
-		targetDir, err := os.MkdirTemp("", "atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-		defer os.RemoveAll(targetDir)
+		targetDir := t.TempDir()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 		err = writer.Write(tc.payload, nil)
@@ -565,16 +547,11 @@ func TestUpdate(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := os.MkdirTemp("", "atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-		defer os.RemoveAll(targetDir)
+		targetDir := t.TempDir()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
-		err = writer.Write(tc.first, nil)
+		err := writer.Write(tc.first, nil)
 		if err != nil {
 			t.Errorf("%v: unexpected error writing: %v", tc.name, err)
 			continue
@@ -733,12 +710,7 @@ func TestMultipleUpdates(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := os.MkdirTemp("", "atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-		defer os.RemoveAll(targetDir)
+		targetDir := t.TempDir()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
@@ -946,15 +918,10 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := os.MkdirTemp("", "atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-		defer os.RemoveAll(targetDir)
+		targetDir := t.TempDir()
 
 		dataDirPath := filepath.Join(targetDir, dataDirName)
-		err = os.MkdirAll(dataDirPath, 0755)
+		err := os.MkdirAll(dataDirPath, 0755)
 		if err != nil {
 			t.Fatalf("%v: unexpected error creating data path: %v", tc.name, err)
 		}
@@ -986,11 +953,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 }
 
 func TestSetPerms(t *testing.T) {
-	targetDir, err := os.MkdirTemp("", "atomic-write")
-	if err != nil {
-		t.Fatalf("unexpected error creating tmp dir: %v", err)
-	}
-	defer os.RemoveAll(targetDir)
+	targetDir := t.TempDir()
 
 	// Test that setPerms() is called once and with valid timestamp directory.
 	payload1 := map[string]FileProjection{
@@ -1000,7 +963,7 @@ func TestSetPerms(t *testing.T) {
 
 	var setPermsCalled int
 	writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
-	err = writer.Write(payload1, func(subPath string) error {
+	err := writer.Write(payload1, func(subPath string) error {
 		fileInfo, err := os.Stat(filepath.Join(targetDir, subPath))
 		if err != nil {
 			t.Fatalf("unexpected error getting file info: %v", err)

@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -82,26 +81,14 @@ rLTt0TTazzwBCgCD0Jkoqg==
 -----END PRIVATE KEY-----`
 
 func TestCreateSecretTLS(t *testing.T) {
-	mustMkdirTemp := func(p string) string {
-		dir, err := os.MkdirTemp("", p)
-		if err != nil {
-			t.Fatalf("failed creating a tmp dir: %v", err)
-		}
-
-		return dir
-	}
-
-	validCertTmpDir := mustMkdirTemp("tls-valid-cert-test")
+	validCertTmpDir := t.TempDir()
 	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
-	defer tearDown(validCertTmpDir)
 
-	invalidCertTmpDir := mustMkdirTemp("tls-invalid-cert-test")
+	invalidCertTmpDir := t.TempDir()
 	invalidKeyPath, invalidCertPath := writeKeyPair(invalidCertTmpDir, "test", "test", t)
-	defer tearDown(invalidCertTmpDir)
 
-	mismatchCertTmpDir := mustMkdirTemp("tls-mismatch-test")
+	mismatchCertTmpDir := t.TempDir()
 	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, rsaKeyPEM, mismatchRSAKeyPEM, t)
-	defer tearDown(mismatchCertTmpDir)
 
 	tests := map[string]struct {
 		tlsSecretName string
@@ -193,13 +180,6 @@ func TestCreateSecretTLS(t *testing.T) {
 				t.Errorf("test %s\n expected:\n%#v\ngot:\n%#v", name, test.expected, secretTLS)
 			}
 		})
-	}
-}
-
-func tearDown(tmpDir string) {
-	err := os.RemoveAll(tmpDir)
-	if err != nil {
-		fmt.Printf("Error in cleaning up test: %v", err)
 	}
 }
 
