@@ -27,8 +27,6 @@ read the CNCF [announcement].
 
 See our documentation on [kubernetes.io].
 
-Try our [interactive tutorial].
-
 Take a free course on [Scalable Microservices with Kubernetes].
 
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
@@ -79,7 +77,6 @@ That said, if you have questions, reach out to us
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://go.dev/doc/install
-[interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
