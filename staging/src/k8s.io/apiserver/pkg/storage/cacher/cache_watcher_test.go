@@ -359,30 +359,30 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	clock := testingclock.NewFakeClock(time.Now())
 	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
 	now := clock.Now()
-	watchers.addWatcher(newWatcher(now.Add(10 * time.Second)))
-	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
-	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
+	watchers.addWatcherThreadUnsafe(newWatcher(now.Add(10 * time.Second)))
+	watchers.addWatcherThreadUnsafe(newWatcher(now.Add(20 * time.Second)))
+	watchers.addWatcherThreadUnsafe(newWatcher(now.Add(20 * time.Second)))
 
 	if len(watchers.watchersBuckets) != 2 {
 		t.Errorf("unexpected bucket size: %#v", watchers.watchersBuckets)
 	}
-	watchers0 := watchers.popExpiredWatchers()
+	watchers0 := watchers.popExpiredWatchersThreadUnsafe()
 	if len(watchers0) != 0 {
 		t.Errorf("unexpected bucket size: %#v", watchers0)
 	}
 
 	clock.Step(10 * time.Second)
-	watchers1 := watchers.popExpiredWatchers()
+	watchers1 := watchers.popExpiredWatchersThreadUnsafe()
 	if len(watchers1) != 1 || len(watchers1[0]) != 1 {
 		t.Errorf("unexpected bucket size: %v", watchers1)
 	}
-	watchers1 = watchers.popExpiredWatchers()
+	watchers1 = watchers.popExpiredWatchersThreadUnsafe()
 	if len(watchers1) != 0 {
 		t.Errorf("unexpected bucket size: %#v", watchers1)
 	}
 
 	clock.Step(12 * time.Second)
-	watchers2 := watchers.popExpiredWatchers()
+	watchers2 := watchers.popExpiredWatchersThreadUnsafe()
 	if len(watchers2) != 1 || len(watchers2[0]) != 2 {
 		t.Errorf("unexpected bucket size: %#v", watchers2)
 	}
@@ -603,49 +603,49 @@ func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 
 	clock := testingclock.NewFakeClock(time.Now())
 	target := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
-	if !target.addWatcher(newWatcher("1", clock.Now().Add(2*time.Minute))) {
+	if !target.addWatcherThreadUnsafe(newWatcher("1", clock.Now().Add(2*time.Minute))) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 
 	// the watcher is immediately expired (it's waiting for bookmark, so it is scheduled immediately)
-	ret := target.popExpiredWatchers()
+	ret := target.popExpiredWatchersThreadUnsafe()
 	if len(ret) != 1 || len(ret[0]) != 1 {
 		t.Fatalf("expected only one watcher to be expired")
 	}
-	if !target.addWatcher(ret[0][0]) {
+	if !target.addWatcherThreadUnsafe(ret[0][0]) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 
 	// after one second time the watcher is still expired
 	clock.Step(1 * time.Second)
-	ret = target.popExpiredWatchers()
+	ret = target.popExpiredWatchersThreadUnsafe()
 	if len(ret) != 1 || len(ret[0]) != 1 {
 		t.Fatalf("expected only one watcher to be expired")
 	}
-	if !target.addWatcher(ret[0][0]) {
+	if !target.addWatcherThreadUnsafe(ret[0][0]) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 
 	// after 29 seconds the watcher is still expired
 	clock.Step(29 * time.Second)
-	ret = target.popExpiredWatchers()
+	ret = target.popExpiredWatchersThreadUnsafe()
 	if len(ret) != 1 || len(ret[0]) != 1 {
 		t.Fatalf("expected only one watcher to be expired")
 	}
 
 	// after confirming the watcher is not expired immediately
 	ret[0][0].markBookmarkAfterRvAsReceived(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{}})
-	if !target.addWatcher(ret[0][0]) {
+	if !target.addWatcherThreadUnsafe(ret[0][0]) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	clock.Step(30 * time.Second)
-	ret = target.popExpiredWatchers()
+	ret = target.popExpiredWatchersThreadUnsafe()
 	if len(ret) != 0 {
 		t.Fatalf("didn't expect any watchers to be expired")
 	}
 
 	clock.Step(30 * time.Second)
-	ret = target.popExpiredWatchers()
+	ret = target.popExpiredWatchersThreadUnsafe()
 	if len(ret) != 1 || len(ret[0]) != 1 {
 		t.Fatalf("expected only one watcher to be expired")
 	}

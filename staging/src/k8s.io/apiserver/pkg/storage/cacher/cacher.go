@@ -184,7 +184,6 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
 type watcherBookmarkTimeBuckets struct {
-	lock sync.Mutex
 	// the key of watcherBuckets is the number of seconds since createTime
 	watchersBuckets   map[int64][]*cacheWatcher
 	createTime        time.Time
@@ -205,7 +204,7 @@ func newTimeBucketWatchers(clock clock.Clock, bookmarkFrequency time.Duration) *
 
 // adds a watcher to the bucket, if the deadline is before the start, it will be
 // added to the first one.
-func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
+func (t *watcherBookmarkTimeBuckets) addWatcherThreadUnsafe(w *cacheWatcher) bool {
 	// note that the returned time can be before t.createTime,
 	// especially in cases when the nextBookmarkTime method
 	// give us the zero value of type Time
@@ -215,8 +214,6 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 		return false
 	}
 	bucketID := int64(nextTime.Sub(t.createTime) / time.Second)
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	if bucketID < t.startBucketID {
 		bucketID = t.startBucketID
 	}
@@ -225,12 +222,10 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 	return true
 }
 
-func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
+func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cacheWatcher {
 	currentBucketID := int64(t.clock.Since(t.createTime) / time.Second)
 	// There should be one or two elements in almost all cases
 	expiredWatchers := make([][]*cacheWatcher, 0, 2)
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	for ; t.startBucketID <= currentBucketID; t.startBucketID++ {
 		if watchers, ok := t.watchersBuckets[t.startBucketID]; ok {
 			delete(t.watchersBuckets, t.startBucketID)
@@ -328,6 +323,7 @@ type Cacher struct {
 	// dispatching that event to avoid race with closing channels in watchers.
 	watchersToStop []*cacheWatcher
 	// Maintain a timeout queue to send the bookmark event before the watcher times out.
+	// Note that this field when accessed MUST be protected by the Cacher.lock.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
@@ -647,7 +643,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 		// Add it to the queue only when the client support watch bookmarks.
 		if watcher.allowWatchBookmarks {
-			c.bookmarkWatchers.addWatcher(watcher)
+			c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
 		}
 		c.watcherIdx++
 	}()
@@ -927,8 +923,12 @@ func (c *Cacher) dispatchEvents() {
 			// Never send a bookmark event if we did not see an event here, this is fine
 			// because we don't provide any guarantees on sending bookmarks.
 			if lastProcessedResourceVersion == 0 {
-				// pop expired watchers in case there has been no update
-				c.bookmarkWatchers.popExpiredWatchers()
+				func() {
+					c.Lock()
+					defer c.Unlock()
+					// pop expired watchers in case there has been no update
+					c.bookmarkWatchers.popExpiredWatchersThreadUnsafe()
+				}()
 				continue
 			}
 			bookmarkEvent := &watchCacheEvent{
@@ -1050,7 +1050,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 func (c *Cacher) startDispatchingBookmarkEventsLocked() {
 	// Pop already expired watchers. However, explicitly ignore stopped ones,
 	// as we don't delete watcher from bookmarkWatchers when it is stopped.
-	for _, watchers := range c.bookmarkWatchers.popExpiredWatchers() {
+	for _, watchers := range c.bookmarkWatchers.popExpiredWatchersThreadUnsafe() {
 		for _, watcher := range watchers {
 			// c.Lock() is held here.
 			// watcher.stopThreadUnsafe() is protected by c.Lock()
@@ -1155,7 +1155,7 @@ func (c *Cacher) finishDispatching() {
 			continue
 		}
 		// requeue the watcher for the next bookmark if needed.
-		c.bookmarkWatchers.addWatcher(watcher)
+		c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
 	}
 	c.expiredBookmarkWatchers = c.expiredBookmarkWatchers[:0]
 }
