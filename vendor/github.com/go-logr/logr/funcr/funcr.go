@@ -21,13 +21,13 @@ limitations under the License.
 // github.com/go-logr/logr.LogSink with output through an arbitrary
 // "write" function.  See New and NewJSON for details.
 //
-// Custom LogSinks
+// # Custom LogSinks
 //
 // For users who need more control, a funcr.Formatter can be embedded inside
 // your own custom LogSink implementation. This is useful when the LogSink
 // needs to implement additional methods, for example.
 //
-// Formatting
+// # Formatting
 //
 // This will respect logr.Marshaler, fmt.Stringer, and error interfaces for
 // values which are being logged.  When rendering a struct, funcr will use Go's
@@ -37,6 +37,7 @@ package funcr
 import (
 	"bytes"
 	"encoding"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -217,7 +218,7 @@ func newFormatter(opts Options, outfmt outputFormat) Formatter {
 		prefix:       "",
 		values:       nil,
 		depth:        0,
-		opts:         opts,
+		opts:         &opts,
 	}
 	return f
 }
@@ -231,7 +232,7 @@ type Formatter struct {
 	values       []interface{}
 	valuesStr    string
 	depth        int
-	opts         Options
+	opts         *Options
 }
 
 // outputFormat indicates which outputFormat to use.
@@ -447,6 +448,7 @@ func (f Formatter) prettyWithFlags(value interface{}, flags uint32, depth int) s
 		if flags&flagRawStruct == 0 {
 			buf.WriteByte('{')
 		}
+		printComma := false // testing i>0 is not enough because of JSON omitted fields
 		for i := 0; i < t.NumField(); i++ {
 			fld := t.Field(i)
 			if fld.PkgPath != "" {
@@ -478,9 +480,10 @@ func (f Formatter) prettyWithFlags(value interface{}, flags uint32, depth int) s
 			if omitempty && isEmpty(v.Field(i)) {
 				continue
 			}
-			if i > 0 {
+			if printComma {
 				buf.WriteByte(',')
 			}
+			printComma = true // if we got here, we are rendering a field
 			if fld.Anonymous && fld.Type.Kind() == reflect.Struct && name == "" {
 				buf.WriteString(f.prettyWithFlags(v.Field(i).Interface(), flags|flagRawStruct, depth+1))
 				continue
@@ -500,6 +503,20 @@ func (f Formatter) prettyWithFlags(value interface{}, flags uint32, depth int) s
 		}
 		return buf.String()
 	case reflect.Slice, reflect.Array:
+		// If this is outputing as JSON make sure this isn't really a json.RawMessage.
+		// If so just emit "as-is" and don't pretty it as that will just print
+		// it as [X,Y,Z,...] which isn't terribly useful vs the string form you really want.
+		if f.outputFormat == outputJSON {
+			if rm, ok := value.(json.RawMessage); ok {
+				// If it's empty make sure we emit an empty value as the array style would below.
+				if len(rm) > 0 {
+					buf.Write(rm)
+				} else {
+					buf.WriteString("null")
+				}
+				return buf.String()
+			}
+		}
 		buf.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
