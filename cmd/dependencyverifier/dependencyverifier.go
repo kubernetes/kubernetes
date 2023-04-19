@@ -206,12 +206,14 @@ func main() {
 	for _, mainModule := range mainModules {
 		// visit to find unwanted modules still referenced from the main module
 		visit(func(m module, via []module) {
+			log.Printf("unwanted module\n", m.name)
 			if _, unwanted := configFromFile.Spec.UnwantedModules[m.name]; unwanted {
 				// this is unwanted, store what is referencing it
 				referencer := via[len(via)-1]
+				log.Printf("unwanted referencer\n", referencer)
 				if !moduleInSlice(referencer, unwantedToReferencers[m.name], false) {
 					// // uncomment to get a detailed tree of the path that referenced the unwanted dependency
-					//
+
 					// i := 0
 					// for _, v := range via {
 					// 	if v.version != "" && v.version != "v0.0.0" {
@@ -228,6 +230,8 @@ func main() {
 			}
 		}, mainModule, moduleGraph, effectiveVersions)
 	}
+
+	log.Printf("unwantedToReferencers\n", unwantedToReferencers)
 
 	config := &Unwanted{}
 	config.Spec.UnwantedModules = configFromFile.Spec.UnwantedModules
@@ -257,6 +261,8 @@ func main() {
 
 	needUpdate := false
 
+	log.Printf("From upstream\n", configFromFile.Status)
+	log.Printf("From local\n", config.Status)
 	// Compare unwanted list from unwanted-dependencies.json with current status from `go mod graph`
 	expected, err := json.MarshalIndent(configFromFile.Status, "", "  ")
 	if err != nil {

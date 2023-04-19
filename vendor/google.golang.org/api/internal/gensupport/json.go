@@ -13,9 +13,10 @@ import (
 
 // MarshalJSON returns a JSON encoding of schema containing only selected fields.
 // A field is selected if any of the following is true:
-//   * it has a non-empty value
-//   * its field name is present in forceSendFields and it is not a nil pointer or nil interface
-//   * its field name is present in nullFields.
+//   - it has a non-empty value
+//   - its field name is present in forceSendFields and it is not a nil pointer or nil interface
+//   - its field name is present in nullFields.
+//
 // The JSON key for each selected field is taken from the field's json: struct tag.
 func MarshalJSON(schema interface{}, forceSendFields, nullFields []string) ([]byte, error) {
 	if len(forceSendFields) == 0 && len(nullFields) == 0 {

@@ -194,6 +194,8 @@ func WithContainer() Option {
 }
 
 // WithContainerID adds an attribute with the id of the container to the configured Resource.
+// Note: WithContainerID will not extract the correct container ID in an ECS environment.
+// Please use the ECS resource detector instead (https://pkg.go.dev/go.opentelemetry.io/contrib/detectors/aws/ecs).
 func WithContainerID() Option {
 	return WithDetectors(cgroupContainerIDDetector{})
 }

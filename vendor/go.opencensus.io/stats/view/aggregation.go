@@ -90,9 +90,9 @@ func Sum() *Aggregation {
 //
 // If len(bounds) >= 2 then the boundaries for bucket index i are:
 //
-//     [-infinity, bounds[i]) for i = 0
-//     [bounds[i-1], bounds[i]) for 0 < i < length
-//     [bounds[i-1], +infinity) for i = length
+//	[-infinity, bounds[i]) for i = 0
+//	[bounds[i-1], bounds[i]) for 0 < i < length
+//	[bounds[i-1], +infinity) for i = length
 //
 // If len(bounds) is 0 then there is no histogram associated with the
 // distribution. There will be a single bucket with boundaries
